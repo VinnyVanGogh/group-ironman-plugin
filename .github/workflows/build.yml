@@ -1,0 +1,24 @@
+name: build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Java 11 is what the Plugin Hub builds with. Building on a newer JDK
+      # locally can compile source the Hub's toolchain then rejects, so CI
+      # pins the version the Hub actually uses.
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: gradle
+
+      - run: chmod +x ./gradlew
+      - run: ./gradlew build --no-daemon

@@ -1,0 +1,19 @@
+.gradle
+build
+.idea/
+.project
+.settings/
+.classpath
+nbactions.xml
+nb-configuration.xml
+nbproject/
+
+# Agent instructions, not part of the plugin.
+CLAUDE.md
+
+# Plugin Hub watcher state. Local to this machine.
+.hubwatch.state.json
+
+# Measurement captures taken from a live client name real accounts. Keep the
+# conclusions in BRIEF.md and the raw data out of the published repo.
+docs/measurements/*.csv
