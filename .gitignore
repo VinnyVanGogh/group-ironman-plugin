@@ -17,3 +17,6 @@ CLAUDE.md
 # Measurement captures taken from a live client name real accounts. Keep the
 # conclusions in BRIEF.md and the raw data out of the published repo.
 docs/measurements/*.csv
+
+# macOS Finder droppings.
+.DS_Store

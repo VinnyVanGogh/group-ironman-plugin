@@ -1,0 +1,1378 @@
+{
+  "version": 1,
+  "account": {
+    "skills": [
+      {
+        "skill": "attack",
+        "level": 1,
+        "xp": 0
+      },
+      {
+        "skill": "defence",
+        "level": 1,
+        "xp": 0
+      },
+      {
+        "skill": "strength",
+        "level": 83,
+        "xp": 2928283
+      },
+      {
+        "skill": "hitpoints",
+        "level": 25,
+        "xp": 8537
+      },
+      {
+        "skill": "ranged",
+        "level": 1,
+        "xp": 12
+      },
+      {
+        "skill": "prayer",
+        "level": 1,
+        "xp": 0
+      },
+      {
+        "skill": "magic",
+        "level": 39,
+        "xp": 37174
+      },
+      {
+        "skill": "cooking",
+        "level": 21,
+        "xp": 5202
+      },
+      {
+        "skill": "woodcutting",
+        "level": 37,
+        "xp": 29237
+      },
+      {
+        "skill": "fletching",
+        "level": 25,
+        "xp": 8218
+      },
+      {
+        "skill": "fishing",
+        "level": 59,
+        "xp": 254047
+      },
+      {
+        "skill": "firemaking",
+        "level": 20,
+        "xp": 4480
+      },
+      {
+        "skill": "crafting",
+        "level": 25,
+        "xp": 7948
+      },
+      {
+        "skill": "smithing",
+        "level": 30,
+        "xp": 14571
+      },
+      {
+        "skill": "mining",
+        "level": 69,
+        "xp": 692575
+      },
+      {
+        "skill": "herblore",
+        "level": 11,
+        "xp": 1420
+      },
+      {
+        "skill": "agility",
+        "level": 39,
+        "xp": 33976
+      },
+      {
+        "skill": "thieving",
+        "level": 40,
+        "xp": 38588
+      },
+      {
+        "skill": "slayer",
+        "level": 9,
+        "xp": 1090
+      },
+      {
+        "skill": "farming",
+        "level": 1,
+        "xp": 0
+      },
+      {
+        "skill": "runecraft",
+        "level": 30,
+        "xp": 14657
+      },
+      {
+        "skill": "hunter",
+        "level": 9,
+        "xp": 1000
+      },
+      {
+        "skill": "construction",
+        "level": 21,
+        "xp": 5058
+      },
+      {
+        "skill": "sailing",
+        "level": 31,
+        "xp": 15227
+      }
+    ],
+    "completed": [
+      1,
+      2,
+      4,
+      5,
+      10,
+      11,
+      14,
+      15,
+      16,
+      18,
+      20,
+      25,
+      27,
+      33,
+      35,
+      38,
+      44,
+      47,
+      50,
+      74,
+      77,
+      126,
+      128,
+      145,
+      146,
+      147,
+      151,
+      168,
+      170,
+      176,
+      184,
+      192,
+      195,
+      198,
+      203,
+      204,
+      205,
+      213
+    ],
+    "rules": [
+      {
+        "skill": "agility",
+        "type": "GOAL",
+        "value": 70
+      },
+      {
+        "skill": "attack",
+        "type": "NO_XP"
+      },
+      {
+        "skill": "construction",
+        "type": "GOAL",
+        "value": 83
+      },
+      {
+        "skill": "cooking",
+        "type": "GOAL",
+        "value": 80
+      },
+      {
+        "skill": "crafting",
+        "type": "GOAL",
+        "value": 70
+      },
+      {
+        "skill": "defence",
+        "type": "NO_XP"
+      },
+      {
+        "skill": "farming",
+        "type": "GOAL",
+        "value": 85
+      },
+      {
+        "skill": "firemaking",
+        "type": "GOAL",
+        "value": 50
+      },
+      {
+        "skill": "fishing",
+        "type": "GOAL",
+        "value": 80
+      },
+      {
+        "skill": "fletching",
+        "type": "GOAL",
+        "value": 85
+      },
+      {
+        "skill": "herblore",
+        "type": "GOAL",
+        "value": 78
+      },
+      {
+        "skill": "hitpoints",
+        "type": "HARD_CAP",
+        "value": 28
+      },
+      {
+        "skill": "hunter",
+        "type": "GOAL",
+        "value": 80
+      },
+      {
+        "skill": "magic",
+        "type": "HARD_CAP",
+        "value": 56
+      },
+      {
+        "skill": "mining",
+        "type": "GOAL",
+        "value": 85
+      },
+      {
+        "skill": "prayer",
+        "type": "NO_XP"
+      },
+      {
+        "skill": "ranged",
+        "type": "HARD_CAP",
+        "value": 56
+      },
+      {
+        "skill": "runecraft",
+        "type": "GOAL",
+        "value": 77
+      },
+      {
+        "skill": "sailing",
+        "type": "GOAL",
+        "value": 67
+      },
+      {
+        "skill": "slayer",
+        "type": "GOAL",
+        "value": 85
+      },
+      {
+        "skill": "smithing",
+        "type": "GOAL",
+        "value": 94
+      },
+      {
+        "skill": "strength",
+        "type": "GOAL",
+        "value": 84
+      },
+      {
+        "skill": "thieving",
+        "type": "GOAL",
+        "value": 84
+      },
+      {
+        "skill": "woodcutting",
+        "type": "GOAL",
+        "value": 75
+      }
+    ]
+  },
+  "expected": [
+    {
+      "quest_id": 1,
+      "slug": "cooks_assistant",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 2,
+      "slug": "romeo_juliet",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 3,
+      "slug": "demon_slayer",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 4,
+      "slug": "shield_of_arrav",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 5,
+      "slug": "sheep_shearer",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 6,
+      "slug": "the_restless_ghost",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 7,
+      "slug": "ernest_the_chicken",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 8,
+      "slug": "vampyre_slayer",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 9,
+      "slug": "imp_catcher",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 10,
+      "slug": "prince_ali_rescue",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 11,
+      "slug": "dorics_quest",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 12,
+      "slug": "black_knights_fortress",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 13,
+      "slug": "witchs_potion",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 14,
+      "slug": "the_knights_sword",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 15,
+      "slug": "goblin_diplomacy",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 16,
+      "slug": "pirates_treasure",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 17,
+      "slug": "dragon_slayer_i",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 18,
+      "slug": "druidic_ritual",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 19,
+      "slug": "lost_city",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 20,
+      "slug": "witchs_house",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 21,
+      "slug": "merlins_crystal",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 22,
+      "slug": "heroes_quest",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 23,
+      "slug": "scorpion_catcher",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 24,
+      "slug": "family_crest",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 25,
+      "slug": "fishing_contest",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 26,
+      "slug": "tribal_totem",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 27,
+      "slug": "monks_friend",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 28,
+      "slug": "temple_of_ikov",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 29,
+      "slug": "clock_tower",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 30,
+      "slug": "holy_grail",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 31,
+      "slug": "tree_gnome_village",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 32,
+      "slug": "fight_arena",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 33,
+      "slug": "hazeel_cult",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 34,
+      "slug": "sheep_herder",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 35,
+      "slug": "plague_city",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 36,
+      "slug": "sea_slug",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 37,
+      "slug": "waterfall_quest",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 38,
+      "slug": "jungle_potion",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 39,
+      "slug": "the_grand_tree",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 40,
+      "slug": "underground_pass",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 41,
+      "slug": "observatory_quest",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 42,
+      "slug": "the_tourist_trap",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 43,
+      "slug": "watchtower",
+      "status": "BOOSTABLE"
+    },
+    {
+      "quest_id": 44,
+      "slug": "dwarf_cannon",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 45,
+      "slug": "murder_mystery",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 46,
+      "slug": "the_dig_site",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 47,
+      "slug": "gertrudes_cat",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 48,
+      "slug": "legends_quest",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 49,
+      "slug": "rogue_trader",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 50,
+      "slug": "rune_mysteries",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 51,
+      "slug": "death_plateau",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 52,
+      "slug": "eadgars_ruse",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 53,
+      "slug": "big_chompy_bird_hunting",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 54,
+      "slug": "elemental_workshop_i",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 55,
+      "slug": "nature_spirit",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 56,
+      "slug": "priest_in_peril",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 57,
+      "slug": "regicide",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 58,
+      "slug": "tai_bwo_wannai_trio",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 59,
+      "slug": "troll_stronghold",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 60,
+      "slug": "shades_of_mortton",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 61,
+      "slug": "the_fremennik_trials",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 62,
+      "slug": "horror_from_the_deep",
+      "status": "QUEST_BLOCKED"
+    },
+    {
+      "quest_id": 63,
+      "slug": "throne_of_miscellania",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 64,
+      "slug": "monkey_madness_i",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 65,
+      "slug": "haunted_mine",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 66,
+      "slug": "troll_romance",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 67,
+      "slug": "in_search_of_the_myreque",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 68,
+      "slug": "creature_of_fenkenstrain",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 69,
+      "slug": "roving_elves",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 70,
+      "slug": "ghosts_ahoy",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 71,
+      "slug": "one_small_favour",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 72,
+      "slug": "mountain_daughter",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 73,
+      "slug": "between_a_rock",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 74,
+      "slug": "the_feud",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 75,
+      "slug": "the_golem",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 76,
+      "slug": "desert_treasure_i",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 77,
+      "slug": "icthlarins_little_helper",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 78,
+      "slug": "tears_of_guthix",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 79,
+      "slug": "the_lost_tribe",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 80,
+      "slug": "the_giant_dwarf",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 81,
+      "slug": "recruitment_drive",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 82,
+      "slug": "mournings_end_part_i",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 83,
+      "slug": "forgettable_tale",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 84,
+      "slug": "garden_of_tranquillity",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 85,
+      "slug": "a_tail_of_two_cats",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 86,
+      "slug": "wanted",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 87,
+      "slug": "mournings_end_part_ii",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 88,
+      "slug": "rum_deal",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 89,
+      "slug": "shadow_of_the_storm",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 90,
+      "slug": "making_history",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 91,
+      "slug": "ratcatchers",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 92,
+      "slug": "spirits_of_the_elid",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 93,
+      "slug": "devious_minds",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 94,
+      "slug": "the_hand_in_the_sand",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 95,
+      "slug": "enakhras_lament",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 96,
+      "slug": "cabin_fever",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 97,
+      "slug": "fairytale_i_growing_pains",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 98,
+      "slug": "recipe_for_disaster",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 99,
+      "slug": "in_aid_of_the_myreque",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 100,
+      "slug": "a_souls_bane",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 101,
+      "slug": "rag_and_bone_man_i",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 102,
+      "slug": "swan_song",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 103,
+      "slug": "royal_trouble",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 104,
+      "slug": "death_to_the_dorgeshuun",
+      "status": "QUEST_BLOCKED"
+    },
+    {
+      "quest_id": 105,
+      "slug": "fairytale_ii_cure_a_queen",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 106,
+      "slug": "lunar_diplomacy",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 107,
+      "slug": "the_eyes_of_glouphrie",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 108,
+      "slug": "darkness_of_hallowvale",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 109,
+      "slug": "the_slug_menace",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 110,
+      "slug": "elemental_workshop_ii",
+      "status": "QUEST_BLOCKED"
+    },
+    {
+      "quest_id": 111,
+      "slug": "my_arms_big_adventure",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 112,
+      "slug": "enlightened_journey",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 113,
+      "slug": "eagles_peak",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 114,
+      "slug": "animal_magnetism",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 115,
+      "slug": "contact",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 116,
+      "slug": "cold_war",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 117,
+      "slug": "the_fremennik_isles",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 118,
+      "slug": "the_great_brain_robbery",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 119,
+      "slug": "what_lies_below",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 120,
+      "slug": "olafs_quest",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 121,
+      "slug": "another_slice_of_h_a_m",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 122,
+      "slug": "dream_mentor",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 123,
+      "slug": "grim_tales",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 124,
+      "slug": "kings_ransom",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 125,
+      "slug": "shilo_village",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 126,
+      "slug": "biohazard",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 127,
+      "slug": "alfred_grimhands_barcrawl",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 128,
+      "slug": "enter_the_abyss",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 129,
+      "slug": "the_generals_shadow",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 130,
+      "slug": "barbarian_training",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 131,
+      "slug": "skippy_and_the_mogres",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 132,
+      "slug": "curse_of_the_empty_lord",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 133,
+      "slug": "tower_of_life",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 134,
+      "slug": "rag_and_bone_man_ii",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 135,
+      "slug": "land_of_the_goblins",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 136,
+      "slug": "while_guthix_sleeps",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 137,
+      "slug": "zogre_flesh_eaters",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 138,
+      "slug": "lair_of_tarn_razorlor",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 139,
+      "slug": "architectural_alliance",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 140,
+      "slug": "monkey_madness_ii",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 141,
+      "slug": "bear_your_soul",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 142,
+      "slug": "the_enchanted_key",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 143,
+      "slug": "mage_arena_i",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 144,
+      "slug": "family_pest",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 145,
+      "slug": "misthalin_mystery",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 146,
+      "slug": "client_of_kourend",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 147,
+      "slug": "the_queen_of_thieves",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 148,
+      "slug": "bone_voyage",
+      "status": "QUEST_BLOCKED"
+    },
+    {
+      "quest_id": 149,
+      "slug": "dragon_slayer_ii",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 150,
+      "slug": "the_depths_of_despair",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 151,
+      "slug": "recipe_for_disaster_another_cooks_quest",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 152,
+      "slug": "recipe_for_disaster_freeing_the_goblin_generals",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 153,
+      "slug": "recipe_for_disaster_freeing_the_mountain_dwarf",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 154,
+      "slug": "recipe_for_disaster_freeing_evil_dave",
+      "status": "QUEST_BLOCKED"
+    },
+    {
+      "quest_id": 155,
+      "slug": "recipe_for_disaster_freeing_pirate_pete",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 156,
+      "slug": "recipe_for_disaster_freeing_the_lumbridge_guide",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 157,
+      "slug": "recipe_for_disaster_freeing_sir_amik_varze",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 158,
+      "slug": "recipe_for_disaster_freeing_king_awowogei",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 159,
+      "slug": "recipe_for_disaster_freeing_skrach_uglogwee",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 160,
+      "slug": "mage_arena_ii",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 161,
+      "slug": "the_corsair_curse",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 162,
+      "slug": "a_taste_of_hope",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 163,
+      "slug": "tale_of_the_righteous",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 164,
+      "slug": "making_friends_with_my_arm",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 165,
+      "slug": "recipe_for_disaster_defeating_the_culinaromancer",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 166,
+      "slug": "song_of_the_elves",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 167,
+      "slug": "the_ascent_of_arceuus",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 168,
+      "slug": "the_forsaken_tower",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 169,
+      "slug": "the_fremennik_exiles",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 170,
+      "slug": "x_marks_the_spot",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 171,
+      "slug": "the_curse_of_arrav",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 172,
+      "slug": "defender_of_varrock",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 173,
+      "slug": "in_search_of_knowledge",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 174,
+      "slug": "sins_of_the_father",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 175,
+      "slug": "a_kingdom_divided",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 176,
+      "slug": "daddys_home",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 177,
+      "slug": "a_porcine_of_interest",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 178,
+      "slug": "getting_ahead",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 179,
+      "slug": "below_ice_mountain",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 180,
+      "slug": "a_night_at_the_theatre",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 181,
+      "slug": "beneath_cursed_sands",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 182,
+      "slug": "the_frozen_door",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 183,
+      "slug": "hopespears_will",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 184,
+      "slug": "temple_of_the_eye",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 185,
+      "slug": "the_path_of_glouphrie",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 186,
+      "slug": "sleeping_giants",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 187,
+      "slug": "into_the_tombs",
+      "status": "QUEST_BLOCKED"
+    },
+    {
+      "quest_id": 188,
+      "slug": "the_garden_of_death",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 189,
+      "slug": "desert_treasure_ii_the_fallen_empire",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 190,
+      "slug": "secrets_of_the_north",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 191,
+      "slug": "his_faithful_servants",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 192,
+      "slug": "children_of_the_sun",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 193,
+      "slug": "perilous_moons",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 194,
+      "slug": "the_ribbiting_tale_of_a_lily_pad_labour_dispute",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 195,
+      "slug": "twilights_promise",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 196,
+      "slug": "at_first_light",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 197,
+      "slug": "the_heart_of_darkness",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 198,
+      "slug": "death_on_the_isle",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 199,
+      "slug": "meat_and_greet",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 200,
+      "slug": "ethically_acquired_antiquities",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 201,
+      "slug": "the_blood_moon_rises",
+      "status": "BUILD_BLOCKED"
+    },
+    {
+      "quest_id": 202,
+      "slug": "the_final_dawn",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 203,
+      "slug": "pandemonium",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 204,
+      "slug": "prying_times",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 205,
+      "slug": "current_affairs",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 206,
+      "slug": "troubled_tortugans",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 207,
+      "slug": "the_red_reef",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 208,
+      "slug": "shadows_of_custodia",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 209,
+      "slug": "scrambled",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 210,
+      "slug": "vale_totems_miniquest",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 211,
+      "slug": "spirit_of_adventure",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 212,
+      "slug": "lost_lover",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 213,
+      "slug": "learning_the_ropes",
+      "status": "COMPLETE"
+    },
+    {
+      "quest_id": 214,
+      "slug": "the_ides_of_milk",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 215,
+      "slug": "the_graveyard",
+      "status": "UNREACHABLE"
+    },
+    {
+      "quest_id": 216,
+      "slug": "fallen_from_grace",
+      "status": "SKILL_BLOCKED"
+    },
+    {
+      "quest_id": 217,
+      "slug": "a_ruff_situation",
+      "status": "ELIGIBLE"
+    },
+    {
+      "quest_id": 218,
+      "slug": "crab_quest",
+      "status": "SKILL_BLOCKED"
+    }
+  ]
+}

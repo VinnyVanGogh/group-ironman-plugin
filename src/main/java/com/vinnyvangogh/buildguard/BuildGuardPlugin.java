@@ -1,22 +1,22 @@
 package com.vinnyvangogh.buildguard;
 
 import com.google.inject.Provides;
-import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.events.GameTick;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 
 /**
  * Build Guard.
  *
- * <p>The shape to keep: state is rebuilt once per game tick and published as
- * an immutable snapshot. Anything that renders reads the latest snapshot and
- * computes nothing itself, because rendering runs every frame and the game
- * state it describes only changes on a tick.
+ * <p>Nothing is wired up yet, deliberately. The four in-scope pieces exist as
+ * stubs that throw — {@code rules}, {@code verdict}, {@code warning} and
+ * {@code lamp} — and `docs/SOURCE-MAP.md` names the questpath-plugin file each
+ * one ports from.
+ *
+ * <p>The engine this plugin is carved out of is a port of a Go planner held to
+ * 218 generated verdicts. Until those vectors run green here, this plugin has
+ * no opinion about any quest, and says so rather than guessing.
  */
 @Slf4j
 @PluginDescriptor(
@@ -26,12 +26,6 @@ import net.runelite.client.plugins.PluginDescriptor;
 )
 public class BuildGuardPlugin extends Plugin
 {
-	@Inject
-	private Client client;
-
-	@Inject
-	private BuildGuardConfig config;
-
 	@Provides
 	BuildGuardConfig provideConfig(ConfigManager configManager)
 	{
@@ -50,13 +44,4 @@ public class BuildGuardPlugin extends Plugin
 		// Mirror of startUp(), in reverse. Never block here: no
 		// awaitTermination, no joins, no sleeps.
 	}
-
-	@Subscribe
-	public void onGameTick(GameTick tick)
-	{
-		// Rebuild the snapshot here. Cheap work only: this runs 100 times a
-		// minute. Scanning the whole scene belongs in a spawn/despawn
-		// listener that maintains its own collection, not here.
-	}
-
 }

@@ -1,0 +1,2279 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "the live pure, an ordinary 10k lamp with a level 30 floor",
+      "account": {
+        "skills": [
+          {
+            "skill": "attack",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "defence",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "strength",
+            "level": 82,
+            "xp": 2192818
+          },
+          {
+            "skill": "hitpoints",
+            "level": 10,
+            "xp": 1154
+          },
+          {
+            "skill": "ranged",
+            "level": 55,
+            "xp": 166636
+          },
+          {
+            "skill": "prayer",
+            "level": 31,
+            "xp": 15000
+          },
+          {
+            "skill": "magic",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "cooking",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "herblore",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "mining",
+            "level": 60,
+            "xp": 273742
+          },
+          {
+            "skill": "fletching",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "runecraft",
+            "level": 1,
+            "xp": 0
+          }
+        ],
+        "rules": [
+          {
+            "skill": "attack",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "defence",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "prayer",
+            "type": "SOFT_CAP"
+          },
+          {
+            "skill": "magic",
+            "type": "HARD_CAP",
+            "value": 41
+          },
+          {
+            "skill": "hitpoints",
+            "type": "HARD_CAP",
+            "value": 10
+          },
+          {
+            "skill": "cooking",
+            "type": "GOAL",
+            "value": 60
+          }
+        ]
+      },
+      "lamp": {
+        "item_id": 4447,
+        "name": "Antique lamp",
+        "modelled": true,
+        "xp": 10000,
+        "min_level": 30
+      },
+      "inputs": {},
+      "expected": [
+        {
+          "skill": "attack",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "defence",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "strength",
+          "state": "OK",
+          "rank": 4,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "hitpoints",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "ranged",
+          "state": "OK",
+          "rank": 2,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "prayer",
+          "state": "RISKY",
+          "risk": "SOFT_CAP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "magic",
+          "state": "BLOCKED",
+          "block": "HARD_CAP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "cooking",
+          "state": "OK",
+          "rank": 1,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "woodcutting",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "fletching",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "fishing",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "firemaking",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "crafting",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "smithing",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "mining",
+          "state": "OK",
+          "rank": 3,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "herblore",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "agility",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "thieving",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "slayer",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "farming",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "runecraft",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "hunter",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "construction",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "sailing",
+          "state": "BLOCKED",
+          "block": "BELOW_MINIMUM",
+          "xp": 10000,
+          "xp_known": true
+        }
+      ]
+    },
+    {
+      "name": "the free Ranged ceiling flags what no build rule covers",
+      "account": {
+        "skills": [
+          {
+            "skill": "attack",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "defence",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "strength",
+            "level": 82,
+            "xp": 2192818
+          },
+          {
+            "skill": "hitpoints",
+            "level": 10,
+            "xp": 1154
+          },
+          {
+            "skill": "ranged",
+            "level": 55,
+            "xp": 166636
+          },
+          {
+            "skill": "prayer",
+            "level": 31,
+            "xp": 15000
+          },
+          {
+            "skill": "magic",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "cooking",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "herblore",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "mining",
+            "level": 60,
+            "xp": 273742
+          },
+          {
+            "skill": "fletching",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "runecraft",
+            "level": 1,
+            "xp": 0
+          }
+        ],
+        "rules": [
+          {
+            "skill": "attack",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "defence",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "prayer",
+            "type": "SOFT_CAP"
+          },
+          {
+            "skill": "magic",
+            "type": "HARD_CAP",
+            "value": 41
+          },
+          {
+            "skill": "hitpoints",
+            "type": "HARD_CAP",
+            "value": 10
+          },
+          {
+            "skill": "cooking",
+            "type": "GOAL",
+            "value": 60
+          }
+        ]
+      },
+      "lamp": {
+        "item_id": 3,
+        "name": "100k free-choice lamp",
+        "modelled": true,
+        "xp": 100000
+      },
+      "inputs": {
+        "free_ceiling": 55,
+        "has_ceiling": true
+      },
+      "expected": [
+        {
+          "skill": "attack",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "defence",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "strength",
+          "state": "OK",
+          "rank": 18,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "hitpoints",
+          "state": "BLOCKED",
+          "block": "AT_CAP",
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "ranged",
+          "state": "RISKY",
+          "risk": "FREE_CEILING",
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "prayer",
+          "state": "RISKY",
+          "risk": "SOFT_CAP",
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "magic",
+          "state": "BLOCKED",
+          "block": "HARD_CAP",
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "cooking",
+          "state": "OK",
+          "rank": 1,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "woodcutting",
+          "state": "OK",
+          "rank": 16,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "fletching",
+          "state": "OK",
+          "rank": 8,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "fishing",
+          "state": "OK",
+          "rank": 7,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "firemaking",
+          "state": "OK",
+          "rank": 6,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "crafting",
+          "state": "OK",
+          "rank": 4,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "smithing",
+          "state": "OK",
+          "rank": 14,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "mining",
+          "state": "OK",
+          "rank": 17,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "herblore",
+          "state": "OK",
+          "rank": 9,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "agility",
+          "state": "OK",
+          "rank": 2,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "thieving",
+          "state": "OK",
+          "rank": 15,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "slayer",
+          "state": "OK",
+          "rank": 13,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "farming",
+          "state": "OK",
+          "rank": 5,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "runecraft",
+          "state": "OK",
+          "rank": 11,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "hunter",
+          "state": "OK",
+          "rank": 10,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "construction",
+          "state": "OK",
+          "rank": 3,
+          "xp": 100000,
+          "xp_known": true
+        },
+        {
+          "skill": "sailing",
+          "state": "OK",
+          "rank": 12,
+          "xp": 100000,
+          "xp_known": true
+        }
+      ]
+    },
+    {
+      "name": "an unmodelled lamp blocks NO_XP and ranks nothing",
+      "account": {
+        "skills": [
+          {
+            "skill": "attack",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "defence",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "strength",
+            "level": 82,
+            "xp": 2192818
+          },
+          {
+            "skill": "hitpoints",
+            "level": 10,
+            "xp": 1154
+          },
+          {
+            "skill": "ranged",
+            "level": 55,
+            "xp": 166636
+          },
+          {
+            "skill": "prayer",
+            "level": 31,
+            "xp": 15000
+          },
+          {
+            "skill": "magic",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "cooking",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "herblore",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "mining",
+            "level": 60,
+            "xp": 273742
+          },
+          {
+            "skill": "fletching",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "runecraft",
+            "level": 1,
+            "xp": 0
+          }
+        ],
+        "rules": [
+          {
+            "skill": "attack",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "defence",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "prayer",
+            "type": "SOFT_CAP"
+          },
+          {
+            "skill": "magic",
+            "type": "HARD_CAP",
+            "value": 41
+          },
+          {
+            "skill": "hitpoints",
+            "type": "HARD_CAP",
+            "value": 10
+          },
+          {
+            "skill": "cooking",
+            "type": "GOAL",
+            "value": 60
+          }
+        ]
+      },
+      "lamp": {
+        "item_id": 999999,
+        "name": "unknown lamp",
+        "modelled": false
+      },
+      "inputs": {},
+      "expected": [
+        {
+          "skill": "attack",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp_known": false
+        },
+        {
+          "skill": "defence",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp_known": false
+        },
+        {
+          "skill": "strength",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "hitpoints",
+          "state": "UNKNOWN",
+          "xp_known": false
+        },
+        {
+          "skill": "ranged",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "prayer",
+          "state": "UNKNOWN",
+          "xp_known": false
+        },
+        {
+          "skill": "magic",
+          "state": "UNKNOWN",
+          "xp_known": false
+        },
+        {
+          "skill": "cooking",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "woodcutting",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "fletching",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "fishing",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "firemaking",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "crafting",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "smithing",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "mining",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "herblore",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "agility",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "thieving",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "slayer",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "farming",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "runecraft",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "hunter",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "construction",
+          "state": "OK",
+          "xp_known": false
+        },
+        {
+          "skill": "sailing",
+          "state": "OK",
+          "xp_known": false
+        }
+      ]
+    },
+    {
+      "name": "a scaling lamp is worth a different amount in every skill",
+      "account": {
+        "skills": [
+          {
+            "skill": "attack",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "defence",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "strength",
+            "level": 82,
+            "xp": 2192818
+          },
+          {
+            "skill": "hitpoints",
+            "level": 10,
+            "xp": 1154
+          },
+          {
+            "skill": "ranged",
+            "level": 55,
+            "xp": 166636
+          },
+          {
+            "skill": "prayer",
+            "level": 31,
+            "xp": 15000
+          },
+          {
+            "skill": "magic",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "cooking",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "herblore",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "mining",
+            "level": 60,
+            "xp": 273742
+          },
+          {
+            "skill": "fletching",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "runecraft",
+            "level": 1,
+            "xp": 0
+          }
+        ],
+        "rules": [
+          {
+            "skill": "attack",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "defence",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "prayer",
+            "type": "SOFT_CAP"
+          },
+          {
+            "skill": "magic",
+            "type": "HARD_CAP",
+            "value": 41
+          },
+          {
+            "skill": "hitpoints",
+            "type": "HARD_CAP",
+            "value": 10
+          },
+          {
+            "skill": "cooking",
+            "type": "GOAL",
+            "value": 60
+          }
+        ]
+      },
+      "lamp": {
+        "item_id": 2528,
+        "name": "Lamp",
+        "modelled": true,
+        "xp_per_level": 10
+      },
+      "inputs": {},
+      "expected": [
+        {
+          "skill": "attack",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "defence",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "strength",
+          "state": "OK",
+          "rank": 20,
+          "xp": 820,
+          "xp_known": true
+        },
+        {
+          "skill": "hitpoints",
+          "state": "BLOCKED",
+          "block": "AT_CAP",
+          "xp": 100,
+          "xp_known": true
+        },
+        {
+          "skill": "ranged",
+          "state": "OK",
+          "rank": 18,
+          "xp": 550,
+          "xp_known": true
+        },
+        {
+          "skill": "prayer",
+          "state": "RISKY",
+          "risk": "SOFT_CAP",
+          "xp": 310,
+          "xp_known": true
+        },
+        {
+          "skill": "magic",
+          "state": "OK",
+          "rank": 17,
+          "xp": 400,
+          "xp_known": true
+        },
+        {
+          "skill": "cooking",
+          "state": "OK",
+          "rank": 1,
+          "xp": 400,
+          "xp_known": true
+        },
+        {
+          "skill": "woodcutting",
+          "state": "OK",
+          "rank": 16,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "fletching",
+          "state": "OK",
+          "rank": 8,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "fishing",
+          "state": "OK",
+          "rank": 7,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "firemaking",
+          "state": "OK",
+          "rank": 6,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "crafting",
+          "state": "OK",
+          "rank": 4,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "smithing",
+          "state": "OK",
+          "rank": 14,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "mining",
+          "state": "OK",
+          "rank": 19,
+          "xp": 600,
+          "xp_known": true
+        },
+        {
+          "skill": "herblore",
+          "state": "OK",
+          "rank": 9,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "agility",
+          "state": "OK",
+          "rank": 2,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "thieving",
+          "state": "OK",
+          "rank": 15,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "slayer",
+          "state": "OK",
+          "rank": 13,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "farming",
+          "state": "OK",
+          "rank": 5,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "runecraft",
+          "state": "OK",
+          "rank": 11,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "hunter",
+          "state": "OK",
+          "rank": 10,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "construction",
+          "state": "OK",
+          "rank": 3,
+          "xp": 10,
+          "xp_known": true
+        },
+        {
+          "skill": "sailing",
+          "state": "OK",
+          "rank": 12,
+          "xp": 10,
+          "xp_known": true
+        }
+      ]
+    },
+    {
+      "name": "a Book of Knowledge is 15 per level, not 10",
+      "account": {
+        "skills": [
+          {
+            "skill": "attack",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "defence",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "strength",
+            "level": 82,
+            "xp": 2192818
+          },
+          {
+            "skill": "hitpoints",
+            "level": 10,
+            "xp": 1154
+          },
+          {
+            "skill": "ranged",
+            "level": 55,
+            "xp": 166636
+          },
+          {
+            "skill": "prayer",
+            "level": 31,
+            "xp": 15000
+          },
+          {
+            "skill": "magic",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "cooking",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "herblore",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "mining",
+            "level": 60,
+            "xp": 273742
+          },
+          {
+            "skill": "fletching",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "runecraft",
+            "level": 1,
+            "xp": 0
+          }
+        ],
+        "rules": [
+          {
+            "skill": "attack",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "defence",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "prayer",
+            "type": "SOFT_CAP"
+          },
+          {
+            "skill": "magic",
+            "type": "HARD_CAP",
+            "value": 41
+          },
+          {
+            "skill": "hitpoints",
+            "type": "HARD_CAP",
+            "value": 10
+          },
+          {
+            "skill": "cooking",
+            "type": "GOAL",
+            "value": 60
+          }
+        ]
+      },
+      "lamp": {
+        "item_id": 11640,
+        "name": "Book of Knowledge",
+        "modelled": true,
+        "xp_per_level": 15
+      },
+      "inputs": {},
+      "expected": [
+        {
+          "skill": "attack",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "defence",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "strength",
+          "state": "OK",
+          "rank": 20,
+          "xp": 1230,
+          "xp_known": true
+        },
+        {
+          "skill": "hitpoints",
+          "state": "BLOCKED",
+          "block": "AT_CAP",
+          "xp": 150,
+          "xp_known": true
+        },
+        {
+          "skill": "ranged",
+          "state": "OK",
+          "rank": 18,
+          "xp": 825,
+          "xp_known": true
+        },
+        {
+          "skill": "prayer",
+          "state": "RISKY",
+          "risk": "SOFT_CAP",
+          "xp": 465,
+          "xp_known": true
+        },
+        {
+          "skill": "magic",
+          "state": "OK",
+          "rank": 17,
+          "xp": 600,
+          "xp_known": true
+        },
+        {
+          "skill": "cooking",
+          "state": "OK",
+          "rank": 1,
+          "xp": 600,
+          "xp_known": true
+        },
+        {
+          "skill": "woodcutting",
+          "state": "OK",
+          "rank": 16,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "fletching",
+          "state": "OK",
+          "rank": 8,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "fishing",
+          "state": "OK",
+          "rank": 7,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "firemaking",
+          "state": "OK",
+          "rank": 6,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "crafting",
+          "state": "OK",
+          "rank": 4,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "smithing",
+          "state": "OK",
+          "rank": 14,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "mining",
+          "state": "OK",
+          "rank": 19,
+          "xp": 900,
+          "xp_known": true
+        },
+        {
+          "skill": "herblore",
+          "state": "OK",
+          "rank": 9,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "agility",
+          "state": "OK",
+          "rank": 2,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "thieving",
+          "state": "OK",
+          "rank": 15,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "slayer",
+          "state": "OK",
+          "rank": 13,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "farming",
+          "state": "OK",
+          "rank": 5,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "runecraft",
+          "state": "OK",
+          "rank": 11,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "hunter",
+          "state": "OK",
+          "rank": 10,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "construction",
+          "state": "OK",
+          "rank": 3,
+          "xp": 15,
+          "xp_known": true
+        },
+        {
+          "skill": "sailing",
+          "state": "OK",
+          "rank": 12,
+          "xp": 15,
+          "xp_known": true
+        }
+      ]
+    },
+    {
+      "name": "a tie on levels gained falls to the slower skill, then to nothing guessed",
+      "account": {
+        "skills": [
+          {
+            "skill": "attack",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "defence",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "strength",
+            "level": 82,
+            "xp": 2192818
+          },
+          {
+            "skill": "hitpoints",
+            "level": 10,
+            "xp": 1154
+          },
+          {
+            "skill": "ranged",
+            "level": 55,
+            "xp": 166636
+          },
+          {
+            "skill": "prayer",
+            "level": 31,
+            "xp": 15000
+          },
+          {
+            "skill": "magic",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "cooking",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "herblore",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "mining",
+            "level": 60,
+            "xp": 273742
+          },
+          {
+            "skill": "fletching",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "runecraft",
+            "level": 1,
+            "xp": 0
+          }
+        ],
+        "rules": [
+          {
+            "skill": "attack",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "defence",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "prayer",
+            "type": "SOFT_CAP"
+          },
+          {
+            "skill": "magic",
+            "type": "HARD_CAP",
+            "value": 41
+          },
+          {
+            "skill": "hitpoints",
+            "type": "HARD_CAP",
+            "value": 10
+          },
+          {
+            "skill": "cooking",
+            "type": "GOAL",
+            "value": 60
+          }
+        ]
+      },
+      "lamp": {
+        "item_id": 1,
+        "name": "plain 10k lamp",
+        "modelled": true,
+        "xp": 10000
+      },
+      "inputs": {
+        "rates": {
+          "fletching": 60000,
+          "herblore": 35000
+        }
+      },
+      "expected": [
+        {
+          "skill": "attack",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "defence",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "strength",
+          "state": "OK",
+          "rank": 19,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "hitpoints",
+          "state": "BLOCKED",
+          "block": "AT_CAP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "ranged",
+          "state": "OK",
+          "rank": 17,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "prayer",
+          "state": "RISKY",
+          "risk": "SOFT_CAP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "magic",
+          "state": "BLOCKED",
+          "block": "HARD_CAP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "cooking",
+          "state": "OK",
+          "rank": 1,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "woodcutting",
+          "state": "OK",
+          "rank": 16,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "fletching",
+          "state": "OK",
+          "rank": 3,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "fishing",
+          "state": "OK",
+          "rank": 9,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "firemaking",
+          "state": "OK",
+          "rank": 8,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "crafting",
+          "state": "OK",
+          "rank": 6,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "smithing",
+          "state": "OK",
+          "rank": 14,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "mining",
+          "state": "OK",
+          "rank": 18,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "herblore",
+          "state": "OK",
+          "rank": 2,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "agility",
+          "state": "OK",
+          "rank": 4,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "thieving",
+          "state": "OK",
+          "rank": 15,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "slayer",
+          "state": "OK",
+          "rank": 13,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "farming",
+          "state": "OK",
+          "rank": 7,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "runecraft",
+          "state": "OK",
+          "rank": 11,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "hunter",
+          "state": "OK",
+          "rank": 10,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "construction",
+          "state": "OK",
+          "rank": 5,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "sailing",
+          "state": "OK",
+          "rank": 12,
+          "xp": 10000,
+          "xp_known": true
+        }
+      ]
+    },
+    {
+      "name": "a level the route needs outranks where the lamp buys most",
+      "account": {
+        "skills": [
+          {
+            "skill": "attack",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "defence",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "strength",
+            "level": 82,
+            "xp": 2192818
+          },
+          {
+            "skill": "hitpoints",
+            "level": 10,
+            "xp": 1154
+          },
+          {
+            "skill": "ranged",
+            "level": 55,
+            "xp": 166636
+          },
+          {
+            "skill": "prayer",
+            "level": 31,
+            "xp": 15000
+          },
+          {
+            "skill": "magic",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "cooking",
+            "level": 40,
+            "xp": 37224
+          },
+          {
+            "skill": "herblore",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "mining",
+            "level": 60,
+            "xp": 273742
+          },
+          {
+            "skill": "fletching",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "runecraft",
+            "level": 1,
+            "xp": 0
+          }
+        ],
+        "rules": [
+          {
+            "skill": "attack",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "defence",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "prayer",
+            "type": "SOFT_CAP"
+          },
+          {
+            "skill": "magic",
+            "type": "HARD_CAP",
+            "value": 41
+          },
+          {
+            "skill": "hitpoints",
+            "type": "HARD_CAP",
+            "value": 10
+          },
+          {
+            "skill": "cooking",
+            "type": "GOAL",
+            "value": 60
+          }
+        ]
+      },
+      "lamp": {
+        "item_id": 1,
+        "name": "plain 10k lamp",
+        "modelled": true,
+        "xp": 10000
+      },
+      "inputs": {
+        "route_needs": {
+          "cooking": 41
+        }
+      },
+      "expected": [
+        {
+          "skill": "attack",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "defence",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "strength",
+          "state": "OK",
+          "rank": 19,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "hitpoints",
+          "state": "BLOCKED",
+          "block": "AT_CAP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "ranged",
+          "state": "OK",
+          "rank": 17,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "prayer",
+          "state": "RISKY",
+          "risk": "SOFT_CAP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "magic",
+          "state": "BLOCKED",
+          "block": "HARD_CAP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "cooking",
+          "state": "OK",
+          "rank": 1,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "woodcutting",
+          "state": "OK",
+          "rank": 16,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "fletching",
+          "state": "OK",
+          "rank": 8,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "fishing",
+          "state": "OK",
+          "rank": 7,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "firemaking",
+          "state": "OK",
+          "rank": 6,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "crafting",
+          "state": "OK",
+          "rank": 4,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "smithing",
+          "state": "OK",
+          "rank": 14,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "mining",
+          "state": "OK",
+          "rank": 18,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "herblore",
+          "state": "OK",
+          "rank": 9,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "agility",
+          "state": "OK",
+          "rank": 2,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "thieving",
+          "state": "OK",
+          "rank": 15,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "slayer",
+          "state": "OK",
+          "rank": 13,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "farming",
+          "state": "OK",
+          "rank": 5,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "runecraft",
+          "state": "OK",
+          "rank": 11,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "hunter",
+          "state": "OK",
+          "rank": 10,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "construction",
+          "state": "OK",
+          "rank": 3,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "sailing",
+          "state": "OK",
+          "rank": 12,
+          "xp": 10000,
+          "xp_known": true
+        }
+      ]
+    },
+    {
+      "name": "a lamp restricted to skills this build has closed has nowhere to go",
+      "account": {
+        "skills": [
+          {
+            "skill": "attack",
+            "level": 1,
+            "xp": 0
+          },
+          {
+            "skill": "defence",
+            "level": 1,
+            "xp": 0
+          }
+        ],
+        "rules": [
+          {
+            "skill": "attack",
+            "type": "NO_XP"
+          },
+          {
+            "skill": "defence",
+            "type": "NO_XP"
+          }
+        ]
+      },
+      "lamp": {
+        "item_id": 2,
+        "name": "melee-only lamp",
+        "modelled": true,
+        "xp": 10000,
+        "skills": [
+          "attack",
+          "defence"
+        ]
+      },
+      "inputs": {},
+      "expected": [
+        {
+          "skill": "attack",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "defence",
+          "state": "BLOCKED",
+          "block": "NO_XP",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "strength",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "hitpoints",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "ranged",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "prayer",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "magic",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "cooking",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "woodcutting",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "fletching",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "fishing",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "firemaking",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "crafting",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "smithing",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "mining",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "herblore",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "agility",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "thieving",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "slayer",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "farming",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "runecraft",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "hunter",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "construction",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "sailing",
+          "state": "BLOCKED",
+          "block": "NOT_ALLOWED",
+          "xp": 10000,
+          "xp_known": true
+        }
+      ]
+    },
+    {
+      "name": "an account with no build rules blocks nothing and still ranks",
+      "account": {
+        "skills": [
+          {
+            "skill": "herblore",
+            "level": 1,
+            "xp": 0
+          }
+        ]
+      },
+      "lamp": {
+        "item_id": 1,
+        "name": "plain 10k lamp",
+        "modelled": true,
+        "xp": 10000
+      },
+      "inputs": {},
+      "expected": [
+        {
+          "skill": "attack",
+          "state": "OK",
+          "rank": 2,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "defence",
+          "state": "OK",
+          "rank": 6,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "strength",
+          "state": "OK",
+          "rank": 21,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "hitpoints",
+          "state": "OK",
+          "rank": 24,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "ranged",
+          "state": "OK",
+          "rank": 16,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "prayer",
+          "state": "OK",
+          "rank": 15,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "magic",
+          "state": "OK",
+          "rank": 13,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "cooking",
+          "state": "OK",
+          "rank": 4,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "woodcutting",
+          "state": "OK",
+          "rank": 23,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "fletching",
+          "state": "OK",
+          "rank": 10,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "fishing",
+          "state": "OK",
+          "rank": 9,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "firemaking",
+          "state": "OK",
+          "rank": 8,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "crafting",
+          "state": "OK",
+          "rank": 5,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "smithing",
+          "state": "OK",
+          "rank": 20,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "mining",
+          "state": "OK",
+          "rank": 14,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "herblore",
+          "state": "OK",
+          "rank": 11,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "agility",
+          "state": "OK",
+          "rank": 1,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "thieving",
+          "state": "OK",
+          "rank": 22,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "slayer",
+          "state": "OK",
+          "rank": 19,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "farming",
+          "state": "OK",
+          "rank": 7,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "runecraft",
+          "state": "OK",
+          "rank": 17,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "hunter",
+          "state": "OK",
+          "rank": 12,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "construction",
+          "state": "OK",
+          "rank": 3,
+          "xp": 10000,
+          "xp_known": true
+        },
+        {
+          "skill": "sailing",
+          "state": "OK",
+          "rank": 18,
+          "xp": 10000,
+          "xp_known": true
+        }
+      ]
+    }
+  ]
+}
