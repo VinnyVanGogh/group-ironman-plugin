@@ -52,6 +52,29 @@ its own.
 If you turn sharing off while in a party, your client stops sending. Members
 keep the last build they received from you until you leave the party.
 
+**Group banks, storage and stats**, all off by default. Each one works on its
+own (you do not need *Share build with party* for them), and each only shows
+you other members' data while you share the same thing yourself.
+
+| Setting | What it sends to your party |
+| --- | --- |
+| Share bank | When you close your bank: each item and how many, no tabs or slots. Members see your bank as "last seen 2h ago" with its total value. Kept on disk, so it is still there after a restart or when you are offline. |
+| Share group storage changes | When you close group storage: what you took and deposited, and what was left. Everyone's panel keeps a log of the last 200 changes. |
+| Share stats | Every skill's real and boosted level (shown as `90 (+8)` or `70 (-3)`), HP, prayer, run energy, special attack, your world and map region number. |
+| Share inventory and equipment | What you are carrying and wearing, with counts, for the search. |
+| Storage minimums | Not sent anywhere. One per line, `Shark: 100`. A desktop notification when a group storage close leaves an item below its minimum; once per item until it is restocked. Your own closes always count; other members' count when *Share group storage changes* is on. |
+
+The **Who has it?** box at the top of the Build Guard panel searches members'
+last banks, inventories, equipment and group storage by item name (two
+letters or more).
+
+The storage log only has visits by members running Build Guard with *Share
+group storage changes* on. A change by anyone else is not attributed to
+anybody; it just shows up in the next logged visit's "before".
+
+Banks and the storage log are saved in `.runelite/build-guard/group-cache.json`.
+Delete that file to forget them.
+
 ## Testing with friends
 
 Until Build Guard is on the Plugin Hub, every member runs a **developer
@@ -128,7 +151,31 @@ Log in and join a party exactly as in steps 4 and 5 above.
 - With **Share gear list** on, picking up or equipping an item should show it
   under "Who has what" within a few seconds.
 - Turn **Share build with party** off: your friends' panels should stop
-  updating for you, and your own Build Guard panel disappears.
+  updating for you, and your own Build Guard panel disappears (unless a group
+  bank/storage/stats switch is on).
+
+Group banks, storage and stats (two or more members with the same switch on):
+
+1. **Bank.** Open and close your bank. Within a few seconds a friend's panel
+   shows a "Banks (last seen)" line for you: kinds, item count, value, "last
+   seen just now". Check the value is roughly what the bank's own value
+   shows. Restart the friend's client: your line should still be there.
+2. **Group storage.** Open group storage, take 3 of a stack and deposit
+   something, close it. Everyone's "Group storage log" should read like
+   `<your name> took 3 x Shark, deposited 100 x Coal (just now)`. Then open it and
+   only move a stack to another slot: no new log line. Deposit noted items:
+   the log should name the item, not "item 1234" or a second entry.
+3. **Minimums.** Set `Shark: 1000` (more than storage has), open and close
+   storage: one desktop notification. Close it again: no second one.
+4. **Stats.** Drink a stat-boosting potion: your Attack/Strength in friends'
+   panels reads like `90 (+8)` within a couple of seconds, and counts down as
+   it wears off. Pray for a bit: Prayer reads `70 (-3)`. Run energy and
+   special attack should follow too, and the world number should match.
+5. **Search.** Type `shark` in "Who has it?": every member's bank, inventory,
+   equipment and storage stack of sharks, with counts.
+6. **Off means off.** Turn each switch off: your friends stop getting that
+   kind of update from you (check their panels), and the matching section
+   empties in yours.
 
 ## Limitations
 
@@ -142,6 +189,14 @@ Log in and join a party exactly as in steps 4 and 5 above.
   without it simply does not appear in the panel.
 - Quest data is bundled at build time, so it is as current as the release
   and no more.
+- **Banks are as of the last close.** Items moved since then, or a bank never
+  opened with *Share bank* on, are not known.
+- **The storage log only sees members running Build Guard** with storage
+  sharing on. It is a record of what each client saw, not the game's own log.
+- **Region is a number** (the 64×64 map region id), not a place name: the
+  plugin has no map-name data and does not guess.
+- **Bank values use RuneLite's cached Grand Exchange prices**, which are what
+  the bank's own value display uses; untradeables count as 0.
 
 ## Building and tests
 

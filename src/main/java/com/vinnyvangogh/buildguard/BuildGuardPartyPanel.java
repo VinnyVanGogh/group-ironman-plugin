@@ -6,72 +6,203 @@ import java.util.Map;
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 
 /**
- * The party side panel: every member's caps and levels, who is at risk, and
- * who has what. Text only; it draws what {@link PartyRoster} hands it.
+ * The party side panel: every member's caps and levels, who is at risk, who
+ * has what, and the Group Ironman extras: live stats, last banks, the group
+ * storage log and the "Who has it?" search. Text only; it draws what
+ * {@link PartyRoster} and {@link GroupRoster} hand it.
  */
 class BuildGuardPartyPanel extends PluginPanel
 {
+	/** What the panel last drew, so typing in the search box can redraw on its own. */
+	static final class View
+	{
+		final boolean inParty;
+		final PartyRoster party;
+		final GroupRoster group;
+		final ItemLookup items;
+		final GroupOutbox.Switches switches;
+
+		View(boolean inParty, PartyRoster party, GroupRoster group, ItemLookup items, GroupOutbox.Switches switches)
+		{
+			this.inParty = inParty;
+			this.party = party;
+			this.group = group;
+			this.items = items;
+			this.switches = switches;
+		}
+	}
+
 	private final JPanel body = new JPanel();
+	private final JTextField search = new JTextField();
+	private View view;
 
 	BuildGuardPartyPanel()
 	{
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
+
+		JPanel top = new JPanel(new BorderLayout());
+		top.setBorder(new EmptyBorder(0, 0, 6, 0));
+		JLabel label = new JLabel("Who has it?");
+		label.setFont(FontManager.getRunescapeSmallFont());
+		top.add(label, BorderLayout.NORTH);
+		search.setToolTipText("Search members' last banks, inventories, equipment and group storage by item name");
+		search.getDocument().addDocumentListener(new DocumentListener()
+		{
+			@Override
+			public void insertUpdate(DocumentEvent e)
+			{
+				redraw();
+			}
+
+			@Override
+			public void removeUpdate(DocumentEvent e)
+			{
+				redraw();
+			}
+
+			@Override
+			public void changedUpdate(DocumentEvent e)
+			{
+				redraw();
+			}
+		});
+		top.add(search, BorderLayout.CENTER);
+		add(top, BorderLayout.NORTH);
+
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 		body.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		add(body, BorderLayout.NORTH);
+		add(body, BorderLayout.CENTER);
 	}
 
 	/** Must be called on the Swing thread. */
-	void render(boolean inParty, PartyRoster roster)
+	void render(View view)
 	{
+		this.view = view;
+		redraw();
+	}
+
+	private void redraw()
+	{
+		View v = view;
 		body.removeAll();
-		if (!inParty)
+		if (v == null)
 		{
-			line("Not in a RuneLite Party.");
-			line("Join one from the Party panel; every member needs Build Guard with 'Share build with party' on.");
+			return;
 		}
-		else if (roster.isEmpty())
+		long now = System.currentTimeMillis();
+
+		String query = search.getText();
+		if (query != null && query.trim().length() >= GroupSearch.MIN_QUERY)
 		{
-			line("No builds shared yet.");
-			line("Members appear here once they turn on 'Share build with party'.");
-		}
-		else
-		{
-			heading("Builds");
-			for (String s : roster.memberLines())
+			heading("Who has it?");
+			List<String> hits = GroupSearch.search(query, v.group.searchSources(), v.items, now);
+			if (hits.isEmpty())
+			{
+				line("Nobody's shared bank, inventory, equipment or the group storage has it.");
+			}
+			for (String s : hits)
 			{
 				line(s);
 			}
+		}
 
-			List<String> risks = roster.riskLines();
-			if (!risks.isEmpty())
+		if (!v.inParty)
+		{
+			line("Not in a RuneLite Party.");
+			line("Join one from the Party panel; every member needs Build Guard with sharing turned on.");
+		}
+		else if (v.party.isEmpty() && !v.group.hasAnything())
+		{
+			line("Nothing shared yet.");
+			line("Members appear here once they turn on sharing in Build Guard's settings.");
+		}
+
+		renderBuilds(v.party);
+
+		List<List<String>> stats = v.group.statsBlocks();
+		if (!stats.isEmpty())
+		{
+			heading("Group stats");
+		}
+		for (List<String> block : stats)
+		{
+			for (String s : block)
 			{
-				heading("At risk");
-				for (String s : risks)
-				{
-					line(s);
-				}
+				line(s);
 			}
+			gap();
+		}
 
-			Map<String, List<String>> gear = roster.gearIndex();
-			if (!gear.isEmpty())
+		List<String> banks = v.group.bankLines(v.items, now);
+		if (!banks.isEmpty())
+		{
+			heading("Banks (last seen)");
+			for (String s : banks)
 			{
-				heading("Who has what");
-				for (Map.Entry<String, List<String>> e : gear.entrySet())
-				{
-					line(e.getKey() + ": " + String.join(", ", e.getValue()));
-				}
+				line(s);
 			}
 		}
+
+		if (v.switches.storage)
+		{
+			heading("Group storage log");
+			line("Only changes by members running Build Guard with storage sharing on are listed.");
+			List<String> log = v.group.log().lines(v.items, now);
+			if (log.isEmpty())
+			{
+				line("No changes seen yet.");
+			}
+			for (String s : log)
+			{
+				line(s);
+			}
+		}
+
 		body.revalidate();
 		body.repaint();
+	}
+
+	private void renderBuilds(PartyRoster roster)
+	{
+		if (roster.isEmpty())
+		{
+			return;
+		}
+		heading("Builds");
+		for (String s : roster.memberLines())
+		{
+			line(s);
+		}
+
+		List<String> risks = roster.riskLines();
+		if (!risks.isEmpty())
+		{
+			heading("At risk");
+			for (String s : risks)
+			{
+				line(s);
+			}
+		}
+
+		Map<String, List<String>> gear = roster.gearIndex();
+		if (!gear.isEmpty())
+		{
+			heading("Who has what");
+			for (Map.Entry<String, List<String>> e : gear.entrySet())
+			{
+				line(e.getKey() + ": " + String.join(", ", e.getValue()));
+			}
+		}
 	}
 
 	private void heading(String text)
@@ -80,6 +211,13 @@ class BuildGuardPartyPanel extends PluginPanel
 		label.setFont(FontManager.getRunescapeBoldFont());
 		label.setForeground(ColorScheme.BRAND_ORANGE);
 		label.setBorder(new EmptyBorder(8, 0, 2, 0));
+		body.add(label);
+	}
+
+	private void gap()
+	{
+		JLabel label = new JLabel(" ");
+		label.setBorder(new EmptyBorder(0, 0, 2, 0));
 		body.add(label);
 	}
 

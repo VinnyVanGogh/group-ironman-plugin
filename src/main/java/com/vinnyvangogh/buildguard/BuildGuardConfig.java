@@ -106,4 +106,76 @@ public interface BuildGuardConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigSection(
+		name = "Group banks, storage and stats",
+		description = "Group Ironman extras over RuneLite Party. Each is off until you turn it on, and each only"
+			+ " shows you other members' data while you share your own.",
+		position = 2
+	)
+	String groupSection = "group";
+
+	@ConfigItem(
+		keyName = "groupShareBank",
+		name = "Share bank",
+		description = "When you close your bank, send its item counts to your party, and show each member's last"
+			+ " bank with when it was seen and its value. Kept on disk so it survives a restart.",
+		section = groupSection,
+		position = 0
+	)
+	default boolean groupShareBank()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "groupShareStorage",
+		name = "Share group storage changes",
+		description = "When you close group storage, tell your party what you took and deposited, and keep a log"
+			+ " of the last 200 changes. Only members running Build Guard with this on are logged.",
+		section = groupSection,
+		position = 1
+	)
+	default boolean groupShareStorage()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "groupShareStats",
+		name = "Share stats",
+		description = "Send your real and boosted levels, HP, prayer, run energy, special attack, world and map"
+			+ " region, and show every member's",
+		section = groupSection,
+		position = 2
+	)
+	default boolean groupShareStats()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "groupShareCarried",
+		name = "Share inventory and equipment",
+		description = "Send the item counts of your inventory and worn items, for the 'Who has it?' search",
+		section = groupSection,
+		position = 3
+	)
+	default boolean groupShareCarried()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "groupLowStock",
+		name = "Storage minimums",
+		description = "One per line or comma, 'Shark: 100'. A desktop notification when a group storage close"
+			+ " leaves an item below its minimum. Empty means no alerts.",
+		section = groupSection,
+		position = 4
+	)
+	default String groupLowStock()
+	{
+		return "";
+	}
 }

@@ -182,6 +182,46 @@ names only, worn and carried, never the bank, and only with its own switch on.
 All three are **off by default**, and with build sharing off the client sends
 no message at all (`PartyOutboxTest.optedOutMemberSendsNothing`).
 
+### Phase 0 addendum — GIM part 2 (2026-11-03)
+
+Asked for by the Board from the group's chat ("being able to see groups
+bank", "the last of each member", "when people change group storage, group
+stats including boosts"). Same channel and the same rule as #5: each member's
+own client sends that member's own data, opt-in per feature, through
+`PartyService`. No server, no HTTP, no reading anything about a player who is
+not running the plugin with the switch on.
+
+**8. Member banks, last seen — allowed, with precedent.** Sent on bank close
+as item id and count, no slots or tabs. *Nearest rule:* Data & Privacy,
+"no crowdsourcing data about other players": nothing here is about another
+player; it is a member choosing to show their own bank to their own team.
+*Precedent:* the Hub plugin **Group Ironmen Tracker** shares members' banks,
+group storage, inventories, equipment and skills (through its own website,
+with the third-party-server warning); Build Guard does the same subset with
+no server at all. Its README was not re-read in this run: cite it again
+before submitting.
+
+**9. Group storage change log — allowed.** A diff of what the local player's
+own client showed on open and on close. Only visits by members running the
+plugin are logged, and the panel says so, so nothing is inferred about anyone
+else. Precedent as #8.
+
+**10. Group stats with boosts — allowed, with precedent.** The base client's
+`party` plugin already shares HP, prayer, run energy and special attack
+(`StatusUpdate`); Party Panel shares skill levels. World and a coarse map
+region (64×64 tiles, the region id) only; the base `party` plugin shares exact
+location.
+
+**11. "Who has it?" search — allowed.** A search over data the members already
+chose to share (#7, #8, #9). It adds no data.
+
+**12. Low-stock alerts — allowed, with precedent.** A desktop notification via
+RuneLite's `Notifier`, which the base client's `idlenotifier` and many Hub
+plugins use. It informs; it does not act.
+
+All five are **off by default** and each has its own switch
+(`GroupOutboxTest.optedOutSendsNothing`, `eachSwitchOnlyOpensItsOwnFeature`).
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection, and therefore any integration that reads another plugin's
