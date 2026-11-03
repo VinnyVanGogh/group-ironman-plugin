@@ -68,6 +68,26 @@ public class GroupOutboxTest
 	}
 
 	@Test
+	public void thePart3SwitchesAreOffUnlessTurnedOnAndOnlyOpenTheirOwnFeature()
+	{
+		MemberExtras extras = new MemberExtras(one(), one(), one(), 1);
+		java.util.List<GroupEvent> events = Collections.singletonList(GroupEvent.clog(1, "Me", "Abyssal whip"));
+		assertNull("the part 2 constructor leaves part 3 off", GroupOutbox.extras(GSON, ALL_ON, extras));
+		assertTrue(GroupOutbox.events(GSON, ALL_ON, events).isEmpty());
+
+		GroupOutbox.Switches extrasOnly = new GroupOutbox.Switches(false, false, false, false, true, false);
+		assertTrue(extrasOnly.any());
+		assertNotNull(GroupOutbox.extras(GSON, extrasOnly, extras));
+		assertTrue(GroupOutbox.events(GSON, extrasOnly, events).isEmpty());
+		assertNull(GroupOutbox.carried(GSON, extrasOnly, one(), one()));
+
+		GroupOutbox.Switches dropsOnly = new GroupOutbox.Switches(false, false, false, false, false, true);
+		assertNull(GroupOutbox.extras(GSON, dropsOnly, extras));
+		assertEquals(1, GroupOutbox.events(GSON, dropsOnly, events).size());
+		assertNull(GroupOutbox.stats(GSON, dropsOnly, stats()));
+	}
+
+	@Test
 	public void aVisitThatChangedNothingIsNotSent()
 	{
 		Map<Integer, Integer> none = Collections.emptyMap();

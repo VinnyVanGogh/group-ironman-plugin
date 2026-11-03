@@ -8,16 +8,22 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.EnumComposition;
+import net.runelite.api.EnumID;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
@@ -25,28 +31,36 @@ import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.StatChanged;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetClosed;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarPlayerID;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.Notifier;
 import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemStack;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.events.UserPart;
 import net.runelite.client.party.messages.UserSync;
 
 /**
- * The Group Ironman extras: member banks, the group storage log, live stats,
- * "who has it?" and storage minimums.
+ * The Group Ironman extras: member banks, the group storage log, live stats
+ * and where each member is, inventories and equipment, rune pouch, quiver and
+ * seed vault, the drops and collection log list, online / last seen, "who has
+ * it?" and storage minimums.
  *
  * <p>Registered on the event bus by {@link BuildGuardPlugin} while the plugin
  * runs. Every send goes through {@link GroupOutbox}, so a member with a
@@ -63,7 +77,33 @@ class GroupService
 {
 	/** Fewest ticks between two stats sends; stats change on every prayer drain tick. */
 	static final int STATS_INTERVAL_TICKS = 3;
+	/** Stats are resent at least this often (about a minute) so members can tell online from gone. */
+	static final int STATS_HEARTBEAT_TICKS = 100;
+	/** Walking this many tiles counts as a move worth sending; every step would be a message per tick. */
+	static final int MOVE_TILES = 8;
 	static final int CARRIED_INTERVAL_TICKS = 5;
+	static final int EXTRAS_INTERVAL_TICKS = 5;
+	/** How many drops and log slots the panel lists. */
+	static final int MAX_EVENT_LINES = 50;
+
+	private static final int[] POUCH_TYPES = {
+		VarbitID.RUNE_POUCH_TYPE_1, VarbitID.RUNE_POUCH_TYPE_2, VarbitID.RUNE_POUCH_TYPE_3,
+		VarbitID.RUNE_POUCH_TYPE_4, VarbitID.RUNE_POUCH_TYPE_5, VarbitID.RUNE_POUCH_TYPE_6
+	};
+	private static final int[] POUCH_AMOUNTS = {
+		VarbitID.RUNE_POUCH_QUANTITY_1, VarbitID.RUNE_POUCH_QUANTITY_2, VarbitID.RUNE_POUCH_QUANTITY_3,
+		VarbitID.RUNE_POUCH_QUANTITY_4, VarbitID.RUNE_POUCH_QUANTITY_5, VarbitID.RUNE_POUCH_QUANTITY_6
+	};
+	private static final Set<Integer> POUCH_VARBITS = new HashSet<>();
+
+	static
+	{
+		for (int i = 0; i < POUCH_TYPES.length; i++)
+		{
+			POUCH_VARBITS.add(POUCH_TYPES[i]);
+			POUCH_VARBITS.add(POUCH_AMOUNTS[i]);
+		}
+	}
 
 	private static final String CACHE_DIR = "build-guard";
 	private static final String CACHE_FILE = "group-cache.json";
@@ -113,8 +153,24 @@ class GroupService
 	private int lastSpec = -1;
 	private int lastRegion = -1;
 	private int lastWorld = -1;
+	private int lastX;
+	private int lastY;
+	private int lastPlane;
 	private String lastStatsSent;
 	private String lastCarriedSent;
+	private boolean extrasDirty;
+	private int ticksSinceExtras = EXTRAS_INTERVAL_TICKS;
+	private String lastExtrasSent;
+	private Map<Integer, Integer> seedVault = new TreeMap<>();
+	private long seedVaultAt = -1;
+	private boolean session;
+
+	private volatile RegionNames regions = RegionNames.parse("");
+	/** Nothing is written to disk until the file has been read, or a save would replace it with less. */
+	private volatile boolean cacheLoaded;
+	/** When this player last played before this session; 0 when not known. */
+	private volatile long since;
+	private volatile String self = "";
 
 	final ItemLookup lookup = new ItemLookup()
 	{
@@ -135,12 +191,28 @@ class GroupService
 	void startUp(Runnable onChange)
 	{
 		this.onChange = onChange;
+		cacheLoaded = false;
+		since = 0;
 		reloadConfig();
-		executor.execute(this::loadCache);
+		executor.execute(() ->
+		{
+			regions = RegionNames.load();
+			loadCache();
+		});
 	}
 
 	void shutDown()
 	{
+		if (session)
+		{
+			roster.markPlayed(System.currentTimeMillis());
+		}
+		saveCache();
+		cacheLoaded = false;
+		session = false;
+		seedVault = new TreeMap<>();
+		seedVaultAt = -1;
+		lastExtrasSent = null;
 		roster.clearAll();
 		assembler.clear();
 		names.clear();
@@ -162,7 +234,25 @@ class GroupService
 	GroupOutbox.Switches switches()
 	{
 		return new GroupOutbox.Switches(config.groupShareBank(), config.groupShareStorage(),
-			config.groupShareStats(), config.groupShareCarried());
+			config.groupShareStats(), config.groupShareCarried(), config.groupShareExtras(),
+			config.groupShareDrops());
+	}
+
+	RegionNames regions()
+	{
+		return regions;
+	}
+
+	/** When this player last played before this session, 0 when not known (first run, or still loading). */
+	long since()
+	{
+		return since;
+	}
+
+	/** This player's name, for leaving their own drops out of "since you last played". */
+	String self()
+	{
+		return self;
 	}
 
 	void reloadConfig()
@@ -178,12 +268,18 @@ class GroupService
 		{
 			roster.clearCarried();
 		}
+		if (!s.extras)
+		{
+			roster.clearExtras();
+		}
 		clientThread.invokeLater(() ->
 		{
 			lastStatsSent = null;
 			lastCarriedSent = null;
+			lastExtrasSent = null;
 			statsDirty = true;
 			carriedDirty = true;
+			extrasDirty = true;
 		});
 		onChange.run();
 	}
@@ -218,6 +314,93 @@ class GroupService
 		{
 			carriedDirty = true;
 		}
+		else if (id == InventoryID.SEED_VAULT)
+		{
+			// Only sent by the game while the vault is open: this is the vault "as last seen".
+			seedVault = counts(event.getItemContainer());
+			seedVaultAt = System.currentTimeMillis();
+			extrasDirty = true;
+		}
+	}
+
+	@Subscribe
+	public void onVarbitChanged(VarbitChanged event)
+	{
+		if (POUCH_VARBITS.contains(event.getVarbitId())
+			|| event.getVarpId() == VarPlayerID.DIZANAS_QUIVER_TEMP_AMMO
+			|| event.getVarpId() == VarPlayerID.DIZANAS_QUIVER_TEMP_AMMO_AMOUNT)
+		{
+			extrasDirty = true;
+		}
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		if (event.getGameState() == GameState.LOGIN_SCREEN && session)
+		{
+			// Logged out: remember when, so the next login knows what is new since.
+			session = false;
+			roster.markPlayed(System.currentTimeMillis());
+			saveCache();
+		}
+	}
+
+	@Subscribe
+	public void onNpcLootReceived(NpcLootReceived event)
+	{
+		if (!switches().drops || event.getNpc() == null)
+		{
+			return;
+		}
+		long min = Math.max(0, config.groupDropMinValue());
+		Map<Integer, Integer> all = new TreeMap<>();
+		for (ItemStack stack : event.getItems())
+		{
+			ItemCounts.add(all, stack.getId(), stack.getQuantity(), itemManager::canonicalize);
+		}
+		Map<Integer, Integer> kept = new TreeMap<>();
+		for (Map.Entry<Integer, Integer> e : all.entrySet())
+		{
+			if ((long) itemManager.getItemPrice(e.getKey()) * e.getValue() >= min)
+			{
+				kept.put(e.getKey(), e.getValue());
+			}
+		}
+		recordEvent(GroupEvent.drop(System.currentTimeMillis(), localName(), event.getNpc().getName(), kept));
+	}
+
+	@Subscribe
+	public void onChatMessage(ChatMessage event)
+	{
+		if (event.getType() != ChatMessageType.GAMEMESSAGE || !switches().drops)
+		{
+			return;
+		}
+		String item = ClogMessage.parse(event.getMessage());
+		if (item != null)
+		{
+			recordEvent(GroupEvent.clog(System.currentTimeMillis(), localName(), item));
+		}
+	}
+
+	/** Client thread. Logs one of this player's own events and tells the party. */
+	private void recordEvent(GroupEvent event)
+	{
+		if (!roster.events().add(event))
+		{
+			return;
+		}
+		resolveNow(event.items.keySet());
+		if (partyService.isInParty())
+		{
+			for (String payload : GroupOutbox.events(gson, switches(), Collections.singletonList(event)))
+			{
+				partyService.send(new BuildGuardGroupMessage(payload));
+			}
+		}
+		saveCache();
+		onChange.run();
 	}
 
 	@Subscribe
@@ -244,7 +427,32 @@ class GroupService
 	{
 		ticksSinceStats++;
 		ticksSinceCarried++;
-		if (client.getGameState() != GameState.LOGGED_IN || !partyService.isInParty())
+		ticksSinceExtras++;
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+		long now = System.currentTimeMillis();
+		if (!session)
+		{
+			session = true;
+			extrasDirty = true;
+			Player player = client.getLocalPlayer();
+			if (player != null && player.getName() != null)
+			{
+				self = player.getName();
+			}
+			if (cacheLoaded)
+			{
+				// Before this tick's mark: the last time seen in the previous session.
+				since = roster.lastPlayed();
+			}
+		}
+		if (cacheLoaded)
+		{
+			roster.markPlayed(now);
+		}
+		if (!partyService.isInParty())
 		{
 			return;
 		}
@@ -256,13 +464,27 @@ class GroupService
 			int run = client.getEnergy() / 100;
 			int spec = client.getVarpValue(VarPlayerID.SA_ENERGY) / 10;
 			int world = client.getWorld();
-			int region = region();
-			if (run != lastRun || spec != lastSpec || world != lastWorld || region != lastRegion)
+			WorldPoint at = position();
+			int region = at == null ? 0 : at.getRegionID();
+			int x = at == null ? 0 : at.getX();
+			int y = at == null ? 0 : at.getY();
+			int plane = at == null ? 0 : at.getPlane();
+			if (run != lastRun || spec != lastSpec || world != lastWorld || region != lastRegion
+				|| plane != lastPlane || Math.abs(x - lastX) + Math.abs(y - lastY) >= MOVE_TILES)
 			{
 				lastRun = run;
 				lastSpec = spec;
 				lastWorld = world;
 				lastRegion = region;
+				lastX = x;
+				lastY = y;
+				lastPlane = plane;
+				statsDirty = true;
+			}
+			if (ticksSinceStats >= STATS_HEARTBEAT_TICKS)
+			{
+				// Nothing changed for a minute: send the same again so members still see us online.
+				lastStatsSent = null;
 				statsDirty = true;
 			}
 			if (statsDirty && ticksSinceStats >= STATS_INTERVAL_TICKS)
@@ -277,6 +499,12 @@ class GroupService
 			carriedDirty = false;
 			sendCarried(s);
 		}
+
+		if (s.extras && extrasDirty && ticksSinceExtras >= EXTRAS_INTERVAL_TICKS)
+		{
+			extrasDirty = false;
+			sendExtras(s);
+		}
 	}
 
 	/** Someone joined and asked for a resend. */
@@ -287,14 +515,26 @@ class GroupService
 		{
 			lastStatsSent = null;
 			lastCarriedSent = null;
+			lastExtrasSent = null;
 			statsDirty = true;
 			carriedDirty = true;
-			if (lastBank != null && partyService.isInParty())
+			extrasDirty = true;
+			if (!partyService.isInParty())
+			{
+				return;
+			}
+			if (lastBank != null)
 			{
 				for (String payload : GroupOutbox.bank(gson, switches(), lastBank))
 				{
 					partyService.send(new BuildGuardGroupMessage(payload));
 				}
+			}
+			// The joiner may have been offline for these: this is how "since you last played" works with no server.
+			List<GroupEvent> mine = roster.events().recentBy(localName(), System.currentTimeMillis());
+			for (String payload : GroupOutbox.events(gson, switches(), mine))
+			{
+				partyService.send(new BuildGuardGroupMessage(payload));
 			}
 		});
 	}
@@ -317,8 +557,10 @@ class GroupService
 		roster.clearLive();
 		lastStatsSent = null;
 		lastCarriedSent = null;
+		lastExtrasSent = null;
 		statsDirty = true;
 		carriedDirty = true;
+		extrasDirty = true;
 		onChange.run();
 	}
 
@@ -395,9 +637,46 @@ class GroupService
 				}
 				roster.putStats(name, decoded.stats);
 				break;
+			case EXTRAS:
+				if (!s.extras)
+				{
+					return;
+				}
+				MemberExtras before = roster.extras().get(name);
+				roster.putExtras(name, decoded.extras);
+				resolve(decoded.extras.runePouch.keySet());
+				resolve(decoded.extras.quiver.keySet());
+				resolve(decoded.extras.seedVault.keySet());
+				if (before == null || before.seedVaultAt != roster.extras().get(name).seedVaultAt)
+				{
+					// The pouch changes every cast; only a new seed vault is worth a disk write.
+					saveCache();
+				}
+				break;
+			case EVENTS:
+				if (!s.drops)
+				{
+					return;
+				}
+				boolean added = false;
+				for (GroupEvent e : decoded.events)
+				{
+					if (roster.events().add(e.withMember(name)))
+					{
+						resolve(e.items.keySet());
+						added = true;
+					}
+				}
+				if (added)
+				{
+					saveCache();
+				}
+				break;
 			default:
 				return;
 		}
+		// Anything accepted from a member means their client is running and in the party.
+		roster.heard(name, now);
 		onChange.run();
 	}
 
@@ -482,7 +761,7 @@ class GroupService
 			skills.put(skill.getName(), new MemberStats.Level(client.getRealSkillLevel(skill),
 				client.getBoostedSkillLevel(skill)));
 		}
-		MemberStats stats = new MemberStats(skills, lastRun, lastSpec, lastWorld, lastRegion);
+		MemberStats stats = new MemberStats(skills, lastRun, lastSpec, lastWorld, lastRegion, lastX, lastY, lastPlane);
 		String payload = GroupOutbox.stats(gson, s, stats);
 		if (payload == null || Objects.equals(payload, lastStatsSent))
 		{
@@ -492,7 +771,57 @@ class GroupService
 		lastStatsSent = payload;
 		ticksSinceStats = 0;
 		roster.putStats(localName(), stats);
+		roster.heard(localName(), System.currentTimeMillis());
 		onChange.run();
+	}
+
+	/** Client thread. */
+	private void sendExtras(GroupOutbox.Switches s)
+	{
+		MemberExtras extras = new MemberExtras(runePouch(), quiver(), seedVault, seedVaultAt);
+		String payload = GroupOutbox.extras(gson, s, extras);
+		if (payload == null || Objects.equals(payload, lastExtrasSent))
+		{
+			return;
+		}
+		partyService.send(new BuildGuardGroupMessage(payload));
+		lastExtrasSent = payload;
+		ticksSinceExtras = 0;
+		resolveNow(extras.runePouch.keySet());
+		resolveNow(extras.quiver.keySet());
+		resolveNow(extras.seedVault.keySet());
+		roster.putExtras(localName(), extras);
+		onChange.run();
+	}
+
+	/** Client thread. Rune type varbits index the RUNEPOUCH_RUNE enum, the way the base rune pouch plugin reads them. */
+	private Map<Integer, Integer> runePouch()
+	{
+		Map<Integer, Integer> out = new TreeMap<>();
+		EnumComposition runes = client.getEnum(EnumID.RUNEPOUCH_RUNE);
+		if (runes == null)
+		{
+			return out;
+		}
+		for (int i = 0; i < POUCH_TYPES.length; i++)
+		{
+			int type = client.getVarbitValue(POUCH_TYPES[i]);
+			int amount = client.getVarbitValue(POUCH_AMOUNTS[i]);
+			if (type > 0 && amount > 0)
+			{
+				ItemCounts.add(out, runes.getIntValue(type), amount, itemManager::canonicalize);
+			}
+		}
+		return out;
+	}
+
+	/** Client thread. Dizana's quiver's ammo: an item id and count in two varps, -1 or 0 when empty. */
+	private Map<Integer, Integer> quiver()
+	{
+		Map<Integer, Integer> out = new TreeMap<>();
+		ItemCounts.add(out, client.getVarpValue(VarPlayerID.DIZANAS_QUIVER_TEMP_AMMO),
+			client.getVarpValue(VarPlayerID.DIZANAS_QUIVER_TEMP_AMMO_AMOUNT), itemManager::canonicalize);
+		return out;
 	}
 
 	/** Client thread. */
@@ -533,16 +862,15 @@ class GroupService
 		return out;
 	}
 
-	/** Client thread. The real-world region, also inside instances; 0 when not known. */
-	private int region()
+	/** Client thread. The real-world tile, also inside instances; null when not known. */
+	private WorldPoint position()
 	{
 		Player player = client.getLocalPlayer();
 		if (player == null || player.getLocalLocation() == null)
 		{
-			return 0;
+			return null;
 		}
-		WorldPoint point = WorldPoint.fromLocalInstance(client, player.getLocalLocation());
-		return point == null ? 0 : point.getRegionID();
+		return WorldPoint.fromLocalInstance(client, player.getLocalLocation());
 	}
 
 	private String localName()
@@ -623,24 +951,18 @@ class GroupService
 	/** Executor thread. */
 	private void loadCache()
 	{
-		File file = cacheFile();
-		if (!file.isFile())
-		{
-			return;
-		}
 		try
 		{
-			String json = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
-			if (!GroupCache.read(gson, json, roster))
+			if (!readCache())
 			{
-				log.debug("group cache unreadable, starting empty");
 				return;
 			}
 		}
-		catch (IOException e)
+		finally
 		{
-			log.debug("could not read group cache", e);
-			return;
+			// Read before any tick marks this session as played.
+			since = roster.lastPlayed();
+			cacheLoaded = true;
 		}
 		clientThread.invokeLater(() ->
 		{
@@ -655,8 +977,38 @@ class GroupService
 		});
 	}
 
+	/** Executor thread. False when there is no file or it cannot be read. */
+	private boolean readCache()
+	{
+		File file = cacheFile();
+		if (!file.isFile())
+		{
+			return false;
+		}
+		try
+		{
+			String json = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+			if (!GroupCache.read(gson, json, roster))
+			{
+				log.debug("group cache unreadable, starting empty");
+				return false;
+			}
+			return true;
+		}
+		catch (IOException e)
+		{
+			log.debug("could not read group cache", e);
+			return false;
+		}
+	}
+
 	private void saveCache()
 	{
+		if (!cacheLoaded)
+		{
+			// Whatever arrived meanwhile is in the roster and goes out with the first save after loading.
+			return;
+		}
 		String json = GroupCache.write(gson, roster);
 		executor.execute(() ->
 		{

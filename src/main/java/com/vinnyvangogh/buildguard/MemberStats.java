@@ -44,19 +44,53 @@ final class MemberStats
 	private final int specialAttack;
 	private final int world;
 	private final int region;
+	private final int x;
+	private final int y;
+	private final int plane;
+
+	/** Without a position: what a part 2 sender sends. */
+	MemberStats(Map<String, Level> skills, int runEnergy, int specialAttack, int world, int region)
+	{
+		this(skills, runEnergy, specialAttack, world, region, 0, 0, 0);
+	}
 
 	/**
 	 * @param runEnergy percent, 0 to 100
 	 * @param specialAttack percent, 0 to 100
 	 * @param region the 64x64 map region id, or 0 when unknown
+	 * @param x world tile x, or 0 when unknown (also inside instances, the real-world tile)
 	 */
-	MemberStats(Map<String, Level> skills, int runEnergy, int specialAttack, int world, int region)
+	MemberStats(Map<String, Level> skills, int runEnergy, int specialAttack, int world, int region, int x, int y,
+		int plane)
 	{
 		this.skills = Collections.unmodifiableMap(new LinkedHashMap<>(skills));
 		this.runEnergy = runEnergy;
 		this.specialAttack = specialAttack;
 		this.world = world;
 		this.region = region;
+		this.x = x;
+		this.y = y;
+		this.plane = plane;
+	}
+
+	int x()
+	{
+		return x;
+	}
+
+	int y()
+	{
+		return y;
+	}
+
+	int plane()
+	{
+		return plane;
+	}
+
+	boolean hasPosition()
+	{
+		return x > 0 && y > 0;
 	}
 
 	Map<String, Level> skills()
@@ -93,12 +127,13 @@ final class MemberStats
 		}
 		MemberStats m = (MemberStats) o;
 		return skills.equals(m.skills) && runEnergy == m.runEnergy && specialAttack == m.specialAttack
-			&& world == m.world && region == m.region;
+			&& world == m.world && region == m.region && x == m.x && y == m.y && plane == m.plane;
 	}
 
 	@Override
 	public int hashCode()
 	{
-		return skills.hashCode() * 31 + runEnergy * 7 + specialAttack * 13 + world * 17 + region;
+		return skills.hashCode() * 31 + runEnergy * 7 + specialAttack * 13 + world * 17 + region + x * 19 + y * 23
+			+ plane;
 	}
 }

@@ -20,8 +20,13 @@ Warns before a quest, lamp or activity gives XP that breaks a capped account's b
   - a group storage log: who took or deposited what, last 200 changes;
   - live group stats with boosts and drains (`90 (+8)`), HP, prayer, run,
     special attack and world;
-  - a "Who has it?" search across banks, inventories, equipment and storage;
-  - storage minimums with a desktop notification when stock runs low.
+  - a "Who has it?" search across banks, inventories, equipment, rune
+    pouches, quivers, seed vaults and storage;
+  - storage minimums with a desktop notification when stock runs low;
+  - who is online, or when they were last seen, and where (world and place
+    name), optionally as markers on the world map;
+  - each member's inventory, equipment, rune pouch, quiver and seed vault;
+  - "Since you last played": members' drops and new collection log slots.
 
 Build Guard only warns. It never blocks a click or acts for you, and it makes
 no network connections of its own; party data goes through RuneLite's Party
@@ -40,4 +45,5 @@ RuneLite Party as your friends and turn on *Share build with party*.
 
 ## License
 
-BSD-2-Clause. See [LICENSE](LICENSE).
+BSD-2-Clause. See [LICENSE](LICENSE) and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

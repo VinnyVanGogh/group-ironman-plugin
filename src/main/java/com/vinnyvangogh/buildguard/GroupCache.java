@@ -8,10 +8,11 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * What survives a restart: members' last banks, the storage log and the last
- * group storage contents, as one JSON document. Live data (inventories,
- * equipment, stats) is not kept; it is only meaningful while the member is
- * online.
+ * What survives a restart: members' last banks, the storage log, the last
+ * group storage contents, members' rune pouch, quiver and seed vault, the
+ * drops log, when each member was last heard from and when this player last
+ * played, as one JSON document. Live data (inventories, equipment, stats) is
+ * not kept; it is only meaningful while the member is online.
  *
  * <p>Pure, {@code String} in and out. The plugin reads and writes the file
  * ({@code .runelite/build-guard/group-cache.json}) off the client thread. A
@@ -62,6 +63,39 @@ final class GroupCache
 			storage.add("i", ItemCounts.toJson(roster.storageItems()));
 			out.add("storage", storage);
 		}
+
+		JsonObject extras = new JsonObject();
+		for (Map.Entry<String, MemberExtras> e : roster.extras().entrySet())
+		{
+			JsonObject x = new JsonObject();
+			x.add("rp", ItemCounts.toJson(e.getValue().runePouch));
+			x.add("q", ItemCounts.toJson(e.getValue().quiver));
+			x.add("sv", ItemCounts.toJson(e.getValue().seedVault));
+			x.addProperty("svts", e.getValue().seedVaultAt);
+			extras.add(e.getKey(), x);
+		}
+		out.add("extras", extras);
+
+		JsonArray events = new JsonArray();
+		for (GroupEvent e : roster.events().entries())
+		{
+			JsonObject entry = new JsonObject();
+			entry.addProperty("t", e.type == GroupEvent.Type.DROP ? "d" : "c");
+			entry.addProperty("ts", e.at);
+			entry.addProperty("by", e.member);
+			entry.addProperty("s", e.text);
+			entry.add("i", ItemCounts.toJson(e.items));
+			events.add(entry);
+		}
+		out.add("events", events);
+
+		JsonObject heard = new JsonObject();
+		for (Map.Entry<String, Long> e : roster.lastHeard().entrySet())
+		{
+			heard.addProperty(e.getKey(), e.getValue());
+		}
+		out.add("heard", heard);
+		out.addProperty("played", roster.lastPlayed());
 		return gson.toJson(out);
 	}
 
@@ -142,6 +176,73 @@ final class GroupCache
 				roster.restoreStorage(ts, by != null && by.isJsonPrimitive() ? by.getAsString() : "",
 					ItemCounts.fromJson(s.get("i"), GroupCodec.MAX_STORAGE_ITEMS));
 			}
+		}
+
+		// Part 3. A part 2 file has none of these keys and loads as before.
+		JsonElement extras = in.get("extras");
+		if (extras != null && extras.isJsonObject())
+		{
+			int n = 0;
+			for (Map.Entry<String, JsonElement> e : extras.getAsJsonObject().entrySet())
+			{
+				if (n++ >= MAX_MEMBERS || !e.getValue().isJsonObject())
+				{
+					continue;
+				}
+				JsonObject x = e.getValue().getAsJsonObject();
+				Long svts = ItemCounts.longValue(x.get("svts"));
+				roster.putExtras(e.getKey(), new MemberExtras(
+					ItemCounts.fromJson(x.get("rp"), GroupCodec.MAX_POUCH_ITEMS),
+					ItemCounts.fromJson(x.get("q"), GroupCodec.MAX_QUIVER_ITEMS),
+					ItemCounts.fromJson(x.get("sv"), GroupCodec.MAX_SEED_VAULT_ITEMS),
+					svts == null ? -1 : svts));
+			}
+		}
+
+		JsonElement events = in.get("events");
+		if (events != null && events.isJsonArray())
+		{
+			for (JsonElement item : events.getAsJsonArray())
+			{
+				if (!item.isJsonObject())
+				{
+					continue;
+				}
+				JsonObject entry = item.getAsJsonObject();
+				Long ts = ItemCounts.longValue(entry.get("ts"));
+				JsonElement t = entry.get("t");
+				JsonElement by = entry.get("by");
+				JsonElement s = entry.get("s");
+				if (ts == null || t == null || !t.isJsonPrimitive() || by == null || !by.isJsonPrimitive()
+					|| s == null || !s.isJsonPrimitive())
+				{
+					continue;
+				}
+				roster.events().add("d".equals(t.getAsString())
+					? GroupEvent.drop(ts, by.getAsString(), s.getAsString(),
+						ItemCounts.fromJson(entry.get("i"), GroupEvent.MAX_DROP_ITEMS))
+					: GroupEvent.clog(ts, by.getAsString(), s.getAsString()));
+			}
+		}
+
+		JsonElement heard = in.get("heard");
+		if (heard != null && heard.isJsonObject())
+		{
+			int n = 0;
+			for (Map.Entry<String, JsonElement> e : heard.getAsJsonObject().entrySet())
+			{
+				Long at = ItemCounts.longValue(e.getValue());
+				if (n++ < MAX_MEMBERS && at != null && at > 0)
+				{
+					roster.heard(e.getKey(), at);
+				}
+			}
+		}
+
+		Long played = ItemCounts.longValue(in.get("played"));
+		if (played != null && played > 0)
+		{
+			roster.markPlayed(played);
 		}
 		return true;
 	}

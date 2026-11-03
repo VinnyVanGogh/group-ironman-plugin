@@ -22,18 +22,28 @@ final class GroupOutbox
 		final boolean storage;
 		final boolean stats;
 		final boolean carried;
+		final boolean extras;
+		final boolean drops;
 
+		/** The part 2 switches, with the part 3 ones off. */
 		Switches(boolean bank, boolean storage, boolean stats, boolean carried)
+		{
+			this(bank, storage, stats, carried, false, false);
+		}
+
+		Switches(boolean bank, boolean storage, boolean stats, boolean carried, boolean extras, boolean drops)
 		{
 			this.bank = bank;
 			this.storage = storage;
 			this.stats = stats;
 			this.carried = carried;
+			this.extras = extras;
+			this.drops = drops;
 		}
 
 		boolean any()
 		{
-			return bank || storage || stats || carried;
+			return bank || storage || stats || carried || extras || drops;
 		}
 	}
 
@@ -76,5 +86,24 @@ final class GroupOutbox
 			return null;
 		}
 		return GroupCodec.encodeCarried(gson, inventory, worn);
+	}
+
+	static String extras(Gson gson, Switches switches, MemberExtras extras)
+	{
+		if (!switches.extras || extras == null)
+		{
+			return null;
+		}
+		return GroupCodec.encodeExtras(gson, extras);
+	}
+
+	/** Empty when drop sharing is off or there is nothing to send. */
+	static List<String> events(Gson gson, Switches switches, List<GroupEvent> events)
+	{
+		if (!switches.drops || events == null)
+		{
+			return Collections.emptyList();
+		}
+		return GroupCodec.encodeEvents(gson, events);
 	}
 }
