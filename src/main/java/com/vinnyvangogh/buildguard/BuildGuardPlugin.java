@@ -39,6 +39,7 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.PartyChanged;
@@ -60,7 +61,9 @@ import net.runelite.client.ui.NavigationButton;
  * panel, read by {@link RuleText}), a chat warning when the selected attack
  * style trains a skill those rules cap, and the opt-in group features over
  * RuneLite Party: each member's rules and levels, the at-risk line, and a
- * "who has what" gear list. Party traffic goes only through RuneLite's own
+ * "who has what" gear list. The Group Ironman extras (banks, the storage log,
+ * live stats, search, storage minimums) live in {@link GroupService}, which
+ * this plugin registers on the event bus. Party traffic goes only through RuneLite's own
  * {@link PartyService}; this plugin makes no network calls of its own.
  *
  * <p>The quest verdict, quest-start warning and lamp facades are still stubs
@@ -104,6 +107,12 @@ public class BuildGuardPlugin extends Plugin
 	@Inject
 	private ItemManager itemManager;
 
+	@Inject
+	private EventBus eventBus;
+
+	@Inject
+	private GroupService group;
+
 	private final PartyRoster roster = new PartyRoster();
 	private BuildGuardPartyPanel panel;
 	private NavigationButton navButton;
@@ -129,6 +138,9 @@ public class BuildGuardPlugin extends Plugin
 	protected void startUp()
 	{
 		wsClient.registerMessage(BuildGuardPartyMessage.class);
+		wsClient.registerMessage(BuildGuardGroupMessage.class);
+		eventBus.register(group);
+		group.startUp(this::redraw);
 		panel = new BuildGuardPartyPanel();
 		navButton = NavigationButton.builder()
 			.tooltip("Build Guard: party")
@@ -152,6 +164,9 @@ public class BuildGuardPlugin extends Plugin
 	protected void shutDown()
 	{
 		wsClient.unregisterMessage(BuildGuardPartyMessage.class);
+		wsClient.unregisterMessage(BuildGuardGroupMessage.class);
+		eventBus.unregister(group);
+		group.shutDown();
 		clientToolbar.removeNavigation(navButton);
 		roster.clear();
 		rules = Collections.emptyList();
@@ -171,6 +186,7 @@ public class BuildGuardPlugin extends Plugin
 			return;
 		}
 		reloadRules();
+		group.reloadConfig();
 		updateNavButton();
 		lastSent = null;
 		clientThread.invokeLater(() ->
@@ -256,6 +272,7 @@ public class BuildGuardPlugin extends Plugin
 	public void onPartyChanged(PartyChanged event)
 	{
 		roster.clear();
+		group.onPartyChanged();
 		lastSent = null;
 		dirty = true;
 		redraw();
@@ -292,14 +309,17 @@ public class BuildGuardPlugin extends Plugin
 
 	private void updateNavButton()
 	{
-		if (config.partyShareBuild())
+		if (!config.partyShareBuild())
+		{
+			roster.clear();
+		}
+		if (config.partyShareBuild() || group.anyOn())
 		{
 			clientToolbar.addNavigation(navButton);
 		}
 		else
 		{
 			clientToolbar.removeNavigation(navButton);
-			roster.clear();
 		}
 		redraw();
 	}
@@ -471,8 +491,9 @@ public class BuildGuardPlugin extends Plugin
 		{
 			return;
 		}
-		boolean inParty = partyService.isInParty();
-		SwingUtilities.invokeLater(() -> p.render(inParty, roster));
+		BuildGuardPartyPanel.View view = new BuildGuardPartyPanel.View(partyService.isInParty(), roster,
+			group.roster(), group.lookup, group.switches());
+		SwingUtilities.invokeLater(() -> p.render(view));
 	}
 
 	private static boolean containsSkill(List<BuildRule> list, String skill)

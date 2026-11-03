@@ -14,7 +14,14 @@ Warns before a quest, lamp or activity gives XP that breaks a capped account's b
   Group Ironman team with pures:
   - every member's caps and current levels in one side panel;
   - an "at risk" line when a member's style is about to give them capped XP;
-  - a "who has what" list of the items members choose to share.
+  - a "who has what" list of the items members choose to share;
+  - each member's last bank ("last seen 2h ago", with value), kept across
+    restarts;
+  - a group storage log: who took or deposited what, last 200 changes;
+  - live group stats with boosts and drains (`90 (+8)`), HP, prayer, run,
+    special attack and world;
+  - a "Who has it?" search across banks, inventories, equipment and storage;
+  - storage minimums with a desktop notification when stock runs low.
 
 Build Guard only warns. It never blocks a click or acts for you, and it makes
 no network connections of its own; party data goes through RuneLite's Party
