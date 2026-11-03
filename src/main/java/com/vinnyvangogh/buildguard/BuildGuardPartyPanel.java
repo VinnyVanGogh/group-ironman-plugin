@@ -16,8 +16,10 @@ import net.runelite.client.ui.PluginPanel;
 
 /**
  * The party side panel: every member's caps and levels, who is at risk, who
- * has what, and the Group Ironman extras: live stats, last banks, the group
- * storage log and the "Who has it?" search. Text only; it draws what
+ * has what, and the Group Ironman extras: who is online and where, drops and
+ * collection log slots since you last played, carried items and the rune
+ * pouch, quiver and seed vault, live stats, last banks, the group storage log
+ * and the "Who has it?" search. Text only; it draws what
  * {@link PartyRoster} and {@link GroupRoster} hand it.
  */
 class BuildGuardPartyPanel extends PluginPanel
@@ -30,14 +32,22 @@ class BuildGuardPartyPanel extends PluginPanel
 		final GroupRoster group;
 		final ItemLookup items;
 		final GroupOutbox.Switches switches;
+		final RegionNames regions;
+		/** When this player last played before this session, 0 when not known. */
+		final long since;
+		final String self;
 
-		View(boolean inParty, PartyRoster party, GroupRoster group, ItemLookup items, GroupOutbox.Switches switches)
+		View(boolean inParty, PartyRoster party, GroupRoster group, ItemLookup items, GroupOutbox.Switches switches,
+			RegionNames regions, long since, String self)
 		{
 			this.inParty = inParty;
 			this.party = party;
 			this.group = group;
 			this.items = items;
 			this.switches = switches;
+			this.regions = regions;
+			this.since = since;
+			this.self = self;
 		}
 	}
 
@@ -127,9 +137,34 @@ class BuildGuardPartyPanel extends PluginPanel
 			line("Members appear here once they turn on sharing in Build Guard's settings.");
 		}
 
+		List<String> members = v.group.memberLines(v.regions, now);
+		if (!members.isEmpty())
+		{
+			heading("Members");
+			for (String s : members)
+			{
+				line(s);
+			}
+		}
+
+		if (v.switches.drops)
+		{
+			renderEvents(v, now);
+		}
+
 		renderBuilds(v.party);
 
-		List<List<String>> stats = v.group.statsBlocks();
+		List<String> held = v.group.itemLines(v.items, now);
+		if (!held.isEmpty())
+		{
+			heading("Items");
+			for (String s : held)
+			{
+				line(s);
+			}
+		}
+
+		List<List<String>> stats = v.group.statsBlocks(v.regions);
 		if (!stats.isEmpty())
 		{
 			heading("Group stats");
@@ -170,6 +205,36 @@ class BuildGuardPartyPanel extends PluginPanel
 
 		body.revalidate();
 		body.repaint();
+	}
+
+	/** Drops and new collection log slots since this player last played, or the latest when that is not known. */
+	private void renderEvents(View v, long now)
+	{
+		List<GroupEvent> events;
+		if (v.since > 0)
+		{
+			heading("Since you last played (" + BoostText.ago(now, v.since) + ")");
+			events = v.group.events().since(v.since, v.self);
+		}
+		else
+		{
+			heading("Drops and collection log");
+			events = v.group.events().entries();
+		}
+		if (events.isEmpty())
+		{
+			line(v.since > 0 ? "Nothing new from the group." : "None seen yet.");
+			return;
+		}
+		List<String> lines = DropLog.lines(events, v.items, now);
+		for (int i = 0; i < lines.size() && i < GroupService.MAX_EVENT_LINES; i++)
+		{
+			line(lines.get(i));
+		}
+		if (lines.size() > GroupService.MAX_EVENT_LINES)
+		{
+			line("and " + (lines.size() - GroupService.MAX_EVENT_LINES) + " more.");
+		}
 	}
 
 	private void renderBuilds(PartyRoster roster)

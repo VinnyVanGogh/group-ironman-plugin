@@ -60,9 +60,23 @@ you other members' data while you share the same thing yourself.
 | --- | --- |
 | Share bank | When you close your bank: each item and how many, no tabs or slots. Members see your bank as "last seen 2h ago" with its total value. Kept on disk, so it is still there after a restart or when you are offline. |
 | Share group storage changes | When you close group storage: what you took and deposited, and what was left. Everyone's panel keeps a log of the last 200 changes. |
-| Share stats | Every skill's real and boosted level (shown as `90 (+8)` or `70 (-3)`), HP, prayer, run energy, special attack, your world and map region number. |
-| Share inventory and equipment | What you are carrying and wearing, with counts, for the search. |
+| Share stats | Every skill's real and boosted level (shown as `90 (+8)` or `70 (-3)`), HP, prayer, run energy, special attack, your world and where you are (resent every 8 tiles you walk, and once a minute so members see you as online). |
+| Share inventory and equipment | What you are carrying and wearing, with counts, for the panel's "Items" list and the search. |
 | Storage minimums | Not sent anywhere. One per line, `Shark: 100`. A desktop notification when a group storage close leaves an item below its minimum; once per item until it is restocked. Your own closes always count; other members' count when *Share group storage changes* is on. |
+| Share rune pouch, quiver, seed vault | What is in your rune pouch and Dizana's quiver, and your seed vault as of the last time you opened it. |
+| Share drops and collection log | Your NPC drops (items worth at least *Drops worth at least*, 10,000 gp by default; 0 sends everything) and each new collection log slot. Kept on disk for everyone, and resent for 7 days whenever someone joins the party. |
+| Show members on world map | Not sent anywhere. Marks online members on the world map. Needs *Share stats* on, for you and for them. |
+
+The panel's **Members** list shows each member as *online* (heard from in
+the last 3 minutes), *last seen 2h ago*, or *not seen yet*, with their world
+and place ("Lumbridge", "Vorkath", "Taverley Dungeon"; a region number where
+the bundled table has no name).
+
+**Since you last played** lists the group's drops and new collection log
+slots after the last time you were logged in, newest first. Your own are left
+out. On the first run it lists the latest ones instead. New collection log
+slots are read from the game's chat line, so turn on the in-game setting
+*Collection log - New addition notification* (Settings, Chat).
 
 The **Who has it?** box at the top of the Build Guard panel searches members'
 last banks, inventories, equipment and group storage by item name (two
@@ -72,8 +86,9 @@ The storage log only has visits by members running Build Guard with *Share
 group storage changes* on. A change by anyone else is not attributed to
 anybody; it just shows up in the next logged visit's "before".
 
-Banks and the storage log are saved in `.runelite/build-guard/group-cache.json`.
-Delete that file to forget them.
+Banks, the storage log, rune pouches, quivers, seed vaults, drops, last seen
+times and when you last played are saved in
+`.runelite/build-guard/group-cache.json`. Delete that file to forget them.
 
 ## Testing with friends
 
@@ -177,6 +192,39 @@ Group banks, storage and stats (two or more members with the same switch on):
    kind of update from you (check their panels), and the matching section
    empties in yours.
 
+Members, items, drops and the map (two or more members with the same
+switches on):
+
+7. **Online / last seen.** With *Share stats* on for both of you, your friend
+   reads `online, world 302, Lumbridge` (their world and place) in your
+   **Members** list. Walk into a dungeon or to a boss: the place updates
+   within a few seconds. Have them log out: within 3 minutes they read
+   `last seen just now`, then `last seen 5m ago`.
+8. **Items.** With *Share inventory and equipment*, the **Items** list shows
+   `<name> wearing: ...` and `<name> carrying: ...` and follows a gear swap
+   within a few seconds.
+9. **Rune pouch, quiver, seed vault.** With *Share rune pouch, quiver, seed
+   vault*: cast a spell from the pouch and the `rune pouch:` line drops by the
+   runes used. Equip Dizana's quiver with arrows in it: a `quiver:` line.
+   Open and close the seed vault: `seed vault: N kinds, M seeds (last seen just
+   now)`. Search a seed or rune name in "Who has it?": it is found there.
+   Check the rune names are right (not "item 1234") and the quiver count
+   matches the game.
+10. **Drops.** With *Share drops and collection log* on, kill something that
+    drops an item worth over 10,000 gp: your friend's **Since you last
+    played** (or **Drops and collection log** on a first run) gains
+    `<name>: <NPC> dropped ...`. Your own panel does not list your own drops.
+    Set *Drops worth at least* to 0: every drop shows.
+11. **Collection log.** With the in-game new-addition notification on, get a
+    new collection log slot: a `new collection log slot, <item>` line.
+12. **Since you last played.** Log out for a few minutes while your friend
+    gets a drop, log back in: the drop is listed under **Since you last
+    played** once your friend is online. Restart the client: the list is
+    still there.
+13. **World map.** Turn on *Show members on world map* (with *Share stats*):
+    open the world map, an orange dot with your friend's name sits where they
+    are, and disappears a few minutes after they log out.
+
 ## Limitations
 
 - **Quest and lamp warnings are not wired up yet.** The warning today is for
@@ -193,8 +241,18 @@ Group banks, storage and stats (two or more members with the same switch on):
   opened with *Share bank* on, are not known.
 - **The storage log only sees members running Build Guard** with storage
   sharing on. It is a record of what each client saw, not the game's own log.
-- **Region is a number** (the 64×64 map region id), not a place name: the
-  plugin has no map-name data and does not guess.
+- **Place names come from a bundled table** (about 970 map regions: cities,
+  bosses, raids, minigames, dungeons, areas). A region not in it shows as a
+  number rather than a guess.
+- **There is no server.** "Since you last played" only has what a member's
+  client resent while you were both online; a member who never comes online
+  again after you do cannot send you their drops. Drops are NPC drops only
+  (not chests, raids rewards or clue caskets), and collection log slots need
+  the in-game chat notification.
+- **The seed vault is as of the last open.** The rune pouch and quiver are
+  live.
+- **The world map shows members, not a map in the panel**: the client has no
+  map picture a plugin could draw without downloading it.
 - **Bank values use RuneLite's cached Grand Exchange prices**, which are what
   the bank's own value display uses; untradeables count as 0.
 

@@ -144,8 +144,8 @@ public interface BuildGuardConfig extends Config
 	@ConfigItem(
 		keyName = "groupShareStats",
 		name = "Share stats",
-		description = "Send your real and boosted levels, HP, prayer, run energy, special attack, world and map"
-			+ " region, and show every member's",
+		description = "Send your real and boosted levels, HP, prayer, run energy, special attack, world and"
+			+ " location, and show every member's, with online / last seen",
 		section = groupSection,
 		position = 2
 	)
@@ -177,5 +177,55 @@ public interface BuildGuardConfig extends Config
 	default String groupLowStock()
 	{
 		return "";
+	}
+
+	@ConfigItem(
+		keyName = "groupShareExtras",
+		name = "Share rune pouch, quiver, seed vault",
+		description = "Send what is in your rune pouch and Dizana's quiver, and your seed vault as of the last time"
+			+ " you opened it, and show every member's",
+		section = groupSection,
+		position = 5
+	)
+	default boolean groupShareExtras()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "groupShareDrops",
+		name = "Share drops and collection log",
+		description = "Send your NPC drops and new collection log slots, and keep every member's in a 'Since you"
+			+ " last played' list. Collection log slots need the game's new-addition chat message turned on.",
+		section = groupSection,
+		position = 6
+	)
+	default boolean groupShareDrops()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "groupDropMinValue",
+		name = "Drops worth at least (gp)",
+		description = "Only items whose stack is worth at least this much are shared from a drop. 0 shares every item.",
+		section = groupSection,
+		position = 7
+	)
+	default int groupDropMinValue()
+	{
+		return 10_000;
+	}
+
+	@ConfigItem(
+		keyName = "groupWorldMap",
+		name = "Show members on world map",
+		description = "Mark online members on the world map. Needs 'Share stats' on, here and on their side.",
+		section = groupSection,
+		position = 8
+	)
+	default boolean groupWorldMap()
+	{
+		return false;
 	}
 }

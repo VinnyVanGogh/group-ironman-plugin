@@ -113,6 +113,9 @@ public class BuildGuardPlugin extends Plugin
 	@Inject
 	private GroupService group;
 
+	@Inject
+	private MemberMapMarkers markers;
+
 	private final PartyRoster roster = new PartyRoster();
 	private BuildGuardPartyPanel panel;
 	private NavigationButton navButton;
@@ -167,6 +170,7 @@ public class BuildGuardPlugin extends Plugin
 		wsClient.unregisterMessage(BuildGuardGroupMessage.class);
 		eventBus.unregister(group);
 		group.shutDown();
+		markers.clear();
 		clientToolbar.removeNavigation(navButton);
 		roster.clear();
 		rules = Collections.emptyList();
@@ -492,8 +496,21 @@ public class BuildGuardPlugin extends Plugin
 			return;
 		}
 		BuildGuardPartyPanel.View view = new BuildGuardPartyPanel.View(partyService.isInParty(), roster,
-			group.roster(), group.lookup, group.switches());
+			group.roster(), group.lookup, group.switches(), group.regions(), group.since(), group.self());
 		SwingUtilities.invokeLater(() -> p.render(view));
+		updateMarkers();
+	}
+
+	private void updateMarkers()
+	{
+		if (config.groupWorldMap() && config.groupShareStats() && partyService.isInParty())
+		{
+			markers.update(group.roster().onlineStats(System.currentTimeMillis()), group.self());
+		}
+		else
+		{
+			markers.clear();
+		}
 	}
 
 	private static boolean containsSkill(List<BuildRule> list, String skill)

@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * The JSON inside a {@link BuildGuardGroupMessage}: one of four kinds, each
+ * The JSON inside a {@link BuildGuardGroupMessage}: one of six kinds, each
  * tagged {@code k}.
  *
  * <ul>
@@ -19,7 +19,10 @@ import java.util.TreeMap;
  * so no single message exceeds {@link #MAX_PAYLOAD_CHARS}.</li>
  * <li>{@code carried}: inventory and worn items.</li>
  * <li>{@code storage}: one group storage visit, see {@link StorageChange}.</li>
- * <li>{@code stats}: live levels and status, see {@link MemberStats}.</li>
+ * <li>{@code stats}: live levels, status and position, see {@link MemberStats}.</li>
+ * <li>{@code extras}: rune pouch, quiver and seed vault, see {@link MemberExtras}.</li>
+ * <li>{@code events}: drops and new collection log slots, split like a bank,
+ * see {@link GroupEvent}.</li>
  * </ul>
  *
  * <p><b>Why a size cap of our own.</b> RuneLite 1.12.39's {@code WSClient}
@@ -51,9 +54,29 @@ final class GroupCodec
 	/** Room for the header fields of a bank part, generously. */
 	private static final int BANK_HEADER_CHARS = 120;
 
+	/** The rune pouch has four slots, six with the divine upgrade; the rest is headroom. */
+	static final int MAX_POUCH_ITEMS = 8;
+	static final int MAX_QUIVER_ITEMS = 2;
+	/**
+	 * Chosen so the fullest extras message fits {@link #MAX_PAYLOAD_CHARS}: an
+	 * item pair is at most 19 characters, and 250 of them is 4,750. The game has
+	 * well under 250 kinds of seed.
+	 */
+	static final int MAX_SEED_VAULT_ITEMS = 250;
+	static final int MAX_EVENTS_PER_MESSAGE = 100;
+	/** World tiles stay well under this on both axes. */
+	static final int MAX_COORD = 1 << 15;
+
+	/** Room for {@code {"v":1,"k":"events","e":[]}} and change. */
+	private static final int EVENTS_HEADER_CHARS = 40;
+
+	/**
+	 * The {@code k} on the wire. {@link #EXTRAS} and {@link #EVENTS} came in
+	 * part 3; a part 2 build reads them as an unknown kind and ignores them.
+	 */
 	enum Kind
 	{
-		BANK, CARRIED, STORAGE, STATS
+		BANK, CARRIED, STORAGE, STATS, EXTRAS, EVENTS
 	}
 
 	/** One part of a split bank snapshot. */
@@ -93,14 +116,50 @@ final class GroupCodec
 		final Carried carried;
 		final StorageChange storage;
 		final MemberStats stats;
+		final MemberExtras extras;
+		/** Each with an empty member: the receiver files them under the party member they came from. */
+		final List<GroupEvent> events;
 
-		private Decoded(Kind kind, BankPart bank, Carried carried, StorageChange storage, MemberStats stats)
+		private Decoded(Kind kind, BankPart bank, Carried carried, StorageChange storage, MemberStats stats,
+			MemberExtras extras, List<GroupEvent> events)
 		{
 			this.kind = kind;
 			this.bank = bank;
 			this.carried = carried;
 			this.storage = storage;
 			this.stats = stats;
+			this.extras = extras;
+			this.events = events;
+		}
+
+		static Decoded of(BankPart bank)
+		{
+			return new Decoded(Kind.BANK, bank, null, null, null, null, null);
+		}
+
+		static Decoded of(Carried carried)
+		{
+			return new Decoded(Kind.CARRIED, null, carried, null, null, null, null);
+		}
+
+		static Decoded of(StorageChange storage)
+		{
+			return new Decoded(Kind.STORAGE, null, null, storage, null, null, null);
+		}
+
+		static Decoded of(MemberStats stats)
+		{
+			return new Decoded(Kind.STATS, null, null, null, stats, null, null);
+		}
+
+		static Decoded of(MemberExtras extras)
+		{
+			return new Decoded(Kind.EXTRAS, null, null, null, null, extras, null);
+		}
+
+		static Decoded of(List<GroupEvent> events)
+		{
+			return new Decoded(Kind.EVENTS, null, null, null, null, null, events);
 		}
 	}
 
@@ -181,7 +240,82 @@ final class GroupCodec
 		o.addProperty("spec", stats.specialAttack());
 		o.addProperty("w", stats.world());
 		o.addProperty("r", stats.region());
+		if (stats.hasPosition())
+		{
+			o.addProperty("x", stats.x());
+			o.addProperty("y", stats.y());
+			o.addProperty("pl", stats.plane());
+		}
 		return gson.toJson(o);
+	}
+
+	/** One message; the seed vault is cut to {@link #MAX_SEED_VAULT_ITEMS} so it always fits. */
+	static String encodeExtras(Gson gson, MemberExtras extras)
+	{
+		JsonObject o = header(Kind.EXTRAS);
+		o.add("rp", ItemCounts.toJson(first(extras.runePouch, MAX_POUCH_ITEMS)));
+		o.add("q", ItemCounts.toJson(first(extras.quiver, MAX_QUIVER_ITEMS)));
+		o.add("sv", ItemCounts.toJson(first(extras.seedVault, MAX_SEED_VAULT_ITEMS)));
+		o.addProperty("svts", extras.seedVaultAt);
+		return gson.toJson(o);
+	}
+
+	/**
+	 * As many messages as it takes to fit {@link #MAX_PAYLOAD_CHARS}, none for
+	 * no events. Sizes are measured on the JSON Gson actually writes, so names
+	 * Gson escapes are counted at their escaped length.
+	 */
+	static List<String> encodeEvents(Gson gson, List<GroupEvent> events)
+	{
+		List<String> out = new ArrayList<>();
+		JsonArray current = new JsonArray();
+		int chars = EVENTS_HEADER_CHARS;
+		for (GroupEvent e : events)
+		{
+			JsonObject event = new JsonObject();
+			event.addProperty("t", e.type == GroupEvent.Type.DROP ? "d" : "c");
+			event.addProperty("ts", e.at);
+			event.addProperty("s", e.text);
+			if (e.type == GroupEvent.Type.DROP)
+			{
+				event.add("i", ItemCounts.toJson(e.items));
+			}
+			int size = gson.toJson(event).length() + 1;
+			if (current.size() > 0 && (chars + size > MAX_PAYLOAD_CHARS || current.size() >= MAX_EVENTS_PER_MESSAGE))
+			{
+				out.add(eventsPayload(gson, current));
+				current = new JsonArray();
+				chars = EVENTS_HEADER_CHARS;
+			}
+			current.add(event);
+			chars += size;
+		}
+		if (current.size() > 0)
+		{
+			out.add(eventsPayload(gson, current));
+		}
+		return out;
+	}
+
+	private static String eventsPayload(Gson gson, JsonArray events)
+	{
+		JsonObject o = header(Kind.EVENTS);
+		o.add("e", events);
+		return gson.toJson(o);
+	}
+
+	private static Map<Integer, Integer> first(Map<Integer, Integer> counts, int max)
+	{
+		Map<Integer, Integer> out = new TreeMap<>();
+		for (Map.Entry<Integer, Integer> e : new TreeMap<>(counts).entrySet())
+		{
+			if (out.size() >= max)
+			{
+				break;
+			}
+			out.put(e.getKey(), e.getValue());
+		}
+		return out;
 	}
 
 	/** The decoded message, or null when it is not one this build can read. */
@@ -221,18 +355,26 @@ final class GroupCodec
 			case "bank":
 				return decodeBank(in);
 			case "carried":
-				return new Decoded(Kind.CARRIED, null, new Carried(
+				return Decoded.of(new Carried(
 					ItemCounts.fromJson(in.get("inv"), MAX_CARRIED_ITEMS),
-					ItemCounts.fromJson(in.get("eq"), MAX_CARRIED_ITEMS)), null, null);
+					ItemCounts.fromJson(in.get("eq"), MAX_CARRIED_ITEMS)));
 			case "storage":
-				return new Decoded(Kind.STORAGE, null, null, new StorageChange(
+				return Decoded.of(new StorageChange(
 					longOr(in.get("ts"), 0),
 					"",
 					ItemCounts.fromJson(in.get("took"), MAX_STORAGE_ITEMS),
 					ItemCounts.fromJson(in.get("dep"), MAX_STORAGE_ITEMS),
-					ItemCounts.fromJson(in.get("now"), MAX_STORAGE_ITEMS)), null);
+					ItemCounts.fromJson(in.get("now"), MAX_STORAGE_ITEMS)));
 			case "stats":
 				return decodeStats(in);
+			case "extras":
+				return Decoded.of(new MemberExtras(
+					ItemCounts.fromJson(in.get("rp"), MAX_POUCH_ITEMS),
+					ItemCounts.fromJson(in.get("q"), MAX_QUIVER_ITEMS),
+					ItemCounts.fromJson(in.get("sv"), MAX_SEED_VAULT_ITEMS),
+					longOr(in.get("svts"), -1)));
+			case "events":
+				return decodeEvents(in);
 			default:
 				// A kind from a newer build.
 				return null;
@@ -249,7 +391,54 @@ final class GroupCodec
 			return null;
 		}
 		Map<Integer, Integer> items = ItemCounts.fromJson(in.get("i"), MAX_BANK_ITEMS);
-		return new Decoded(Kind.BANK, new BankPart(ts, (int) part, (int) of, items), null, null, null);
+		return Decoded.of(new BankPart(ts, (int) part, (int) of, items));
+	}
+
+	/** Bad events are skipped one at a time, like bad item pairs. */
+	private static Decoded decodeEvents(JsonObject in)
+	{
+		List<GroupEvent> events = new ArrayList<>();
+		JsonElement e = in.get("e");
+		if (e != null && e.isJsonArray())
+		{
+			for (JsonElement item : e.getAsJsonArray())
+			{
+				if (events.size() >= MAX_EVENTS_PER_MESSAGE)
+				{
+					break;
+				}
+				if (!item.isJsonObject())
+				{
+					continue;
+				}
+				JsonObject o = item.getAsJsonObject();
+				Long ts = ItemCounts.longValue(o.get("ts"));
+				JsonElement t = o.get("t");
+				JsonElement s = o.get("s");
+				if (ts == null || ts < 0 || t == null || !t.isJsonPrimitive() || s == null || !s.isJsonPrimitive())
+				{
+					continue;
+				}
+				GroupEvent event;
+				switch (t.getAsString())
+				{
+					case "d":
+						event = GroupEvent.drop(ts, "", s.getAsString(),
+							ItemCounts.fromJson(o.get("i"), GroupEvent.MAX_DROP_ITEMS));
+						break;
+					case "c":
+						event = GroupEvent.clog(ts, "", s.getAsString());
+						break;
+					default:
+						continue;
+				}
+				if (event.isValid())
+				{
+					events.add(event);
+				}
+			}
+		}
+		return Decoded.of(events);
 	}
 
 	private static Decoded decodeStats(JsonObject in)
@@ -283,11 +472,14 @@ final class GroupCodec
 				}
 			}
 		}
-		return new Decoded(Kind.STATS, null, null, null, new MemberStats(skills,
+		return Decoded.of(new MemberStats(skills,
 			clamp(longOr(in.get("run"), 0), 0, 100),
 			clamp(longOr(in.get("spec"), 0), 0, 100),
 			clamp(longOr(in.get("w"), 0), 0, 9999),
-			clamp(longOr(in.get("r"), 0), 0, 1 << 16)));
+			clamp(longOr(in.get("r"), 0), 0, 1 << 16),
+			clamp(longOr(in.get("x"), 0), 0, MAX_COORD),
+			clamp(longOr(in.get("y"), 0), 0, MAX_COORD),
+			clamp(longOr(in.get("pl"), 0), 0, 3)));
 	}
 
 	private static JsonObject header(Kind kind)

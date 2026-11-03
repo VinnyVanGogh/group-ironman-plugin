@@ -222,6 +222,46 @@ plugins use. It informs; it does not act.
 All five are **off by default** and each has its own switch
 (`GroupOutboxTest.optedOutSendsNothing`, `eachSwitchOnlyOpensItsOwnFeature`).
 
+### Phase 0 addendum — GIM part 3 (2026-11-03)
+
+Asked for by the Board ("keep ours for the GIM thing and just add some of
+their stuff"): the Group Ironmen Tracker extras, same channel and same rule as
+#8 to #12. Each member's own client sends its own data, opt-in, through
+`PartyService`; no server, no accounts, no tokens.
+
+**13. Inventory and equipment per member — allowed.** Part 2 already sent
+them for the search (#11); part 3 lists them in the panel. Precedent: Group
+Ironmen Tracker; Party Panel shows members' gear.
+
+**14. Rune pouch, Dizana's quiver, seed vault — allowed.** Read from the
+local player's own varbits (`RUNE_POUCH_TYPE_n` / `RUNE_POUCH_QUANTITY_n`
+through `EnumID.RUNEPOUCH_RUNE`, exactly as the base `runepouch` plugin does)
+and varps (`DIZANAS_QUIVER_TEMP_AMMO[_AMOUNT]`), and the seed vault container
+(`InventoryID.SEED_VAULT`) when the player opens it. Precedent: Group
+Ironmen Tracker shares all three.
+
+**15. Drops and new collection log slots, "since you last played" — allowed.**
+Drops from `NpcLootReceived`, which the client's own `LootManager` posts (the
+base loot tracker reads it); collection log slots from the game's own chat
+line. Both are the player's own. *Nearest rule:* none; it reads no other
+player and automates nothing. Precedent: Group Ironmen Tracker issue #87 asks
+for this; the base loot tracker and many Hub plugins (e.g. Dink) report the
+same events off-client.
+
+**16. Where each member is — allowed, with precedent.** World, exact tile and
+a place name from a bundled region table. The base `party` plugin already
+shares exact location. Members on the world map use `WorldMapPointManager`,
+the API the base client's own world map markers use; off by default.
+
+**17. Online / last seen — allowed.** Derived from when a member's client last
+sent anything; stats sharing resends once a minute so silence means gone.
+Adds no data.
+
+All part 3 switches are **off by default** and each opens only its own feature
+(`GroupOutboxTest.thePart3SwitchesAreOffUnlessTurnedOnAndOnlyOpenTheirOwnFeature`).
+Group Ironmen Tracker's README was not re-read in this run either: cite it
+before submitting.
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection, and therefore any integration that reads another plugin's
