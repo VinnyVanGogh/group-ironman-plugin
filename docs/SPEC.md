@@ -57,6 +57,10 @@ Not resolved. Do not close one by guessing.
   filter at build time, or add the flag.
 - **How build rules are entered.** Presets (pure, zerker, skiller, …) or
   manual per-skill entry, or both. questpath-plugin has a manual editor only.
+  *Partly settled 2026-11-03:* the group features needed rules to share, so
+  manual entry now exists as a config text box (`buildRules`, parsed by
+  `RuleText`, e.g. `Defence: 1, Prayer: none`). Presets and a proper editor
+  are still open.
 - **How the plugin reads quest completion state.** `Quest#getState` over
   `Quest.values()` on the client thread is what questpath-plugin does, matched
   **by name** rather than by id. Confirm that survives as the only source once
