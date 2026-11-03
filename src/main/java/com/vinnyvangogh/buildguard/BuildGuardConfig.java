@@ -26,6 +26,13 @@ public interface BuildGuardConfig extends Config
 	)
 	String displaySection = "display";
 
+	@ConfigSection(
+		name = "Group (RuneLite Party)",
+		description = "Share your build with your RuneLite Party, e.g. a Group Ironman team. Everything here is off until you turn it on.",
+		position = 1
+	)
+	String partySection = "party";
+
 	@ConfigItem(
 		keyName = "enabled",
 		name = "Enabled",
@@ -38,4 +45,65 @@ public interface BuildGuardConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+		keyName = "buildRules",
+		name = "Build rules",
+		description = "One per line or comma: 'Defence: 1' caps Defence at 1, 'Prayer: none' means no XP,"
+			+ " 'Strength: goal 99' and 'Ranged: soft' only inform",
+		section = displaySection,
+		position = 1
+	)
+	default String buildRules()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = "warnAttackStyle",
+		name = "Warn on attack style",
+		description = "Chat warning when your selected attack style trains a skill your rules cap",
+		section = displaySection,
+		position = 2
+	)
+	default boolean warnAttackStyle()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "partyShareBuild",
+		name = "Share build with party",
+		description = "Send your build rules and the levels of those skills to your RuneLite Party,"
+			+ " and show the party's builds in a side panel",
+		section = partySection,
+		position = 0
+	)
+	default boolean partyShareBuild()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "partyShareRisk",
+		name = "Tell party when at risk",
+		description = "Also show your party a line when your attack style is about to give XP your rules cap",
+		section = partySection,
+		position = 1
+	)
+	default boolean partyShareRisk()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "partyShareGear",
+		name = "Share gear list",
+		description = "Also send the names of the items you are wearing and carrying, for the panel's 'who has what' list",
+		section = partySection,
+		position = 2
+	)
+	default boolean partyShareGear()
+	{
+		return false;
+	}
 }

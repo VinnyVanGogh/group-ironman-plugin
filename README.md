@@ -2,52 +2,34 @@
 
 Warns before a quest, lamp or activity gives XP that breaks a capped account's build
 
-> **Status: scaffold.** Nothing is implemented yet. Every piece is a stub that
-> throws, so installing this plugin today does nothing at all. The scope lives
-> in [`docs/SPEC.md`](docs/SPEC.md) and the engine it will be carved out of is
-> mapped in [`docs/SOURCE-MAP.md`](docs/SOURCE-MAP.md).
+> **Status: early test build.** Not on the Plugin Hub yet. Quest verdicts,
+> the quest-start warning and lamp advice are planned, not wired up.
 
-## What it does
+## Features
 
-*(Planned.)* If your account is built around a skill you must never train —
-a pure, a zerker, a skiller, anything capped on purpose — this tells you
-before the experience lands, not after:
+- **Your build rules, per skill:** no XP, a hard cap, a soft cap or a goal.
+- **Attack-style warning:** a red chat line when your selected style trains a
+  skill you capped (Controlled or Defensive on a 1 Defence pure, for example).
+- **Group features over RuneLite Party**, opt-in and off by default, for a
+  Group Ironman team with pures:
+  - every member's caps and current levels in one side panel;
+  - an "at risk" line when a member's style is about to give them capped XP;
+  - a "who has what" list of the items members choose to share.
 
-- **Your rules, per skill:** no XP, a hard cap, a soft cap or a goal, with the
-  experience still left under each one.
-- **A verdict per quest, with the reason** — "blocked via Death Plateau:
-  3,000 Attack XP" — judged across the whole prerequisite chain.
-- **A warning before you start** a quest that would break the build, or one
-  that is permanently out of reach because a prerequisite would.
-- **Lamp advice:** on the experience lamp's skill-choice interface, the skills
-  your rules close are greyed and the ones worth choosing are boxed.
+Build Guard only warns. It never blocks a click or acts for you, and it makes
+no network connections of its own; party data goes through RuneLite's Party
+service.
 
-**Build restrictions are about XP, not levels.** A 1-Defence account is blocked
-by any quest that *awards* Defence experience, whatever its level requirements
-say.
+## Quick start
 
-## Settings
+On Windows, double-click `tools/windows/Run-BuildGuard.cmd` (or the copy on
+the release page). It fetches Java if needed and starts RuneLite with Build
+Guard loaded. Elsewhere, run `./gradlew run`. Log in with RuneLite's Jagex
+account panel, type your rules into Build Guard's settings (e.g.
+`Defence: 1, Prayer: none`), and to use the group features join the same
+RuneLite Party as your friends and turn on *Share build with party*.
 
-Not settled. The scaffold carries the template's single `Enabled` key and
-nothing else; see the open decisions in `docs/SPEC.md`.
-
-## Limitations
-
-- **Nothing works yet.** See the status note above.
-- Quest data will be bundled at build time, so it is as current as the release
-  and no more. It does not update when the wiki does.
-- It warns. It never blocks a click, removes a menu option or does anything on
-  your behalf.
-
-## Building
-
-```sh
-./gradlew build     # compiles and runs the tests
-./gradlew run       # launches a developer client with the plugin side-loaded
-```
-
-Logging in to the developer client uses a Jagex account:
-<https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts>
+**Full steps, settings and what to test: [SETUP.md](SETUP.md).**
 
 ## License
 

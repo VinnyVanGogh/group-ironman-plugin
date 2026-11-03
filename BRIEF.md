@@ -145,6 +145,43 @@ Decide between those two before writing any of it, and write the verdict here.
 Do not reach the same outcome by a different route: the rules are about what
 happens to the player's click, not about which API does it.
 
+### Phase 0 addendum — group features over RuneLite Party (2026-11-03)
+
+Asked for by the Board for a Group Ironman team with pures. The source research
+note named in the task (`00-hub/docs/research/group-ironman-plugins.md`,
+commit 5e8e856) was **not reachable from this run**: `00-hub/docs/research/`
+holds only `donation-links.md`, and no repo visible here has that commit. The
+verdicts below come from the rules and precedent directly.
+
+**5. Each member shares their build rules and the levels of those skills —
+allowed, with precedent.**
+
+- *Nearest rules.* Data & Privacy: "no crowdsourcing data about other
+  players", "no exposing player information over HTTP".
+- *Why it falls on the allowed side.* Nothing is collected about anyone. Each
+  member's own client sends that member's own data, only after they turn it
+  on, only to the party they joined, through RuneLite's own `PartyService`
+  relay. No server or database of ours exists, and no HTTP client either.
+- *Precedent.* The base client's `party` plugin (`StatusUpdate`) shares HP,
+  prayer, run energy and special attack the same way. The Hub plugin **Party
+  Panel** (TheStonedTurtle, `plugin-hub/plugins/party-panel`) shares
+  "Inventory, worn Equipment, Active Prayers, and skill levels" between party
+  members (its README, read 2026-11-03).
+
+**6. Attack-style warning, locally and as an optional group line — allowed,
+with precedent.** It is `attackstyles` (warn when a style trains a warned
+skill), with the warned set taken from the build rules instead of five
+checkboxes. The group line only repeats to the party what the member's own
+client already knows about the member, opt-in, like #5. It is not about
+combat against anyone and not a PvP group summary: the party is your own team.
+
+**7. "Who has what" gear list — allowed, with precedent.** Party Panel shares
+worn equipment and inventory over the same channel. Build Guard sends item
+names only, worn and carried, never the bank, and only with its own switch on.
+
+All three are **off by default**, and with build sharing off the client sends
+no message at all (`PartyOutboxTest.optedOutMemberSendsNothing`).
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection, and therefore any integration that reads another plugin's

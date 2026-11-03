@@ -1,0 +1,3 @@
+# The Windows launcher gets CRLF on checkout; cmd.exe mis-parses some
+# constructs in LF-only batch files.
+*.cmd text eol=crlf
