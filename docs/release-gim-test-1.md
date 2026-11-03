@@ -5,6 +5,12 @@ is ready to test. Nothing here has been published or tagged.
 
 ## Before publishing
 
+0. **The repo is private** (`gh repo view` on 2026-11-03). Friends without
+   access cannot download a release asset or the source zip from a private
+   repo, so the launcher's `[2/3]` step would fail for them with a 404. Either
+   make the repo public before publishing, or have each friend download the
+   whole repo some other way and run `tools\windows\Run-BuildGuard.cmd` from
+   inside it (the launcher then uses that copy and downloads no source).
 1. Merge the PR, then tag the merge commit: `git tag gim-test-1 <merge sha>`
    and push the tag. `Run-BuildGuard.cmd` downloads
    `archive/refs/tags/gim-test-1.zip` when it is run on its own, so **the tag
@@ -28,7 +34,7 @@ is ready to test. Nothing here has been published or tagged.
 > `%LOCALAPPDATA%\BuildGuard`. If Windows says "Windows protected your PC",
 > click **More info → Run anyway** (it is an unsigned text script; open it in
 > Notepad to read it). Full steps, including the one-time Jagex account login
-> and joining the party: see *Testing with friends (Windows)* in the README.
+> and joining the party: see *Testing with friends (Windows)* in SETUP.md.
 >
 > **What to test:** put your rules in Build Guard's settings (e.g.
 > `Defence: 1`), turn on *Share build with party*, join the same RuneLite
