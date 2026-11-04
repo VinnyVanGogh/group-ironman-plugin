@@ -45,7 +45,7 @@ final class GroupSearch
 	static List<String> search(String query, List<Source> sources, ItemLookup items, long now)
 	{
 		List<String> out = new ArrayList<>();
-		String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+		String q = normalize(query);
 		if (q.length() < MIN_QUERY)
 		{
 			return out;
@@ -76,6 +76,63 @@ final class GroupSearch
 				break;
 			}
 			out.add(e.getKey() + ": " + String.join(", ", e.getValue()));
+		}
+		return out;
+	}
+
+	/**
+	 * The newest storage log visits that took or deposited a matching item,
+	 * newest first, at most {@code limit}: "Alex took 1 x Dragon hunter wand
+	 * from storage (3d ago)". {@code log} is {@link StorageLog#entries()},
+	 * already newest first.
+	 */
+	static List<String> history(String query, List<StorageChange> log, ItemLookup items, long now, int limit)
+	{
+		List<String> out = new ArrayList<>();
+		String q = normalize(query);
+		if (q.length() < MIN_QUERY)
+		{
+			return out;
+		}
+		for (StorageChange c : log)
+		{
+			if (out.size() >= limit)
+			{
+				break;
+			}
+			Map<Integer, Integer> took = matching(c.took(), q, items);
+			Map<Integer, Integer> deposited = matching(c.deposited(), q, items);
+			List<String> parts = new ArrayList<>();
+			if (!took.isEmpty())
+			{
+				parts.add("took " + StorageLog.describe(took, items) + " from storage");
+			}
+			if (!deposited.isEmpty())
+			{
+				parts.add("deposited " + StorageLog.describe(deposited, items) + " into storage");
+			}
+			if (!parts.isEmpty())
+			{
+				out.add(c.member() + " " + String.join(", ", parts) + " (" + BoostText.ago(now, c.at()) + ")");
+			}
+		}
+		return out;
+	}
+
+	static String normalize(String query)
+	{
+		return query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+	}
+
+	private static Map<Integer, Integer> matching(Map<Integer, Integer> counts, String q, ItemLookup items)
+	{
+		Map<Integer, Integer> out = new TreeMap<>();
+		for (Map.Entry<Integer, Integer> e : counts.entrySet())
+		{
+			if (items.name(e.getKey()).toLowerCase(Locale.ROOT).contains(q))
+			{
+				out.put(e.getKey(), e.getValue());
+			}
 		}
 		return out;
 	}
