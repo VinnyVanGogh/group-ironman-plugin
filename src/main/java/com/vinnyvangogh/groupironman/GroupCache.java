@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -15,7 +15,7 @@ import java.util.Map;
  * not kept; it is only meaningful while the member is online.
  *
  * <p>Pure, {@code String} in and out. The plugin reads and writes the file
- * ({@code .runelite/build-guard/group-cache.json}) off the client thread. A
+ * ({@code .runelite/group-ironman/group-cache.json}) off the client thread. A
  * file this build cannot read is treated as empty, never as an error: losing
  * a cache costs one bank visit per member.
  */

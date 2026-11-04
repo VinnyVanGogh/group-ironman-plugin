@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
@@ -6,112 +6,30 @@ import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 
 /**
- * Settings for Build Guard.
+ * Settings for Group Ironman.
  *
  * <p>The group name and every {@code keyName} below are frozen once a version
  * is live on the Plugin Hub: renaming one silently resets that setting for
  * every user who has it. Choose them as if they were permanent, because they
  * are.
+ *
+ * <p>The group is this plugin's own: not Build Guard's {@code build-guard}, so
+ * the two never read or write each other's settings, and not
+ * {@code groupironman}, which the Hub plugin "Group Iron Man" (Spedwards)
+ * already uses. Author-prefixed so it survives a display-name change. Every
+ * switch defaults to off: a fresh install sends nothing and listens to nothing.
  */
-@ConfigGroup(BuildGuardConfig.GROUP)
-public interface BuildGuardConfig extends Config
+@ConfigGroup(GroupIronmanConfig.GROUP)
+public interface GroupIronmanConfig extends Config
 {
 	/** Frozen. See the class javadoc. */
-	String GROUP = "build-guard";
-
-	@ConfigSection(
-		name = "Display",
-		description = "What is shown and where",
-		position = 0
-	)
-	String displaySection = "display";
-
-	@ConfigSection(
-		name = "Group (RuneLite Party)",
-		description = "Share your build with your RuneLite Party, e.g. a Group Ironman team. Everything here is off until you turn it on.",
-		position = 1
-	)
-	String partySection = "party";
-
-	@ConfigItem(
-		keyName = "enabled",
-		name = "Enabled",
-		description = "Turns the readout on and off without disabling the plugin",
-		section = displaySection,
-		position = 0
-	)
-	default boolean enabled()
-	{
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "buildRules",
-		name = "Build rules",
-		description = "One per line or comma: 'Defence: 1' caps Defence at 1, 'Prayer: none' means no XP,"
-			+ " 'Strength: goal 99' and 'Ranged: soft' only inform",
-		section = displaySection,
-		position = 1
-	)
-	default String buildRules()
-	{
-		return "";
-	}
-
-	@ConfigItem(
-		keyName = "warnAttackStyle",
-		name = "Warn on attack style",
-		description = "Chat warning when your selected attack style trains a skill your rules cap",
-		section = displaySection,
-		position = 2
-	)
-	default boolean warnAttackStyle()
-	{
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "partyShareBuild",
-		name = "Share build with party",
-		description = "Send your build rules and the levels of those skills to your RuneLite Party,"
-			+ " and show the party's builds in a side panel",
-		section = partySection,
-		position = 0
-	)
-	default boolean partyShareBuild()
-	{
-		return false;
-	}
-
-	@ConfigItem(
-		keyName = "partyShareRisk",
-		name = "Tell party when at risk",
-		description = "Also show your party a line when your attack style is about to give XP your rules cap",
-		section = partySection,
-		position = 1
-	)
-	default boolean partyShareRisk()
-	{
-		return false;
-	}
-
-	@ConfigItem(
-		keyName = "partyShareGear",
-		name = "Share gear list",
-		description = "Also send the names of the items you are wearing and carrying, for the panel's 'who has what' list",
-		section = partySection,
-		position = 2
-	)
-	default boolean partyShareGear()
-	{
-		return false;
-	}
+	String GROUP = "vvg-group-ironman";
 
 	@ConfigSection(
 		name = "Group banks, storage and stats",
-		description = "Group Ironman extras over RuneLite Party. Each is off until you turn it on, and each only"
+		description = "Group Ironman sharing over RuneLite Party. Each is off until you turn it on, and each only"
 			+ " shows you other members' data while you share your own.",
-		position = 2
+		position = 0
 	)
 	String groupSection = "group";
 
@@ -132,7 +50,7 @@ public interface BuildGuardConfig extends Config
 		keyName = "groupShareStorage",
 		name = "Share group storage changes",
 		description = "When you close group storage, tell your party what you took and deposited, and keep a log"
-			+ " of the last 200 changes. Only members running Build Guard with this on are logged.",
+			+ " of the last 200 changes. Only members running Group Ironman with this on are logged.",
 		section = groupSection,
 		position = 1
 	)
@@ -239,6 +157,6 @@ public interface BuildGuardConfig extends Config
 	)
 	default boolean groupFindCommand()
 	{
-		return true;
+		return false;
 	}
 }

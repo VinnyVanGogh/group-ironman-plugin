@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * The JSON inside a {@link BuildGuardGroupMessage}: one of six kinds, each
+ * The JSON inside a {@link VvgGroupIronmanMessage}: one of six kinds, each
  * tagged {@code k}.
  *
  * <ul>
@@ -33,8 +33,7 @@ import java.util.TreeMap;
  * the party relay's own limit is not published. So this plugin picks a budget
  * far below anything a relay is likely to enforce and splits to fit it.
  *
- * <p><b>Version tolerance</b> is the same as {@link PartyBuildCodec}: any
- * {@code v >= 1} is read, unknown kinds and fields are ignored, missing
+ * <p><b>Version tolerance</b>: any {@code v >= 1} is read, unknown kinds and fields are ignored, missing
  * fields decode to empty, and every list is capped.
  */
 final class GroupCodec

@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +40,7 @@ final class FindCommand
 		lines.addAll(GroupSearch.history(q, log, items, now, HISTORY_LIMIT));
 		if (lines.isEmpty())
 		{
-			out.add("Nothing found for '" + plain(query.trim()) + "'. Only members running Build Guard with sharing"
+			out.add("Nothing found for '" + plain(query.trim()) + "'. Only members running Group Ironman with sharing"
 				+ " on are tracked, as of their last sync; trades and drops between members are not.");
 			return out;
 		}
@@ -50,7 +50,7 @@ final class FindCommand
 		}
 		if (lines.size() > MAX_LINES)
 		{
-			out.add((lines.size() - MAX_LINES) + " more, see the Build Guard panel");
+			out.add((lines.size() - MAX_LINES) + " more, see the Group Ironman panel");
 		}
 		return out;
 	}

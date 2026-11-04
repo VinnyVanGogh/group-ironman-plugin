@@ -1,8 +1,7 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import java.awt.BorderLayout;
 import java.util.List;
-import java.util.Map;
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -15,20 +14,17 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 
 /**
- * The party side panel: every member's caps and levels, who is at risk, who
- * has what, and the Group Ironman extras: who is online and where, drops and
- * collection log slots since you last played, carried items and the rune
- * pouch, quiver and seed vault, live stats, last banks, the group storage log
- * and the "Who has it?" search. Text only; it draws what
- * {@link PartyRoster} and {@link GroupRoster} hand it.
+ * The group side panel: who is online and where, drops and collection log
+ * slots since you last played, carried items and the rune pouch, quiver and
+ * seed vault, live stats, last banks, the group storage log and the "Who has
+ * it?" search. Text only; it draws what {@link GroupRoster} hands it.
  */
-class BuildGuardPartyPanel extends PluginPanel
+class GroupIronmanPanel extends PluginPanel
 {
 	/** What the panel last drew, so typing in the search box can redraw on its own. */
 	static final class View
 	{
 		final boolean inParty;
-		final PartyRoster party;
 		final GroupRoster group;
 		final ItemLookup items;
 		final GroupOutbox.Switches switches;
@@ -37,11 +33,10 @@ class BuildGuardPartyPanel extends PluginPanel
 		final long since;
 		final String self;
 
-		View(boolean inParty, PartyRoster party, GroupRoster group, ItemLookup items, GroupOutbox.Switches switches,
+		View(boolean inParty, GroupRoster group, ItemLookup items, GroupOutbox.Switches switches,
 			RegionNames regions, long since, String self)
 		{
 			this.inParty = inParty;
-			this.party = party;
 			this.group = group;
 			this.items = items;
 			this.switches = switches;
@@ -55,7 +50,7 @@ class BuildGuardPartyPanel extends PluginPanel
 	private final JTextField search = new JTextField();
 	private View view;
 
-	BuildGuardPartyPanel()
+	GroupIronmanPanel()
 	{
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
@@ -134,12 +129,12 @@ class BuildGuardPartyPanel extends PluginPanel
 		if (!v.inParty)
 		{
 			line("Not in a RuneLite Party.");
-			line("Join one from the Party panel; every member needs Build Guard with sharing turned on.");
+			line("Join one from the Party panel; every member needs Group Ironman with sharing turned on.");
 		}
-		else if (v.party.isEmpty() && !v.group.hasAnything())
+		else if (!v.group.hasAnything())
 		{
 			line("Nothing shared yet.");
-			line("Members appear here once they turn on sharing in Build Guard's settings.");
+			line("Members appear here once they turn on sharing in Group Ironman's settings.");
 		}
 
 		List<String> members = v.group.memberLines(v.regions, now);
@@ -156,8 +151,6 @@ class BuildGuardPartyPanel extends PluginPanel
 		{
 			renderEvents(v, now);
 		}
-
-		renderBuilds(v.party);
 
 		List<String> held = v.group.itemLines(v.items, now);
 		if (!held.isEmpty())
@@ -196,7 +189,7 @@ class BuildGuardPartyPanel extends PluginPanel
 		if (v.switches.storage)
 		{
 			heading("Group storage log");
-			line("Only changes by members running Build Guard with storage sharing on are listed.");
+			line("Only changes by members running Group Ironman with storage sharing on are listed.");
 			List<String> log = v.group.log().lines(v.items, now);
 			if (log.isEmpty())
 			{
@@ -239,39 +232,6 @@ class BuildGuardPartyPanel extends PluginPanel
 		if (lines.size() > GroupService.MAX_EVENT_LINES)
 		{
 			line("and " + (lines.size() - GroupService.MAX_EVENT_LINES) + " more.");
-		}
-	}
-
-	private void renderBuilds(PartyRoster roster)
-	{
-		if (roster.isEmpty())
-		{
-			return;
-		}
-		heading("Builds");
-		for (String s : roster.memberLines())
-		{
-			line(s);
-		}
-
-		List<String> risks = roster.riskLines();
-		if (!risks.isEmpty())
-		{
-			heading("At risk");
-			for (String s : risks)
-			{
-				line(s);
-			}
-		}
-
-		Map<String, List<String>> gear = roster.gearIndex();
-		if (!gear.isEmpty())
-		{
-			heading("Who has what");
-			for (Map.Entry<String, List<String>> e : gear.entrySet())
-			{
-				line(e.getKey() + ": " + String.join(", ", e.getValue()));
-			}
 		}
 	}
 

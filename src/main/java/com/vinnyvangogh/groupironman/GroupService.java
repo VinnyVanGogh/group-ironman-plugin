@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import java.io.File;
@@ -65,11 +65,10 @@ import net.runelite.client.party.messages.UserSync;
  * seed vault, the drops and collection log list, online / last seen, "who has
  * it?" and storage minimums.
  *
- * <p>Registered on the event bus by {@link BuildGuardPlugin} while the plugin
+ * <p>Registered on the event bus by {@link GroupIronmanPlugin} while the plugin
  * runs. Every send goes through {@link GroupOutbox}, so a member with a
  * feature off sends nothing of it; every receive is dropped unless this
- * member shares the same feature, the rule {@link BuildGuardPlugin} already
- * applies to builds.
+ * member shares the same feature.
  *
  * <p>Data only ever comes from this player's own client: their bank and
  * group storage as the game shows them, their own stats. Nothing is read
@@ -108,7 +107,8 @@ class GroupService
 		}
 	}
 
-	private static final String CACHE_DIR = "build-guard";
+	/** Its own folder, never Build Guard's: both plugins may run side by side. */
+	static final String CACHE_DIR = "group-ironman";
 	private static final String CACHE_FILE = "group-cache.json";
 
 	@Inject
@@ -118,7 +118,7 @@ class GroupService
 	private ClientThread clientThread;
 
 	@Inject
-	private BuildGuardConfig config;
+	private GroupIronmanConfig config;
 
 	@Inject
 	private Gson gson;
@@ -409,7 +409,7 @@ class GroupService
 		{
 			chatMessageManager.queue(QueuedMessage.builder()
 				.type(ChatMessageType.GAMEMESSAGE)
-				.runeLiteFormattedMessage("Build Guard: " + line)
+				.runeLiteFormattedMessage(GroupIronmanPlugin.NAME + ": " + line)
 				.build());
 		}
 	}
@@ -426,7 +426,7 @@ class GroupService
 		{
 			for (String payload : GroupOutbox.events(gson, switches(), Collections.singletonList(event)))
 			{
-				partyService.send(new BuildGuardGroupMessage(payload));
+				partyService.send(new VvgGroupIronmanMessage(payload));
 			}
 		}
 		saveCache();
@@ -557,14 +557,14 @@ class GroupService
 			{
 				for (String payload : GroupOutbox.bank(gson, switches(), lastBank))
 				{
-					partyService.send(new BuildGuardGroupMessage(payload));
+					partyService.send(new VvgGroupIronmanMessage(payload));
 				}
 			}
 			// The joiner may have been offline for these: this is how "since you last played" works with no server.
 			List<GroupEvent> mine = roster.events().recentBy(localName(), System.currentTimeMillis());
 			for (String payload : GroupOutbox.events(gson, switches(), mine))
 			{
-				partyService.send(new BuildGuardGroupMessage(payload));
+				partyService.send(new VvgGroupIronmanMessage(payload));
 			}
 		});
 	}
@@ -595,7 +595,7 @@ class GroupService
 	}
 
 	@Subscribe
-	public void onBuildGuardGroupMessage(BuildGuardGroupMessage message)
+	public void onVvgGroupIronmanMessage(VvgGroupIronmanMessage message)
 	{
 		PartyMember local = partyService.getLocalMember();
 		if (local != null && local.getMemberId() == message.getMemberId())
@@ -738,7 +738,7 @@ class GroupService
 		String payload = GroupOutbox.storage(gson, s, change);
 		if (payload != null && partyService.isInParty())
 		{
-			partyService.send(new BuildGuardGroupMessage(payload));
+			partyService.send(new VvgGroupIronmanMessage(payload));
 		}
 		saveCache();
 		onChange.run();
@@ -771,7 +771,7 @@ class GroupService
 		{
 			for (String payload : GroupOutbox.bank(gson, s, snapshot))
 			{
-				partyService.send(new BuildGuardGroupMessage(payload));
+				partyService.send(new VvgGroupIronmanMessage(payload));
 			}
 		}
 		saveCache();
@@ -797,7 +797,7 @@ class GroupService
 		{
 			return;
 		}
-		partyService.send(new BuildGuardGroupMessage(payload));
+		partyService.send(new VvgGroupIronmanMessage(payload));
 		lastStatsSent = payload;
 		ticksSinceStats = 0;
 		roster.putStats(localName(), stats);
@@ -814,7 +814,7 @@ class GroupService
 		{
 			return;
 		}
-		partyService.send(new BuildGuardGroupMessage(payload));
+		partyService.send(new VvgGroupIronmanMessage(payload));
 		lastExtrasSent = payload;
 		ticksSinceExtras = 0;
 		resolveNow(extras.runePouch.keySet());
@@ -864,7 +864,7 @@ class GroupService
 		{
 			return;
 		}
-		partyService.send(new BuildGuardGroupMessage(payload));
+		partyService.send(new VvgGroupIronmanMessage(payload));
 		lastCarriedSent = payload;
 		ticksSinceCarried = 0;
 		resolveNow(inventory.keySet());
@@ -934,7 +934,7 @@ class GroupService
 		resolveNow(storage.keySet());
 		for (LowStock.Alert alert : lowStock.check(storage, lookup))
 		{
-			notifier.notify("Build Guard: " + alert.message());
+			notifier.notify(GroupIronmanPlugin.NAME + ": " + alert.message());
 		}
 	}
 

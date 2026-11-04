@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import java.util.Collections;
@@ -7,8 +7,7 @@ import java.util.Map;
 
 /**
  * Decides which group payloads this client is willing to send, and is the
- * only place that decides it, the same way {@link PartyOutbox} does for the
- * build.
+ * only place that decides it.
  *
  * <p>Each feature has its own switch and each is off by default. A switch that
  * is off means nothing of that kind leaves this client: not an empty payload,
