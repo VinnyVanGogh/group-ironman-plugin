@@ -2,7 +2,7 @@
 
 ## RuneLite: region names
 
-`src/main/resources/com/vinnyvangogh/buildguard/regions.txt` lists map region
+`src/main/resources/com/vinnyvangogh/groupironman/regions.txt` lists map region
 ids and place names taken from RuneLite's `DiscordGameEventType`
 (`runelite-client` 1.12.39,
 `net/runelite/client/plugins/discord/DiscordGameEventType.java`). No code was
@@ -39,6 +39,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The group features match features of Group Ironmen Tracker
 (<https://github.com/christoabrown/group-ironmen-tracker>, BSD 2-Clause). No
-code from it is included: Build Guard sends over RuneLite Party instead of a
+code from it is included: Group Ironman sends over RuneLite Party instead of a
 web server, and every encoder, log and panel here was written for this
 plugin. If code is ever ported from it, its copyright notice goes here.

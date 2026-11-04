@@ -2,13 +2,27 @@
 
 ## Unreleased
 
-- `::find <item>` chat command: who in the group holds a matching item (last
-  bank, inventory, equipment, rune pouch, quiver, seed vault, group storage)
-  and who last took or deposited it in group storage. Shown only in your own
-  chatbox, at most five lines. `::`, not `!`, so the query is never sent to
-  public chat. New setting *::find chat command*, on by default.
-- "Who has it?" in the panel also lists the newest three storage log visits
-  that moved a matching item.
-- The storage log already survived a restart (it is in
-  `.runelite/build-guard/group-cache.json`, capped at 200 visits); now covered
-  by a round-trip test.
+Split out of Build Guard (VinnyVanGogh/build-guard-plugin, up to its PR #5)
+as a plugin of its own, so a group can use the group features without Build
+Guard's build and XP warnings.
+
+- New identity: plugin name *Group Ironman* (working name; see below),
+  package `com.vinnyvangogh.groupironman`, config group `vvg-group-ironman`,
+  party message `VvgGroupIronmanMessage`, saved data in
+  `.runelite/group-ironman/`. None of these overlap Build Guard's, so both
+  plugins run side by side without reading each other's settings or decoding
+  each other's messages. Settings and saved data are not carried over from
+  Build Guard.
+- The config group is not `groupironman`: the Hub plugin *Group Iron Man*
+  (slug `group-ironman`) already uses that group. For the same reason the
+  display name must change before Hub submission.
+- Kept from Build Guard: member banks, the group storage log, live stats with
+  boosts, online / last seen and place names, inventories and equipment, rune
+  pouch, quiver and seed vault, drops and collection log ("Since you last
+  played"), "Who has it?", `::find`, storage minimums and world map markers.
+- Removed, staying in Build Guard: build rules, the attack-style warning,
+  sharing build rules / at-risk lines / the gear-name list with the party,
+  and the quest and lamp engine with its bundled quest and lamp data.
+- `::find chat command` is now **off by default**, like every other switch:
+  a fresh install does nothing until it is turned on.
+- The Windows launcher is not carried over; it builds Build Guard.
