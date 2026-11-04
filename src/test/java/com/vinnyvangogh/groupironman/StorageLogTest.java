@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import java.util.Collections;
 import java.util.List;
@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static com.vinnyvangogh.buildguard.FakeItems.*;
+import static com.vinnyvangogh.groupironman.FakeItems.*;
 
 public class StorageLogTest
 {

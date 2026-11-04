@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import java.util.Map;
@@ -7,7 +7,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static com.vinnyvangogh.buildguard.FakeItems.*;
+import static com.vinnyvangogh.groupironman.FakeItems.*;
 
 /** Members' last banks, the storage log and storage survive a restart. */
 public class GroupCacheTest

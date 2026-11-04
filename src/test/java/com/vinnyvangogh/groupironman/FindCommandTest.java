@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import java.util.Arrays;
@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static com.vinnyvangogh.buildguard.FakeItems.*;
+import static com.vinnyvangogh.groupironman.FakeItems.*;
 
 public class FindCommandTest
 {
@@ -116,7 +116,7 @@ public class FindCommandTest
 			Collections.singletonList(new GroupSearch.Source("Alex", "bank", many, -1)), log.entries(), ITEMS, NOW);
 		assertEquals(FindCommand.MAX_LINES + 1, out.size());
 		assertEquals("item 90001: Alex bank 1", out.get(0));
-		assertEquals("4 more, see the Build Guard panel", out.get(FindCommand.MAX_LINES));
+		assertEquals("4 more, see the Group Ironman panel", out.get(FindCommand.MAX_LINES));
 	}
 
 	@Test
@@ -130,7 +130,7 @@ public class FindCommandTest
 			ITEMS, NOW);
 		assertEquals(1, out.size());
 		assertTrue(out.get(0).startsWith("Nothing found for 'dragon hunter wand'."));
-		assertTrue(out.get(0).contains("Only members running Build Guard with sharing on are tracked"));
+		assertTrue(out.get(0).contains("Only members running Group Ironman with sharing on are tracked"));
 		assertTrue(out.get(0).contains("trades and drops between members are not"));
 	}
 

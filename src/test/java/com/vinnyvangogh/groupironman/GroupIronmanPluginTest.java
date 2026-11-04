@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import net.runelite.client.RuneLite;
 import net.runelite.client.externalplugins.ExternalPluginManager;
@@ -10,11 +10,11 @@ import net.runelite.client.externalplugins.ExternalPluginManager;
  * <p>This is a launcher, not a test. A clean JVM start proves the plugin
  * loads and nothing else.
  */
-public class BuildGuardPluginTest
+public class GroupIronmanPluginTest
 {
 	public static void main(String[] args) throws Exception
 	{
-		ExternalPluginManager.loadBuiltin(BuildGuardPlugin.class);
+		ExternalPluginManager.loadBuiltin(GroupIronmanPlugin.class);
 		RuneLite.main(args);
 	}
 }

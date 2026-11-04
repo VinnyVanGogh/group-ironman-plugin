@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import java.util.Collections;

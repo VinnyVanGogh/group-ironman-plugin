@@ -20,7 +20,7 @@ repositories {
 // changed. Bump deliberately, checking:
 //   https://repo.runelite.net/net/runelite/client/maven-metadata.xml
 def runeLiteVersion = '1.12.39'
-def pluginMainClass = 'com.vinnyvangogh.buildguard.BuildGuardPluginTest'
+def pluginMainClass = 'com.vinnyvangogh.groupironman.GroupIronmanPluginTest'
 
 dependencies {
 	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
@@ -37,7 +37,7 @@ dependencies {
 // from runelite-client. Inject them instead. Declaring them here is a
 // Plugin Hub rejection.
 
-group = 'com.vinnyvangogh.buildguard'
+group = 'com.vinnyvangogh.groupironman'
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'

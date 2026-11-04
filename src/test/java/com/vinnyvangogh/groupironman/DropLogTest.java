@@ -1,4 +1,4 @@
-package com.vinnyvangogh.buildguard;
+package com.vinnyvangogh.groupironman;
 
 import java.util.List;
 import java.util.Map;
@@ -8,7 +8,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static com.vinnyvangogh.buildguard.FakeItems.*;
+import static com.vinnyvangogh.groupironman.FakeItems.*;
 
 /** The "since you last played" log: members' drops and new collection log slots. */
 public class DropLogTest
