@@ -24,6 +24,9 @@ Guard's build and XP warnings.
   and the quest and lamp engine with its bundled quest and lamp data.
 - `::find chat command` is now **off by default**, like every other switch:
   a fresh install does nothing until it is turned on.
-- The Windows launcher is not carried over; it builds Build Guard.
+- Windows double-click launcher `tools/windows/Run-GimUtilities.cmd`, ported
+  from Build Guard's: finds or installs a SHA-256-pinned Java 11, downloads
+  this repo's `gim-test-1` tag (or uses the checkout it sits in), and runs
+  the client. Keeps everything in `%LOCALAPPDATA%\GimUtilities`.
 - Built against RuneLite 1.13.5 (was 1.12.39, inherited from Build Guard).
   On 1.12.39 `./gradlew run` exited with code 255 about 12 seconds in.

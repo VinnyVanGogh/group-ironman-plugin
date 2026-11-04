@@ -6,6 +6,7 @@ plugin is, see the [README](README.md).
 - [Settings](#settings)
 - [Running it next to Build Guard](#running-it-next-to-build-guard)
 - [Testing with friends](#testing-with-friends)
+  - [Windows: double-click launcher](#windows-double-click-launcher)
   - [What to look at](#what-to-look-at)
 - [Limitations](#limitations)
 - [Building and tests](#building-and-tests)
@@ -116,7 +117,8 @@ loaded. It uses your normal RuneLite settings folder (`.runelite` in your
 user folder), so your other plugins and settings come along.
 
 1. Install a JDK between 11 and 21, then from the repo folder run
-   `./gradlew run`.
+   `./gradlew run`. On Windows, use the
+   [double-click launcher](#windows-double-click-launcher) instead.
 2. **Log in.** Jagex Accounts cannot type a password into a developer
    client. Use RuneLite's Jagex account panel instead
    ([RuneLite wiki: Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts)):
@@ -129,8 +131,43 @@ user folder), so your other plugins and settings come along.
    and turns on the switches they want. The GIM Utilities panel (a green badge
    on the sidebar) appears once any switch is on.
 
-There is no Windows double-click launcher in this repo yet; Build Guard's
-launcher builds Build Guard, not this.
+### Windows: double-click launcher
+
+You need nothing installed. You do not need admin rights, and nothing on your
+system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
+
+1. **Download `Run-GimUtilities.cmd`** from the release page the group was
+   sent (or from `tools/windows/` in this repo).
+2. **Double-click it.** A black window prints its progress:
+   - `[1/3]` finds Java 11 to 21. If you have none, it downloads Eclipse
+     Temurin Java 11 (about 200 MB) and checks its SHA-256 fingerprint
+     against the one written in the launcher before unpacking it. If the
+     fingerprint does not match, it stops.
+   - `[2/3]` downloads the GIM Utilities source at tag `gim-test-1` from
+     GitHub. Run from inside a checkout (`tools\windows\`), it uses that
+     checkout instead.
+   - `[3/3]` builds and starts RuneLite. The first run takes a few minutes
+     while it downloads Gradle and RuneLite. Later runs reuse all of it and
+     start much faster.
+
+   If something fails, the window stays open with the reason in red. Take a
+   screenshot of it. A 404 at `[2/3]` means the repo is not public yet or the
+   tag has not been pushed.
+3. **If Windows shows "Windows protected your PC"** (SmartScreen): the
+   launcher is a plain text script, not a signed program, so Windows does not
+   recognise it. Click **More info**, then **Run anyway**. You can open the
+   `.cmd` in Notepad first to read exactly what it does. If you see "Windows
+   cannot access the specified file", right-click the file, choose
+   **Properties**, tick **Unblock**, click **OK**, and double-click again.
+4. Carry on from step 2 above (log in, join the party, turn sharing on). To
+   stop, close the RuneLite window.
+
+For whoever cuts the test release: the launcher downloads
+`github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-1.zip`
+with no login, so the repo has to be public and the `gim-test-1` tag pushed
+before friends run it. To test a different tag, change `$SourceRef` at the
+top of the launcher. The checksum step has its own tests:
+`pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1`.
 
 ### What to look at
 
