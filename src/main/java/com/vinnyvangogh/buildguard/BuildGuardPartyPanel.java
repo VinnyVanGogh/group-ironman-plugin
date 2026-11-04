@@ -124,6 +124,11 @@ class BuildGuardPartyPanel extends PluginPanel
 			{
 				line(s);
 			}
+			for (String s : GroupSearch.history(query, v.group.log().entries(), v.items, now,
+				FindCommand.HISTORY_LIMIT))
+			{
+				line(s);
+			}
 		}
 
 		if (!v.inParty)

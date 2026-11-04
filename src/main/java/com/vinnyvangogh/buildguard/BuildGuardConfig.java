@@ -228,4 +228,17 @@ public interface BuildGuardConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigItem(
+		keyName = "groupFindCommand",
+		name = "::find chat command",
+		description = "Type '::find dragon hunter wand' in the chatbox to see who has it and who last took it"
+			+ " from group storage. The answer is shown only to you; nothing is sent to chat.",
+		section = groupSection,
+		position = 9
+	)
+	default boolean groupFindCommand()
+	{
+		return true;
+	}
 }

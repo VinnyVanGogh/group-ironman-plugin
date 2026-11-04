@@ -66,6 +66,7 @@ you other members' data while you share the same thing yourself.
 | Share rune pouch, quiver, seed vault | What is in your rune pouch and Dizana's quiver, and your seed vault as of the last time you opened it. |
 | Share drops and collection log | Your NPC drops (items worth at least *Drops worth at least*, 10,000 gp by default; 0 sends everything) and each new collection log slot. Kept on disk for everyone, and resent for 7 days whenever someone joins the party. |
 | Show members on world map | Not sent anywhere. Marks online members on the world map. Needs *Share stats* on, for you and for them. |
+| ::find chat command | **On by default.** Not sent anywhere. Lets you type `::find dragon hunter wand` in the chatbox (see below). |
 
 The panel's **Members** list shows each member as *online* (heard from in
 the last 3 minutes), *last seen 2h ago*, or *not seen yet*, with their world
@@ -80,7 +81,44 @@ slots are read from the game's chat line, so turn on the in-game setting
 
 The **Who has it?** box at the top of the Build Guard panel searches members'
 last banks, inventories, equipment and group storage by item name (two
-letters or more).
+letters or more). Under the holders it lists the newest three storage log
+visits that took or deposited a matching item, e.g. `Alex took 1 x Dragon
+hunter wand from storage (3d ago)`.
+
+**`::find` in the chatbox** asks the same question without opening the panel:
+
+```
+::find dragon hunter wand
+```
+
+answers, in your chatbox only:
+
+```
+Build Guard: Dragon hunter wand: Sam bank 1 (2h ago)
+Build Guard: Alex took 1 x Dragon hunter wand from storage (3d ago)
+```
+
+At most five lines; anything past that ends with `N more, see the Build
+Guard panel`. It matches any part of the name, ignoring case, like the panel.
+
+It is `::find`, not `!find`, on purpose. A `!` command is ordinary chat: the
+game sends the text to public (or clan) chat first, and RuneLite only acts on
+it once it comes back, so everyone around you would see what you searched for.
+RuneLite catches `::` text in the chatbox before it is sent and hands it to
+plugins instead (`ChatInputManager`, which posts a `CommandExecuted` event), so
+nothing leaves your client. It works in the normal client; developer mode is
+not needed. Turn it off with *::find chat command*.
+
+What it can and cannot see:
+
+- **Only members running Build Guard** with the matching sharing switch on.
+  A member without it holds nothing as far as `::find` knows.
+- **Only what each client saw, as of its last sync**: a bank as of its last
+  close, storage as of the last logged visit, inventories while online.
+- **Storage history only covers members with *Share group storage changes*
+  on.** A visit by anyone else is not attributed to anybody.
+- **Trades and drops between members are not tracked.** If Alex hands Sam the
+  wand, `::find` still shows Alex's last bank until Sam's next sync.
 
 The storage log only has visits by members running Build Guard with *Share
 group storage changes* on. A change by anyone else is not attributed to
@@ -88,7 +126,10 @@ anybody; it just shows up in the next logged visit's "before".
 
 Banks, the storage log, rune pouches, quivers, seed vaults, drops, last seen
 times and when you last played are saved in
-`.runelite/build-guard/group-cache.json`. Delete that file to forget them.
+`.runelite/build-guard/group-cache.json`, so the storage log (still the last
+200 visits) and `::find`'s history survive a restart. It is one file per
+computer, not per group: if you switch groups, delete it to forget the old
+group's data.
 
 ## Testing with friends
 
@@ -187,7 +228,12 @@ Group banks, storage and stats (two or more members with the same switch on):
    it wears off. Pray for a bit: Prayer reads `70 (-3)`. Run energy and
    special attack should follow too, and the world number should match.
 5. **Search.** Type `shark` in "Who has it?": every member's bank, inventory,
-   equipment and storage stack of sharks, with counts.
+   equipment and storage stack of sharks, with counts, then who last took or
+   deposited sharks in storage. Type `::find shark` in the chatbox: the same
+   answer as `Build Guard:` lines, and nothing appears in public chat (check
+   with a friend standing next to you). `::find s` asks for more letters;
+   `::find zzz` says nothing was found. Restart the client and `::find shark`
+   again: the storage history is still there.
 6. **Off means off.** Turn each switch off: your friends stop getting that
    kind of update from you (check their panels), and the matching section
    empties in yours.
@@ -241,6 +287,8 @@ switches on):
   opened with *Share bank* on, are not known.
 - **The storage log only sees members running Build Guard** with storage
   sharing on. It is a record of what each client saw, not the game's own log.
+- **`::find` and "Who has it?" do not follow trades or drops between members.**
+  They know each member's holdings as of that member's last sync.
 - **Place names come from a bundled table** (about 970 map regions: cities,
   bosses, raids, minigames, dungeons, areas). A region not in it shows as a
   number rather than a guess.

@@ -32,6 +32,7 @@ import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
@@ -47,6 +48,8 @@ import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.Notifier;
 import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.game.ItemManager;
@@ -128,6 +131,9 @@ class GroupService
 
 	@Inject
 	private Notifier notifier;
+
+	@Inject
+	private ChatMessageManager chatMessageManager;
 
 	@Inject
 	private ScheduledExecutorService executor;
@@ -381,6 +387,30 @@ class GroupService
 		if (item != null)
 		{
 			recordEvent(GroupEvent.clog(System.currentTimeMillis(), localName(), item));
+		}
+	}
+
+	/**
+	 * {@code ::find dragon hunter wand}. RuneLite's ChatInputManager posts
+	 * this instead of sending the text, so the query never reaches public
+	 * chat, and the answer goes only to this player's chatbox.
+	 */
+	@Subscribe
+	public void onCommandExecuted(CommandExecuted event)
+	{
+		if (!FindCommand.NAME.equalsIgnoreCase(event.getCommand()) || !config.groupFindCommand())
+		{
+			return;
+		}
+		resolveNow(roster.knownItemIds());
+		String query = String.join(" ", event.getArguments());
+		for (String line : FindCommand.answer(query, roster.searchSources(), roster.log().entries(), lookup,
+			System.currentTimeMillis()))
+		{
+			chatMessageManager.queue(QueuedMessage.builder()
+				.type(ChatMessageType.GAMEMESSAGE)
+				.runeLiteFormattedMessage("Build Guard: " + line)
+				.build());
 		}
 	}
 
