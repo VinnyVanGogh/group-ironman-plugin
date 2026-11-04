@@ -25,3 +25,5 @@ Guard's build and XP warnings.
 - `::find chat command` is now **off by default**, like every other switch:
   a fresh install does nothing until it is turned on.
 - The Windows launcher is not carried over; it builds Build Guard.
+- Built against RuneLite 1.13.5 (was 1.12.39, inherited from Build Guard).
+  On 1.12.39 `./gradlew run` exited with code 255 about 12 seconds in.
