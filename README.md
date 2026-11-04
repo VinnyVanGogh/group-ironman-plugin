@@ -20,8 +20,9 @@ Warns before a quest, lamp or activity gives XP that breaks a capped account's b
   - a group storage log: who took or deposited what, last 200 changes;
   - live group stats with boosts and drains (`90 (+8)`), HP, prayer, run,
     special attack and world;
-  - a "Who has it?" search across banks, inventories, equipment, rune
-    pouches, quivers, seed vaults and storage;
+  - a "Who has it?" search (in the panel or via `::find <item>` in chat) across
+    banks, inventories, equipment, rune pouches, quivers, seed vaults, storage
+    and recent storage history;
   - storage minimums with a desktop notification when stock runs low;
   - who is online, or when they were last seen, and where (world and place
     name), optionally as markers on the world map;
