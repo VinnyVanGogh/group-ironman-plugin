@@ -2,7 +2,7 @@
 scope: committed
 ---
 
-# Planning answers — Group Ironman
+# Planning answers — GIM Utilities
 
 Decisions that are not derivable from the code, with the date and how long each
 is good for. One entry per question; a correction **replaces** its entry rather
@@ -31,8 +31,16 @@ equipment*, which sends counts as well as names.
 **Off by default**, unlike Build Guard where it was on: the brief asked that a
 fresh install has every feature off. It sends nothing either way.
 
-## Display name — volatile · 2026-11-04
+## Display name and config group — durable · 2026-11-04
 
-**Open, for the Board.** "Group Ironman" is the working name but clashes with
-the Hub's "Group Iron Man" (slug `group-ironman`). Proposed: "GIM Party Share"
-or "Group Iron Party". See `BRIEF.md`, "The one thing to raise".
+**Board decided: "GIM Utilities"**, config group `gimutilities`, saved data in
+`.runelite/gim-utilities/`. "Group Ironman" clashes with the Hub's
+"Group Iron Man" (slug `group-ironman`) and 20+ `gim-*` plugins exist; no
+`gim-util*` slug does. The Java package (`com.vinnyvangogh.groupironman`) and
+the party message class (`VvgGroupIronmanMessage`) stay as they are: both are
+internal and the message name is the wire contract.
+
+## Repo visibility and test builds — volatile · 2026-11-04
+
+`VinnyVanGogh/group-ironman-plugin` is public. A friend-test Windows launcher
+(RUNELITE-73) downloads tag `gim-test-1` once this split merges.

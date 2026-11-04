@@ -6,7 +6,7 @@ import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 
 /**
- * Settings for Group Ironman.
+ * Settings for GIM Utilities.
  *
  * <p>The group name and every {@code keyName} below are frozen once a version
  * is live on the Plugin Hub: renaming one silently resets that setting for
@@ -16,14 +16,14 @@ import net.runelite.client.config.ConfigSection;
  * <p>The group is this plugin's own: not Build Guard's {@code build-guard}, so
  * the two never read or write each other's settings, and not
  * {@code groupironman}, which the Hub plugin "Group Iron Man" (Spedwards)
- * already uses. Author-prefixed so it survives a display-name change. Every
- * switch defaults to off: a fresh install sends nothing and listens to nothing.
+ * already uses. Every switch defaults to off: a fresh install sends nothing
+ * and listens to nothing.
  */
 @ConfigGroup(GroupIronmanConfig.GROUP)
 public interface GroupIronmanConfig extends Config
 {
 	/** Frozen. See the class javadoc. */
-	String GROUP = "vvg-group-ironman";
+	String GROUP = "gimutilities";
 
 	@ConfigSection(
 		name = "Group banks, storage and stats",
@@ -50,7 +50,7 @@ public interface GroupIronmanConfig extends Config
 		keyName = "groupShareStorage",
 		name = "Share group storage changes",
 		description = "When you close group storage, tell your party what you took and deposited, and keep a log"
-			+ " of the last 200 changes. Only members running Group Ironman with this on are logged.",
+			+ " of the last 200 changes. Only members running GIM Utilities with this on are logged.",
 		section = groupSection,
 		position = 1
 	)

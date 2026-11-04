@@ -20,7 +20,7 @@ import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 
 /**
- * Group Ironman.
+ * GIM Utilities.
  *
  * <p>Opt-in group sharing over RuneLite Party: member banks, the group storage
  * log, live stats with boosts and where each member is, inventories and
@@ -41,7 +41,7 @@ import net.runelite.client.ui.NavigationButton;
 public class GroupIronmanPlugin extends Plugin
 {
 	/** Shown in the plugin list and at the start of every chat line and notification this plugin writes. */
-	static final String NAME = "Group Ironman";
+	static final String NAME = "GIM Utilities";
 
 	@Inject
 	private ClientToolbar clientToolbar;

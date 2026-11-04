@@ -6,16 +6,15 @@ Split out of Build Guard (VinnyVanGogh/build-guard-plugin, up to its PR #5)
 as a plugin of its own, so a group can use the group features without Build
 Guard's build and XP warnings.
 
-- New identity: plugin name *Group Ironman* (working name; see below),
-  package `com.vinnyvangogh.groupironman`, config group `vvg-group-ironman`,
-  party message `VvgGroupIronmanMessage`, saved data in
-  `.runelite/group-ironman/`. None of these overlap Build Guard's, so both
-  plugins run side by side without reading each other's settings or decoding
-  each other's messages. Settings and saved data are not carried over from
-  Build Guard.
-- The config group is not `groupironman`: the Hub plugin *Group Iron Man*
-  (slug `group-ironman`) already uses that group. For the same reason the
-  display name must change before Hub submission.
+- New identity: plugin name *GIM Utilities*, package
+  `com.vinnyvangogh.groupironman`, config group `gimutilities`, party message
+  `VvgGroupIronmanMessage`, saved data in `.runelite/gim-utilities/`. None of
+  these overlap Build Guard's, so both plugins run side by side without
+  reading each other's settings or decoding each other's messages. Settings
+  and saved data are not carried over from Build Guard.
+- Not named "Group Ironman" and not config group `groupironman`: the Hub
+  plugin *Group Iron Man* (slug `group-ironman`) already has that name and
+  uses that group.
 - Kept from Build Guard: member banks, the group storage log, live stats with
   boosts, online / last seen and place names, inventories and equipment, rune
   pouch, quiver and seed vault, drops and collection log ("Since you last

@@ -40,7 +40,7 @@ final class FindCommand
 		lines.addAll(GroupSearch.history(q, log, items, now, HISTORY_LIMIT));
 		if (lines.isEmpty())
 		{
-			out.add("Nothing found for '" + plain(query.trim()) + "'. Only members running Group Ironman with sharing"
+			out.add("Nothing found for '" + plain(query.trim()) + "'. Only members running GIM Utilities with sharing"
 				+ " on are tracked, as of their last sync; trades and drops between members are not.");
 			return out;
 		}
@@ -50,7 +50,7 @@ final class FindCommand
 		}
 		if (lines.size() > MAX_LINES)
 		{
-			out.add((lines.size() - MAX_LINES) + " more, see the Group Ironman panel");
+			out.add((lines.size() - MAX_LINES) + " more, see the GIM Utilities panel");
 		}
 		return out;
 	}

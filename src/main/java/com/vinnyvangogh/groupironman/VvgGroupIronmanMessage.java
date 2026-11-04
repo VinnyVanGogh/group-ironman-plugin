@@ -3,7 +3,7 @@ package com.vinnyvangogh.groupironman;
 import net.runelite.client.party.messages.PartyMemberMessage;
 
 /**
- * The one message Group Ironman sends over RuneLite Party: banks, carried
+ * The one message GIM Utilities sends over RuneLite Party: banks, carried
  * items, group storage changes, live stats, extras and drops.
  *
  * <p>The relay routes by {@code getSimpleName()}, so the class name is the

@@ -13,7 +13,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Group Ironman split out of Build Guard and both may run in the same client,
+ * GIM Utilities split out of Build Guard and both may run in the same client,
  * so nothing this plugin stores or sends may collide with Build Guard's. These
  * pin the names Build Guard uses as literals: they are its frozen identity and
  * this repo no longer has its classes.
@@ -34,7 +34,7 @@ public class PluginIdentityTest
 	@Test
 	public void configGroupIsItsOwnAndNotBuildGuards()
 	{
-		assertEquals("vvg-group-ironman", GroupIronmanConfig.GROUP);
+		assertEquals("gimutilities", GroupIronmanConfig.GROUP);
 		assertEquals(GroupIronmanConfig.GROUP, GroupIronmanConfig.class.getAnnotation(ConfigGroup.class).value());
 		assertNotEquals(BUILD_GUARD_CONFIG_GROUP, GroupIronmanConfig.GROUP);
 		assertNotEquals(HUB_GROUP_IRON_MAN_CONFIG_GROUP, GroupIronmanConfig.GROUP);
@@ -55,14 +55,14 @@ public class PluginIdentityTest
 	@Test
 	public void cacheFolderIsNotBuildGuards()
 	{
-		assertEquals("group-ironman", GroupService.CACHE_DIR);
+		assertEquals("gim-utilities", GroupService.CACHE_DIR);
 		assertNotEquals(BUILD_GUARD_CACHE_DIR, GroupService.CACHE_DIR);
 	}
 
 	@Test
-	public void pluginIsNamedGroupIronman()
+	public void pluginIsNamedGimUtilities()
 	{
-		assertEquals("Group Ironman", GroupIronmanPlugin.class.getAnnotation(PluginDescriptor.class).name());
+		assertEquals("GIM Utilities", GroupIronmanPlugin.class.getAnnotation(PluginDescriptor.class).name());
 	}
 
 	@Test

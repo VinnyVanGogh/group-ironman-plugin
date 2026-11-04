@@ -39,6 +39,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The group features match features of Group Ironmen Tracker
 (<https://github.com/christoabrown/group-ironmen-tracker>, BSD 2-Clause). No
-code from it is included: Group Ironman sends over RuneLite Party instead of a
+code from it is included: GIM Utilities sends over RuneLite Party instead of a
 web server, and every encoder, log and panel here was written for this
 plugin. If code is ever ported from it, its copyright notice goes here.

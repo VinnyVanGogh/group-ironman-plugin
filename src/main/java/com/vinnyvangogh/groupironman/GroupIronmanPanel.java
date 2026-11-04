@@ -129,12 +129,12 @@ class GroupIronmanPanel extends PluginPanel
 		if (!v.inParty)
 		{
 			line("Not in a RuneLite Party.");
-			line("Join one from the Party panel; every member needs Group Ironman with sharing turned on.");
+			line("Join one from the Party panel; every member needs GIM Utilities with sharing turned on.");
 		}
 		else if (!v.group.hasAnything())
 		{
 			line("Nothing shared yet.");
-			line("Members appear here once they turn on sharing in Group Ironman's settings.");
+			line("Members appear here once they turn on sharing in GIM Utilities' settings.");
 		}
 
 		List<String> members = v.group.memberLines(v.regions, now);
@@ -189,7 +189,7 @@ class GroupIronmanPanel extends PluginPanel
 		if (v.switches.storage)
 		{
 			heading("Group storage log");
-			line("Only changes by members running Group Ironman with storage sharing on are listed.");
+			line("Only changes by members running GIM Utilities with storage sharing on are listed.");
 			List<String> log = v.group.log().lines(v.items, now);
 			if (log.isEmpty())
 			{

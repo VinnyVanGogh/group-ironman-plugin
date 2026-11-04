@@ -1,4 +1,4 @@
-# Group Ironman
+# GIM Utilities
 
 Share banks, group storage changes, stats and drops with your Group Ironman
 team over RuneLite Party.
@@ -31,7 +31,7 @@ RuneLite's Party service.
 
 Run `./gradlew run`, log in with RuneLite's Jagex account panel, join the same
 RuneLite Party as your group, and turn on the switches you want under
-*Group Ironman* in the plugin settings.
+*GIM Utilities* in the plugin settings.
 
 **Full steps, settings and what to test: [SETUP.md](SETUP.md).**
 

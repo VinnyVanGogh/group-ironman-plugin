@@ -1,4 +1,4 @@
-# Group Ironman — research & build brief
+# GIM Utilities — research & build brief
 
 The authoritative record of what was decided and why. Findings go **in this
 file**, under the phase that produced them, so nothing has to be re-derived
@@ -115,10 +115,10 @@ repos:
 
 | What | Value | Why not the obvious one |
 | --- | --- | --- |
-| Config group | `vvg-group-ironman` | `groupironman` is already the `@ConfigGroup` of the Hub plugin **Group Iron Man** (Spedwards, slug `group-ironman`, `GroupIronManConfig.java:9` at `8700097`). Sharing it would read and write that plugin's settings. |
+| Config group | `gimutilities` | `groupironman` is already the `@ConfigGroup` of the Hub plugin **Group Iron Man** (Spedwards, slug `group-ironman`, `GroupIronManConfig.java:9` at `8700097`). Sharing it would read and write that plugin's settings. |
 | Party message type | `VvgGroupIronmanMessage` | The relay routes by simple class name, so the name is shared by every plugin on the client. Build Guard uses `BuildGuardGroupMessage`; a generic `GroupIronmanMessage` could meet another group plugin's. A GitHub-wide code search to prove the generic name free was held at the gate, so the author prefix makes it moot. |
-| Saved data | `.runelite/group-ironman/` | Build Guard's is `.runelite/build-guard/`. |
-| Display name | `Group Ironman` (working name) | **Clashes on the Hub**: slug `group-ironman` exists, display name "Group Iron Man". Must change before submission; see "The one thing to raise". |
+| Saved data | `.runelite/gim-utilities/` | Build Guard's is `.runelite/build-guard/`. |
+| Display name | `GIM Utilities` (Board, 2026-11-04) | "Group Ironman" **clashes on the Hub**: slug `group-ironman` exists, display name "Group Iron Man", and 20+ `gim-*` slugs exist. No `gim-util*` slug does. |
 
 ### Out of scope — do not implement, do not propose workarounds
 
@@ -130,14 +130,13 @@ repos:
 - **Automating anything**: moving items, withdrawing, walking. Input
   Restrictions.
 
-### The one thing to raise before submitting
+### The display name (settled)
 
-**The display name.** "Group Ironman" clashes with the existing Hub plugin
-"Group Iron Man" (slug `group-ironman`). Candidates checked free on
-2026-11-04 (no slug in `plugin-hub/plugins/` matches): **GIM Party Share**
-(`gim-party-share`) and **Group Iron Party** (`group-iron-party`). Changing
-the display name later costs nothing: the config group and message type do
-not depend on it.
+"Group Ironman" clashes with the existing Hub plugin "Group Iron Man" (slug
+`group-ironman`). Candidates proposed on 2026-11-04 were **GIM Party Share**
+(`gim-party-share`) and **Group Iron Party** (`group-iron-party`); the Board
+chose **GIM Utilities** with config group `gimutilities`. The message type
+does not depend on the display name.
 
 ---
 

@@ -108,7 +108,7 @@ class GroupService
 	}
 
 	/** Its own folder, never Build Guard's: both plugins may run side by side. */
-	static final String CACHE_DIR = "group-ironman";
+	static final String CACHE_DIR = "gim-utilities";
 	private static final String CACHE_FILE = "group-cache.json";
 
 	@Inject

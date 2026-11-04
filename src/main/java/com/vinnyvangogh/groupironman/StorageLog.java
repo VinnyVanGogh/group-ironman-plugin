@@ -9,7 +9,7 @@ import java.util.Map;
  * The rolling group storage change log: the newest {@link #MAX_ENTRIES}
  * visits, newest first.
  *
- * <p>Only visits by members running Group Ironman with storage sharing on are
+ * <p>Only visits by members running GIM Utilities with storage sharing on are
  * here. A member without it changes storage silently, and the next visit by
  * someone who has it sees the result as part of their own "before".
  */

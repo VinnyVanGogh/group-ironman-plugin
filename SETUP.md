@@ -1,6 +1,6 @@
-# Group Ironman: setup and testing
+# GIM Utilities: setup and testing
 
-Everything needed to install, configure and test Group Ironman. For what the
+Everything needed to install, configure and test GIM Utilities. For what the
 plugin is, see the [README](README.md).
 
 - [Settings](#settings)
@@ -31,7 +31,7 @@ nothing, collects nothing, and its side panel button is hidden.
 
 Each member has to turn sharing on themselves; nobody's client can read
 another's. Everything travels through RuneLite's own Party service, the same
-one the built-in Party plugin uses. Group Ironman makes no network connections
+one the built-in Party plugin uses. GIM Utilities makes no network connections
 of its own.
 
 The panel's **Members** list shows each member as *online* (heard from in
@@ -45,7 +45,7 @@ out. On the first run it lists the latest ones instead. New collection log
 slots are read from the game's chat line, so turn on the in-game setting
 *Collection log - New addition notification* (Settings, Chat).
 
-The **Who has it?** box at the top of the Group Ironman panel searches
+The **Who has it?** box at the top of the GIM Utilities panel searches
 members' last banks, inventories, equipment and group storage by item name
 (two letters or more). Under the holders it lists the newest three storage log
 visits that took or deposited a matching item, e.g. `Alex took 1 x Dragon
@@ -61,12 +61,13 @@ same question without opening the panel:
 answers, in your chatbox only:
 
 ```
-Group Ironman: Dragon hunter wand: Sam bank 1 (2h ago)
-Group Ironman: Alex took 1 x Dragon hunter wand from storage (3d ago)
+GIM Utilities: Dragon hunter wand: Sam bank 1 (2h ago)
+GIM Utilities: Alex took 1 x Dragon hunter wand from storage (3d ago)
 ```
 
-At most five lines; anything past that ends with `N more, see the Group
-Ironman panel`. It matches any part of the name, ignoring case, like the panel.
+At most five lines; anything past that ends with `N more, see the GIM
+Utilities panel`. It matches any part of the name, ignoring case, like the
+panel.
 
 It is `::find`, not `!find`, on purpose. A `!` command is ordinary chat: the
 game sends the text to public (or clan) chat first, and RuneLite only acts on
@@ -77,7 +78,7 @@ nothing leaves your client.
 
 What it can and cannot see:
 
-- **Only members running Group Ironman** with the matching sharing switch on.
+- **Only members running GIM Utilities** with the matching sharing switch on.
 - **Only what each client saw, as of its last sync**: a bank as of its last
   close, storage as of the last logged visit, inventories while online.
 - **Storage history only covers members with *Share group storage changes*
@@ -88,28 +89,28 @@ What it can and cannot see:
 
 Banks, the storage log, rune pouches, quivers, seed vaults, drops, last seen
 times and when you last played are saved in
-`.runelite/group-ironman/group-cache.json`. It is one file per computer, not
+`.runelite/gim-utilities/group-cache.json`. It is one file per computer, not
 per group: if you switch groups, delete it to forget the old group's data.
 
 ## Running it next to Build Guard
 
-Group Ironman was split out of Build Guard. Both can be installed at once and
+GIM Utilities was split out of Build Guard. Both can be installed at once and
 never touch each other:
 
-- **Settings.** Group Ironman's config group is `vvg-group-ironman`; Build
-  Guard's is `build-guard`. Turning a switch on in one does not turn it on in the
-  other, and nothing is copied across: set Group Ironman up from scratch.
-- **Party messages.** Group Ironman sends `VvgGroupIronmanMessage`; Build Guard
-  sends `BuildGuardGroupMessage`. RuneLite's party relay routes by that name,
-  so neither plugin receives or decodes the other's traffic. A member on Build
-  Guard's group features and a member on Group Ironman do not see each other:
-  the whole group should use the same one.
-- **Saved data.** `.runelite/group-ironman/` here, `.runelite/build-guard/`
+- **Settings.** GIM Utilities' config group is `gimutilities`; Build Guard's
+  is `build-guard`. Turning a switch on in one does not turn it on in the
+  other, and nothing is copied across: set GIM Utilities up from scratch.
+- **Party messages.** GIM Utilities sends `VvgGroupIronmanMessage`; Build
+  Guard sends `BuildGuardGroupMessage`. RuneLite's party relay routes by that
+  name, so neither plugin receives or decodes the other's traffic. A member on
+  Build Guard's group features and a member on GIM Utilities do not see each
+  other: the whole group should use the same one.
+- **Saved data.** `.runelite/gim-utilities/` here, `.runelite/build-guard/`
   there. Build Guard's saved banks and storage log are not imported.
 
 ## Testing with friends
 
-Until Group Ironman is on the Plugin Hub, every member runs a **developer
+Until GIM Utilities is on the Plugin Hub, every member runs a **developer
 build**: a RuneLite window started from this source, with the plugin already
 loaded. It uses your normal RuneLite settings folder (`.runelite` in your
 user folder), so your other plugins and settings come along.
@@ -124,19 +125,19 @@ user folder), so your other plugins and settings come along.
 3. **Join the same RuneLite Party.** One person opens the built-in **Party**
    panel (turn on the **Party** plugin if it is missing), clicks **Create
    party**, and shares the passphrase. Everyone else clicks **Join party**.
-4. **Turn sharing on.** Everyone opens *Group Ironman* in the plugin settings
-   and turns on the switches they want. The Group Ironman panel (a green badge
+4. **Turn sharing on.** Everyone opens *GIM Utilities* in the plugin settings
+   and turns on the switches they want. The GIM Utilities panel (a green badge
    on the sidebar) appears once any switch is on.
 
-There is no Windows double-click launcher for this plugin yet; Build Guard's
+There is no Windows double-click launcher in this repo yet; Build Guard's
 launcher builds Build Guard, not this.
 
 ### What to look at
 
 Banks, storage and stats (two or more members with the same switch on):
 
-1. **Fresh install.** Before turning anything on: no Group Ironman panel
-   button, and `::find shark` gets no `Group Ironman:` answer.
+1. **Fresh install.** Before turning anything on: no GIM Utilities panel
+   button, and `::find shark` gets no `GIM Utilities:` answer.
 2. **Bank.** Open and close your bank. Within a few seconds a friend's panel
    shows a "Banks (last seen)" line for you: kinds, item count, value, "last
    seen just now". Restart the friend's client: your line should still be
@@ -152,7 +153,7 @@ Banks, storage and stats (two or more members with the same switch on):
    it wears off.
 6. **Search.** Type `shark` in "Who has it?": every member's sharks, with
    counts, then who last took or deposited sharks. Turn on *::find chat
-   command* and type `::find shark`: the same answer as `Group Ironman:`
+   command* and type `::find shark`: the same answer as `GIM Utilities:`
    lines, and nothing appears in public chat.
 7. **Off means off.** Turn each switch off: your friends stop getting that
    kind of update from you, and the matching section empties in yours.
@@ -179,7 +180,7 @@ Members, items, drops and the map:
 
 - **Banks are as of the last close.** Items moved since then, or a bank never
   opened with *Share bank* on, are not known.
-- **The storage log only sees members running Group Ironman** with storage
+- **The storage log only sees members running GIM Utilities** with storage
   sharing on. It is a record of what each client saw, not the game's own log.
 - **`::find` and "Who has it?" do not follow trades or drops between members.**
 - **Place names come from a bundled table** (about 970 map regions). A region
