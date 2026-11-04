@@ -19,7 +19,7 @@ repositories {
 // that passed yesterday can fail today for reasons nothing in this repo
 // changed. Bump deliberately, checking:
 //   https://repo.runelite.net/net/runelite/client/maven-metadata.xml
-def runeLiteVersion = '1.12.39'
+def runeLiteVersion = '1.13.5'
 def pluginMainClass = 'com.vinnyvangogh.groupironman.GroupIronmanPluginTest'
 
 dependencies {
