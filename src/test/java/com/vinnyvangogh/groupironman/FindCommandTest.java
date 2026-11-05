@@ -39,6 +39,46 @@ public class FindCommandTest
 	}
 
 	@Test
+	public void chatAnswerNamesTheSearchSaysYourAndColoursEachPlace()
+	{
+		// Board 2026-11-04: show the search, say "your bank" for yourself, colour each kind of place.
+		java.awt.Color q = new java.awt.Color(0x11, 0x11, 0x11);
+		java.awt.Color item = new java.awt.Color(0x22, 0x22, 0x22);
+		java.awt.Color mine = new java.awt.Color(0x33, 0x33, 0x33);
+		java.awt.Color theirs = new java.awt.Color(0x44, 0x44, 0x44);
+		java.awt.Color storage = new java.awt.Color(0x55, 0x55, 0x55);
+		java.awt.Color carried = new java.awt.Color(0x66, 0x66, 0x66);
+		FindStyle style = new FindStyle("GroupShip", q, item, mine, theirs, storage, carried);
+
+		GroupRoster roster = new GroupRoster();
+		roster.putBank("GroupShip", new BankSnapshot(NOW, items(SHARK, 15)));
+		roster.putBank("Alex", new BankSnapshot(NOW, items(SHARK, 2)));
+		roster.putCarried("Sam", new GroupCodec.Carried(items(SHARK, 1), items(WHIP, 1)));
+		roster.putStorage(new StorageChange(NOW - TimeUnit.MINUTES.toMillis(8), "GroupShip", items(SHARK, 3), items(),
+			items(SHARK, 140)));
+
+		List<String> out = FindCommand.answer("Shark", roster.searchSources(), roster.log().entries(), ITEMS, NOW, style);
+		assertEquals("Find <col=111111>Shark</col>:", out.get(0));
+		String line = out.get(1);
+		assertTrue(line, line.startsWith("<col=222222>Shark</col>: "));
+		assertTrue(line, line.contains("<col=333333>15 in your bank</col>"));
+		assertTrue(line, line.contains("<col=444444>2 in Alex's bank</col>"));
+		assertTrue(line, line.contains("<col=666666>1 in Sam's inventory</col>"));
+		assertTrue(line, line.contains("<col=555555>140 in group storage</col>"));
+		assertEquals("<col=555555>You took 3 x Shark from storage</col> (8m ago)", out.get(2));
+
+		List<String> whip = FindCommand.answer("whip", roster.searchSources(), roster.log().entries(), ITEMS, NOW, style);
+		assertTrue(whip.get(1), whip.get(1).contains("<col=666666>1 equipped by Sam</col>"));
+
+		List<String> none = FindCommand.answer("dragon", roster.searchSources(), roster.log().entries(), ITEMS, NOW,
+			style);
+		assertTrue(none.get(0), none.get(0).startsWith("Nothing found for <col=111111>dragon</col>."));
+		// A query with tag characters cannot inject markup.
+		assertTrue(FindCommand.answer("<col=ff0000>sh", roster.searchSources(), roster.log().entries(), ITEMS, NOW,
+			style).get(0).contains("col=ff0000sh"));
+	}
+
+	@Test
 	public void answersCurrentHoldersThenWhoLastTookItFromStorage()
 	{
 		GroupRoster roster = new GroupRoster();

@@ -459,11 +459,17 @@ final class PanelModel
 	/** "Grimy guam leaf 15 - GroupShip bank", one row per item and place. */
 	static List<FindRow> find(String query, GroupRoster group, ItemLookup items, long now)
 	{
+		return find(query, group, items, now, "");
+	}
+
+	/** Rows read from your side: "Trout - 15 in your bank", "Trout - 140 in group storage". */
+	static List<FindRow> find(String query, GroupRoster group, ItemLookup items, long now, String self)
+	{
+		FindStyle words = new FindStyle(self, null, null, null, null, null, null);
 		List<FindRow> out = new ArrayList<>();
 		for (GroupSearch.Hit h : GroupSearch.hits(query, group.searchSources(), items))
 		{
-			String place = "Group".equals(h.member) ? "group " + h.where : h.member + " " + h.where;
-			out.add(new FindRow(h.itemId, h.name + " " + h.quantity + " - " + place,
+			out.add(new FindRow(h.itemId, h.name + " - " + words.place(h),
 				h.seenAt < 0 ? "" : BoostText.ago(now, h.seenAt)));
 		}
 		return out;

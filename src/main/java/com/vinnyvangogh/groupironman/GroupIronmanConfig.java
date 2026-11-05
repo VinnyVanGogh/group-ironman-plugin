@@ -1,5 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
+import java.awt.Color;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -196,5 +197,57 @@ public interface GroupIronmanConfig extends Config
 	default boolean groupFindCommand()
 	{
 		return false;
+	}
+
+	@ConfigSection(
+		name = "::find colours",
+		description = "Colours in the ::find answer, so you can tell your bank, members' banks, group storage and"
+			+ " what people carry apart at a glance.",
+		position = 2,
+		closedByDefault = true
+	)
+	String findSection = "findColours";
+
+	@ConfigItem(keyName = "findQueryColour", name = "Your search", description = "The words you searched for.",
+		section = findSection, position = 0)
+	default Color findQueryColour()
+	{
+		return new Color(0xD0, 0x5A, 0x00);
+	}
+
+	@ConfigItem(keyName = "findItemColour", name = "Item name", description = "Each matching item's name.",
+		section = findSection, position = 1)
+	default Color findItemColour()
+	{
+		return new Color(0x1E, 0x5A, 0xA8);
+	}
+
+	@ConfigItem(keyName = "findYourBankColour", name = "Your bank", description = "What is in your own bank.",
+		section = findSection, position = 2)
+	default Color findYourBankColour()
+	{
+		return new Color(0x1E, 0x8C, 0x1E);
+	}
+
+	@ConfigItem(keyName = "findMemberBankColour", name = "Members' banks",
+		description = "What is in another member's bank.", section = findSection, position = 3)
+	default Color findMemberBankColour()
+	{
+		return new Color(0x8A, 0x2B, 0xE2);
+	}
+
+	@ConfigItem(keyName = "findStorageColour", name = "Group storage",
+		description = "What is in group storage, and who took or deposited it.", section = findSection, position = 4)
+	default Color findStorageColour()
+	{
+		return new Color(0xB8, 0x86, 0x0B);
+	}
+
+	@ConfigItem(keyName = "findCarriedColour", name = "Carried and worn",
+		description = "What someone has in their inventory, equipped, or in a pouch, quiver or seed vault.",
+		section = findSection, position = 5)
+	default Color findCarriedColour()
+	{
+		return new Color(0x00, 0x8B, 0x8B);
 	}
 }

@@ -764,7 +764,7 @@ class GroupIronmanPanel extends PluginPanel
 				+ " chatbox gives the same answer.");
 			return;
 		}
-		List<PanelModel.FindRow> rows = PanelModel.find(q, v.group, v.items, now);
+		List<PanelModel.FindRow> rows = PanelModel.find(q, v.group, v.items, now, v.self);
 		if (rows.isEmpty())
 		{
 			empty(tab, "Nobody has it.", "Nothing shared matches '" + ItemQuery.normalize(q) + "'. Only members running"

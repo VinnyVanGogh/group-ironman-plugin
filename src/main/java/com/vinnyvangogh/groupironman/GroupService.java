@@ -620,7 +620,7 @@ class GroupService
 		resolveNow(roster.knownItemIds());
 		String query = String.join(" ", event.getArguments());
 		for (String line : FindCommand.answer(query, roster.searchSources(), roster.log().entries(), lookup,
-			System.currentTimeMillis()))
+			System.currentTimeMillis(), FindStyle.of(config, self)))
 		{
 			tell(line);
 		}

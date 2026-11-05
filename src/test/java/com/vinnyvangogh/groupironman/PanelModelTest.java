@@ -140,9 +140,11 @@ public class PanelModelTest
 		roster.putCarried("Sam", new GroupCodec.Carried(items(SHARK, 5), items()));
 		roster.putStorage(new StorageChange(NOW - 3 * MIN, "Sam", items(), items(SHARK, 1), items(SHARK, 40)));
 		List<PanelModel.FindRow> rows = PanelModel.find("shark", roster, ITEMS, NOW);
-		assertEquals("Shark 5 - Sam inventory", rows.get(0).text);
+		assertEquals("Shark - 5 in Sam's inventory", rows.get(0).text);
 		assertEquals("", rows.get(0).ago);
-		assertEquals("Shark 40 - group storage", rows.get(1).text);
+		assertEquals("Shark - 40 in group storage", rows.get(1).text);
+		// From Sam's side his own things read "your".
+		assertEquals("Shark - 5 in your inventory", PanelModel.find("shark", roster, ITEMS, NOW, "sam").get(0).text);
 		assertEquals("3m ago", rows.get(1).ago);
 	}
 

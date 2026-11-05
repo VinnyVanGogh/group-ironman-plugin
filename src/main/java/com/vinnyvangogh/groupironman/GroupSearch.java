@@ -127,6 +127,63 @@ final class GroupSearch
 	}
 
 	/**
+	 * {@link #search} for the chatbox, worded and coloured by {@code style}:
+	 * "Trout: 15 in your bank (just now), 140 in group storage (8m ago)".
+	 */
+	static List<String> searchStyled(String query, List<Source> sources, ItemLookup items, long now, FindStyle style)
+	{
+		Map<String, List<String>> lines = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+		for (Hit h : hits(query, sources, items))
+		{
+			String when = h.seenAt < 0 ? "" : " (" + BoostText.ago(now, h.seenAt) + ")";
+			lines.computeIfAbsent(h.name, k -> new ArrayList<>()).add(style.place(h) + when);
+		}
+		List<String> out = new ArrayList<>();
+		for (Map.Entry<String, List<String>> e : lines.entrySet())
+		{
+			out.add(FindStyle.paint(e.getKey(), style.item) + ": " + String.join(", ", e.getValue()));
+		}
+		return out;
+	}
+
+	/** {@link #history} for the chatbox: "You took 15 Trout from storage (8m ago)", in the storage colour. */
+	static List<String> historyStyled(String query, List<StorageChange> log, ItemLookup items, long now, int limit,
+		FindStyle style)
+	{
+		List<String> out = new ArrayList<>();
+		ItemQuery q = ItemQuery.parse(query);
+		if (q == null)
+		{
+			return out;
+		}
+		for (StorageChange c : log)
+		{
+			if (out.size() >= limit)
+			{
+				break;
+			}
+			Map<Integer, Integer> took = matching(c.took(), q, items);
+			Map<Integer, Integer> deposited = matching(c.deposited(), q, items);
+			List<String> parts = new ArrayList<>();
+			if (!took.isEmpty())
+			{
+				parts.add("took " + StorageLog.describe(took, items) + " from storage");
+			}
+			if (!deposited.isEmpty())
+			{
+				parts.add("deposited " + StorageLog.describe(deposited, items) + " into storage");
+			}
+			if (!parts.isEmpty())
+			{
+				String who = style.isYou(c.member()) ? "You" : c.member();
+				out.add(FindStyle.paint(who + " " + String.join(", ", parts), style.storage)
+					+ " (" + BoostText.ago(now, c.at()) + ")");
+			}
+		}
+		return out;
+	}
+
+	/**
 	 * The newest storage log visits that took or deposited a matching item,
 	 * newest first, at most {@code limit}: "Alex took 1 x Dragon hunter wand
 	 * from storage (3d ago)". {@code log} is {@link StorageLog#entries()},

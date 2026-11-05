@@ -65,9 +65,9 @@ public class ItemQueryTest
 
 		List<PanelModel.FindRow> panel = PanelModel.find("guam", roster, ITEMS, NOW);
 		assertEquals(2, panel.size());
-		assertEquals("Grimy guam leaf 15 - GroupShip bank", panel.get(0).text);
+		assertEquals("Grimy guam leaf - 15 in GroupShip's bank", panel.get(0).text);
 		assertEquals(GRIMY_GUAM, panel.get(0).itemId);
-		assertEquals("Guam potion (unf) 3 - GroupShip bank", panel.get(1).text);
+		assertEquals("Guam potion (unf) - 3 in GroupShip's bank", panel.get(1).text);
 
 		List<String> chat = FindCommand.answer("guam", roster.searchSources(), roster.log().entries(), ITEMS, NOW);
 		assertEquals(2, chat.size());
