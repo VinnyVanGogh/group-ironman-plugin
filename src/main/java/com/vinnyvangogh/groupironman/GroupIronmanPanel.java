@@ -3,12 +3,11 @@ package com.vinnyvangogh.groupironman;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.GridLayout;
-import java.awt.Toolkit;
-import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -62,8 +61,8 @@ class GroupIronmanPanel extends PluginPanel
 
 		void newKey();
 
-		/** The "[GIMU] key" line, or null without a key. */
-		String shareLine();
+		/** Fills the chatbox with the group-channel "[GIMU] key" line for the player to send. */
+		void shareInChat();
 	}
 
 	/** Everything a redraw needs, captured on the client side. */
@@ -106,7 +105,7 @@ class GroupIronmanPanel extends PluginPanel
 	private final SkillIconManager skillIcons;
 	private final Actions actions;
 
-	private final JPanel header = new JPanel();
+	private final JPanel header = new Column();
 	private final CardLayout cards = new CardLayout();
 	private final JPanel views = new JPanel(cards);
 	private final Map<String, JPanel> tabs = new LinkedHashMap<>();
@@ -126,9 +125,7 @@ class GroupIronmanPanel extends PluginPanel
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
 
-		JPanel top = new JPanel();
-		top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
-		header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+		JPanel top = new Column();
 		top.add(header);
 		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log"));
 		add(top, BorderLayout.NORTH);
@@ -149,8 +146,7 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			wrap.add(searchBar, BorderLayout.NORTH);
 		}
-		JPanel content = new JPanel();
-		content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+		JPanel content = new Column();
 		wrap.add(content, BorderLayout.CENTER);
 		tabs.put(name, content);
 		views.add(wrap, name);
@@ -304,13 +300,9 @@ class GroupIronmanPanel extends PluginPanel
 			case NEW_KEY:
 				actions.newKey();
 				break;
-			case COPY_SHARE_LINE:
-				String line = actions.shareLine();
-				if (line != null)
-				{
-					// The player pastes and sends it themselves: a plugin may not type into the chatbox.
-					Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(line), null);
-				}
+			case SHARE_KEY:
+				// The game chatbox takes no paste, so the line is filled in for the player to send.
+				actions.shareInChat();
 				break;
 			default:
 				break;
@@ -344,8 +336,7 @@ class GroupIronmanPanel extends PluginPanel
 	private JComponent memberCard(PanelModel.MemberCard c)
 	{
 		JPanel card = section();
-		JPanel body = new JPanel();
-		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		JPanel body = new Column();
 		body.setOpaque(false);
 		boolean open = !collapsed.contains(c.name);
 		body.setVisible(open);
@@ -445,8 +436,7 @@ class GroupIronmanPanel extends PluginPanel
 
 	private JComponent itemGrid(List<PanelModel.ItemCell> items)
 	{
-		JPanel wrap = new JPanel();
-		wrap.setLayout(new BoxLayout(wrap, BoxLayout.Y_AXIS));
+		JPanel wrap = new Column();
 		wrap.setOpaque(false);
 		JPanel grid = new JPanel(new GridLayout(0, GRID_COLUMNS, 1, 1));
 		grid.setOpaque(false);
@@ -608,8 +598,7 @@ class GroupIronmanPanel extends PluginPanel
 
 	private static JPanel section()
 	{
-		JPanel p = new JPanel();
-		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+		JPanel p = new Column();
 		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		p.setBorder(BorderFactory.createCompoundBorder(new EmptyBorder(0, 0, 6, 0), new EmptyBorder(6, 6, 6, 6)));
 		return p;
@@ -644,6 +633,30 @@ class GroupIronmanPanel extends PluginPanel
 	static String escape(String s)
 	{
 		return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+	}
+
+	/**
+	 * A vertical BoxLayout panel that left-aligns everything added to it.
+	 * BoxLayout lines children up on their alignmentX; JLabel defaults to left
+	 * (0.0) and JPanel to centre (0.5), so a mix started labels at the middle
+	 * and pushed text past the panel's right edge (Board's test, 2026-11-04).
+	 */
+	static final class Column extends JPanel
+	{
+		Column()
+		{
+			setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+		}
+
+		@Override
+		protected void addImpl(Component comp, Object constraints, int index)
+		{
+			if (comp instanceof JComponent)
+			{
+				((JComponent) comp).setAlignmentX(Component.LEFT_ALIGNMENT);
+			}
+			super.addImpl(comp, constraints, index);
+		}
 	}
 
 	/** A small labelled bar: "HP 72/99" over a fill. Greyed when the member is offline. */

@@ -27,8 +27,8 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigSection(
 		name = "Group sync",
-		description = "How GIM Utilities connects your group, without the Party plugin. Press 'Join group sync' in the"
-			+ " GIM Utilities panel once per session.",
+		description = "How GIM Utilities connects your group, without the Party plugin. Once there is a group key it"
+			+ " joins by itself when you log in.",
 		position = 0
 	)
 	String syncSection = "sync";
@@ -47,7 +47,7 @@ public interface GroupIronmanConfig extends Config
 	@ConfigItem(
 		keyName = "groupSync",
 		name = "Sync with my group",
-		description = "Connect to your group's private party when you press 'Join group sync' in the panel. Off: solo,"
+		description = "Connect to your group's private party by itself when you log in. Off: solo,"
 			+ " nothing is sent and the panel shows only what this client saw. Does nothing until there is a group key.",
 		section = syncSection,
 		position = 0

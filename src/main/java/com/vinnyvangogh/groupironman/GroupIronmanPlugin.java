@@ -7,6 +7,10 @@ import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Client;
+import net.runelite.api.GameState;
+import net.runelite.api.ScriptID;
+import net.runelite.api.VarClientStr;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
@@ -35,8 +39,9 @@ import net.runelite.client.ui.NavigationButton;
  *
  * <p>Party traffic goes only through RuneLite's own {@code PartyService}; this
  * plugin makes no network calls of its own and runs no server. It joins the
- * group's party itself when the player presses "Join group sync", so the
- * Party plugin can stay off.
+ * group's party by itself once there is a group key, so the Party plugin can
+ * stay off. "Share key in group chat" only fills in the chatbox; the player
+ * presses Enter, the same way the core Chat History plugin refills it.
  */
 @Slf4j
 @PluginDescriptor(
@@ -48,6 +53,8 @@ public class GroupIronmanPlugin extends Plugin
 {
 	/** Shown in the plugin list and at the start of every chat line and notification this plugin writes. */
 	static final String NAME = "GIM Utilities";
+	/** Sends a chatbox line to the Ironman group's channel (the game's own hint: "//// or /g"). */
+	static final String GROUP_CHAT_PREFIX = "/g ";
 
 	@Inject
 	private ClientToolbar clientToolbar;
@@ -78,6 +85,9 @@ public class GroupIronmanPlugin extends Plugin
 
 	@Inject
 	private ClientThread clientThread;
+
+	@Inject
+	private Client client;
 
 	private GroupIronmanPanel panel;
 	private NavigationButton navButton;
@@ -123,9 +133,20 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
-			public String shareLine()
+			public void shareInChat()
 			{
-				return group.shareLine();
+				clientThread.invokeLater(() ->
+				{
+					String line = group.shareLine();
+					if (line == null || client.getGameState() != GameState.LOGGED_IN)
+					{
+						return;
+					}
+					// Fills in the chatbox on the group channel; never sends it. The
+					// player reads it and presses Enter.
+					client.setVarcStrValue(VarClientStr.CHATBOX_TYPED_TEXT, GROUP_CHAT_PREFIX + line);
+					client.runScript(ScriptID.CHAT_TEXT_INPUT_REBUILD, "");
+				});
 			}
 		});
 		navButton = NavigationButton.builder()

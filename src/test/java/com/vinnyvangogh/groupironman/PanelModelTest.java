@@ -170,6 +170,35 @@ public class PanelModelTest
 	}
 
 	@Test
+	public void sharingTheKeyGoesThroughTheChatboxNotTheClipboard()
+	{
+		// Board's test 2026-11-04: the game chatbox takes no paste, and the button was named
+		// 'Copy share line'. Every state that offers sharing offers the chatbox button.
+		GroupMembers group = GroupMembers.of("GroupShip", Arrays.asList("Alex", "Me"));
+		for (GroupSync.State s : new GroupSync.State[]{GroupSync.State.READY, GroupSync.State.STALE,
+			GroupSync.State.CONNECTED, GroupSync.State.NO_GROUP})
+		{
+			assertTrue(s.name(), SyncHeader.of(s, 0, group).buttons.contains(SyncHeader.Button.SHARE_KEY));
+		}
+		assertEquals("Share key in group chat", SyncHeader.Button.SHARE_KEY.label);
+		// Joining is automatic now; the header says so rather than asking for a click.
+		assertEquals("Connecting", SyncHeader.of(GroupSync.State.READY, 0, group).title);
+	}
+
+	@Test
+	public void columnsLeftAlignEverything()
+	{
+		// Mixed alignments in a BoxLayout pushed text past the panel's right edge.
+		GroupIronmanPanel.Column column = new GroupIronmanPanel.Column();
+		javax.swing.JPanel box = new javax.swing.JPanel();
+		javax.swing.JLabel label = new javax.swing.JLabel("x");
+		column.add(box);
+		column.add(label);
+		assertEquals(java.awt.Component.LEFT_ALIGNMENT, box.getAlignmentX(), 0f);
+		assertEquals(java.awt.Component.LEFT_ALIGNMENT, label.getAlignmentX(), 0f);
+	}
+
+	@Test
 	public void panelTextFromPeersIsEscaped()
 	{
 		assertEquals("&lt;b&gt;Alex &amp; Sam&lt;/b&gt;", GroupIronmanPanel.escape("<b>Alex & Sam</b>"));
