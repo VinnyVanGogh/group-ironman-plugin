@@ -29,9 +29,11 @@ RuneLite's Party service.
 
 ## Quick start
 
-Run `./gradlew run`, log in with RuneLite's Jagex account panel, join the same
-RuneLite Party as your group, and turn on the switches you want under
-*GIM Utilities* in the plugin settings.
+Run `./gradlew run`, log in with RuneLite's Jagex account panel, and turn on
+the switches you want under *GIM Utilities* in the plugin settings. One member
+creates a group key in the GIM Utilities panel and sends the share line in
+group chat; then everyone clicks **Join group sync**. The Party plugin is not
+needed.
 
 **Full steps, settings and what to test: [SETUP.md](SETUP.md).**
 

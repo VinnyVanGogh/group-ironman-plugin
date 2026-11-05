@@ -120,6 +120,52 @@ repos:
 | Saved data | `.runelite/gim-utilities/` | Build Guard's is `.runelite/build-guard/`. |
 | Display name | `GIM Utilities` (Board, 2026-11-04) | "Group Ironman" **clashes on the Hub**: slug `group-ironman` exists, display name "Group Iron Man", and 20+ `gim-*` slugs exist. No `gim-util*` slug does. |
 
+### Phase 0 addendum — round 2, no Party panel (2026-11-04)
+
+Board asked for the plugin to stand on its own ("auto hidden party"), with a
+random group key shared in group chat. Checked against `runelite/runelite` at
+tag `runelite-parent-1.13.5` before any code:
+
+- **`PartyService` is core.** `party/PartyService.java:61-62` is a Guice
+  `@Singleton`; `changeParty(String)` at :151 closes the socket, hashes the
+  passphrase and connects. Nothing in it references the Party plugin, so it
+  works with that plugin off. Passphrase to id is
+  `sha256(utf8).asLong() & Long.MAX_VALUE` (:308-312), no length limit.
+  RuneLite itself logs the passphrase at debug level (:160); our code never
+  logs the key.
+- **Names only travel when asked for.** `PartyDataService.java:285` sends
+  `CHARACTER_NAME` only while some plugin subscribes; the Party plugin does at
+  `PartyPlugin.java:210`. With it off, member names stay `<unknown>`, so GIM
+  Utilities subscribes itself (and unsubscribes on shutdown).
+- **`PartyPlugin.shutDown` does not leave the party** and removes its
+  overlays (:228): with the plugin off, its run-energy overlay is hidden.
+- **Auto-joining is rejected.** Wiki "Rejected or Rolled-Back Features":
+  "Auto-rejoin for parties: Would put undue strain on the party servers."
+  Precedent of rejection: plugin-hub PR #19833 *Party Smarty*
+  (`PartyService.changeParty` on login), closed 2026-10-31 by a maintainer:
+  "Auto joining parties is a rejected feature." **So every join is the
+  player's click** ("Join group sync"). Leaving our own party on shutdown or
+  when sync is turned off is not a join.
+- **Typing into the chatbox is rejected.** Same page: "Plugins which
+  programmatically insert text into the user's chatbox input for any reason
+  ... This is considered to be autotyping." So *Copy share line* uses the
+  clipboard; the player pastes and presses Enter.
+- **Reading and hiding chat lines is allowed.** Precedent: the base chat
+  filter plugin drops lines through the `chatFilterCheck` script callback
+  (`ChatFilterPlugin.java:177-257`); GIM Utilities drops only `[GIMU]` lines
+  in `CLAN_GIM_CHAT`.
+- **Roster.** `client.getClanSettings(ClanID.GROUP_IRONMAN).getMembers()`
+  (fallback `getClanChannel(ClanID.GROUP_IRONMAN)`), runelite-api 1.13.5. No
+  hiscores or Wise Old Man calls: the in-game roster is authoritative and
+  needs no network (and no third-party-server warning).
+- **Why a random key.** Group name, member names and join dates are on the
+  hiscores; a passphrase built from them could be rebuilt by anyone, and
+  party data is relayed to everyone in the party.
+- **Panel layout** after Quest Helper (`Zoinkwiz/quest-helper`,
+  `panel/QuestHelperPanel.java`): `IconTextField` search bar, `CardLayout`
+  views, sections collapsed from their header, a `JScrollPane` around it all
+  (here, `PluginPanel`'s own).
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection**, and therefore any integration that reads another plugin's
@@ -129,6 +175,8 @@ repos:
   needs a website; this plugin's point is that it does not.
 - **Automating anything**: moving items, withdrawing, walking. Input
   Restrictions.
+- **Joining a party without a click**, on login or on a timer, and **putting
+  text into the chatbox input** (the share line goes on the clipboard).
 
 ### The display name (settled)
 
