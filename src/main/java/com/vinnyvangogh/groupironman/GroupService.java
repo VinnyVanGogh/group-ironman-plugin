@@ -67,6 +67,7 @@ import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.events.UserPart;
 import net.runelite.client.party.messages.UserSync;
+import net.runelite.http.api.item.ItemPrice;
 
 /**
  * The Group Ironman extras: member banks, the group storage log, live stats
@@ -196,6 +197,9 @@ class GroupService
 	/** When this player last played before this session; 0 when not known. */
 	private volatile long since;
 	private volatile String self = "";
+	private final Watchlist watchlist = new Watchlist();
+	/** "Share group watchlist" as last read, so turning it on sends the list once. */
+	private volatile boolean lastShareWatch;
 
 	final ItemLookup lookup = new ItemLookup()
 	{
@@ -221,7 +225,12 @@ class GroupService
 
 	void startUp(Runnable onChange)
 	{
-		this.onChange = onChange;
+		loadWatchlist();
+		this.onChange = () ->
+		{
+			checkWatchlist();
+			onChange.run();
+		};
 		sync = new GroupSync(new GroupSync.Party()
 		{
 			@Override
@@ -388,6 +397,12 @@ class GroupService
 			sync.leaveOwn();
 		}
 		lowStock = LowStock.parse(config.groupLowStock());
+		boolean shareWatch = config.groupShareWatchlist();
+		if (shareWatch && !lastShareWatch)
+		{
+			clientThread.invokeLater(this::sendWatch);
+		}
+		lastShareWatch = shareWatch;
 		GroupOutbox.Switches s = switches();
 		// Turning a live feature off drops what was collected for it.
 		if (!s.stats)
@@ -815,6 +830,7 @@ class GroupService
 			{
 				partyService.send(new VvgGroupIronmanMessage(payload));
 			}
+			sendWatch();
 		});
 	}
 
@@ -966,6 +982,13 @@ class GroupService
 				{
 					saveCache();
 				}
+				break;
+			case WATCH:
+				if (!config.groupShareWatchlist())
+				{
+					return;
+				}
+				receiveWatch(name, decoded.watch, now);
 				break;
 			default:
 				return;
@@ -1269,6 +1292,7 @@ class GroupService
 				return false;
 			}
 			resolveNow(roster.knownItemIds());
+			resolveNow(watchlist.itemIds());
 			onChange.run();
 			return true;
 		});
@@ -1332,6 +1356,156 @@ class GroupService
 	/** Kept for the panel: is any group feature on, so the panel button should show. */
 	boolean anyOn()
 	{
-		return switches().any() || !lowStock.isEmpty();
+		return switches().any() || !lowStock.isEmpty() || config.groupShareWatchlist() || !watchlist.isEmpty();
+	}
+
+	// Watchlists (RUNELITE-86). Saved in the hidden "watchlist" setting, so the
+	// personal list follows this player's RuneLite profile to their other
+	// sessions; only the group list is ever sent, and only with its switch on.
+
+	Watchlist watchlist()
+	{
+		return watchlist;
+	}
+
+	boolean sharingWatchlist()
+	{
+		return config.groupShareWatchlist();
+	}
+
+	/** Any thread. */
+	private void loadWatchlist()
+	{
+		String saved = config.watchlist();
+		if (saved != null && !saved.isEmpty() && !watchlist.load(gson, saved))
+		{
+			log.debug("watchlist setting unreadable, keeping an empty list");
+		}
+		lastShareWatch = config.groupShareWatchlist();
+	}
+
+	private void saveWatchlist()
+	{
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_WATCHLIST, watchlist.toJson(gson));
+	}
+
+	/** Swing thread: the panel's buttons. */
+	void watchAddPersonal(int itemId, int quantity)
+	{
+		watchChanged(watchlist.addPersonal(itemId, quantity, System.currentTimeMillis(), roster.searchSources()), false);
+	}
+
+	void watchAddGroup(int itemId, int quantity)
+	{
+		watchChanged(watchlist.addGroup(itemId, quantity, self, System.currentTimeMillis(), roster.searchSources()),
+			true);
+	}
+
+	void watchRemovePersonal(int itemId)
+	{
+		watchChanged(watchlist.removePersonal(itemId), false);
+	}
+
+	void watchRemoveGroup(int itemId)
+	{
+		watchChanged(watchlist.removeGroup(itemId), true);
+	}
+
+	void watchAccept(int itemId)
+	{
+		watchChanged(watchlist.accept(itemId, roster.searchSources()), true);
+	}
+
+	void watchDismiss(int itemId)
+	{
+		watchChanged(watchlist.dismiss(itemId), false);
+	}
+
+	void watchAcceptAll()
+	{
+		watchChanged(watchlist.acceptAll(roster.searchSources()) > 0, true);
+	}
+
+	private void watchChanged(boolean changed, boolean groupList)
+	{
+		if (!changed)
+		{
+			return;
+		}
+		saveWatchlist();
+		resolve(watchlist.itemIds());
+		if (groupList)
+		{
+			clientThread.invokeLater(this::sendWatch);
+		}
+		onChange.run();
+	}
+
+	/**
+	 * Names the add-item search can find: every tradeable item ItemManager
+	 * knows, plus any item already seen in the group (untradeables included).
+	 * ItemManager.search reads its price map only, so any thread may call it.
+	 */
+	Map<Integer, String> watchSearchNames()
+	{
+		Map<Integer, String> out = new java.util.HashMap<>(names);
+		for (ItemPrice p : itemManager.search(""))
+		{
+			out.putIfAbsent(p.getId(), p.getName());
+		}
+		return out;
+	}
+
+	/** Client thread. This player's whole group list; an empty one too, so members drop its suggestions. */
+	private void sendWatch()
+	{
+		if (!syncing())
+		{
+			return;
+		}
+		String payload = GroupOutbox.watch(gson, config.groupShareWatchlist(), watchlist.shared());
+		if (payload != null)
+		{
+			partyService.send(new VvgGroupIronmanMessage(payload));
+		}
+	}
+
+	/** A member's group list arrived: what is new to this player becomes a suggestion, never an addition. */
+	private void receiveWatch(String member, List<Watchlist.Entry> theirs, long now)
+	{
+		if (!watchlist.receive(member, theirs, now))
+		{
+			return;
+		}
+		List<Integer> ids = new ArrayList<>();
+		for (Watchlist.Entry e : theirs)
+		{
+			ids.add(e.itemId);
+		}
+		resolve(ids);
+		saveWatchlist();
+	}
+
+	/**
+	 * After any change in what the group holds. Event 22 fires once per item
+	 * and is remembered across restarts.
+	 */
+	private void checkWatchlist()
+	{
+		if (watchlist.isEmpty())
+		{
+			return;
+		}
+		List<GroupSearch.Source> seen = roster.searchSources();
+		List<Watchlist.Got> got = watchlist.checkGot(seen);
+		if (!got.isEmpty())
+		{
+			saveWatchlist();
+			// TODO(RUNELITE-85, part A): route event 22 "someone got a watchlist item" (each Got: the
+			// entry and its holders) to part A's Discord webhook and overlays, behind its own toggle.
+		}
+		// TODO(RUNELITE-85, part A): route event 19 "important item nobody in the group has" from
+		// watchlist.missingFromGroup(seen) to part A's outputs, behind its own toggle, firing on the
+		// change from held to missing rather than on every check.
 	}
 }

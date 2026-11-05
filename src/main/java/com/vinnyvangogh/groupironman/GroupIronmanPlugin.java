@@ -145,7 +145,7 @@ public class GroupIronmanPlugin extends Plugin
 				}
 				return saved;
 			}
-		});
+		}, watchActions());
 		navButton = NavigationButton.builder()
 			.tooltip(NAME)
 			.icon(icon())
@@ -172,7 +172,9 @@ public class GroupIronmanPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (!GroupIronmanConfig.GROUP.equals(event.getGroup()))
+		if (!GroupIronmanConfig.GROUP.equals(event.getGroup())
+			// The saved watchlists: written by this plugin, which already redrew.
+			|| GroupIronmanConfig.KEY_WATCHLIST.equals(event.getKey()))
 		{
 			return;
 		}
@@ -185,6 +187,73 @@ public class GroupIronmanPlugin extends Plugin
 	{
 		group.onPartyChanged();
 		redraw();
+	}
+
+	/** The Watch tab's buttons (RUNELITE-86); each runs on the Swing thread. */
+	private WatchlistTab.Actions watchActions()
+	{
+		return new WatchlistTab.Actions()
+		{
+			@Override
+			public Watchlist watchlist()
+			{
+				return group.watchlist();
+			}
+
+			@Override
+			public boolean sharing()
+			{
+				return group.sharingWatchlist();
+			}
+
+			@Override
+			public java.util.Map<Integer, String> searchNames()
+			{
+				return group.watchSearchNames();
+			}
+
+			@Override
+			public void addPersonal(int itemId, int quantity)
+			{
+				group.watchAddPersonal(itemId, quantity);
+			}
+
+			@Override
+			public void addGroup(int itemId, int quantity)
+			{
+				group.watchAddGroup(itemId, quantity);
+			}
+
+			@Override
+			public void removePersonal(int itemId)
+			{
+				group.watchRemovePersonal(itemId);
+			}
+
+			@Override
+			public void removeGroup(int itemId)
+			{
+				group.watchRemoveGroup(itemId);
+			}
+
+			@Override
+			public void accept(int itemId)
+			{
+				group.watchAccept(itemId);
+			}
+
+			@Override
+			public void dismiss(int itemId)
+			{
+				group.watchDismiss(itemId);
+			}
+
+			@Override
+			public void acceptAll()
+			{
+				group.watchAcceptAll();
+			}
+		};
 	}
 
 	/** The panel button shows only while at least one group feature is on. */

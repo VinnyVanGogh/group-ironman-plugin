@@ -23,6 +23,7 @@ import java.util.TreeMap;
  * <li>{@code extras}: rune pouch, quiver and seed vault, see {@link MemberExtras}.</li>
  * <li>{@code events}: drops and new collection log slots, split like a bank,
  * see {@link GroupEvent}.</li>
+ * <li>{@code watch}: the sender's whole group watchlist, see {@link Watchlist}.</li>
  * </ul>
  *
  * <p><b>Why a size cap of our own.</b> RuneLite 1.12.39's {@code WSClient}
@@ -68,14 +69,17 @@ final class GroupCodec
 
 	/** Room for {@code {"v":1,"k":"events","e":[]}} and change. */
 	private static final int EVENTS_HEADER_CHARS = 40;
+	/** Room for {@code {"v":1,"k":"watch","w":[]}} and change. */
+	private static final int WATCH_HEADER_CHARS = 40;
 
 	/**
 	 * The {@code k} on the wire. {@link #EXTRAS} and {@link #EVENTS} came in
 	 * part 3; a part 2 build reads them as an unknown kind and ignores them.
+	 * {@link #WATCH} came with watchlists; older builds ignore it the same way.
 	 */
 	enum Kind
 	{
-		BANK, CARRIED, STORAGE, STATS, EXTRAS, EVENTS
+		BANK, CARRIED, STORAGE, STATS, EXTRAS, EVENTS, WATCH
 	}
 
 	/** One part of a split bank snapshot. */
@@ -118,10 +122,19 @@ final class GroupCodec
 		final MemberExtras extras;
 		/** Each with an empty member: the receiver files them under the party member they came from. */
 		final List<GroupEvent> events;
+		/** The sender's group watchlist; an adder of "" means the sender. */
+		final List<Watchlist.Entry> watch;
 
 		private Decoded(Kind kind, BankPart bank, Carried carried, StorageChange storage, MemberStats stats,
 			MemberExtras extras, List<GroupEvent> events)
 		{
+			this(kind, bank, carried, storage, stats, extras, events, null);
+		}
+
+		private Decoded(Kind kind, BankPart bank, Carried carried, StorageChange storage, MemberStats stats,
+			MemberExtras extras, List<GroupEvent> events, List<Watchlist.Entry> watch)
+		{
+			this.watch = watch;
 			this.kind = kind;
 			this.bank = bank;
 			this.carried = carried;
@@ -159,6 +172,11 @@ final class GroupCodec
 		static Decoded of(List<GroupEvent> events)
 		{
 			return new Decoded(Kind.EVENTS, null, null, null, null, null, events);
+		}
+
+		static Decoded watch(List<Watchlist.Entry> watch)
+		{
+			return new Decoded(Kind.WATCH, null, null, null, null, null, null, watch);
 		}
 	}
 
@@ -296,6 +314,36 @@ final class GroupCodec
 		return out;
 	}
 
+	/**
+	 * The sender's group watchlist in one message, so a receiver always has
+	 * the whole list and can drop what is no longer on it. At most
+	 * {@link Watchlist#MAX_ITEMS}; entries past {@link #MAX_PAYLOAD_CHARS}
+	 * (only possible with long escaped names) are left off.
+	 */
+	static String encodeWatch(Gson gson, List<Watchlist.Entry> entries)
+	{
+		JsonArray w = new JsonArray();
+		int chars = WATCH_HEADER_CHARS;
+		for (Watchlist.Entry e : entries)
+		{
+			if (w.size() >= Watchlist.MAX_ITEMS)
+			{
+				break;
+			}
+			JsonArray entry = Watchlist.entryJson(e);
+			int size = gson.toJson(entry).length() + 1;
+			if (chars + size > MAX_PAYLOAD_CHARS)
+			{
+				break;
+			}
+			w.add(entry);
+			chars += size;
+		}
+		JsonObject o = header(Kind.WATCH);
+		o.add("w", w);
+		return gson.toJson(o);
+	}
+
 	private static String eventsPayload(Gson gson, JsonArray events)
 	{
 		JsonObject o = header(Kind.EVENTS);
@@ -374,6 +422,8 @@ final class GroupCodec
 					longOr(in.get("svts"), -1)));
 			case "events":
 				return decodeEvents(in);
+			case "watch":
+				return Decoded.watch(Watchlist.entriesFrom(in.get("w"), Watchlist.MAX_ITEMS));
 			default:
 				// A kind from a newer build.
 				return null;

@@ -51,8 +51,8 @@ import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.IconTextField;
 
 /**
- * The group side panel: a sync header, then five tabs (Group, Banks,
- * Storage, Find, Log). Layout after Quest Helper's panel
+ * The group side panel: a sync header, then six tabs (Group, Banks,
+ * Storage, Find, Log, Watch). Layout after Quest Helper's panel
  * (Zoinkwiz/quest-helper {@code QuestHelperPanel}): an {@link IconTextField}
  * search bar, views swapped with a {@link CardLayout}, and sections that
  * collapse from their header. Items are icon grids from {@link ItemManager},
@@ -140,8 +140,13 @@ class GroupIronmanPanel extends PluginPanel
 	private long keyNoteAt;
 	private View view;
 
-	GroupIronmanPanel(ItemManager itemManager, SkillIconManager skillIcons, SpriteManager sprites, Actions actions)
+	/** The Watch tab (RUNELITE-86), its own class. */
+	private final WatchlistTab watch;
+
+	GroupIronmanPanel(ItemManager itemManager, SkillIconManager skillIcons, SpriteManager sprites, Actions actions,
+		WatchlistTab.Actions watchActions)
 	{
+		this.watch = new WatchlistTab(itemManager, watchActions, this::redraw);
 		loadOrbIcon(sprites, "HP", SpriteID.MINIMAP_ORB_HITPOINTS_ICON);
 		loadOrbIcon(sprites, "Prayer", SpriteID.MINIMAP_ORB_PRAYER_ICON);
 		loadOrbIcon(sprites, "Run", SpriteID.MINIMAP_ORB_RUN_ICON);
@@ -154,7 +159,7 @@ class GroupIronmanPanel extends PluginPanel
 
 		JPanel top = new Column();
 		top.add(header);
-		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log"));
+		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Watch"));
 		add(top, BorderLayout.NORTH);
 
 		addTab("Group", null);
@@ -162,6 +167,7 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Storage", storageFilter);
 		addTab("Find", findQuery);
 		addTab("Log", null);
+		addTab("Watch", watch.top());
 		add(views, BorderLayout.CENTER);
 	}
 
@@ -216,6 +222,9 @@ class GroupIronmanPanel extends PluginPanel
 					break;
 				case "Log":
 					drawLog(tab, v, now);
+					break;
+				case "Watch":
+					watch.draw(tab, v);
 					break;
 				default:
 					drawGroup(tab, v, now);
@@ -844,7 +853,7 @@ class GroupIronmanPanel extends PluginPanel
 
 	// Building blocks.
 
-	private static JPanel section()
+	static JPanel section()
 	{
 		JPanel p = new Column();
 		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -858,7 +867,7 @@ class GroupIronmanPanel extends PluginPanel
 		tab.add(text(next, MUTED));
 	}
 
-	private static JLabel heading(String text)
+	static JLabel heading(String text)
 	{
 		JLabel label = new JLabel(text);
 		label.setFont(FontManager.getRunescapeBoldFont());
@@ -867,7 +876,7 @@ class GroupIronmanPanel extends PluginPanel
 		return label;
 	}
 
-	private static JLabel text(String text, Color color)
+	static JLabel text(String text, Color color)
 	{
 		// The html wrapper makes long lines wrap at the panel width. Text from
 		// peers is escaped first: a display name or item name is data, not markup.

@@ -258,4 +258,43 @@ public interface GroupIronmanConfig extends Config
 	{
 		return new Color(0x00, 0x8B, 0x8B);
 	}
+
+	// Watchlists (RUNELITE-86). Kept in their own section to merge cleanly with other parts.
+
+	@ConfigSection(
+		name = "Watchlists",
+		description = "Items you want to keep an eye on, personal and shared with your group. Add them in the panel's"
+			+ " Watch tab.",
+		position = 3
+	)
+	String watchSection = "watchlists";
+
+	/** Frozen. Where the lists are saved; set only by the panel, never shown. */
+	String KEY_WATCHLIST = "watchlist";
+
+	@ConfigItem(
+		keyName = "groupShareWatchlist",
+		name = "Share group watchlist",
+		description = "Send your group watchlist to your party, and see items other members add as suggestions you"
+			+ " can accept or dismiss. Your personal watchlist is never sent.",
+		section = watchSection,
+		position = 0
+	)
+	default boolean groupShareWatchlist()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = KEY_WATCHLIST,
+		name = "Watchlists",
+		description = "Saved personal and group watchlists",
+		hidden = true,
+		section = watchSection,
+		position = 1
+	)
+	default String watchlist()
+	{
+		return "";
+	}
 }

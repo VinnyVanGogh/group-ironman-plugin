@@ -96,6 +96,20 @@ final class GroupOutbox
 		return GroupCodec.encodeExtras(gson, extras);
 	}
 
+	/**
+	 * The group watchlist, null when "Share group watchlist" is off. Its own
+	 * switch rather than one in {@link Switches}: an empty list is still sent,
+	 * so members drop suggestions that came from it.
+	 */
+	static String watch(Gson gson, boolean on, List<Watchlist.Entry> group)
+	{
+		if (!on || group == null)
+		{
+			return null;
+		}
+		return GroupCodec.encodeWatch(gson, group);
+	}
+
 	/** Empty when drop sharing is off or there is nothing to send. */
 	static List<String> events(Gson gson, Switches switches, List<GroupEvent> events)
 	{
