@@ -97,7 +97,8 @@ public class ItemQueryTest
 			{
 				String name = p.getFileName().toString();
 				String code = new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
-				boolean map = code.contains("WorldMap") || code.contains("WORLDMAP") || code.contains("Worldmap");
+				// World map APIs, not the 'groupWorldMap' setting's name.
+				boolean map = code.replace("groupWorldMap", "").matches("(?s).*(WorldMap|WORLDMAP|Worldmap).*");
 				if (map && !name.equals("MemberMapMarkers.java"))
 				{
 					offenders.add(name);
