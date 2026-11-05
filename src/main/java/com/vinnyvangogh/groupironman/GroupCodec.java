@@ -332,24 +332,17 @@ final class GroupCodec
 	static GroupEvent eventFrom(JsonObject o, String member)
 	{
 		Long ts = ItemCounts.longValue(o.get("ts"));
-		JsonElement t = o.get("t");
+		GroupEvent.Type type = GroupEvent.Type.of(string(o.get("t")));
 		JsonElement s = o.get("s");
-		if (ts == null || ts < 0 || t == null || !t.isJsonPrimitive() || s == null || !s.isJsonPrimitive())
+		if (ts == null || ts < 0 || type == null || s == null || !s.isJsonPrimitive())
 		{
 			return null;
 		}
-		GroupEvent.Type type = GroupEvent.Type.of(t.getAsString());
-		if (type == null)
-		{
-			return null;
-		}
-		Long n = ItemCounts.longValue(o.get("n"));
-		Long w = ItemCounts.longValue(o.get("w"));
 		return GroupEvent.of(type, ts, member).text(s.getAsString())
 			.items(ItemCounts.fromJson(o.get("i"), GroupEvent.MAX_DROP_ITEMS))
-			.number(n == null ? 0 : n)
+			.number(number(o.get("n"), Long.MIN_VALUE, Long.MAX_VALUE))
 			.detail(string(o.get("x")))
-			.world(w == null || w < 0 || w > MAX_COORD ? 0 : w.intValue())
+			.world((int) number(o.get("w"), 0, MAX_COORD))
 			.location(string(o.get("l")))
 			.build();
 	}
@@ -357,6 +350,13 @@ final class GroupCodec
 	private static String string(JsonElement e)
 	{
 		return e != null && e.isJsonPrimitive() ? e.getAsString() : "";
+	}
+
+	/** The whole number in {@code e}, 0 when missing or outside {@code min..max}. */
+	private static long number(JsonElement e, long min, long max)
+	{
+		Long n = ItemCounts.longValue(e);
+		return n == null || n < min || n > max ? 0 : n;
 	}
 
 	private static String eventsPayload(Gson gson, JsonArray events)
