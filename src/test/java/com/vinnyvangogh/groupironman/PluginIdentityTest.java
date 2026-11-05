@@ -86,8 +86,10 @@ public class PluginIdentityTest
 		// Six share switches, the world map, ::find, "Sync with my group" and "Colour item names" (a ::find
 		// look, off): a new switch must be added here on purpose. Sync is the one switch on by default (Board,
 		// round 2): it does nothing without a group key, and even with one nothing is sent until the player
-		// presses Join.
-		assertEquals(10, switches);
+		// presses Join. Part A of the group events adds 44 more, every one off: "Share group events", "Post to
+		// Discord", "Attach a screenshot", "Group box", and a Discord and an overlay switch per event kind.
+		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length, switches);
+		assertEquals(54, switches);
 		assertEquals(Collections.singletonList("groupSync"), on);
 		assertEquals("", DEFAULTS.groupLowStock());
 		assertEquals("no key on a fresh install", "", DEFAULTS.groupKey());
