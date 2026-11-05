@@ -73,8 +73,10 @@ final class SyncHeader
 				return new SyncHeader("In another party; GIM sync paused", "Nothing is sent to that party.", false,
 					Button.SWITCH);
 			case CONNECTED:
-				return new SyncHeader("Connected, " + othersOnline + (othersOnline == 1 ? " member" : " members")
-					+ " online", "Synced with " + group + ". Only roster members are shown.", true,
+				// Counts you too (Board 2026-11-04: "zero members online, even though I'm online").
+				return new SyncHeader("Connected, " + (othersOnline + 1) + " online"
+					+ (othersOnline == 0 ? " (you)" : ""), "Synced with " + group + ". Only roster members are"
+					+ " shown.", true,
 					Button.COPY_KEY, Button.NEW_KEY, Button.LEAVE);
 			default:
 				throw new IllegalArgumentException(String.valueOf(state));

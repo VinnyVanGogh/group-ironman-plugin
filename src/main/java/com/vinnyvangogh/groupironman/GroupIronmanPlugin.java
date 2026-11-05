@@ -15,6 +15,7 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.PartyChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SkillIconManager;
+import net.runelite.client.game.SpriteManager;
 import net.runelite.client.party.PartyDataService;
 import net.runelite.client.party.PartyDataType;
 import net.runelite.client.party.WSClient;
@@ -81,6 +82,9 @@ public class GroupIronmanPlugin extends Plugin
 	@Inject
 	private ClientThread clientThread;
 
+	@Inject
+	private SpriteManager spriteManager;
+
 	private GroupIronmanPanel panel;
 	private NavigationButton navButton;
 
@@ -98,7 +102,7 @@ public class GroupIronmanPlugin extends Plugin
 		// CHARACTER_NAME only while subscribed). Without the Party plugin, that is us.
 		partyDataService.subscribe(this, PartyDataType.CHARACTER_NAME);
 		eventBus.register(group);
-		panel = new GroupIronmanPanel(itemManager, skillIconManager, new GroupIronmanPanel.Actions()
+		panel = new GroupIronmanPanel(itemManager, skillIconManager, spriteManager, new GroupIronmanPanel.Actions()
 		{
 			@Override
 			public void join()

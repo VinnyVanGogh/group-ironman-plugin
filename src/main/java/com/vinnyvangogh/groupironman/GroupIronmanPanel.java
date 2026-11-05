@@ -7,6 +7,16 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.Shape;
+import java.awt.image.BufferedImage;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.swing.SwingUtilities;
+import net.runelite.api.SpriteID;
+import net.runelite.client.game.ItemStats;
+import net.runelite.client.game.SpriteManager;
+import net.runelite.client.util.AsyncBufferedImage;
 import java.awt.GridLayout;
 import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
@@ -109,6 +119,8 @@ class GroupIronmanPanel extends PluginPanel
 
 	private final ItemManager itemManager;
 	private final SkillIconManager skillIcons;
+	/** The minimap orbs' own icons, by bar label; filled in as the sprites load. */
+	private final Map<String, BufferedImage> orbIcons = new ConcurrentHashMap<>();
 	private final Actions actions;
 
 	private final JPanel header = new Column();
@@ -126,8 +138,12 @@ class GroupIronmanPanel extends PluginPanel
 	private long keyNoteAt;
 	private View view;
 
-	GroupIronmanPanel(ItemManager itemManager, SkillIconManager skillIcons, Actions actions)
+	GroupIronmanPanel(ItemManager itemManager, SkillIconManager skillIcons, SpriteManager sprites, Actions actions)
 	{
+		loadOrbIcon(sprites, "HP", SpriteID.MINIMAP_ORB_HITPOINTS_ICON);
+		loadOrbIcon(sprites, "Prayer", SpriteID.MINIMAP_ORB_PRAYER_ICON);
+		loadOrbIcon(sprites, "Run", SpriteID.MINIMAP_ORB_RUN_ICON);
+		loadOrbIcon(sprites, "Spec", SpriteID.MINIMAP_ORB_SPECIAL_ICON);
 		this.itemManager = itemManager;
 		this.skillIcons = skillIcons;
 		this.actions = actions;
@@ -405,7 +421,7 @@ class GroupIronmanPanel extends PluginPanel
 			bars.setOpaque(false);
 			for (PanelModel.Bar b : c.bars)
 			{
-				bars.add(new BarLabel(b, barColor(b.label), c.online || c.you));
+				bars.add(new Orb(b, barColor(b.label), c.online || c.you, orbIcons.get(b.label)));
 			}
 			body.add(bars);
 		}
@@ -413,8 +429,34 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			body.add(skillGrid(c.skills, c.online || c.you));
 		}
+		// Worn then inventory, small and side by side, in the game's own layouts.
+		PanelModel.ItemGroup worn = null;
+		PanelModel.ItemGroup inventory = null;
 		for (PanelModel.ItemGroup g : c.items)
 		{
+			if ("Worn".equals(g.title))
+			{
+				worn = g;
+			}
+			else if ("Inventory".equals(g.title))
+			{
+				inventory = g;
+			}
+		}
+		if (worn != null || inventory != null)
+		{
+			JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+			row.setOpaque(false);
+			row.add(captioned("Worn", wornLayout(worn == null ? new ArrayList<>() : worn.items)));
+			row.add(captioned("Inventory", inventoryLayout(inventory == null ? new ArrayList<>() : inventory.items)));
+			body.add(row);
+		}
+		for (PanelModel.ItemGroup g : c.items)
+		{
+			if (g == worn || g == inventory)
+			{
+				continue;
+			}
 			body.add(text(g.title, MUTED));
 			body.add(itemGrid(g.items));
 		}
@@ -424,6 +466,132 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		card.add(body);
 		return card;
+	}
+
+	private void loadOrbIcon(SpriteManager sprites, String label, int spriteId)
+	{
+		sprites.getSpriteAsync(spriteId, 0, image ->
+		{
+			orbIcons.put(label, image);
+			SwingUtilities.invokeLater(this::redraw);
+		});
+	}
+
+	private static JComponent captioned(String caption, JComponent content)
+	{
+		JPanel p = new Column();
+		p.setOpaque(false);
+		JLabel label = new JLabel(caption);
+		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setForeground(MUTED);
+		p.add(label);
+		p.add(content);
+		return p;
+	}
+
+	/**
+	 * The worn-equipment tab's layout, 3 x 5: head; cape, neck, ammo; weapon, body,
+	 * shield; legs; hands, feet, ring. Each item goes to the slot its stats name.
+	 */
+	private JComponent wornLayout(List<PanelModel.ItemCell> items)
+	{
+		JComponent[] cells = new JComponent[WORN_LAYOUT.length];
+		for (PanelModel.ItemCell item : items)
+		{
+			ItemStats stats = itemManager.getItemStats(item.id);
+			int slot = stats == null || stats.getEquipment() == null ? -1 : stats.getEquipment().getSlot();
+			int at = wornCell(slot);
+			if (at < 0 || cells[at] != null)
+			{
+				at = firstFree(cells);
+			}
+			if (at >= 0)
+			{
+				cells[at] = smallItem(item);
+			}
+		}
+		JPanel grid = new JPanel(new GridLayout(5, 3, 1, 1));
+		grid.setOpaque(false);
+		for (int i = 0; i < cells.length; i++)
+		{
+			grid.add(cells[i] != null ? cells[i] : WORN_LAYOUT[i] < 0 ? spacer() : emptySlot());
+		}
+		return grid;
+	}
+
+	/** Equipment slot index (EquipmentInventorySlot) per cell of the 3 x 5 layout; -1 is a gap. */
+	private static final int[] WORN_LAYOUT = {
+		-1, 0, -1,
+		1, 2, 13,
+		3, 4, 5,
+		-1, 7, -1,
+		9, 10, 12,
+	};
+
+	static int wornCell(int slot)
+	{
+		for (int i = 0; i < WORN_LAYOUT.length; i++)
+		{
+			if (slot >= 0 && WORN_LAYOUT[i] == slot)
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private static int firstFree(JComponent[] cells)
+	{
+		for (int i = 0; i < cells.length; i++)
+		{
+			if (cells[i] == null && WORN_LAYOUT[i] >= 0)
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	/** The inventory tab's 4 x 7 grid. Shared data has counts, not slots, so items fill it in order. */
+	private JComponent inventoryLayout(List<PanelModel.ItemCell> items)
+	{
+		JPanel grid = new JPanel(new GridLayout(7, 4, 1, 1));
+		grid.setOpaque(false);
+		int shown = 0;
+		for (PanelModel.ItemCell item : items)
+		{
+			if (shown == 28)
+			{
+				break;
+			}
+			grid.add(smallItem(item));
+			shown++;
+		}
+		for (; shown < 28; shown++)
+		{
+			grid.add(emptySlot());
+		}
+		return grid;
+	}
+
+	private JComponent smallItem(PanelModel.ItemCell item)
+	{
+		AsyncBufferedImage image = itemManager.getImage(item.id, (int) Math.min(Integer.MAX_VALUE, item.quantity),
+			item.quantity > 1);
+		return new SmallItem(image, item.tooltip());
+	}
+
+	private static JComponent emptySlot()
+	{
+		return new SmallItem(null, null);
+	}
+
+	private static JComponent spacer()
+	{
+		JPanel p = new JPanel();
+		p.setOpaque(false);
+		p.setPreferredSize(new Dimension(SmallItem.W, SmallItem.H));
+		return p;
 	}
 
 	private static Color barColor(String label)
@@ -700,35 +868,97 @@ class GroupIronmanPanel extends PluginPanel
 	}
 
 	/** A small labelled bar: "HP 72/99" over a fill. Greyed when the member is offline. */
-	private static final class BarLabel extends JComponent
+	/**
+	 * One stat as the minimap draws it (Board 2026-11-04: "the orbs like they have
+	 * near the minimap"): the number on the left, coloured green to red by how full
+	 * it is, then a round orb filled from the bottom with the stat's own icon.
+	 */
+	private static final class Orb extends JComponent
 	{
+		private static final int SIZE = 18;
 		private final PanelModel.Bar bar;
 		private final Color color;
 		private final boolean live;
+		private final BufferedImage icon;
 
-		BarLabel(PanelModel.Bar bar, Color color, boolean live)
+		Orb(PanelModel.Bar bar, Color color, boolean live, BufferedImage icon)
 		{
 			this.bar = bar;
 			this.color = color;
 			this.live = live;
-			setPreferredSize(new Dimension(40, 16));
+			this.icon = icon;
+			setPreferredSize(new Dimension(44, SIZE + 2));
 			setToolTipText(bar.label + " " + bar.text());
 		}
 
 		@Override
 		protected void paintComponent(Graphics g)
 		{
-			int w = getWidth();
-			int h = getHeight();
+			Graphics2D g2 = (Graphics2D) g.create();
+			g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			double share = bar.max <= 0 ? 0 : Math.min(1.0, Math.max(0, bar.current) / (double) bar.max);
+			int x = getWidth() - SIZE - 1;
+			int y = 1;
+			g2.setFont(FontManager.getRunescapeSmallFont());
+			g2.setColor(live ? numberColor(share) : MUTED);
+			String number = String.valueOf(bar.current);
+			int textWidth = g2.getFontMetrics().stringWidth(number);
+			g2.drawString(number, x - textWidth - 3, y + SIZE - 4);
+			// Ring, empty part, then the fill rising from the bottom like the game's orbs.
+			g2.setColor(Color.BLACK);
+			g2.fillOval(x - 1, y - 1, SIZE + 2, SIZE + 2);
+			g2.setColor(ColorScheme.DARK_GRAY_COLOR);
+			g2.fillOval(x, y, SIZE, SIZE);
+			int fill = (int) Math.round(SIZE * share);
+			Shape clip = g2.getClip();
+			g2.clipRect(x, y + SIZE - fill, SIZE, fill);
+			g2.setColor(live ? color : MUTED.darker());
+			g2.fillOval(x, y, SIZE, SIZE);
+			g2.setClip(clip);
+			if (icon != null)
+			{
+				int s = SIZE - 6;
+				g2.drawImage(icon, x + 3, y + 3, s, s, null);
+			}
+			g2.dispose();
+		}
+
+		/** The minimap's number colours: green when full, through yellow, to red when low. */
+		static Color numberColor(double share)
+		{
+			int red = (int) Math.round(255 * Math.min(1.0, 2 * (1 - share)));
+			int green = (int) Math.round(255 * Math.min(1.0, 2 * share));
+			return new Color(red, green, 0);
+		}
+	}
+
+	/** An item icon drawn smaller than ItemManager's 36x32, for the worn and inventory layouts. */
+	private static final class SmallItem extends JComponent
+	{
+		static final int W = 22;
+		static final int H = 20;
+		private final AsyncBufferedImage image;
+
+		SmallItem(AsyncBufferedImage image, String tooltip)
+		{
+			this.image = image;
+			setPreferredSize(new Dimension(W, H));
+			setToolTipText(tooltip);
+			if (image != null)
+			{
+				image.onLoaded(this::repaint);
+			}
+		}
+
+		@Override
+		protected void paintComponent(Graphics g)
+		{
 			g.setColor(ColorScheme.DARK_GRAY_COLOR);
-			g.fillRect(0, 0, w, h);
-			int fill = bar.max <= 0 ? 0 : (int) Math.round(w * Math.min(1.0, Math.max(0, bar.current) / (double) bar.max));
-			g.setColor(live ? color : MUTED.darker());
-			g.fillRect(0, 0, fill, h);
-			g.setFont(FontManager.getRunescapeSmallFont());
-			g.setColor(Color.WHITE);
-			String label = bar.label.substring(0, Math.min(2, bar.label.length())) + " " + bar.current;
-			g.drawString(label, 2, h - 4);
+			g.fillRect(0, 0, W, H);
+			if (image != null)
+			{
+				g.drawImage(image, 0, 0, W, H, null);
+			}
 		}
 	}
 }

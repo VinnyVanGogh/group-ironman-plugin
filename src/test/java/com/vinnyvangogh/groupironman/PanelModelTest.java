@@ -160,9 +160,11 @@ public class PanelModelTest
 		assertEquals(Collections.singletonList(SyncHeader.Button.SWITCH),
 			SyncHeader.of(GroupSync.State.OTHER_PARTY, 0, group).buttons);
 		SyncHeader connected = SyncHeader.of(GroupSync.State.CONNECTED, 2, group);
-		assertEquals("Connected, 2 members online", connected.title);
+		// The count includes you: two others plus you.
+		assertEquals("Connected, 3 online", connected.title);
+		assertEquals("Connected, 1 online (you)", SyncHeader.of(GroupSync.State.CONNECTED, 0, group).title);
 		assertTrue(connected.ok);
-		assertEquals("Connected, 1 member online", SyncHeader.of(GroupSync.State.CONNECTED, 1, group).title);
+		assertEquals("Connected, 2 online", SyncHeader.of(GroupSync.State.CONNECTED, 1, group).title);
 		for (GroupSync.State s : GroupSync.State.values())
 		{
 			assertTrue(s.name(), SyncHeader.of(s, 0, GroupMembers.UNKNOWN).title.length() > 0);
@@ -195,6 +197,20 @@ public class PanelModelTest
 		assertEquals("", GroupKey.fromPasted("hello"));
 		assertEquals("", GroupKey.fromPasted(key + "0"));
 		assertEquals("", GroupKey.fromPasted(null));
+	}
+
+	@Test
+	public void wornItemsGoToTheirEquipmentTabSlots()
+	{
+		// 3 x 5 like the worn-equipment tab: head top middle, weapon/body/shield across the middle.
+		assertEquals(1, GroupIronmanPanel.wornCell(0));   // head
+		assertEquals(6, GroupIronmanPanel.wornCell(3));   // weapon
+		assertEquals(7, GroupIronmanPanel.wornCell(4));   // body
+		assertEquals(8, GroupIronmanPanel.wornCell(5));   // shield
+		assertEquals(14, GroupIronmanPanel.wornCell(12)); // ring
+		assertEquals(5, GroupIronmanPanel.wornCell(13));  // ammo
+		assertEquals(-1, GroupIronmanPanel.wornCell(-1)); // not equipment
+		assertEquals(-1, GroupIronmanPanel.wornCell(6));  // unused slot id
 	}
 
 	@Test
