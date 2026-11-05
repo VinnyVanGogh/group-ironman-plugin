@@ -1,5 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
+import java.awt.Color;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -26,12 +27,50 @@ public interface GroupIronmanConfig extends Config
 	String GROUP = "gimutilities";
 
 	@ConfigSection(
+		name = "Group sync",
+		description = "How GIM Utilities connects your group, without the Party plugin. Press 'Join group sync' in"
+			+ " the panel once per session.",
+		position = 0
+	)
+	String syncSection = "sync";
+
+	@ConfigSection(
 		name = "Group banks, storage and stats",
 		description = "Group Ironman sharing over RuneLite Party. Each is off until you turn it on, and each only"
 			+ " shows you other members' data while you share your own.",
-		position = 0
+		position = 1
 	)
 	String groupSection = "group";
+
+	/** Frozen. */
+	String KEY_GROUP_KEY = "groupKey";
+
+	@ConfigItem(
+		keyName = "groupSync",
+		name = "Sync with my group",
+		description = "Connect to your group's private party when you press 'Join group sync' in the panel. Off: solo,"
+			+ " nothing is sent and the panel shows only what this client saw. Does nothing until there is a group key.",
+		section = syncSection,
+		position = 0
+	)
+	default boolean groupSync()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = KEY_GROUP_KEY,
+		name = "Group key",
+		description = "Your group's secret key, 32 letters and digits. Create one in the panel, or paste the one a"
+			+ " member shared. Party data reaches everyone with this key, so only share it in your group chat.",
+		secret = true,
+		section = syncSection,
+		position = 1
+	)
+	default String groupKey()
+	{
+		return "";
+	}
 
 	@ConfigItem(
 		keyName = "groupShareBank",
@@ -158,5 +197,65 @@ public interface GroupIronmanConfig extends Config
 	default boolean groupFindCommand()
 	{
 		return false;
+	}
+
+	@ConfigSection(
+		name = "::find colours",
+		description = "Colours in the ::find answer, so you can tell your bank, members' banks, group storage and"
+			+ " what people carry apart at a glance.",
+		position = 2,
+		closedByDefault = true
+	)
+	String findSection = "findColours";
+
+	@ConfigItem(keyName = "findQueryColour", name = "Your search", description = "The words you searched for.",
+		section = findSection, position = 0)
+	default Color findQueryColour()
+	{
+		return new Color(0xD0, 0x5A, 0x00);
+	}
+
+	@ConfigItem(keyName = "findColourItemNames", name = "Colour item names",
+		description = "Also colour each item's name. Off keeps the answer calmer: only your search and the places"
+			+ " are coloured.", section = findSection, position = 1)
+	default boolean findColourItemNames()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "findItemColour", name = "Item name", description = "Each matching item's name, when"
+		+ " Colour item names is on.", section = findSection, position = 6)
+	default Color findItemColour()
+	{
+		return new Color(0x1E, 0x5A, 0xA8);
+	}
+
+	@ConfigItem(keyName = "findYourBankColour", name = "Your bank", description = "What is in your own bank.",
+		section = findSection, position = 2)
+	default Color findYourBankColour()
+	{
+		return new Color(0x1E, 0x8C, 0x1E);
+	}
+
+	@ConfigItem(keyName = "findMemberBankColour", name = "Members' banks",
+		description = "What is in another member's bank.", section = findSection, position = 3)
+	default Color findMemberBankColour()
+	{
+		return new Color(0x8A, 0x2B, 0xE2);
+	}
+
+	@ConfigItem(keyName = "findStorageColour", name = "Group storage",
+		description = "What is in group storage, and who took or deposited it.", section = findSection, position = 4)
+	default Color findStorageColour()
+	{
+		return new Color(0xB8, 0x86, 0x0B);
+	}
+
+	@ConfigItem(keyName = "findCarriedColour", name = "Carried and worn",
+		description = "What someone has in their inventory, equipped, or in a pouch, quiver or seed vault.",
+		section = findSection, position = 5)
+	default Color findCarriedColour()
+	{
+		return new Color(0x00, 0x8B, 0x8B);
 	}
 }

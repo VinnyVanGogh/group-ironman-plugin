@@ -38,7 +38,7 @@ public class GroupSearchTest
 		assertEquals(Collections.singletonList(
 			"Shark: Alex bank 120 (2h ago), Sam inventory 5, Group storage 40 (3m ago)"), hits);
 
-		assertEquals(Collections.singletonList("Abyssal whip: Sam equipment 1"),
+		assertEquals(Collections.singletonList("Abyssal whip: Sam equipped 1"),
 			GroupSearch.search("WHIP", roster.searchSources(), ITEMS, NOW));
 	}
 

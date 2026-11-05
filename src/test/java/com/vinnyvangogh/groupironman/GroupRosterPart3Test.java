@@ -8,6 +8,7 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static com.vinnyvangogh.groupironman.FakeItems.*;
 
@@ -36,29 +37,12 @@ public class GroupRosterPart3Test
 	}
 
 	@Test
-	public void presenceReadsOnlineOrLastSeen()
+	public void presenceIsOnlineForThreeMinutes()
 	{
-		assertEquals("not seen yet", Presence.describe(0, NOW));
-		assertEquals("online", Presence.describe(NOW - MIN, NOW));
+		assertFalse(Presence.online(0, NOW));
+		assertTrue(Presence.online(NOW - MIN, NOW));
 		assertTrue(Presence.online(NOW - Presence.ONLINE_MS, NOW));
-		assertEquals("last seen 10m ago", Presence.describe(NOW - 10 * MIN, NOW));
-	}
-
-	@Test
-	public void memberLinesSayWhereOnlineMembersAre()
-	{
-		GroupRoster roster = new GroupRoster();
-		RegionNames regions = RegionNames.parse("Lumbridge=12850\n");
-		roster.heard("Alex", NOW - MIN);
-		roster.putStats("Alex", at(302, 12850));
-		roster.heard("Sam", NOW - 3 * 60 * MIN);
-		roster.putStats("Sam", at(330, 12850));
-		roster.heard("Kim", NOW - MIN);
-		roster.putStats("Kim", at(303, 99));
-		List<String> lines = roster.memberLines(regions, NOW);
-		assertEquals("Alex: online, world 302, Lumbridge", lines.get(0));
-		assertEquals("Kim: online, world 303, region 99", lines.get(1));
-		assertEquals("an offline member's old position is not shown", "Sam: last seen 3h ago", lines.get(2));
+		assertFalse(Presence.online(NOW - 10 * MIN, NOW));
 	}
 
 	@Test
@@ -96,19 +80,6 @@ public class GroupRosterPart3Test
 	}
 
 	@Test
-	public void carriedLinesListWornAndCarriedItems()
-	{
-		GroupRoster roster = new GroupRoster();
-		roster.putCarried("Alex", new GroupCodec.Carried(items(SHARK, 20), items(WHIP, 1)));
-		roster.putExtras("Alex", new MemberExtras(items(COAL, 100), items(), items(SHARK, 4), NOW - 120 * MIN));
-		List<String> lines = roster.itemLines(new FakeItems(), NOW);
-		assertEquals("Alex wearing: 1 x Abyssal whip", lines.get(0));
-		assertEquals("Alex carrying: 20 x Shark", lines.get(1));
-		assertEquals("Alex rune pouch: 100 x Coal", lines.get(2));
-		assertEquals("Alex seed vault: 1 kinds, 4 seeds (last seen 2h ago)", lines.get(3));
-	}
-
-	@Test
 	public void extrasEventsHeardAndLastPlayedSurviveARestart()
 	{
 		GroupRoster before = new GroupRoster();
@@ -128,7 +99,28 @@ public class GroupRosterPart3Test
 		assertEquals(items(WHIP, 1), after.events().entries().get(1).items);
 		assertEquals(NOW - 2 * MIN, (long) after.lastHeard().get("Sam"));
 		assertEquals(NOW - 3 * MIN, after.lastPlayed());
-		assertTrue("live stats are not kept", after.statsFor("Sam") == null);
+		assertEquals("last stats are kept for the offline card", at(301, 12850), after.allStats().get("Sam"));
+	}
+
+	@Test
+	public void lastSeenStatsAndItemsSurviveARestartWithTheRightAge()
+	{
+		GroupRoster before = new GroupRoster();
+		before.heard("Sam", NOW - 2 * 60 * MIN);
+		before.putStats("Sam", at(303, 12850));
+		before.putCarried("Sam", new GroupCodec.Carried(items(SHARK, 20), items(WHIP, 1)));
+
+		GroupRoster after = new GroupRoster();
+		assertTrue(GroupCache.read(GSON, GroupCache.write(GSON, before), after));
+		assertEquals(items(SHARK, 20), after.allCarried().get("Sam").inventory);
+		assertEquals(items(WHIP, 1), after.allCarried().get("Sam").worn);
+
+		RegionNames regions = RegionNames.parse("Draynor=12850\n");
+		List<PanelModel.MemberCard> cards = PanelModel.members(after, Collections.emptyList(), regions,
+			new FakeItems(), "Me", NOW);
+		assertEquals(1, cards.size());
+		assertFalse(cards.get(0).online);
+		assertEquals("Offline - last seen W303, Draynor, 2h ago", cards.get(0).status);
 	}
 
 	@Test

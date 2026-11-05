@@ -124,12 +124,27 @@ user folder), so your other plugins and settings come along.
    ([RuneLite wiki: Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts)):
    click the **Jagex account** icon on the sidebar, add your account, pick
    your character, then click **Play Now**.
-3. **Join the same RuneLite Party.** One person opens the built-in **Party**
-   panel (turn on the **Party** plugin if it is missing), clicks **Create
-   party**, and shares the passphrase. Everyone else clicks **Join party**.
-4. **Turn sharing on.** Everyone opens *GIM Utilities* in the plugin settings
+3. **Turn sharing on.** Everyone opens *GIM Utilities* in the plugin settings
    and turns on the switches they want. The GIM Utilities panel (a green badge
-   on the sidebar) appears once any switch is on.
+   on the sidebar) appears once any switch is on. The built-in **Party**
+   plugin is not needed and can stay off.
+4. **Share a group key, once.** One member opens the GIM Utilities panel and
+   clicks **Create group key**, then **Copy group key**, and sends the key to
+   the group outside the game (Discord, a DM). The game chatbox takes no
+   paste, and plugins never type into it. Everyone else copies the key and
+   clicks **Paste group key** in the panel, which saves it and joins. Pasting
+   it into *Group key* in the settings works too.
+5. **Join.** Each member clicks **Join group sync** in the panel header, once
+   per session. Joining on its own at login is a rejected Plugin Hub feature,
+   so it waits for the click. The header then reads *Connected, N members
+   online*. If you are already in a party you joined yourself (a raid party,
+   say), it reads *In another party; GIM sync paused* and nothing is sent to
+   that party; **Switch to group sync** moves you.
+
+Party data goes to everyone in the party, so the key is what keeps it inside
+the group. Only names on your in-game group roster are shown; anyone else in
+the party is ignored and listed as *Not in your group*. **New key** replaces a
+leaked key; share the new line and everyone joins again.
 
 ### Windows: double-click launcher
 
@@ -159,7 +174,7 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
    `.cmd` in Notepad first to read exactly what it does. If you see "Windows
    cannot access the specified file", right-click the file, choose
    **Properties**, tick **Unblock**, click **OK**, and double-click again.
-4. Carry on from step 2 above (log in, join the party, turn sharing on). To
+4. Carry on from step 2 above (log in, turn sharing on, share the key, join). To
    stop, close the RuneLite window.
 
 For whoever cuts the test release: the launcher downloads

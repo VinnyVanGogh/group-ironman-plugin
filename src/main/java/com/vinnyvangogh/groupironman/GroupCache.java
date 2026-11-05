@@ -11,8 +11,10 @@ import java.util.Map;
  * What survives a restart: members' last banks, the storage log, the last
  * group storage contents, members' rune pouch, quiver and seed vault, the
  * drops log, when each member was last heard from and when this player last
- * played, as one JSON document. Live data (inventories, equipment, stats) is
- * not kept; it is only meaningful while the member is online.
+ * played, as one JSON document. Each member's last stats (world, place, HP,
+ * prayer, run, levels) and carried items are kept too, so an offline member's
+ * card shows where they were and what they had the last time you were both
+ * online.
  *
  * <p>Pure, {@code String} in and out. The plugin reads and writes the file
  * ({@code .runelite/gim-utilities/group-cache.json}) off the client thread. A
@@ -96,7 +98,47 @@ final class GroupCache
 		}
 		out.add("heard", heard);
 		out.addProperty("played", roster.lastPlayed());
+
+		// Round 2: the last stats and carried items per member, for offline cards. Stored as
+		// the party payload itself so the one decoder (and its limits) reads both.
+		JsonObject stats = new JsonObject();
+		for (Map.Entry<String, MemberStats> e : roster.allStats().entrySet())
+		{
+			stats.addProperty(e.getKey(), GroupCodec.encodeStats(gson, e.getValue()));
+		}
+		out.add("stats", stats);
+		JsonObject carried = new JsonObject();
+		for (Map.Entry<String, GroupCodec.Carried> e : roster.allCarried().entrySet())
+		{
+			carried.addProperty(e.getKey(), GroupCodec.encodeCarried(gson, e.getValue().inventory, e.getValue().worn));
+		}
+		out.add("carried", carried);
 		return gson.toJson(out);
+	}
+
+	private static void readPayloads(Gson gson, JsonElement in, GroupRoster roster)
+	{
+		if (in == null || !in.isJsonObject())
+		{
+			return;
+		}
+		int n = 0;
+		for (Map.Entry<String, JsonElement> e : in.getAsJsonObject().entrySet())
+		{
+			if (n++ >= MAX_MEMBERS || !e.getValue().isJsonPrimitive())
+			{
+				continue;
+			}
+			GroupCodec.Decoded d = GroupCodec.decode(gson, e.getValue().getAsString());
+			if (d != null && d.kind == GroupCodec.Kind.STATS)
+			{
+				roster.putStats(e.getKey(), d.stats);
+			}
+			else if (d != null && d.kind == GroupCodec.Kind.CARRIED)
+			{
+				roster.putCarried(e.getKey(), d.carried);
+			}
+		}
 	}
 
 	/** Loads into {@code roster}. Returns false, leaving it untouched, when the text is unreadable. */
@@ -244,6 +286,8 @@ final class GroupCache
 		{
 			roster.markPlayed(played);
 		}
+		readPayloads(gson, in.get("stats"), roster);
+		readPayloads(gson, in.get("carried"), roster);
 		return true;
 	}
 }

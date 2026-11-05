@@ -29,8 +29,8 @@ final class FindCommand
 		ItemLookup items, long now)
 	{
 		List<String> out = new ArrayList<>();
-		String q = GroupSearch.normalize(query);
-		if (q.length() < GroupSearch.MIN_QUERY)
+		String q = ItemQuery.normalize(query);
+		if (ItemQuery.parse(q) == null)
 		{
 			out.add("Type at least " + GroupSearch.MIN_QUERY + " letters of an item name, e.g. ::find dragon hunter wand");
 			return out;
@@ -44,6 +44,41 @@ final class FindCommand
 				+ " on are tracked, as of their last sync; trades and drops between members are not.");
 			return out;
 		}
+		for (int i = 0; i < lines.size() && i < MAX_LINES; i++)
+		{
+			out.add(lines.get(i));
+		}
+		if (lines.size() > MAX_LINES)
+		{
+			out.add((lines.size() - MAX_LINES) + " more, see the GIM Utilities panel");
+		}
+		return out;
+	}
+
+	/**
+	 * The chatbox answer, worded and coloured by {@code style}: a header naming the
+	 * search ("Find trout:"), then one line per item and the storage history.
+	 */
+	static List<String> answer(String query, List<GroupSearch.Source> sources, List<StorageChange> log,
+		ItemLookup items, long now, FindStyle style)
+	{
+		List<String> out = new ArrayList<>();
+		String q = ItemQuery.normalize(query);
+		if (ItemQuery.parse(q) == null)
+		{
+			out.add("Type at least " + GroupSearch.MIN_QUERY + " letters of an item name, e.g. ::find dragon hunter wand");
+			return out;
+		}
+		String asked = FindStyle.paint(plain(query.trim()), style.query);
+		List<String> lines = new ArrayList<>(GroupSearch.searchStyled(q, sources, items, now, style));
+		lines.addAll(GroupSearch.historyStyled(q, log, items, now, HISTORY_LIMIT, style));
+		if (lines.isEmpty())
+		{
+			out.add("Nothing found for " + asked + ". Only members running GIM Utilities with sharing on are"
+				+ " tracked, as of their last sync; trades and drops between members are not.");
+			return out;
+		}
+		out.add("Find " + asked + ":");
 		for (int i = 0; i < lines.size() && i < MAX_LINES; i++)
 		{
 			out.add(lines.get(i));

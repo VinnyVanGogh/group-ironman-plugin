@@ -42,8 +42,10 @@ public class GroupCacheTest
 		assertEquals(items(SHARK, 1), after.log().entries().get(0).took());
 		assertEquals(items(SHARK, 40, COAL, 9), after.storageItems());
 		assertEquals(300, after.storageAt());
-		// Live data is not kept: only the bank and storage come back as search sources.
-		assertEquals(3, after.searchSources().size());
+		// Round 2 keeps carried items for offline cards: two banks, Sam's inventory and
+		// equipment, and storage come back as search sources.
+		assertEquals(5, after.searchSources().size());
+		assertEquals(items(SHARK, 1), after.allCarried().get("Sam").inventory);
 	}
 
 	@Test

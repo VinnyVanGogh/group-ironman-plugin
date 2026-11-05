@@ -1,12 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -14,8 +10,6 @@ import static com.vinnyvangogh.groupironman.FakeItems.*;
 
 public class GroupRosterTest
 {
-	private static final long NOW = TimeUnit.DAYS.toMillis(10);
-
 	private static Map<Integer, Integer> items(int... pairs)
 	{
 		Map<Integer, Integer> out = new TreeMap<>();
@@ -24,16 +18,6 @@ public class GroupRosterTest
 			out.put(pairs[i], pairs[i + 1]);
 		}
 		return out;
-	}
-
-	@Test
-	public void bankLineHasCountValueAndLastSeen()
-	{
-		GroupRoster roster = new GroupRoster();
-		roster.putBank("Alex", new BankSnapshot(NOW - TimeUnit.HOURS.toMillis(2), items(SHARK, 100, WHIP, 2)));
-		// 100 x 800 + 2 x 1,500,000 = 3,080,000
-		assertEquals(Collections.singletonList("Alex: 2 kinds, 102 items, 3.1M gp (last seen 2h ago)"),
-			roster.bankLines(new FakeItems(), NOW));
 	}
 
 	@Test
@@ -46,25 +30,7 @@ public class GroupRosterTest
 	}
 
 	@Test
-	public void statsShowBoostsDrainsAndStatus()
-	{
-		Map<String, MemberStats.Level> skills = new LinkedHashMap<>();
-		skills.put("Attack", new MemberStats.Level(90, 98));
-		skills.put("Defence", new MemberStats.Level(1, 1));
-		skills.put("Hitpoints", new MemberStats.Level(99, 72));
-		skills.put("Prayer", new MemberStats.Level(70, 67));
-		GroupRoster roster = new GroupRoster();
-		roster.putStats("Alex", new MemberStats(skills, 87, 50, 302, 12850));
-
-		List<List<String>> blocks = roster.statsBlocks();
-		assertEquals(Arrays.asList(
-			"Alex: world 302, region 12850",
-			"HP 72/99, Prayer 67/70, Run 87%, Spec 50%",
-			"Attack 90 (+8), Defence 1, Hitpoints 99 (-27), Prayer 70 (-3)"), blocks.get(0));
-	}
-
-	@Test
-	public void leavingThePartyKeepsBanksButDropsLiveData()
+	public void clearLiveDropsStatsAndCarriedButKeepsBanks()
 	{
 		GroupRoster roster = new GroupRoster();
 		roster.putBank("Alex", new BankSnapshot(1, items(SHARK, 1)));
@@ -73,6 +39,28 @@ public class GroupRosterTest
 		roster.clearLive();
 		assertEquals(1, roster.banks().size());
 		assertEquals(1, roster.searchSources().size());
-		assertEquals(0, roster.statsBlocks().size());
+		assertEquals(0, roster.allStats().size());
+		assertEquals(0, roster.allCarried().size());
+	}
+
+	@Test
+	public void othersOnlineLeavesOutYouAndTheLongGone()
+	{
+		long now = 10_000_000L;
+		GroupRoster roster = new GroupRoster();
+		roster.heard("Me", now);
+		roster.heard("Alex", now - 1_000);
+		roster.heard("Sam", now - Presence.ONLINE_MS - 1);
+		assertEquals(1, roster.othersOnline("me", now));
+	}
+
+	@Test
+	public void strangersAreListedUntilThePartyChanges()
+	{
+		GroupRoster roster = new GroupRoster();
+		roster.stranger("Mallory");
+		assertEquals(Collections.singleton("Mallory"), roster.strangers());
+		roster.clearStrangers();
+		assertEquals(0, roster.strangers().size());
 	}
 }

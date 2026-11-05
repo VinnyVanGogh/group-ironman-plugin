@@ -3,37 +3,53 @@
 Share banks, group storage changes, stats and drops with your Group Ironman
 team over RuneLite Party.
 
-> **Status: early test build.** Not on the Plugin Hub yet. Split out of Build
-> Guard, which keeps its build and XP warnings; the two can run side by side.
+> **Version 1.0.0**, submitted to the Plugin Hub. Split out of Build Guard,
+> which keeps its build and XP warnings; the two can run side by side.
 
 ## Features
 
 Everything is opt-in and off by default. Each member turns on what they want
 to share, and only sees other members' data for what they share themselves.
 
-- each member's last bank ("last seen 2h ago", with value), kept across
-  restarts;
-- a group storage log: who took or deposited what, last 200 changes;
-- live group stats with boosts and drains (`90 (+8)`), HP, prayer, run,
-  special attack and world;
-- who is online, or when they were last seen, and where (world and place
-  name), optionally as markers on the world map;
-- each member's inventory, equipment, rune pouch, quiver and seed vault;
-- "Since you last played": members' drops and new collection log slots;
-- a "Who has it?" search across all of the above, and the `::find <item>`
-  chat command that answers in your own chatbox only;
-- storage minimums with a desktop notification when stock runs low.
+- **Group:** a card per member with world and place, HP / Prayer / Run / Spec
+  orbs, skills, and worn gear and inventory laid out like the game's tabs.
+  Offline members keep what they had the last time you were both online.
+- **Banks:** each member's last bank with value and when it was seen.
+- **Storage:** the last group storage contents you saw, plus who took or
+  deposited what.
+- **Find:** who has an item and where (bank, inventory, worn, pouches, group
+  storage), in the panel or with `::find <item>` in your own chatbox, with
+  colours you can change.
+- **Log:** group storage changes by member, and members' drops and new
+  collection log slots since you last played.
+- Storage minimums with a desktop notification, and optional world map
+  markers.
 
 No server and no network calls of its own: party data goes only through
-RuneLite's Party service.
+RuneLite's Party service, and only names on your in-game group roster are
+shown.
 
 ## Quick start
 
-Run `./gradlew run`, log in with RuneLite's Jagex account panel, join the same
-RuneLite Party as your group, and turn on the switches you want under
-*GIM Utilities* in the plugin settings.
+1. Install *GIM Utilities* from the Plugin Hub and turn on the switches you
+   want in its settings.
+2. One member opens the GIM Utilities panel, clicks **Create group key**, then
+   **Copy group key**, and sends the key to the group (Discord works).
+3. Everyone else copies it and clicks **Paste group key**.
+4. Each session, click **Join group sync**. The Party plugin is not needed.
 
-**Full steps, settings and what to test: [SETUP.md](SETUP.md).**
+Anyone with the key can join your sync, so keep it inside your group.
+
+**Running from source, every setting, and what to test: [SETUP.md](SETUP.md).**
+
+## Coming later
+
+- **Joining on its own.** For now you click *Join group sync* each session:
+  RuneLite does not allow plugins to rejoin parties automatically (it would
+  load their party servers). We may add auto-join once we have our own
+  hosting for group sync; that would be optional, and the Plugin Hub would
+  mark the plugin as using a third-party service.
+- Optional posts to your group's Discord (drops, storage changes, level-ups).
 
 ## License
 

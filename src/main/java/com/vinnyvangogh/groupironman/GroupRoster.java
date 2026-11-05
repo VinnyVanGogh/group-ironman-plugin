@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -39,6 +41,7 @@ final class GroupRoster
 	private final Map<String, MemberStats> stats = new ConcurrentHashMap<>();
 	private final Map<String, MemberExtras> extras = new ConcurrentHashMap<>();
 	private final Map<String, Long> heard = new ConcurrentHashMap<>();
+	private final Set<String> strangers = ConcurrentHashMap.newKeySet();
 	private final StorageLog log = new StorageLog();
 	private final DropLog events = new DropLog();
 	private volatile Storage storage;
@@ -91,9 +94,18 @@ final class GroupRoster
 		return events;
 	}
 
-	MemberStats statsFor(String member)
+	/** How many members other than {@code self} were heard from recently. */
+	int othersOnline(String self, long now)
 	{
-		return stats.get(member);
+		int n = 0;
+		for (Map.Entry<String, Long> e : heard.entrySet())
+		{
+			if (!e.getKey().equalsIgnoreCase(self) && Presence.online(e.getValue(), now))
+			{
+				n++;
+			}
+		}
+		return n;
 	}
 
 	/** Positions of members heard from recently, for the world map. */
@@ -109,94 +121,6 @@ final class GroupRoster
 			}
 		}
 		return out;
-	}
-
-	/**
-	 * "Alex: online, world 302, Lumbridge" or "Sam: last seen 3h ago", one per
-	 * member this client has anything for, sorted by name. Where a member is
-	 * is only shown while they are online.
-	 */
-	List<String> memberLines(RegionNames regions, long now)
-	{
-		Map<String, Long> seen = new TreeMap<>(heard);
-		for (Map.Entry<String, BankSnapshot> e : banks.entrySet())
-		{
-			seen.merge(e.getKey(), e.getValue().takenAt(), Math::max);
-		}
-		for (String name : stats.keySet())
-		{
-			seen.putIfAbsent(name, 0L);
-		}
-		List<String> out = new ArrayList<>();
-		for (Map.Entry<String, Long> e : seen.entrySet())
-		{
-			StringBuilder line = new StringBuilder(e.getKey()).append(": ")
-				.append(Presence.describe(e.getValue(), now));
-			MemberStats s = stats.get(e.getKey());
-			if (s != null && Presence.online(e.getValue(), now))
-			{
-				if (s.world() > 0)
-				{
-					line.append(", world ").append(s.world());
-				}
-				String place = regions.describe(s.region());
-				if (place != null)
-				{
-					line.append(", ").append(place);
-				}
-			}
-			out.add(line.toString());
-		}
-		return out;
-	}
-
-	/** Per member: worn, carried, rune pouch, quiver and seed vault, each only when known. */
-	List<String> itemLines(ItemLookup items, long now)
-	{
-		Map<String, Boolean> names = new TreeMap<>();
-		for (String n : carried.keySet())
-		{
-			names.put(n, true);
-		}
-		for (String n : extras.keySet())
-		{
-			names.put(n, true);
-		}
-		List<String> out = new ArrayList<>();
-		for (String name : names.keySet())
-		{
-			GroupCodec.Carried c = carried.get(name);
-			if (c != null)
-			{
-				addItems(out, name + " wearing: ", c.worn, items);
-				addItems(out, name + " carrying: ", c.inventory, items);
-			}
-			MemberExtras x = extras.get(name);
-			if (x != null)
-			{
-				addItems(out, name + " rune pouch: ", x.runePouch, items);
-				addItems(out, name + " quiver: ", x.quiver, items);
-				if (x.seedVaultAt >= 0)
-				{
-					long seeds = 0;
-					for (int n : x.seedVault.values())
-					{
-						seeds += n;
-					}
-					out.add(name + " seed vault: " + x.seedVault.size() + " kinds, " + seeds + " seeds (last seen "
-						+ BoostText.ago(now, x.seedVaultAt) + ")");
-				}
-			}
-		}
-		return out;
-	}
-
-	private static void addItems(List<String> out, String prefix, Map<Integer, Integer> counts, ItemLookup items)
-	{
-		if (!counts.isEmpty())
-		{
-			out.add(prefix + StorageLog.describe(counts, items));
-		}
 	}
 
 	/** Keeps the newer of the two, so a stale resend cannot replace a fresher bank. */
@@ -221,6 +145,34 @@ final class GroupRoster
 		stats.put(member, s);
 	}
 
+	/** Every member's last stats, online or not. */
+	Map<String, MemberStats> allStats()
+	{
+		return new TreeMap<>(stats);
+	}
+
+	/** Every member's last inventory and worn items, online or not. */
+	Map<String, GroupCodec.Carried> allCarried()
+	{
+		return new TreeMap<>(carried);
+	}
+
+	/** A party member not on the in-game group roster sent something; it was dropped. */
+	void stranger(String name)
+	{
+		strangers.add(name);
+	}
+
+	Set<String> strangers()
+	{
+		return new TreeSet<>(strangers);
+	}
+
+	void clearStrangers()
+	{
+		strangers.clear();
+	}
+
 	/** Records a storage visit in the log and, when it is the newest seen, as the current storage. */
 	boolean putStorage(StorageChange change)
 	{
@@ -232,7 +184,6 @@ final class GroupRoster
 		return log.add(change);
 	}
 
-	/** Live data goes when the party does; banks, the log and storage are kept as "last seen". */
 	void clearLive()
 	{
 		clearCarried();
@@ -249,15 +200,10 @@ final class GroupRoster
 		stats.clear();
 	}
 
-	void forgetLive(String member)
-	{
-		carried.remove(member);
-		stats.remove(member);
-	}
-
 	void clearAll()
 	{
 		clearLive();
+		strangers.clear();
 		banks.clear();
 		log.clear();
 		storage = null;
@@ -307,77 +253,6 @@ final class GroupRoster
 			|| !events.entries().isEmpty();
 	}
 
-	/** "Alex: 812 items, 45.2M (last seen 2h ago)", sorted by name. */
-	List<String> bankLines(ItemLookup items, long now)
-	{
-		List<String> out = new ArrayList<>();
-		for (Map.Entry<String, BankSnapshot> e : banks().entrySet())
-		{
-			long value = 0;
-			long count = 0;
-			for (Map.Entry<Integer, Integer> item : e.getValue().items().entrySet())
-			{
-				value += items.price(item.getKey()) * item.getValue();
-				count += item.getValue();
-			}
-			out.add(e.getKey() + ": " + e.getValue().items().size() + " kinds, " + count + " items, "
-				+ BoostText.gp(value) + " gp (last seen " + BoostText.ago(now, e.getValue().takenAt()) + ")");
-		}
-		return out;
-	}
-
-	/**
-	 * Per member: a header line ("Alex: world 302, region 12850"), a status
-	 * line ("HP 72/99, Prayer 43/70, Run 100%, Spec 50%"), then every skill
-	 * as "Attack 99 (+19)".
-	 */
-	List<List<String>> statsBlocks()
-	{
-		return statsBlocks(RegionNames.parse(""));
-	}
-
-	/** As {@link #statsBlocks()}, with the region as a place name where {@code regions} knows it. */
-	List<List<String>> statsBlocks(RegionNames regions)
-	{
-		List<List<String>> out = new ArrayList<>();
-		for (Map.Entry<String, MemberStats> e : new TreeMap<>(stats).entrySet())
-		{
-			MemberStats s = e.getValue();
-			List<String> block = new ArrayList<>();
-			String where = s.world() > 0 ? "world " + s.world() : "world ?";
-			String place = regions.describe(s.region());
-			if (place != null)
-			{
-				where += ", " + place;
-			}
-			block.add(e.getKey() + ": " + where);
-
-			List<String> status = new ArrayList<>();
-			MemberStats.Level hp = s.skills().get("Hitpoints");
-			MemberStats.Level prayer = s.skills().get("Prayer");
-			if (hp != null)
-			{
-				status.add("HP " + hp.boosted + "/" + hp.real);
-			}
-			if (prayer != null)
-			{
-				status.add("Prayer " + prayer.boosted + "/" + prayer.real);
-			}
-			status.add("Run " + s.runEnergy() + "%");
-			status.add("Spec " + s.specialAttack() + "%");
-			block.add(String.join(", ", status));
-
-			List<String> levels = new ArrayList<>();
-			for (Map.Entry<String, MemberStats.Level> skill : s.skills().entrySet())
-			{
-				levels.add(skill.getKey() + " " + BoostText.level(skill.getValue().real, skill.getValue().boosted));
-			}
-			block.add(String.join(", ", levels));
-			out.add(block);
-		}
-		return out;
-	}
-
 	/** Everything "who has it?" searches. */
 	List<GroupSearch.Source> searchSources()
 	{
@@ -389,7 +264,8 @@ final class GroupRoster
 		for (Map.Entry<String, GroupCodec.Carried> e : new TreeMap<>(carried).entrySet())
 		{
 			out.add(new GroupSearch.Source(e.getKey(), "inventory", e.getValue().inventory, -1));
-			out.add(new GroupSearch.Source(e.getKey(), "equipment", e.getValue().worn, -1));
+			// Reads "GroupShip equipped 1" in ::find and the Find tab (Board 2026-11-04).
+			out.add(new GroupSearch.Source(e.getKey(), "equipped", e.getValue().worn, -1));
 		}
 		for (Map.Entry<String, MemberExtras> e : extras().entrySet())
 		{
