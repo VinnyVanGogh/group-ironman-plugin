@@ -264,7 +264,8 @@ final class GroupRoster
 		for (Map.Entry<String, GroupCodec.Carried> e : new TreeMap<>(carried).entrySet())
 		{
 			out.add(new GroupSearch.Source(e.getKey(), "inventory", e.getValue().inventory, -1));
-			out.add(new GroupSearch.Source(e.getKey(), "equipment", e.getValue().worn, -1));
+			// Reads "GroupShip equipped 1" in ::find and the Find tab (Board 2026-11-04).
+			out.add(new GroupSearch.Source(e.getKey(), "equipped", e.getValue().worn, -1));
 		}
 		for (Map.Entry<String, MemberExtras> e : extras().entrySet())
 		{
