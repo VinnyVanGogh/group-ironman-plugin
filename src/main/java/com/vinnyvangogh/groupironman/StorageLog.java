@@ -57,26 +57,7 @@ final class StorageLog
 		entries.clear();
 	}
 
-	/** "Alex took 5 x Shark, deposited 100 x Coal (3m ago)", newest first. */
-	List<String> lines(ItemLookup items, long now)
-	{
-		List<String> out = new ArrayList<>();
-		for (StorageChange e : entries())
-		{
-			List<String> parts = new ArrayList<>();
-			if (!e.took().isEmpty())
-			{
-				parts.add("took " + describe(e.took(), items));
-			}
-			if (!e.deposited().isEmpty())
-			{
-				parts.add("deposited " + describe(e.deposited(), items));
-			}
-			out.add(e.member() + " " + String.join(", ", parts) + " (" + BoostText.ago(now, e.at()) + ")");
-		}
-		return out;
-	}
-
+	/** "5 x Shark, 100 x Coal", for {@code ::find}'s storage history. */
 	static String describe(Map<Integer, Integer> counts, ItemLookup items)
 	{
 		List<String> parts = new ArrayList<>();

@@ -2,6 +2,7 @@ package com.vinnyvangogh.groupironman;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -82,10 +83,13 @@ public class PluginIdentityTest
 				on.add(m.getName());
 			}
 		}
-		// Six share switches, the world map and ::find: a new switch must be added here on purpose.
-		assertEquals(8, switches);
-		assertTrue("on by default: " + on, on.isEmpty());
+		// Six share switches, the world map, ::find and "Sync with my group": a new switch must be added here
+		// on purpose. Sync is the one switch on by default (Board, round 2): it does nothing without a group
+		// key, and even with one nothing is sent until the player presses Join.
+		assertEquals(9, switches);
+		assertEquals(Collections.singletonList("groupSync"), on);
 		assertEquals("", DEFAULTS.groupLowStock());
+		assertEquals("no key on a fresh install", "", DEFAULTS.groupKey());
 	}
 
 	@Test
@@ -99,5 +103,20 @@ public class PluginIdentityTest
 		assertTrue(LowStock.parse(DEFAULTS.groupLowStock()).isEmpty());
 		assertFalse(DEFAULTS.groupWorldMap());
 		assertFalse(DEFAULTS.groupFindCommand());
+		// Sync on but no key: the panel says "No group key yet" and nothing joins or sends.
+		assertEquals(GroupSync.State.NO_KEY, new GroupSync(new GroupSync.Party()
+		{
+			@Override
+			public String passphrase()
+			{
+				return null;
+			}
+
+			@Override
+			public void changeParty(String passphrase)
+			{
+				throw new AssertionError("joined on a fresh install");
+			}
+		}).state(DEFAULTS.groupSync(), "GroupShip", DEFAULTS.groupKey()));
 	}
 }

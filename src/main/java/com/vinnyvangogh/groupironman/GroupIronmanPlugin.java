@@ -7,12 +7,16 @@ import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.PartyChanged;
-import net.runelite.client.party.PartyService;
+import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.SkillIconManager;
+import net.runelite.client.party.PartyDataService;
+import net.runelite.client.party.PartyDataType;
 import net.runelite.client.party.WSClient;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -29,8 +33,10 @@ import net.runelite.client.ui.NavigationButton;
  * markers. The features live in {@link GroupService}, which this plugin
  * registers on the event bus; this class owns the side panel and its button.
  *
- * <p>Party traffic goes only through RuneLite's own {@link PartyService}; this
- * plugin makes no network calls of its own and runs no server.
+ * <p>Party traffic goes only through RuneLite's own {@code PartyService}; this
+ * plugin makes no network calls of its own and runs no server. It joins the
+ * group's party itself when the player presses "Join group sync", so the
+ * Party plugin can stay off.
  */
 @Slf4j
 @PluginDescriptor(
@@ -47,9 +53,6 @@ public class GroupIronmanPlugin extends Plugin
 	private ClientToolbar clientToolbar;
 
 	@Inject
-	private PartyService partyService;
-
-	@Inject
 	private WSClient wsClient;
 
 	@Inject
@@ -64,6 +67,18 @@ public class GroupIronmanPlugin extends Plugin
 	@Inject
 	private MemberMapMarkers markers;
 
+	@Inject
+	private PartyDataService partyDataService;
+
+	@Inject
+	private ItemManager itemManager;
+
+	@Inject
+	private SkillIconManager skillIconManager;
+
+	@Inject
+	private ClientThread clientThread;
+
 	private GroupIronmanPanel panel;
 	private NavigationButton navButton;
 
@@ -77,8 +92,42 @@ public class GroupIronmanPlugin extends Plugin
 	protected void startUp()
 	{
 		wsClient.registerMessage(VvgGroupIronmanMessage.class);
+		// Member names only travel when some plugin asks for them (PartyDataService sends
+		// CHARACTER_NAME only while subscribed). Without the Party plugin, that is us.
+		partyDataService.subscribe(this, PartyDataType.CHARACTER_NAME);
 		eventBus.register(group);
-		panel = new GroupIronmanPanel();
+		panel = new GroupIronmanPanel(itemManager, skillIconManager, new GroupIronmanPanel.Actions()
+		{
+			@Override
+			public void join()
+			{
+				clientThread.invokeLater(group::joinGroup);
+			}
+
+			@Override
+			public void switchParty()
+			{
+				clientThread.invokeLater(group::switchToGroup);
+			}
+
+			@Override
+			public void leave()
+			{
+				clientThread.invokeLater(group::leaveGroup);
+			}
+
+			@Override
+			public void newKey()
+			{
+				group.newKey();
+			}
+
+			@Override
+			public String shareLine()
+			{
+				return group.shareLine();
+			}
+		});
 		navButton = NavigationButton.builder()
 			.tooltip(NAME)
 			.icon(icon())
@@ -95,6 +144,7 @@ public class GroupIronmanPlugin extends Plugin
 		wsClient.unregisterMessage(VvgGroupIronmanMessage.class);
 		eventBus.unregister(group);
 		group.shutDown();
+		partyDataService.unsubscribe(this, PartyDataType.values());
 		markers.clear();
 		clientToolbar.removeNavigation(navButton);
 		panel = null;
@@ -140,15 +190,16 @@ public class GroupIronmanPlugin extends Plugin
 		{
 			return;
 		}
-		GroupIronmanPanel.View view = new GroupIronmanPanel.View(partyService.isInParty(), group.roster(),
+		GroupIronmanPanel.View view = new GroupIronmanPanel.View(group.syncState(), group.roster(), group.members(),
 			group.lookup, group.switches(), group.regions(), group.since(), group.self());
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
 	}
 
+	/** Markers only add points to the world map; they never open it (that stays the player's click). */
 	private void updateMarkers()
 	{
-		if (config.groupWorldMap() && config.groupShareStats() && partyService.isInParty())
+		if (config.groupWorldMap() && config.groupShareStats() && group.syncing())
 		{
 			markers.update(group.roster().onlineStats(System.currentTimeMillis()), group.self());
 		}

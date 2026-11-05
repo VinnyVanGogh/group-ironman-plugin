@@ -1,31 +1,77 @@
 package com.vinnyvangogh.groupironman;
 
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Graphics;
+import java.awt.GridLayout;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import javax.swing.ButtonGroup;
+import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JTextField;
+import javax.swing.JToggleButton;
+import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import net.runelite.api.Skill;
+import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.SkillIconManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
+import net.runelite.client.ui.components.IconTextField;
 
 /**
- * The group side panel: who is online and where, drops and collection log
- * slots since you last played, carried items and the rune pouch, quiver and
- * seed vault, live stats, last banks, the group storage log and the "Who has
- * it?" search. Text only; it draws what {@link GroupRoster} hands it.
+ * The group side panel: a sync header, then five tabs (Group, Banks,
+ * Storage, Find, Log). Layout after Quest Helper's panel
+ * (Zoinkwiz/quest-helper {@code QuestHelperPanel}): an {@link IconTextField}
+ * search bar, views swapped with a {@link CardLayout}, and sections that
+ * collapse from their header. Items are icon grids from {@link ItemManager},
+ * skills an icon grid from {@link SkillIconManager} in the skills tab's
+ * order.
+ *
+ * <p>It draws what {@link PanelModel} builds; nothing here decides what is
+ * shown. Only the visible tab is rebuilt on a redraw.
  */
 class GroupIronmanPanel extends PluginPanel
 {
-	/** What the panel last drew, so typing in the search box can redraw on its own. */
+	/** What the buttons in the header do. */
+	interface Actions
+	{
+		void join();
+
+		void switchParty();
+
+		void leave();
+
+		void newKey();
+
+		/** The "[GIMU] key" line, or null without a key. */
+		String shareLine();
+	}
+
+	/** Everything a redraw needs, captured on the client side. */
 	static final class View
 	{
-		final boolean inParty;
+		final GroupSync.State sync;
 		final GroupRoster group;
+		final GroupMembers members;
 		final ItemLookup items;
 		final GroupOutbox.Switches switches;
 		final RegionNames regions;
@@ -33,11 +79,12 @@ class GroupIronmanPanel extends PluginPanel
 		final long since;
 		final String self;
 
-		View(boolean inParty, GroupRoster group, ItemLookup items, GroupOutbox.Switches switches,
-			RegionNames regions, long since, String self)
+		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
+			GroupOutbox.Switches switches, RegionNames regions, long since, String self)
 		{
-			this.inParty = inParty;
+			this.sync = sync;
 			this.group = group;
+			this.members = members;
 			this.items = items;
 			this.switches = switches;
 			this.regions = regions;
@@ -46,22 +93,140 @@ class GroupIronmanPanel extends PluginPanel
 		}
 	}
 
-	private final JPanel body = new JPanel();
-	private final JTextField search = new JTextField();
+	private static final int GRID_COLUMNS = 5;
+	/** Bigger grids get a "use the filter" line instead: hundreds of icons in a side panel help nobody. */
+	private static final int MAX_GRID_ITEMS = 200;
+	private static final Color HP = new Color(0xB0, 0x2E, 0x26);
+	private static final Color PRAYER = new Color(0x2E, 0x8B, 0xB0);
+	private static final Color RUN = new Color(0xC8, 0xA0, 0x2A);
+	private static final Color SPEC = new Color(0x3A, 0x9A, 0x4A);
+	private static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR.darker();
+
+	private final ItemManager itemManager;
+	private final SkillIconManager skillIcons;
+	private final Actions actions;
+
+	private final JPanel header = new JPanel();
+	private final CardLayout cards = new CardLayout();
+	private final JPanel views = new JPanel(cards);
+	private final Map<String, JPanel> tabs = new LinkedHashMap<>();
+	private final IconTextField bankFilter = searchBar("Filter banks by item name");
+	private final IconTextField storageFilter = searchBar("Filter storage by item name");
+	private final IconTextField findQuery = searchBar("Item name, e.g. guam or ppot");
+	/** Member cards the player collapsed, by name. */
+	private final Set<String> collapsed = new HashSet<>();
+	private String current = "Group";
 	private View view;
 
-	GroupIronmanPanel()
+	GroupIronmanPanel(ItemManager itemManager, SkillIconManager skillIcons, Actions actions)
 	{
+		this.itemManager = itemManager;
+		this.skillIcons = skillIcons;
+		this.actions = actions;
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
 
-		JPanel top = new JPanel(new BorderLayout());
-		top.setBorder(new EmptyBorder(0, 0, 6, 0));
-		JLabel label = new JLabel("Who has it?");
-		label.setFont(FontManager.getRunescapeSmallFont());
-		top.add(label, BorderLayout.NORTH);
-		search.setToolTipText("Search members' last banks, inventories, equipment and group storage by item name");
-		search.getDocument().addDocumentListener(new DocumentListener()
+		JPanel top = new JPanel();
+		top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
+		header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+		top.add(header);
+		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log"));
+		add(top, BorderLayout.NORTH);
+
+		addTab("Group", null);
+		addTab("Banks", bankFilter);
+		addTab("Storage", storageFilter);
+		addTab("Find", findQuery);
+		addTab("Log", null);
+		add(views, BorderLayout.CENTER);
+	}
+
+	/** The search bar stays put above the content, so typing in it never loses focus to a rebuild. */
+	private void addTab(String name, JComponent searchBar)
+	{
+		JPanel wrap = new JPanel(new BorderLayout());
+		if (searchBar != null)
+		{
+			wrap.add(searchBar, BorderLayout.NORTH);
+		}
+		JPanel content = new JPanel();
+		content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+		wrap.add(content, BorderLayout.CENTER);
+		tabs.put(name, content);
+		views.add(wrap, name);
+	}
+
+	/** Must be called on the Swing thread. */
+	void render(View view)
+	{
+		this.view = view;
+		redraw();
+	}
+
+	private void redraw()
+	{
+		View v = view;
+		if (v == null)
+		{
+			return;
+		}
+		drawHeader(v);
+		JPanel tab = tabs.get(current);
+		tab.removeAll();
+		long now = System.currentTimeMillis();
+		switch (current)
+		{
+			case "Banks":
+				drawBanks(tab, v, now);
+				break;
+			case "Storage":
+				drawStorage(tab, v, now);
+				break;
+			case "Find":
+				drawFind(tab, v, now);
+				break;
+			case "Log":
+				drawLog(tab, v, now);
+				break;
+			default:
+				drawGroup(tab, v, now);
+				break;
+		}
+		tab.revalidate();
+		tab.repaint();
+	}
+
+	private JPanel tabBar(String... names)
+	{
+		JPanel bar = new JPanel(new GridLayout(1, names.length, 2, 0));
+		bar.setBorder(new EmptyBorder(6, 0, 6, 0));
+		ButtonGroup group = new ButtonGroup();
+		for (String name : names)
+		{
+			JToggleButton b = new JToggleButton(name, name.equals(current));
+			b.setFont(FontManager.getRunescapeSmallFont());
+			b.setFocusable(false);
+			b.setMargin(new java.awt.Insets(2, 0, 2, 0));
+			b.addActionListener(e ->
+			{
+				current = name;
+				cards.show(views, name);
+				redraw();
+			});
+			group.add(b);
+			bar.add(b);
+		}
+		return bar;
+	}
+
+	private IconTextField searchBar(String tooltip)
+	{
+		IconTextField field = new IconTextField();
+		field.setIcon(IconTextField.Icon.SEARCH);
+		field.setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH - 20, 30));
+		field.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		field.setToolTipText(tooltip);
+		field.getDocument().addDocumentListener(new DocumentListener()
 		{
 			@Override
 			public void insertUpdate(DocumentEvent e)
@@ -81,188 +246,436 @@ class GroupIronmanPanel extends PluginPanel
 				redraw();
 			}
 		});
-		top.add(search, BorderLayout.CENTER);
-		add(top, BorderLayout.NORTH);
-
-		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
-		body.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		add(body, BorderLayout.CENTER);
+		return field;
 	}
 
-	/** Must be called on the Swing thread. */
-	void render(View view)
-	{
-		this.view = view;
-		redraw();
-	}
+	// Header: sync status and the one button that moves it forward.
 
-	private void redraw()
+	private void drawHeader(View v)
 	{
-		View v = view;
-		body.removeAll();
-		if (v == null)
+		header.removeAll();
+		SyncHeader h = SyncHeader.of(v.sync, v.group.othersOnline(v.self, System.currentTimeMillis()), v.members);
+		JLabel title = new JLabel(h.title);
+		title.setFont(FontManager.getRunescapeBoldFont());
+		title.setForeground(h.ok ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.BRAND_ORANGE);
+		header.add(title);
+		if (h.detail != null)
 		{
+			header.add(text(h.detail, MUTED));
+		}
+		JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 2));
+		for (SyncHeader.Button b : h.buttons)
+		{
+			buttons.add(button(b));
+		}
+		header.add(buttons);
+		for (String stranger : v.group.strangers())
+		{
+			header.add(text("Not in your group: " + stranger + " (ignored)", ColorScheme.PROGRESS_ERROR_COLOR));
+		}
+		header.revalidate();
+		header.repaint();
+	}
+
+	private JButton button(SyncHeader.Button b)
+	{
+		JButton button = new JButton(b.label);
+		button.setFont(FontManager.getRunescapeSmallFont());
+		button.setFocusable(false);
+		button.setToolTipText(b.tooltip);
+		button.addActionListener(e -> press(b));
+		return button;
+	}
+
+	private void press(SyncHeader.Button b)
+	{
+		switch (b)
+		{
+			case JOIN:
+				actions.join();
+				break;
+			case SWITCH:
+				actions.switchParty();
+				break;
+			case LEAVE:
+				actions.leave();
+				break;
+			case CREATE_KEY:
+			case NEW_KEY:
+				actions.newKey();
+				break;
+			case COPY_SHARE_LINE:
+				String line = actions.shareLine();
+				if (line != null)
+				{
+					// The player pastes and sends it themselves: a plugin may not type into the chatbox.
+					Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(line), null);
+				}
+				break;
+			default:
+				break;
+		}
+	}
+
+	// Group tab: one card per member.
+
+	private void drawGroup(JPanel tab, View v, long now)
+	{
+		List<PanelModel.MemberCard> cardsList = PanelModel.members(v.group, v.members.names(), v.regions, v.items,
+			v.self, now);
+		if (cardsList.isEmpty())
+		{
+			empty(tab, "No members yet.", "Turn on 'Share stats' and 'Share inventory and equipment' in GIM Utilities'"
+				+ " settings, then press 'Join group sync' above. Members appear once they do the same.");
 			return;
 		}
-		long now = System.currentTimeMillis();
-
-		String query = search.getText();
-		if (query != null && query.trim().length() >= GroupSearch.MIN_QUERY)
+		boolean anyOffline = false;
+		for (PanelModel.MemberCard c : cardsList)
 		{
-			heading("Who has it?");
-			List<String> hits = GroupSearch.search(query, v.group.searchSources(), v.items, now);
-			if (hits.isEmpty())
-			{
-				line("Nobody's shared bank, inventory, equipment or the group storage has it.");
-			}
-			for (String s : hits)
-			{
-				line(s);
-			}
-			for (String s : GroupSearch.history(query, v.group.log().entries(), v.items, now,
-				FindCommand.HISTORY_LIMIT))
-			{
-				line(s);
-			}
+			anyOffline |= !c.online && !c.you;
+			tab.add(memberCard(c));
 		}
-
-		if (!v.inParty)
+		if (anyOffline)
 		{
-			line("Not in a RuneLite Party.");
-			line("Join one from the Party panel; every member needs GIM Utilities with sharing turned on.");
+			tab.add(text("Offline members show what they had the last time you were both online.", MUTED));
 		}
-		else if (!v.group.hasAnything())
-		{
-			line("Nothing shared yet.");
-			line("Members appear here once they turn on sharing in GIM Utilities' settings.");
-		}
-
-		List<String> members = v.group.memberLines(v.regions, now);
-		if (!members.isEmpty())
-		{
-			heading("Members");
-			for (String s : members)
-			{
-				line(s);
-			}
-		}
-
-		if (v.switches.drops)
-		{
-			renderEvents(v, now);
-		}
-
-		List<String> held = v.group.itemLines(v.items, now);
-		if (!held.isEmpty())
-		{
-			heading("Items");
-			for (String s : held)
-			{
-				line(s);
-			}
-		}
-
-		List<List<String>> stats = v.group.statsBlocks(v.regions);
-		if (!stats.isEmpty())
-		{
-			heading("Group stats");
-		}
-		for (List<String> block : stats)
-		{
-			for (String s : block)
-			{
-				line(s);
-			}
-			gap();
-		}
-
-		List<String> banks = v.group.bankLines(v.items, now);
-		if (!banks.isEmpty())
-		{
-			heading("Banks (last seen)");
-			for (String s : banks)
-			{
-				line(s);
-			}
-		}
-
-		if (v.switches.storage)
-		{
-			heading("Group storage log");
-			line("Only changes by members running GIM Utilities with storage sharing on are listed.");
-			List<String> log = v.group.log().lines(v.items, now);
-			if (log.isEmpty())
-			{
-				line("No changes seen yet.");
-			}
-			for (String s : log)
-			{
-				line(s);
-			}
-		}
-
-		body.revalidate();
-		body.repaint();
 	}
 
-	/** Drops and new collection log slots since this player last played, or the latest when that is not known. */
-	private void renderEvents(View v, long now)
+	private JComponent memberCard(PanelModel.MemberCard c)
 	{
+		JPanel card = section();
+		JPanel body = new JPanel();
+		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		body.setOpaque(false);
+		boolean open = !collapsed.contains(c.name);
+		body.setVisible(open);
+
+		JLabel name = new JLabel((open ? "▾ " : "▸ ") + c.name + (c.you ? " (you)" : ""));
+		name.setFont(FontManager.getRunescapeBoldFont());
+		name.setForeground(c.online || c.you ? Color.WHITE : MUTED);
+		name.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mousePressed(MouseEvent e)
+			{
+				if (!collapsed.remove(c.name))
+				{
+					collapsed.add(c.name);
+				}
+				redraw();
+			}
+		});
+		card.add(name);
+		card.add(text(c.status, c.online ? ColorScheme.PROGRESS_COMPLETE_COLOR : MUTED));
+
+		if (!c.bars.isEmpty())
+		{
+			JPanel bars = new JPanel(new GridLayout(1, c.bars.size(), 2, 0));
+			bars.setOpaque(false);
+			for (PanelModel.Bar b : c.bars)
+			{
+				bars.add(new BarLabel(b, barColor(b.label), c.online || c.you));
+			}
+			body.add(bars);
+		}
+		if (!c.skills.isEmpty())
+		{
+			body.add(skillGrid(c.skills, c.online || c.you));
+		}
+		for (PanelModel.ItemGroup g : c.items)
+		{
+			body.add(text(g.title, MUTED));
+			body.add(itemGrid(g.items));
+		}
+		if (c.seedVault != null)
+		{
+			body.add(text(c.seedVault, MUTED));
+		}
+		card.add(body);
+		return card;
+	}
+
+	private static Color barColor(String label)
+	{
+		switch (label)
+		{
+			case "HP":
+				return HP;
+			case "Prayer":
+				return PRAYER;
+			case "Run":
+				return RUN;
+			default:
+				return SPEC;
+		}
+	}
+
+	private JComponent skillGrid(List<PanelModel.SkillCell> skills, boolean live)
+	{
+		JPanel grid = new JPanel(new GridLayout(0, 3, 1, 1));
+		grid.setOpaque(false);
+		for (PanelModel.SkillCell s : skills)
+		{
+			JLabel cell = new JLabel(s.text());
+			cell.setFont(FontManager.getRunescapeSmallFont());
+			cell.setForeground(!live ? MUTED : s.boosted > s.real ? ColorScheme.PROGRESS_COMPLETE_COLOR
+				: s.boosted < s.real ? ColorScheme.PROGRESS_ERROR_COLOR : Color.WHITE);
+			cell.setToolTipText(s.tooltip());
+			Skill skill = skill(s.skill);
+			if (skill != null)
+			{
+				cell.setIcon(new javax.swing.ImageIcon(skillIcons.getSkillImage(skill, true)));
+			}
+			grid.add(cell);
+		}
+		return grid;
+	}
+
+	private static Skill skill(String name)
+	{
+		for (Skill s : Skill.values())
+		{
+			if (s.getName().equalsIgnoreCase(name))
+			{
+				return s;
+			}
+		}
+		return null;
+	}
+
+	private JComponent itemGrid(List<PanelModel.ItemCell> items)
+	{
+		JPanel wrap = new JPanel();
+		wrap.setLayout(new BoxLayout(wrap, BoxLayout.Y_AXIS));
+		wrap.setOpaque(false);
+		JPanel grid = new JPanel(new GridLayout(0, GRID_COLUMNS, 1, 1));
+		grid.setOpaque(false);
+		for (int i = 0; i < items.size() && i < MAX_GRID_ITEMS; i++)
+		{
+			PanelModel.ItemCell item = items.get(i);
+			JLabel cell = new JLabel();
+			cell.setPreferredSize(new Dimension(36, 32));
+			cell.setHorizontalAlignment(SwingConstants.CENTER);
+			cell.setToolTipText(item.tooltip() + (item.value > 0 ? " (" + BoostText.gp(item.value) + " gp)" : ""));
+			itemManager.getImage(item.id, (int) Math.min(Integer.MAX_VALUE, item.quantity), item.quantity > 1)
+				.addTo(cell);
+			grid.add(cell);
+		}
+		wrap.add(grid);
+		if (items.size() > MAX_GRID_ITEMS)
+		{
+			wrap.add(text("and " + (items.size() - MAX_GRID_ITEMS) + " more: use the filter to find them.", MUTED));
+		}
+		return wrap;
+	}
+
+	// Banks and Storage: filterable icon grids with value.
+
+	private void drawBanks(JPanel tab, View v, long now)
+	{
+		if (!v.switches.bank)
+		{
+			empty(tab, "Bank sharing is off.", "Turn on 'Share bank' in GIM Utilities' settings to see members' banks.");
+			return;
+		}
+		List<PanelModel.BankCard> banks = PanelModel.banks(v.group, v.items, bankFilter.getText(), now);
+		if (banks.isEmpty())
+		{
+			empty(tab, "No banks yet.", "Open and close your bank. Members' banks appear after they do the same.");
+			return;
+		}
+		for (PanelModel.BankCard b : banks)
+		{
+			JPanel card = section();
+			JLabel name = new JLabel(b.member);
+			name.setFont(FontManager.getRunescapeBoldFont());
+			card.add(name);
+			card.add(text(b.summary, MUTED));
+			card.add(b.items.isEmpty() ? text("No item matches the filter.", MUTED) : itemGrid(b.items));
+			tab.add(card);
+		}
+	}
+
+	private void drawStorage(JPanel tab, View v, long now)
+	{
+		if (!v.switches.storage)
+		{
+			empty(tab, "Group storage log is off.", "Turn on 'Share group storage changes' in GIM Utilities' settings.");
+			return;
+		}
+		PanelModel.StorageView s = PanelModel.storage(v.group, v.items, v.self, storageFilter.getText(), now);
+		JPanel contents = section();
+		JLabel title = new JLabel("Group storage");
+		title.setFont(FontManager.getRunescapeBoldFont());
+		contents.add(title);
+		if (s.snapshot == null)
+		{
+			contents.add(text("Not seen yet. Open group storage once and close it; what it holds shows here.", MUTED));
+		}
+		else
+		{
+			contents.add(text(s.snapshot + ", " + BoostText.gp(s.value) + " gp", MUTED));
+			contents.add(s.items.isEmpty() ? text("Empty, or no item matches the filter.", MUTED) : itemGrid(s.items));
+		}
+		tab.add(contents);
+
+		JPanel log = section();
+		JLabel heading = new JLabel("Changes");
+		heading.setFont(FontManager.getRunescapeBoldFont());
+		log.add(heading);
+		if (s.log.isEmpty())
+		{
+			log.add(text("No changes yet. Deposits and withdrawals are logged when you press Save or close storage."
+				+ " Members' changes arrive while you are synced with them.", MUTED));
+		}
+		for (PanelModel.LogRow row : s.log)
+		{
+			log.add(text(row.text + " (" + row.ago + ")", Color.WHITE));
+		}
+		tab.add(log);
+	}
+
+	// Find: one icon row per item and place.
+
+	private void drawFind(JPanel tab, View v, long now)
+	{
+		String q = findQuery.getText();
+		if (ItemQuery.parse(q) == null)
+		{
+			empty(tab, "Who has it?", "Type at least " + GroupSearch.MIN_QUERY + " letters of an item name. Searches"
+				+ " members' last banks, inventories, equipment, pouches and group storage. '::find guam' in the"
+				+ " chatbox gives the same answer.");
+			return;
+		}
+		List<PanelModel.FindRow> rows = PanelModel.find(q, v.group, v.items, now);
+		if (rows.isEmpty())
+		{
+			empty(tab, "Nobody has it.", "Nothing shared matches '" + ItemQuery.normalize(q) + "'. Only members running"
+				+ " GIM Utilities with sharing on are searched, as of their last sync.");
+		}
+		for (PanelModel.FindRow r : rows)
+		{
+			JLabel row = new JLabel(r.text + (r.ago.isEmpty() ? "" : " (" + r.ago + ")"));
+			row.setFont(FontManager.getRunescapeSmallFont());
+			itemManager.getImage(r.itemId).addTo(row);
+			row.setBorder(new EmptyBorder(1, 0, 1, 0));
+			tab.add(row);
+		}
+		for (String s : GroupSearch.history(q, v.group.log().entries(), v.items, now, FindCommand.HISTORY_LIMIT))
+		{
+			tab.add(text(s, MUTED));
+		}
+	}
+
+	// Log: drops and collection log slots.
+
+	private void drawLog(JPanel tab, View v, long now)
+	{
+		if (!v.switches.drops)
+		{
+			empty(tab, "Drops log is off.", "Turn on 'Share drops and collection log' in GIM Utilities' settings.");
+			return;
+		}
 		List<GroupEvent> events;
 		if (v.since > 0)
 		{
-			heading("Since you last played (" + BoostText.ago(now, v.since) + ")");
+			tab.add(heading("Since you last played (" + BoostText.ago(now, v.since) + ")"));
 			events = v.group.events().since(v.since, v.self);
 		}
 		else
 		{
-			heading("Drops and collection log");
+			tab.add(heading("Drops and collection log"));
 			events = v.group.events().entries();
 		}
 		if (events.isEmpty())
 		{
-			line(v.since > 0 ? "Nothing new from the group." : "None seen yet.");
+			tab.add(text(v.since > 0 ? "Nothing new from the group." : "None seen yet. Valuable drops and new"
+				+ " collection log slots appear here.", MUTED));
 			return;
 		}
-		List<String> lines = DropLog.lines(events, v.items, now);
+		List<String> lines = new ArrayList<>(DropLog.lines(events, v.items, now));
 		for (int i = 0; i < lines.size() && i < GroupService.MAX_EVENT_LINES; i++)
 		{
-			line(lines.get(i));
+			tab.add(text(lines.get(i), Color.WHITE));
 		}
 		if (lines.size() > GroupService.MAX_EVENT_LINES)
 		{
-			line("and " + (lines.size() - GroupService.MAX_EVENT_LINES) + " more.");
+			tab.add(text("and " + (lines.size() - GroupService.MAX_EVENT_LINES) + " more.", MUTED));
 		}
 	}
 
-	private void heading(String text)
+	// Building blocks.
+
+	private static JPanel section()
+	{
+		JPanel p = new JPanel();
+		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		p.setBorder(BorderFactory.createCompoundBorder(new EmptyBorder(0, 0, 6, 0), new EmptyBorder(6, 6, 6, 6)));
+		return p;
+	}
+
+	private static void empty(JPanel tab, String title, String next)
+	{
+		tab.add(heading(title));
+		tab.add(text(next, MUTED));
+	}
+
+	private static JLabel heading(String text)
 	{
 		JLabel label = new JLabel(text);
 		label.setFont(FontManager.getRunescapeBoldFont());
 		label.setForeground(ColorScheme.BRAND_ORANGE);
-		label.setBorder(new EmptyBorder(8, 0, 2, 0));
-		body.add(label);
+		label.setBorder(new EmptyBorder(6, 0, 2, 0));
+		return label;
 	}
 
-	private void gap()
-	{
-		JLabel label = new JLabel(" ");
-		label.setBorder(new EmptyBorder(0, 0, 2, 0));
-		body.add(label);
-	}
-
-	private void line(String text)
+	private static JLabel text(String text, Color color)
 	{
 		// The html wrapper makes long lines wrap at the panel width. Text from
 		// peers is escaped first: a display name or item name is data, not markup.
-		JLabel label = new JLabel("<html><body style='width:180px'>" + escape(text) + "</body></html>");
+		JLabel label = new JLabel("<html><body style='width:175px'>" + escape(text) + "</body></html>");
 		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setForeground(color);
 		label.setBorder(new EmptyBorder(1, 0, 1, 0));
-		body.add(label);
+		return label;
 	}
 
-	private static String escape(String s)
+	static String escape(String s)
 	{
 		return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+	}
+
+	/** A small labelled bar: "HP 72/99" over a fill. Greyed when the member is offline. */
+	private static final class BarLabel extends JComponent
+	{
+		private final PanelModel.Bar bar;
+		private final Color color;
+		private final boolean live;
+
+		BarLabel(PanelModel.Bar bar, Color color, boolean live)
+		{
+			this.bar = bar;
+			this.color = color;
+			this.live = live;
+			setPreferredSize(new Dimension(40, 16));
+			setToolTipText(bar.label + " " + bar.text());
+		}
+
+		@Override
+		protected void paintComponent(Graphics g)
+		{
+			int w = getWidth();
+			int h = getHeight();
+			g.setColor(ColorScheme.DARK_GRAY_COLOR);
+			g.fillRect(0, 0, w, h);
+			int fill = bar.max <= 0 ? 0 : (int) Math.round(w * Math.min(1.0, Math.max(0, bar.current) / (double) bar.max));
+			g.setColor(live ? color : MUTED.darker());
+			g.fillRect(0, 0, fill, h);
+			g.setFont(FontManager.getRunescapeSmallFont());
+			g.setColor(Color.WHITE);
+			String label = bar.label.substring(0, Math.min(2, bar.label.length())) + " " + bar.current;
+			g.drawString(label, 2, h - 4);
+		}
 	}
 }

@@ -2,7 +2,6 @@ package com.vinnyvangogh.groupironman;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -33,48 +32,95 @@ final class GroupSearch
 		}
 	}
 
+	/** One matching item in one place: "Grimy guam leaf 15 - Alex bank". */
+	static final class Hit
+	{
+		final int itemId;
+		final String name;
+		final long quantity;
+		final String member;
+		final String where;
+		/** As {@link Source#seenAt}. */
+		final long seenAt;
+
+		Hit(int itemId, String name, long quantity, String member, String where, long seenAt)
+		{
+			this.itemId = itemId;
+			this.name = name;
+			this.quantity = quantity;
+			this.member = member;
+			this.where = where;
+			this.seenAt = seenAt;
+		}
+	}
+
 	private GroupSearch()
 	{
 	}
 
 	/**
-	 * "Shark: Alex bank 120 (2h ago), Sam inventory 5", one line per matching
-	 * item name, sorted by name. Fewer than {@link #MIN_QUERY} characters
-	 * returns nothing rather than the whole group's holdings.
+	 * Every matching item in every source, sorted by item name and then in
+	 * source order, at most {@link #MAX_RESULTS}. Items that share a name (a
+	 * noted and an unnoted id) are added up per source. Fewer than
+	 * {@link #MIN_QUERY} characters returns nothing rather than the whole
+	 * group's holdings.
 	 */
-	static List<String> search(String query, List<Source> sources, ItemLookup items, long now)
+	static List<Hit> hits(String query, List<Source> sources, ItemLookup items)
 	{
-		List<String> out = new ArrayList<>();
-		String q = normalize(query);
-		if (q.length() < MIN_QUERY)
+		List<Hit> out = new ArrayList<>();
+		ItemQuery q = ItemQuery.parse(query);
+		if (q == null)
 		{
 			return out;
 		}
-		Map<String, List<String>> hits = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+		Map<String, List<Hit>> byItem = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 		for (Source source : sources)
 		{
-			Map<String, Long> byName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+			Map<String, long[]> byName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 			for (Map.Entry<Integer, Integer> e : source.items.entrySet())
 			{
 				String name = items.name(e.getKey());
-				if (name.toLowerCase(Locale.ROOT).contains(q))
+				if (q.matches(name))
 				{
-					byName.merge(name, (long) e.getValue(), Long::sum);
+					// [id, quantity]: the first id seen stands for the icon.
+					byName.computeIfAbsent(name, k -> new long[]{e.getKey(), 0})[1] += e.getValue();
 				}
 			}
-			for (Map.Entry<String, Long> e : byName.entrySet())
+			for (Map.Entry<String, long[]> e : byName.entrySet())
 			{
-				String when = source.seenAt < 0 ? "" : " (" + BoostText.ago(now, source.seenAt) + ")";
-				hits.computeIfAbsent(e.getKey(), k -> new ArrayList<>())
-					.add(source.member + " " + source.where + " " + e.getValue() + when);
+				byItem.computeIfAbsent(e.getKey(), k -> new ArrayList<>()).add(new Hit((int) e.getValue()[0],
+					e.getKey(), e.getValue()[1], source.member, source.where, source.seenAt));
 			}
 		}
-		for (Map.Entry<String, List<String>> e : hits.entrySet())
+		for (List<Hit> list : byItem.values())
 		{
-			if (out.size() >= MAX_RESULTS)
+			for (Hit h : list)
 			{
-				break;
+				if (out.size() >= MAX_RESULTS)
+				{
+					return out;
+				}
+				out.add(h);
 			}
+		}
+		return out;
+	}
+
+	/**
+	 * "Shark: Alex bank 120 (2h ago), Sam inventory 5", one line per matching
+	 * item name, sorted by name: {@link #hits} as text for {@code ::find}.
+	 */
+	static List<String> search(String query, List<Source> sources, ItemLookup items, long now)
+	{
+		Map<String, List<String>> lines = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+		for (Hit h : hits(query, sources, items))
+		{
+			String when = h.seenAt < 0 ? "" : " (" + BoostText.ago(now, h.seenAt) + ")";
+			lines.computeIfAbsent(h.name, k -> new ArrayList<>()).add(h.member + " " + h.where + " " + h.quantity + when);
+		}
+		List<String> out = new ArrayList<>();
+		for (Map.Entry<String, List<String>> e : lines.entrySet())
+		{
 			out.add(e.getKey() + ": " + String.join(", ", e.getValue()));
 		}
 		return out;
@@ -89,8 +135,8 @@ final class GroupSearch
 	static List<String> history(String query, List<StorageChange> log, ItemLookup items, long now, int limit)
 	{
 		List<String> out = new ArrayList<>();
-		String q = normalize(query);
-		if (q.length() < MIN_QUERY)
+		ItemQuery q = ItemQuery.parse(query);
+		if (q == null)
 		{
 			return out;
 		}
@@ -119,17 +165,12 @@ final class GroupSearch
 		return out;
 	}
 
-	static String normalize(String query)
-	{
-		return query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-	}
-
-	private static Map<Integer, Integer> matching(Map<Integer, Integer> counts, String q, ItemLookup items)
+	private static Map<Integer, Integer> matching(Map<Integer, Integer> counts, ItemQuery q, ItemLookup items)
 	{
 		Map<Integer, Integer> out = new TreeMap<>();
 		for (Map.Entry<Integer, Integer> e : counts.entrySet())
 		{
-			if (items.name(e.getKey()).toLowerCase(Locale.ROOT).contains(q))
+			if (q.matches(items.name(e.getKey())))
 			{
 				out.put(e.getKey(), e.getValue());
 			}

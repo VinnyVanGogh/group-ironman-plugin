@@ -29,8 +29,8 @@ final class FindCommand
 		ItemLookup items, long now)
 	{
 		List<String> out = new ArrayList<>();
-		String q = GroupSearch.normalize(query);
-		if (q.length() < GroupSearch.MIN_QUERY)
+		String q = ItemQuery.normalize(query);
+		if (ItemQuery.parse(q) == null)
 		{
 			out.add("Type at least " + GroupSearch.MIN_QUERY + " letters of an item name, e.g. ::find dragon hunter wand");
 			return out;

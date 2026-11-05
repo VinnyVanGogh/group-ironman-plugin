@@ -21,14 +21,4 @@ final class Presence
 	{
 		return lastHeard > 0 && now - lastHeard <= ONLINE_MS;
 	}
-
-	/** "online", "last seen 2h ago" or "not seen yet". */
-	static String describe(long lastHeard, long now)
-	{
-		if (lastHeard <= 0)
-		{
-			return "not seen yet";
-		}
-		return online(lastHeard, now) ? "online" : "last seen " + BoostText.ago(now, lastHeard);
-	}
 }
