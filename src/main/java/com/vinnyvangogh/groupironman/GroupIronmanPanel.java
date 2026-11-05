@@ -12,6 +12,7 @@ import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.image.BufferedImage;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.swing.Icon;
 import javax.swing.SwingUtilities;
 import net.runelite.api.SpriteID;
 import net.runelite.client.game.ItemStats;
@@ -397,7 +398,9 @@ class GroupIronmanPanel extends PluginPanel
 		boolean open = !collapsed.contains(c.name);
 		body.setVisible(open);
 
-		JLabel name = new JLabel((open ? "▾ " : "▸ ") + c.name + (c.you ? " (you)" : ""));
+		// A drawn arrow: the RuneScape font has no glyph for ▾/▸ and showed a box.
+		JLabel name = new JLabel(c.name + (c.you ? " (you)" : ""), new Arrow(open), SwingConstants.LEFT);
+		name.setIconTextGap(4);
 		name.setFont(FontManager.getRunescapeBoldFont());
 		name.setForeground(c.online || c.you ? Color.WHITE : MUTED);
 		name.addMouseListener(new MouseAdapter()
@@ -929,6 +932,42 @@ class GroupIronmanPanel extends PluginPanel
 			int red = (int) Math.round(255 * Math.min(1.0, 2 * (1 - share)));
 			int green = (int) Math.round(255 * Math.min(1.0, 2 * share));
 			return new Color(red, green, 0);
+		}
+	}
+
+	/** The collapse arrow on a member card: pointing down when open, right when folded. */
+	static final class Arrow implements Icon
+	{
+		private static final int SIZE = 8;
+		final boolean open;
+
+		Arrow(boolean open)
+		{
+			this.open = open;
+		}
+
+		@Override
+		public void paintIcon(Component c, Graphics g, int x, int y)
+		{
+			Graphics2D g2 = (Graphics2D) g.create();
+			g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			g2.setColor(c.getForeground());
+			int[] xs = open ? new int[]{x, x + SIZE, x + SIZE / 2} : new int[]{x + 1, x + SIZE - 1, x + 1};
+			int[] ys = open ? new int[]{y + 2, y + 2, y + SIZE - 1} : new int[]{y, y + SIZE / 2, y + SIZE};
+			g2.fillPolygon(xs, ys, 3);
+			g2.dispose();
+		}
+
+		@Override
+		public int getIconWidth()
+		{
+			return SIZE;
+		}
+
+		@Override
+		public int getIconHeight()
+		{
+			return SIZE;
 		}
 	}
 
