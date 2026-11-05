@@ -36,7 +36,9 @@ final class FindStyle
 
 	static FindStyle of(GroupIronmanConfig config, String self)
 	{
-		return new FindStyle(self, config.findQueryColour(), config.findItemColour(), config.findYourBankColour(),
+		// Item names in the chat's own colour unless asked (Board 2026-11-04: "a little too colourful").
+		Color item = config.findColourItemNames() ? config.findItemColour() : null;
+		return new FindStyle(self, config.findQueryColour(), item, config.findYourBankColour(),
 			config.findMemberBankColour(), config.findStorageColour(), config.findCarriedColour());
 	}
 

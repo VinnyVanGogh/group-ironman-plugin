@@ -185,8 +185,9 @@ public class PanelModelTest
 			assertTrue(s.name(), SyncHeader.of(s, 0, group).buttons.contains(SyncHeader.Button.COPY_KEY));
 		}
 		assertTrue(SyncHeader.of(GroupSync.State.NO_KEY, 0, group).buttons.contains(SyncHeader.Button.PASTE_KEY));
-		// Joining is automatic now; the header says so rather than asking for a click.
-		assertEquals("Connecting", SyncHeader.of(GroupSync.State.READY, 0, group).title);
+		// Joining is the player's click (auto-rejoin for parties is a rejected RuneLite feature).
+		assertEquals("Not connected", SyncHeader.of(GroupSync.State.READY, 0, group).title);
+		assertTrue(SyncHeader.of(GroupSync.State.READY, 0, group).buttons.contains(SyncHeader.Button.JOIN));
 	}
 
 	@Test

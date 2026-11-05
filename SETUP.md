@@ -129,12 +129,11 @@ user folder), so your other plugins and settings come along.
    on the sidebar) appears once any switch is on. The built-in **Party**
    plugin is not needed and can stay off.
 4. **Share a group key, once.** One member opens the GIM Utilities panel and
-   clicks **Create group key**, then **Copy share line**, pastes it into
-   group chat (`/g`, or `///`) and presses Enter. Plugins never type into the
-   chatbox, so the pasting and the Enter are yours. Every member's GIM
-   Utilities picks the key up from group chat (only group chat), saves it and
-   hides the line. A member who missed it can paste the key into *Group key*
-   in the settings instead.
+   clicks **Create group key**, then **Copy group key**, and sends the key to
+   the group outside the game (Discord, a DM). The game chatbox takes no
+   paste, and plugins never type into it. Everyone else copies the key and
+   clicks **Paste group key** in the panel, which saves it and joins. Pasting
+   it into *Group key* in the settings works too.
 5. **Join.** Each member clicks **Join group sync** in the panel header, once
    per session. Joining on its own at login is a rejected Plugin Hub feature,
    so it waits for the click. The header then reads *Connected, N members

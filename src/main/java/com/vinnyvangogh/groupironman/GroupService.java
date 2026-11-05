@@ -162,9 +162,6 @@ class GroupService
 	private final Map<Integer, Integer> slots = new ConcurrentHashMap<>();
 	private Runnable onChange = () -> { };
 	private GroupSync sync;
-	/** The player pressed Leave this session; auto-join waits for Join. */
-	private boolean leftByPlayer;
-	private int ticksSinceJoinTry = 10;
 
 	private volatile LowStock lowStock = LowStock.parse("");
 	private volatile GroupMembers members = GroupMembers.UNKNOWN;
@@ -325,29 +322,13 @@ class GroupService
 	}
 
 	/**
-	 * Joins the group's party on its own once there is a key and a roster (Board
-	 * 2026-11-04: "we can auto-join"). Only from READY or STALE, so a party the
-	 * player joined themselves is never left, and not after they pressed Leave.
+	 * The "Join group sync" button, and a successful "Paste group key". Joining is
+	 * always the player's own click: "Auto-rejoin for parties" is a rejected
+	 * RuneLite feature ("would put undue strain on the party servers",
+	 * github.com/runelite/runelite/wiki/Rejected-or-Rolled-Back-Features).
 	 */
-	private void autoJoin()
-	{
-		// At most one try every 10 ticks (6 s), so a party that is slow to connect is not re-joined each tick.
-		if (++ticksSinceJoinTry < 10)
-		{
-			return;
-		}
-		GroupSync.State s = syncState();
-		if (!leftByPlayer && (s == GroupSync.State.READY || s == GroupSync.State.STALE))
-		{
-			ticksSinceJoinTry = 0;
-			joinGroup();
-		}
-	}
-
-	/** The "Join group sync" button, and {@link #autoJoin}. */
 	void joinGroup()
 	{
-		leftByPlayer = false;
 		if (sync.join(config.groupSync(), members.group(), config.groupKey()))
 		{
 			onChange.run();
@@ -365,8 +346,6 @@ class GroupService
 
 	void leaveGroup()
 	{
-		// Leave means leave: no auto-join again until the player presses Join.
-		leftByPlayer = true;
 		if (sync.leaveOwn())
 		{
 			onChange.run();
@@ -674,7 +653,6 @@ class GroupService
 		{
 			return;
 		}
-		autoJoin();
 		long now = System.currentTimeMillis();
 		if (!session)
 		{

@@ -12,7 +12,8 @@ final class SyncHeader
 {
 	enum Button
 	{
-		JOIN("Join group sync", "Connect to your group's private party now. It also joins by itself when you log in."),
+		JOIN("Join group sync", "Connect to your group's private party. Once per session; RuneLite does not allow"
+			+ " plugins to rejoin parties on their own."),
 		SWITCH("Switch to group sync", "Leave the party you are in and connect to your group's"),
 		LEAVE("Leave", "Disconnect from your group's party"),
 		CREATE_KEY("Create group key", "Make a new random key for your group; then copy and send the share line"),
@@ -64,10 +65,10 @@ final class SyncHeader
 				return new SyncHeader("Waiting for your group", "Log in on your Group Ironman. The group roster"
 					+ " comes from the game.", false, Button.COPY_KEY);
 			case READY:
-				return new SyncHeader("Connecting", "Joining " + group + "'s sync. Press Join if it does not connect.",
-					false, Button.JOIN, Button.COPY_KEY);
+				return new SyncHeader("Not connected", "Press Join to sync with " + group + ".", false, Button.JOIN,
+					Button.COPY_KEY);
 			case STALE:
-				return new SyncHeader("Group key changed", "Reconnecting with the new key.", false,
+				return new SyncHeader("Group key changed", "Press Join to reconnect with the new key.", false,
 					Button.JOIN, Button.COPY_KEY);
 			case OTHER_PARTY:
 				return new SyncHeader("In another party; GIM sync paused", "Nothing is sent to that party.", false,

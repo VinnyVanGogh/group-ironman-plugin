@@ -1,6 +1,29 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 - 2026-11-04
+
+First Plugin Hub release.
+
+### From the in-game test (2026-11-04)
+
+- **Copy group key / Paste group key.** The key travels outside the game (e.g.
+  Discord): *Copy group key* puts it on the computer's clipboard, *Paste group
+  key* saves one and joins. Nothing writes to the game chatbox.
+- **Joining stays a click.** *Join group sync* once per session (and a paste
+  joins once). "Auto-rejoin for parties" is a rejected RuneLite feature.
+- Member cards: HP / Prayer / Run / Spec as minimap-style orbs with the
+  game's icons; worn items in the equipment tab's layout beside a 4x7
+  inventory; a drawn collapse arrow; the header's online count includes you.
+- `::find` answers name the search, read from your side ("15 in your bank",
+  "140 in group storage", "1 equipped by Sam") and colour each kind of place;
+  new *::find colours* settings (item names uncoloured unless turned on). The
+  Find tab reads the same way.
+- Log tab: group storage changes by member, yours included, above drops.
+- Banks tab: each card says whose bank it is, and a filtered result stays at
+  the top.
+- Fixes: text past the panel's right edge (column alignment), the Group tab
+  drawing blank (item stats read off the client thread), the Leave button cut
+  off; a tab that fails to draw now says so.
 
 ### Round 2 (Board in-game test, 2026-11-04)
 
@@ -10,11 +33,12 @@
   names itself (`PartyDataService`, `CHARACTER_NAME`), which nothing did with
   the Party plugin off. Joining waits for the click: auto-joining parties is
   a rejected Plugin Hub feature.
-- **Group key.** 128 random bits, never derived from public facts. *Copy
-  share line* puts `[GIMU] <key>` on the clipboard for you to send in group
-  chat; members' plugins read it from group chat only, save it and hide it.
-  *Group key* in the settings (a password field) is the paste fallback; *New
-  key* rotates it. New settings: *Sync with my group* (on), *Group key*.
+- **Group key.** 128 random bits, never derived from public facts, shared
+  with *Copy group key* / *Paste group key* (see 1.0.0 above). A `[GIMU] <key>`
+  line someone types in group chat is still read from group chat only, saved
+  and hidden. *Group key* in the settings (a password field) is another way
+  to paste it; *New key* rotates it. New settings: *Sync with my group* (on),
+  *Group key*.
 - A party you joined yourself is never replaced (*In another party; GIM sync
   paused*, with a *Switch* button), and on shutdown only a party GIM
   Utilities joined is left. Nothing is sent to any other party.

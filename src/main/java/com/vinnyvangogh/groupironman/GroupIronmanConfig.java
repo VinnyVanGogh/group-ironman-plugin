@@ -28,8 +28,8 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigSection(
 		name = "Group sync",
-		description = "How GIM Utilities connects your group, without the Party plugin. Once there is a group key it"
-			+ " joins by itself when you log in.",
+		description = "How GIM Utilities connects your group, without the Party plugin. Press 'Join group sync' in"
+			+ " the panel once per session.",
 		position = 0
 	)
 	String syncSection = "sync";
@@ -48,7 +48,7 @@ public interface GroupIronmanConfig extends Config
 	@ConfigItem(
 		keyName = "groupSync",
 		name = "Sync with my group",
-		description = "Connect to your group's private party by itself when you log in. Off: solo,"
+		description = "Connect to your group's private party when you press 'Join group sync' in the panel. Off: solo,"
 			+ " nothing is sent and the panel shows only what this client saw. Does nothing until there is a group key.",
 		section = syncSection,
 		position = 0
@@ -215,8 +215,16 @@ public interface GroupIronmanConfig extends Config
 		return new Color(0xD0, 0x5A, 0x00);
 	}
 
-	@ConfigItem(keyName = "findItemColour", name = "Item name", description = "Each matching item's name.",
-		section = findSection, position = 1)
+	@ConfigItem(keyName = "findColourItemNames", name = "Colour item names",
+		description = "Also colour each item's name. Off keeps the answer calmer: only your search and the places"
+			+ " are coloured.", section = findSection, position = 1)
+	default boolean findColourItemNames()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "findItemColour", name = "Item name", description = "Each matching item's name, when"
+		+ " Colour item names is on.", section = findSection, position = 6)
 	default Color findItemColour()
 	{
 		return new Color(0x1E, 0x5A, 0xA8);

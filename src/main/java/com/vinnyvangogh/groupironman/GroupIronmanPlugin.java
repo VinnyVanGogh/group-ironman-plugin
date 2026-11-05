@@ -137,7 +137,13 @@ public class GroupIronmanPlugin extends Plugin
 			@Override
 			public boolean pasteKey(String text)
 			{
-				return group.pasteKey(text);
+				// Pasting is the player's own click, so it joins once, right away.
+				boolean saved = group.pasteKey(text);
+				if (saved)
+				{
+					clientThread.invokeLater(group::joinGroup);
+				}
+				return saved;
 			}
 		});
 		navButton = NavigationButton.builder()

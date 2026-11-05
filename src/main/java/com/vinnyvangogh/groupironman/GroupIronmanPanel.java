@@ -174,7 +174,11 @@ class GroupIronmanPanel extends PluginPanel
 			wrap.add(searchBar, BorderLayout.NORTH);
 		}
 		JPanel content = new Column();
-		wrap.add(content, BorderLayout.CENTER);
+		// Held at the top: in CENTER a short tab (one filtered item) was stretched to the
+		// panel's height and its grid drifted to the middle (Board's test, 2026-11-04).
+		JPanel top = new JPanel(new BorderLayout());
+		top.add(content, BorderLayout.NORTH);
+		wrap.add(top, BorderLayout.CENTER);
 		tabs.put(name, content);
 		views.add(wrap, name);
 	}
@@ -704,7 +708,8 @@ class GroupIronmanPanel extends PluginPanel
 		for (PanelModel.BankCard b : banks)
 		{
 			JPanel card = section();
-			JLabel name = new JLabel(b.member);
+			boolean mine = !v.self.isEmpty() && v.self.equalsIgnoreCase(b.member);
+			JLabel name = new JLabel(mine ? "Your bank (" + b.member + ")" : b.member + "'s bank");
 			name.setFont(FontManager.getRunescapeBoldFont());
 			card.add(name);
 			card.add(text(b.summary, MUTED));

@@ -83,10 +83,11 @@ public class PluginIdentityTest
 				on.add(m.getName());
 			}
 		}
-		// Six share switches, the world map, ::find and "Sync with my group": a new switch must be added here
-		// on purpose. Sync is the one switch on by default (Board, round 2): it does nothing without a group
-		// key, and even with one nothing is sent until the player presses Join.
-		assertEquals(9, switches);
+		// Six share switches, the world map, ::find, "Sync with my group" and "Colour item names" (a ::find
+		// look, off): a new switch must be added here on purpose. Sync is the one switch on by default (Board,
+		// round 2): it does nothing without a group key, and even with one nothing is sent until the player
+		// presses Join.
+		assertEquals(10, switches);
 		assertEquals(Collections.singletonList("groupSync"), on);
 		assertEquals("", DEFAULTS.groupLowStock());
 		assertEquals("no key on a fresh install", "", DEFAULTS.groupKey());
