@@ -370,10 +370,26 @@ class GroupService
 		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_KEY, GroupKey.generate());
 	}
 
-	/** What "Copy share line" puts on the clipboard, or null without a key. */
-	String shareLine()
+	/** What "Copy group key" puts on the clipboard, or null without a key. */
+	String groupKey()
 	{
-		return GroupKey.isValid(config.groupKey()) ? GroupKey.shareLine(config.groupKey()) : null;
+		String key = GroupKey.normalize(config.groupKey());
+		return key.isEmpty() ? null : key;
+	}
+
+	/**
+	 * "Paste group key": saves the key a member sent (bare or as a share line).
+	 * False, and nothing changes, when the text holds no key.
+	 */
+	boolean pasteKey(String text)
+	{
+		String key = GroupKey.fromPasted(text);
+		if (key.isEmpty())
+		{
+			return false;
+		}
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_KEY, key);
+		return true;
 	}
 
 	void reloadConfig()

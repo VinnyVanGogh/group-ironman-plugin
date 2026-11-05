@@ -74,6 +74,16 @@ final class GroupKey
 		return TAG + " " + normalize(key);
 	}
 
+	/**
+	 * The key in what a member pasted: the bare key (as Copy group key gives it) or a
+	 * share line, with surrounding spaces. "" when it is neither.
+	 */
+	static String fromPasted(String text)
+	{
+		String key = normalize(text);
+		return key.isEmpty() ? parseShareLine(text) : key;
+	}
+
 	/** The key in a share line, or "" when {@code message} is not exactly one. */
 	static String parseShareLine(String message)
 	{

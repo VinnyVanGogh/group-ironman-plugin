@@ -151,7 +151,7 @@ public class PanelModelTest
 	{
 		GroupMembers group = GroupMembers.of("GroupShip", Arrays.asList("Alex", "Me"));
 		assertEquals("No group key yet", SyncHeader.of(GroupSync.State.NO_KEY, 0, group).title);
-		assertEquals(Collections.singletonList(SyncHeader.Button.CREATE_KEY),
+		assertEquals(Arrays.asList(SyncHeader.Button.CREATE_KEY, SyncHeader.Button.PASTE_KEY),
 			SyncHeader.of(GroupSync.State.NO_KEY, 0, group).buttons);
 		assertEquals("Sync off", SyncHeader.of(GroupSync.State.OFF, 0, group).title);
 		assertTrue(SyncHeader.of(GroupSync.State.OFF, 0, group).buttons.isEmpty());
@@ -170,19 +170,31 @@ public class PanelModelTest
 	}
 
 	@Test
-	public void sharingTheKeyGoesThroughTheChatboxNotTheClipboard()
+	public void theKeyIsCopiedAndPastedOutsideTheGame()
 	{
-		// Board's test 2026-11-04: the game chatbox takes no paste, and the button was named
-		// 'Copy share line'. Every state that offers sharing offers the chatbox button.
+		// Board 2026-11-04: the game chatbox takes no paste, and filling it in was dropped;
+		// the key goes out by copy (e.g. to Discord) and comes in by Paste.
 		GroupMembers group = GroupMembers.of("GroupShip", Arrays.asList("Alex", "Me"));
 		for (GroupSync.State s : new GroupSync.State[]{GroupSync.State.READY, GroupSync.State.STALE,
 			GroupSync.State.CONNECTED, GroupSync.State.NO_GROUP})
 		{
-			assertTrue(s.name(), SyncHeader.of(s, 0, group).buttons.contains(SyncHeader.Button.SHARE_KEY));
+			assertTrue(s.name(), SyncHeader.of(s, 0, group).buttons.contains(SyncHeader.Button.COPY_KEY));
 		}
-		assertEquals("Share key in group chat", SyncHeader.Button.SHARE_KEY.label);
+		assertTrue(SyncHeader.of(GroupSync.State.NO_KEY, 0, group).buttons.contains(SyncHeader.Button.PASTE_KEY));
 		// Joining is automatic now; the header says so rather than asking for a click.
 		assertEquals("Connecting", SyncHeader.of(GroupSync.State.READY, 0, group).title);
+	}
+
+	@Test
+	public void aPastedKeyIsReadBareOrAsAShareLine()
+	{
+		String key = "0123456789abcdef0123456789abcdef";
+		assertEquals(key, GroupKey.fromPasted(key));
+		assertEquals(key, GroupKey.fromPasted("  " + key.toUpperCase() + "\n"));
+		assertEquals(key, GroupKey.fromPasted("[GIMU] " + key));
+		assertEquals("", GroupKey.fromPasted("hello"));
+		assertEquals("", GroupKey.fromPasted(key + "0"));
+		assertEquals("", GroupKey.fromPasted(null));
 	}
 
 	@Test

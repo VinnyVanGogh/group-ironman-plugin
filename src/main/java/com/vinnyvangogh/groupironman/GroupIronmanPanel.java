@@ -8,6 +8,9 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.GridLayout;
+import java.awt.Toolkit;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -61,8 +64,11 @@ class GroupIronmanPanel extends PluginPanel
 
 		void newKey();
 
-		/** Fills the chatbox with the group-channel "[GIMU] key" line for the player to send. */
-		void shareInChat();
+		/** The group key for "Copy group key", or null without one. */
+		String groupKey();
+
+		/** Saves a pasted key; false when the text holds none. */
+		boolean pasteKey(String text);
 	}
 
 	/** Everything a redraw needs, captured on the client side. */
@@ -115,6 +121,9 @@ class GroupIronmanPanel extends PluginPanel
 	/** Member cards the player collapsed, by name. */
 	private final Set<String> collapsed = new HashSet<>();
 	private String current = "Group";
+	/** What the last Copy/Paste key press did, shown under the buttons for a while. */
+	private String keyNote;
+	private long keyNoteAt;
 	private View view;
 
 	GroupIronmanPanel(ItemManager itemManager, SkillIconManager skillIcons, Actions actions)
@@ -265,6 +274,10 @@ class GroupIronmanPanel extends PluginPanel
 			buttons.add(button(b));
 		}
 		header.add(buttons);
+		if (keyNote != null && System.currentTimeMillis() - keyNoteAt < 30_000)
+		{
+			header.add(text(keyNote, Color.WHITE));
+		}
 		for (String stranger : v.group.strangers())
 		{
 			header.add(text("Not in your group: " + stranger + " (ignored)", ColorScheme.PROGRESS_ERROR_COLOR));
@@ -300,12 +313,39 @@ class GroupIronmanPanel extends PluginPanel
 			case NEW_KEY:
 				actions.newKey();
 				break;
-			case SHARE_KEY:
-				// The game chatbox takes no paste, so the line is filled in for the player to send.
-				actions.shareInChat();
+			case COPY_KEY:
+				String key = actions.groupKey();
+				if (key != null)
+				{
+					Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(key), null);
+					keyNote = "Key copied. Send it to your group, e.g. in Discord. Anyone with it can join.";
+					keyNoteAt = System.currentTimeMillis();
+				}
+				redraw();
+				break;
+			case PASTE_KEY:
+				keyNote = actions.pasteKey(clipboardText())
+					? "Key saved. Joining your group's sync."
+					: "Your clipboard has no group key. Copy the key a member sent, then press Paste again.";
+				keyNoteAt = System.currentTimeMillis();
+				redraw();
 				break;
 			default:
 				break;
+		}
+	}
+
+	/** Text on the computer's clipboard, or "" when there is none or it cannot be read. */
+	private static String clipboardText()
+	{
+		try
+		{
+			Object data = Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+			return data instanceof String ? (String) data : "";
+		}
+		catch (Exception e)
+		{
+			return "";
 		}
 	}
 

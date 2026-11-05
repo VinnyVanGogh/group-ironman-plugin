@@ -17,8 +17,10 @@ final class SyncHeader
 		LEAVE("Leave", "Disconnect from your group's party"),
 		CREATE_KEY("Create group key", "Make a new random key for your group; then copy and send the share line"),
 		NEW_KEY("New key", "Replace the key, e.g. if it leaked. Share the new one; members must rejoin"),
-		SHARE_KEY("Share key in group chat", "Fills in '/g [GIMU] <key>' in your chatbox. Press Enter to send it to"
-			+ " your group; members' GIM Utilities pick it up, join, and hide the line");
+		COPY_KEY("Copy group key", "Copies the key to your computer's clipboard to send to your group, e.g. in"
+			+ " Discord. Anyone with it can join your group's sync, so share it only with your group"),
+		PASTE_KEY("Paste group key", "Saves the key a member sent you, from your computer's clipboard. The plugin"
+			+ " then joins your group's sync by itself");
 
 		final String label;
 		final String tooltip;
@@ -55,24 +57,25 @@ final class SyncHeader
 				return new SyncHeader("Sync off", "Solo: only what this client saw. Turn on 'Sync with my group' in"
 					+ " settings to share.", false);
 			case NO_KEY:
-				return new SyncHeader("No group key yet", "One member creates a key and shares it in group chat;"
-					+ " everyone else's plugin picks it up.", false, Button.CREATE_KEY);
+				return new SyncHeader("No group key yet", "One member creates a key and sends it to the group, e.g."
+					+ " in Discord; everyone else copies it and presses Paste.", false, Button.CREATE_KEY,
+					Button.PASTE_KEY);
 			case NO_GROUP:
 				return new SyncHeader("Waiting for your group", "Log in on your Group Ironman. The group roster"
-					+ " comes from the game.", false, Button.SHARE_KEY);
+					+ " comes from the game.", false, Button.COPY_KEY);
 			case READY:
 				return new SyncHeader("Connecting", "Joining " + group + "'s sync. Press Join if it does not connect.",
-					false, Button.JOIN, Button.SHARE_KEY);
+					false, Button.JOIN, Button.COPY_KEY);
 			case STALE:
 				return new SyncHeader("Group key changed", "Reconnecting with the new key.", false,
-					Button.JOIN, Button.SHARE_KEY);
+					Button.JOIN, Button.COPY_KEY);
 			case OTHER_PARTY:
 				return new SyncHeader("In another party; GIM sync paused", "Nothing is sent to that party.", false,
 					Button.SWITCH);
 			case CONNECTED:
 				return new SyncHeader("Connected, " + othersOnline + (othersOnline == 1 ? " member" : " members")
 					+ " online", "Synced with " + group + ". Only roster members are shown.", true,
-					Button.SHARE_KEY, Button.NEW_KEY, Button.LEAVE);
+					Button.COPY_KEY, Button.NEW_KEY, Button.LEAVE);
 			default:
 				throw new IllegalArgumentException(String.valueOf(state));
 		}
