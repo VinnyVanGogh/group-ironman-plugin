@@ -271,14 +271,11 @@ final class GroupCodec
 		int chars = EVENTS_HEADER_CHARS;
 		for (GroupEvent e : events)
 		{
-			JsonObject event = new JsonObject();
-			event.addProperty("t", e.type == GroupEvent.Type.DROP ? "d" : "c");
-			event.addProperty("ts", e.at);
-			event.addProperty("s", e.text);
-			if (e.type == GroupEvent.Type.DROP)
+			if (!e.type.travels())
 			{
-				event.add("i", ItemCounts.toJson(e.items));
+				continue;
 			}
+			JsonObject event = eventJson(e);
 			int size = gson.toJson(event).length() + 1;
 			if (current.size() > 0 && (chars + size > MAX_PAYLOAD_CHARS || current.size() >= MAX_EVENTS_PER_MESSAGE))
 			{
@@ -294,6 +291,72 @@ final class GroupCodec
 			out.add(eventsPayload(gson, current));
 		}
 		return out;
+	}
+
+	/**
+	 * One event: {@code t} type code, {@code ts}, {@code s} text, {@code i}
+	 * items, and only when set {@code n} number, {@code x} detail, {@code w}
+	 * world, {@code l} location. A 1.0.0 build reads {@code d} and {@code c}
+	 * exactly as before and skips every other code.
+	 */
+	private static JsonObject eventJson(GroupEvent e)
+	{
+		JsonObject event = new JsonObject();
+		event.addProperty("t", e.type.code);
+		event.addProperty("ts", e.at);
+		event.addProperty("s", e.text);
+		if (!e.items.isEmpty() || e.type == GroupEvent.Type.DROP)
+		{
+			event.add("i", ItemCounts.toJson(e.items));
+		}
+		if (e.number != 0)
+		{
+			event.addProperty("n", e.number);
+		}
+		if (!e.detail.isEmpty())
+		{
+			event.addProperty("x", e.detail);
+		}
+		if (e.world > 0)
+		{
+			event.addProperty("w", e.world);
+		}
+		if (!e.location.isEmpty())
+		{
+			event.addProperty("l", e.location);
+		}
+		return event;
+	}
+
+	/** The event in {@code o}, filed under {@code member}; null when a required field is missing or the code unknown. */
+	static GroupEvent eventFrom(JsonObject o, String member)
+	{
+		Long ts = ItemCounts.longValue(o.get("ts"));
+		GroupEvent.Type type = GroupEvent.Type.of(string(o.get("t")));
+		JsonElement s = o.get("s");
+		if (ts == null || ts < 0 || type == null || s == null || !s.isJsonPrimitive())
+		{
+			return null;
+		}
+		return GroupEvent.of(type, ts, member).text(s.getAsString())
+			.items(ItemCounts.fromJson(o.get("i"), GroupEvent.MAX_DROP_ITEMS))
+			.number(number(o.get("n"), Long.MIN_VALUE, Long.MAX_VALUE))
+			.detail(string(o.get("x")))
+			.world((int) number(o.get("w"), 0, MAX_COORD))
+			.location(string(o.get("l")))
+			.build();
+	}
+
+	private static String string(JsonElement e)
+	{
+		return e != null && e.isJsonPrimitive() ? e.getAsString() : "";
+	}
+
+	/** The whole number in {@code e}, 0 when missing or outside {@code min..max}. */
+	private static long number(JsonElement e, long min, long max)
+	{
+		Long n = ItemCounts.longValue(e);
+		return n == null || n < min || n > max ? 0 : n;
 	}
 
 	private static String eventsPayload(Gson gson, JsonArray events)
@@ -410,28 +473,8 @@ final class GroupCodec
 				{
 					continue;
 				}
-				JsonObject o = item.getAsJsonObject();
-				Long ts = ItemCounts.longValue(o.get("ts"));
-				JsonElement t = o.get("t");
-				JsonElement s = o.get("s");
-				if (ts == null || ts < 0 || t == null || !t.isJsonPrimitive() || s == null || !s.isJsonPrimitive())
-				{
-					continue;
-				}
-				GroupEvent event;
-				switch (t.getAsString())
-				{
-					case "d":
-						event = GroupEvent.drop(ts, "", s.getAsString(),
-							ItemCounts.fromJson(o.get("i"), GroupEvent.MAX_DROP_ITEMS));
-						break;
-					case "c":
-						event = GroupEvent.clog(ts, "", s.getAsString());
-						break;
-					default:
-						continue;
-				}
-				if (event.isValid())
+				GroupEvent event = eventFrom(item.getAsJsonObject(), "");
+				if (event != null && event.type.travels() && event.isValid())
 				{
 					events.add(event);
 				}

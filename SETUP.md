@@ -29,11 +29,38 @@ nothing, collects nothing, and its side panel button is hidden.
 | Share drops and collection log | Your NPC drops (items worth at least *Drops worth at least*, 10,000 gp by default; 0 sends everything) and each new collection log slot. Kept on disk for everyone, and resent for 7 days whenever someone joins the party. |
 | Show members on world map | Not sent anywhere. Marks online members on the world map. Needs *Share stats* on, for you and for them. |
 | ::find chat command | Not sent anywhere. Lets you type `::find dragon hunter wand` in the chatbox (see below). |
+| Share group events | Your pets, deaths, levels, quests, logins and Barrows chests, so members see them as banners. Drops and collection log slots go with *Share drops and collection log*; storage events are worked out by each member from the storage changes already shared. |
 
 Each member has to turn sharing on themselves; nobody's client can read
 another's. Everything travels through RuneLite's own Party service, the same
-one the built-in Party plugin uses. GIM Utilities makes no network connections
-of its own.
+one the built-in Party plugin uses. The only network connection of GIM
+Utilities' own is the optional Discord webhook below.
+
+### Group events: Discord and banners
+
+Five more sections, all closed and all off by default:
+
+- **Group events**: when something counts. *Valuable drop at least* (1M gp,
+  per item stack), *Big storage move at least* (1M gp), *Level ups from level*
+  (1), *Back after (days)* (7), and *Untradeables to ignore* (clue scrolls,
+  keys, totems and the like, by name).
+- **Discord webhook**: *Post to Discord* (shows RuneLite's third-party
+  warning), the *Discord webhook URL* (must be
+  `https://discord.com/api/webhooks/...`; a password field), optional
+  webhooks per category (drops, deaths, storage, progress, group, activities),
+  *Message style* (rich embed or plain text), *Attach a screenshot*, *Mention
+  for big events* (e.g. `<@&role id>`, put in front of pets, 99s, maxing and a
+  Hardcore group death), and *Quiet hours from / until* (posts wait and go
+  when quiet hours end; the same hour twice means none).
+- **Discord: which events** and **Overlays: which events**: one switch per
+  event, for each output.
+- **Overlays**: *Banner time*, *Banner position*, *Most banners at once*, the
+  *Group box* (who is online and on which world, and the latest events) and
+  how many events it lists.
+
+Your client posts only your own events, so a group where everyone posts sees
+each event once. At most 20 posts go per minute and 50 wait; Discord's own
+rate limit is honoured.
 
 The panel's **Members** list shows each member as *online* (heard from in
 the last 3 minutes), *last seen 2h ago*, or *not seen yet*, with their world
@@ -245,6 +272,12 @@ Members, items, drops and the map:
   live.
 - **Bank values use RuneLite's cached Grand Exchange prices**; untradeables
   count as 0.
+- **Group events are what this client saw.** Barrows set progress counts
+  pieces from chests opened with the plugin on, not the collection log.
+  "Every quest done" means every quest *and miniquest* RuneLite lists. A
+  Hardcore group death is reported as a life lost even in a safe minigame.
+  A member's online banner only arrives once they have pressed *Join group
+  sync*; their offline goes to Discord only.
 
 ## Building and tests
 

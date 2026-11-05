@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Group events, part A
+
+- One event model (`GroupEvent`, now typed) feeds two outputs, each with its
+  own switch per event, all off by default: a **Discord webhook** and
+  **in-game banners** plus an optional **group box**.
+- Events: valuable drop (with kill count), pet, new collection log slot,
+  untradeable unique, death (where, killer, world, Hardcore group life lost),
+  big storage deposit / withdrawal, storage visit summary, storage minimum
+  hit, took the last one, level up, 99s and max total, XP milestones (1M, 10M,
+  200M), combat level, total level every 100, quest complete, quest points
+  every 25 and every quest done, online / offline (a hop or quick relog is
+  not posted), back after N days, Barrows chest with set progress.
+- Discord: main webhook plus optional per-category webhooks, embeds or plain
+  text, optional screenshot, mention string for big events, quiet hours.
+  At most 20 posts a minute, 50 waiting, Retry-After honoured; the URL is a
+  secret field and never logged.
+- *Share group events* sends members your non-drop events for their banners;
+  a 1.0.0 client ignores them.
+
 ## 1.0.0 - 2026-11-04
 
 First Plugin Hub release.

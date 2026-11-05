@@ -21,8 +21,8 @@ unchanged.
 ## What this plugin is not
 
 Not a build or XP guard (that stays in Build Guard), not a website companion,
-and not a server: it makes no network calls of its own. Everything goes
-through RuneLite's `PartyService`.
+and not a server. Group data goes only through RuneLite's `PartyService`; the
+one network call of its own is the optional Discord webhook (#18).
 
 ---
 
@@ -166,13 +166,68 @@ tag `runelite-parent-1.13.5` before any code:
   views, sections collapsed from their header, a `JScrollPane` around it all
   (here, `PluginPanel`'s own).
 
+### Phase 0 addendum — group events, Discord and overlays, part A (2026-11-04)
+
+Board, 2026-11-04 (RUNELITE-85): every one of the 50 listed event ideas, each
+its own switch, all off by default; a Discord webhook and in-game overlays set
+up together. Part A is the 20 "easy" kinds (`GroupEvent.Type`).
+
+**18. Discord webhook — allowed, with precedent; needs the third-party
+disclosure.** *Nearest rules:* AGENTS.md Config: a setting that sends anything
+to a third-party server is off by default and carries the warning
+"This feature submits your IP address to a 3rd-party server not controlled or
+verified by RuneLite developers" (here on *Post to Discord*); Data & Privacy,
+"no exposing player information over HTTP" and "no crowdsourcing data about
+other players": each client posts **only its own player's events**
+(`EventRouter`, own only), to a webhook that player pasted, and nothing about
+any other player is ever posted. *Precedent:* Hub plugins **Dink**
+(`pajlads/DinkPlugin`, loot, deaths, levels, clog, quests to a webhook),
+**Discord Loot Logger** (`Adam-/runelite-plugins` `discord-loot-logger`) and
+**GIM Bank Discord** (`Boredska/gim-bank-discord`, group storage changes to a
+webhook). HTTP is RuneLite's injected `OkHttpClient` with `enqueue`, never the
+client thread (AGENTS.md HTTP & JSON).
+
+*The Hub `warning=` line — the brief's assumption corrected.* Checked
+2026-11-04: a `warning=` line belongs in the **plugin-hub manifest**
+(`plugins/<slug>` in `runelite/plugin-hub`), not in this repo's
+`runelite-plugin.properties`, whose documented fields are `displayName`,
+`author`, `description`, `tags`, `plugins`, `version`, `build`
+(`runelite/plugin-hub` README). And the cited webhook plugins carry **none**:
+`plugins/discord-loot-logger`, `plugins/gim-bank-discord` and `plugins/dink`
+are `repository=` and `commit=` only. Manifests that do carry one point at a
+fixed or user-entered third-party site, e.g. `plugins/clan-chat-warnings`:
+"This plugin can fetch and post text to 3rd party websites not controlled or
+verified by the RuneLite Developers. This setting is optional, and only
+accesses the user-inputed site." So: no line was added to
+`runelite-plugin.properties`; when the next Hub update is opened (not
+plugin-hub#20149, which stays untouched), propose in `plugins/gim-utilities`:
+`warning=This plugin can post your own events to a Discord webhook you enter. This is optional, off by default, and sends your IP address to Discord, a 3rd party not controlled or verified by the RuneLite Developers.`
+and let the reviewer decide, since Dink ships without one.
+
+**19. Event banners and the group box — allowed.** Overlays of information
+the client already has or that members chose to share (Data & Privacy, as
+#15). No boss mechanics, no PvP information. *Precedent:* the base client's
+loot and XP drop overlays; Party Panel. Later "situational" banners (only in
+the Wilderness, only in a boss room) filter where a banner shows, never add
+combat information: `ToastQueue.visible` takes that filter.
+
+**20. Event detection — allowed.** Every kind is read from the player's own
+client: `NpcLootReceived`, `ActorDeath` for the local player, `StatChanged`,
+the QP varp, the quest scroll and Barrows reward interfaces, and the game's
+own chat lines (pet, kill count, collection log), the patterns the base
+screenshot plugin uses (`ScreenshotPlugin.java`, runelite master: pet
+messages ~:111-113, kill count ~:102, quest title ~:286). Storage events are
+derived from the storage change each member already shares (#9), so they
+never cross the party themselves.
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection**, and therefore any integration that reads another plugin's
   state. If integration is ever wanted, the channel is
   `net.runelite.client.events.PluginMessage`.
-- **Every network call** of our own, and any server. Group Ironmen Tracker
-  needs a website; this plugin's point is that it does not.
+- **Every network call** of our own but the optional Discord webhook the
+  player sets (#18), and any server. Group Ironmen Tracker needs a website;
+  this plugin's point is that it does not.
 - **Automating anything**: moving items, withdrawing, walking. Input
   Restrictions.
 - **Joining a party without a click**, on login or on a timer, and **putting
