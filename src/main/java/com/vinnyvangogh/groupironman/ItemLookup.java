@@ -15,4 +15,10 @@ interface ItemLookup
 
 	/** Price per item in gp, 0 when unknown. */
 	long price(int id);
+
+	/** The equipment slot (EquipmentInventorySlot index) the item is worn in, or -1. */
+	default int slot(int id)
+	{
+		return -1;
+	}
 }

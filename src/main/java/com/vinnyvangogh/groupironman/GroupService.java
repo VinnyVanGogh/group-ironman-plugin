@@ -61,6 +61,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemStats;
 import net.runelite.client.game.ItemStack;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
@@ -157,6 +158,8 @@ class GroupService
 	private final BankAssembler assembler = new BankAssembler();
 	private final Map<Integer, String> names = new ConcurrentHashMap<>();
 	private final Map<Integer, Long> prices = new ConcurrentHashMap<>();
+	/** Equipment slot per item, read on the client thread with the name (ItemManager stats need it). */
+	private final Map<Integer, Integer> slots = new ConcurrentHashMap<>();
 	private Runnable onChange = () -> { };
 	private GroupSync sync;
 	/** The player pressed Leave this session; auto-join waits for Join. */
@@ -210,6 +213,12 @@ class GroupService
 		public long price(int id)
 		{
 			return prices.getOrDefault(id, 0L);
+		}
+
+		@Override
+		public int slot(int id)
+		{
+			return slots.getOrDefault(id, -1);
 		}
 	};
 
@@ -1221,7 +1230,8 @@ class GroupService
 		List<Integer> missing = new ArrayList<>();
 		for (int id : ids)
 		{
-			if (!names.containsKey(id))
+			// Names loaded from the disk cache come without a slot: look those up again too.
+			if (!names.containsKey(id) || !slots.containsKey(id))
 			{
 				missing.add(id);
 			}
@@ -1241,7 +1251,7 @@ class GroupService
 	{
 		for (int id : ids)
 		{
-			if (names.containsKey(id))
+			if (names.containsKey(id) && slots.containsKey(id))
 			{
 				continue;
 			}
@@ -1251,6 +1261,8 @@ class GroupService
 			{
 				names.put(id, name);
 				prices.put(id, (long) itemManager.getItemPrice(id));
+				ItemStats stats = itemManager.getItemStats(id);
+				slots.put(id, stats == null || stats.getEquipment() == null ? -1 : stats.getEquipment().getSlot());
 			}
 		}
 	}

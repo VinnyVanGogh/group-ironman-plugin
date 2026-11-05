@@ -13,9 +13,9 @@ import java.awt.Shape;
 import java.awt.image.BufferedImage;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.swing.Icon;
+import lombok.extern.slf4j.Slf4j;
 import javax.swing.SwingUtilities;
 import net.runelite.api.SpriteID;
-import net.runelite.client.game.ItemStats;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.util.AsyncBufferedImage;
 import java.awt.GridLayout;
@@ -62,6 +62,7 @@ import net.runelite.client.ui.components.IconTextField;
  * <p>It draws what {@link PanelModel} builds; nothing here decides what is
  * shown. Only the visible tab is rebuilt on a redraw.
  */
+@Slf4j
 class GroupIronmanPanel extends PluginPanel
 {
 	/** What the buttons in the header do. */
@@ -196,23 +197,34 @@ class GroupIronmanPanel extends PluginPanel
 		JPanel tab = tabs.get(current);
 		tab.removeAll();
 		long now = System.currentTimeMillis();
-		switch (current)
+		try
 		{
-			case "Banks":
-				drawBanks(tab, v, now);
-				break;
-			case "Storage":
-				drawStorage(tab, v, now);
-				break;
-			case "Find":
-				drawFind(tab, v, now);
-				break;
-			case "Log":
-				drawLog(tab, v, now);
-				break;
-			default:
-				drawGroup(tab, v, now);
-				break;
+			switch (current)
+			{
+				case "Banks":
+					drawBanks(tab, v, now);
+					break;
+				case "Storage":
+					drawStorage(tab, v, now);
+					break;
+				case "Find":
+					drawFind(tab, v, now);
+					break;
+				case "Log":
+					drawLog(tab, v, now);
+					break;
+				default:
+					drawGroup(tab, v, now);
+					break;
+			}
+		}
+		catch (RuntimeException | AssertionError e)
+		{
+			// A tab that fails to draw says so instead of going blank (the Group tab did, 2026-11-04).
+			log.warn("GIM Utilities: drawing the {} tab failed", current, e);
+			tab.removeAll();
+			empty(tab, "Could not draw this tab.", e.getClass().getSimpleName() + ": " + e.getMessage()
+				+ ". Please report it with the RuneLite log.");
 		}
 		tab.revalidate();
 		tab.repaint();
@@ -285,7 +297,9 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			header.add(text(h.detail, MUTED));
 		}
-		JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 2));
+		// Two per row: a single FlowLayout row never wraps inside the BoxLayout header, so a
+		// third button (Leave) was cut off past the panel's edge.
+		JPanel buttons = new JPanel(new GridLayout(0, 2, 2, 2));
 		for (SyncHeader.Button b : h.buttons)
 		{
 			buttons.add(button(b));
@@ -499,10 +513,12 @@ class GroupIronmanPanel extends PluginPanel
 	private JComponent wornLayout(List<PanelModel.ItemCell> items)
 	{
 		JComponent[] cells = new JComponent[WORN_LAYOUT.length];
+		// Slots come from the client-thread cache: ItemManager's stats may not be read on the
+		// Swing thread (doing so blanked the whole Group tab, Board's test 2026-11-04).
+		View v = view;
 		for (PanelModel.ItemCell item : items)
 		{
-			ItemStats stats = itemManager.getItemStats(item.id);
-			int slot = stats == null || stats.getEquipment() == null ? -1 : stats.getEquipment().getSlot();
+			int slot = v == null ? -1 : v.items.slot(item.id);
 			int at = wornCell(slot);
 			if (at < 0 || cells[at] != null)
 			{
@@ -772,6 +788,22 @@ class GroupIronmanPanel extends PluginPanel
 
 	private void drawLog(JPanel tab, View v, long now)
 	{
+		// Storage changes by name, yours included (Board 2026-11-04: "the log should show that
+		// GroupShip took 15 trout"), above drops; "" as self names you too.
+		if (v.switches.storage)
+		{
+			List<StorageChange> changes = v.group.log().entries();
+			tab.add(heading("Group storage"));
+			if (changes.isEmpty())
+			{
+				tab.add(text("No deposits or withdrawals seen yet.", MUTED));
+			}
+			for (int i = 0; i < changes.size() && i < GroupService.MAX_EVENT_LINES; i++)
+			{
+				StorageChange c = changes.get(i);
+				tab.add(text(PanelModel.change(c, v.items, "") + " (" + BoostText.ago(now, c.at()) + ")", Color.WHITE));
+			}
+		}
 		if (!v.switches.drops)
 		{
 			empty(tab, "Drops log is off.", "Turn on 'Share drops and collection log' in GIM Utilities' settings.");
