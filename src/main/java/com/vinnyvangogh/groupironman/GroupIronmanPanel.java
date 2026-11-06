@@ -416,6 +416,21 @@ class GroupIronmanPanel extends PluginPanel
 		boolean open = !collapsed.contains(c.name);
 		body.setVisible(open);
 
+		card.add(memberName(c, open));
+		card.add(text(c.status, c.online ? ColorScheme.PROGRESS_COMPLETE_COLOR : MUTED));
+		addStats(body, c);
+		addItems(body, c);
+		if (c.seedVault != null)
+		{
+			body.add(text(c.seedVault, MUTED));
+		}
+		card.add(body);
+		return card;
+	}
+
+	/** The card's clickable name line, which collapses and opens the card. */
+	private JLabel memberName(PanelModel.MemberCard c, boolean open)
+	{
 		// A drawn arrow: the RuneScape font has no glyph for ▾/▸ and showed a box.
 		JLabel name = new JLabel(c.name + (c.you ? " (you)" : ""), new Arrow(open), SwingConstants.LEFT);
 		name.setIconTextGap(4);
@@ -433,37 +448,34 @@ class GroupIronmanPanel extends PluginPanel
 				redraw();
 			}
 		});
-		card.add(name);
-		card.add(text(c.status, c.online ? ColorScheme.PROGRESS_COMPLETE_COLOR : MUTED));
+		return name;
+	}
 
+	/** HP/Prayer/Run/Spec orbs, then the skills grid. */
+	private void addStats(JPanel body, PanelModel.MemberCard c)
+	{
+		boolean live = c.online || c.you;
 		if (!c.bars.isEmpty())
 		{
 			JPanel bars = new JPanel(new GridLayout(1, c.bars.size(), 2, 0));
 			bars.setOpaque(false);
 			for (PanelModel.Bar b : c.bars)
 			{
-				bars.add(new Orb(b, barColor(b.label), c.online || c.you, orbIcons.get(b.label)));
+				bars.add(new Orb(b, barColor(b.label), live, orbIcons.get(b.label)));
 			}
 			body.add(bars);
 		}
 		if (!c.skills.isEmpty())
 		{
-			body.add(skillGrid(c.skills, c.online || c.you));
+			body.add(skillGrid(c.skills, live));
 		}
-		// Worn then inventory, small and side by side, in the game's own layouts.
-		PanelModel.ItemGroup worn = null;
-		PanelModel.ItemGroup inventory = null;
-		for (PanelModel.ItemGroup g : c.items)
-		{
-			if ("Worn".equals(g.title))
-			{
-				worn = g;
-			}
-			else if ("Inventory".equals(g.title))
-			{
-				inventory = g;
-			}
-		}
+	}
+
+	/** Worn then inventory, small and side by side in the game's own layouts; any other group as a grid. */
+	private void addItems(JPanel body, PanelModel.MemberCard c)
+	{
+		PanelModel.ItemGroup worn = itemGroup(c.items, "Worn");
+		PanelModel.ItemGroup inventory = itemGroup(c.items, "Inventory");
 		if (worn != null || inventory != null)
 		{
 			JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
@@ -474,19 +486,24 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		for (PanelModel.ItemGroup g : c.items)
 		{
-			if (g == worn || g == inventory)
+			if (g != worn && g != inventory)
 			{
-				continue;
+				body.add(text(g.title, MUTED));
+				body.add(itemGrid(g.items));
 			}
-			body.add(text(g.title, MUTED));
-			body.add(itemGrid(g.items));
 		}
-		if (c.seedVault != null)
+	}
+
+	private static PanelModel.ItemGroup itemGroup(List<PanelModel.ItemGroup> groups, String title)
+	{
+		for (PanelModel.ItemGroup g : groups)
 		{
-			body.add(text(c.seedVault, MUTED));
+			if (title.equals(g.title))
+			{
+				return g;
+			}
 		}
-		card.add(body);
-		return card;
+		return null;
 	}
 
 	private void loadOrbIcon(SpriteManager sprites, String label, int spriteId)
@@ -793,21 +810,9 @@ class GroupIronmanPanel extends PluginPanel
 
 	private void drawLog(JPanel tab, View v, long now)
 	{
-		// Storage changes by name, yours included (Board 2026-11-04: "the log should show that
-		// GroupShip took 15 trout"), above drops; "" as self names you too.
 		if (v.switches.storage)
 		{
-			List<StorageChange> changes = v.group.log().entries();
-			tab.add(heading("Group storage"));
-			if (changes.isEmpty())
-			{
-				tab.add(text("No deposits or withdrawals seen yet.", MUTED));
-			}
-			for (int i = 0; i < changes.size() && i < GroupService.MAX_EVENT_LINES; i++)
-			{
-				StorageChange c = changes.get(i);
-				tab.add(text(PanelModel.change(c, v.items, "") + " (" + BoostText.ago(now, c.at()) + ")", Color.WHITE));
-			}
+			drawStorageLog(tab, v, now);
 		}
 		if (!v.switches.drops)
 		{
@@ -839,6 +844,25 @@ class GroupIronmanPanel extends PluginPanel
 		if (lines.size() > GroupService.MAX_EVENT_LINES)
 		{
 			tab.add(text("and " + (lines.size() - GroupService.MAX_EVENT_LINES) + " more.", MUTED));
+		}
+	}
+
+	/**
+	 * Storage changes by name, yours included (Board 2026-11-04: "the log should show that
+	 * GroupShip took 15 trout"), above drops; "" as self names you too.
+	 */
+	private void drawStorageLog(JPanel tab, View v, long now)
+	{
+		List<StorageChange> changes = v.group.log().entries();
+		tab.add(heading("Group storage"));
+		if (changes.isEmpty())
+		{
+			tab.add(text("No deposits or withdrawals seen yet.", MUTED));
+		}
+		for (int i = 0; i < changes.size() && i < GroupService.MAX_EVENT_LINES; i++)
+		{
+			StorageChange c = changes.get(i);
+			tab.add(text(PanelModel.change(c, v.items, "") + " (" + BoostText.ago(now, c.at()) + ")", Color.WHITE));
 		}
 	}
 
