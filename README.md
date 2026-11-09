@@ -14,16 +14,40 @@ to share, and only sees other members' data for what they share themselves.
 - **Group:** a card per member with world and place, HP / Prayer / Run / Spec
   orbs, skills, and worn gear and inventory laid out like the game's tabs.
   Offline members keep what they had the last time you were both online.
+
+  ![Group tab showing member card with orbs, stats, equipment, and inventory](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/panel-group.png)
+  *Group tab: member card with world/location, vitals orbs, stats, worn gear, and inventory.*
+
 - **Banks:** each member's last bank with value and when it was seen.
+
+  ![Banks tab showing member bank with item counts and total value](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/member-bank.png)
+  *Banks tab: member's last seen bank contents and total value.*
+
 - **Storage:** the last group storage contents you saw, plus who took or
   deposited what.
+
+  ![Storage tab showing group storage contents and change history](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/storage-snapshot.png)
+  *Storage tab: snapshot of group storage items and recent change history.*
+
 - **Find:** who has an item and where (bank, inventory, worn, pouches, group
   storage), in the panel or with `::find <item>` in your own chatbox, with
   colours you can change.
+
+  ![Find tab searching for items across banks and group storage](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/find-panel.png)
+  *Find tab: searching for an item across party members' banks and group storage.*
+
+  ![Chatbox output from ::find command with colour-coded results](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/find-chatbox.png)
+  *Chatbox `::find` command: instant, colour-coded item location lookup.*
+
 - **Log:** group storage changes by member, and members' drops and new
   collection log slots since you last played.
+
+  ![Log tab showing group storage changes and activity since last played](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/storage-log.png)
+  *Log tab: storage deposits/withdrawals and group activity since your last session.*
+
 - Storage minimums with a desktop notification, and optional world map
   markers.
+
 - **Group events** (new, every one its own switch): valuable drops, pets, new
   collection log slots, untradeable uniques, deaths, big storage deposits and
   withdrawals, storage visit summaries, storage minimums, "took the last one",
@@ -36,6 +60,14 @@ to share, and only sees other members' data for what they share themselves.
     member's own events, so nothing is posted twice.
   - **In-game banners**, yours and your group's, plus an optional group box
     with who is online and the latest events.
+
+  ![In-game chat showing group event broadcasts](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/group-events.png)
+  *Group events: in-game broadcasts for member level ups and achievements.*
+
+- **Settings:** granular opt-in toggles for every feature and sharing category.
+
+  ![Settings panel showing configuration toggles for GIM Utilities](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings.png)
+  *Settings: opt-in toggles for group sync, sharing categories, minimums, and commands.*
 
 No server of its own. Party data goes only through RuneLite's Party service,
 and only names on your in-game group roster are shown. **Only the optional
@@ -51,6 +83,9 @@ own events and your IP address to Discord.
    **Copy group key**, and sends the key to the group (Discord works).
 3. Everyone else copies it and clicks **Paste group key**.
 4. Each session, click **Join group sync**. The Party plugin is not needed.
+
+![Panel showing group sync status and join button](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/group-sync.png)
+*Group sync: one-click party join without needing the Party plugin.*
 
 Anyone with the key can join your sync, so keep it inside your group.
 
