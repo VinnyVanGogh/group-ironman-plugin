@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.BiFunction;
 
 /**
  * "Who has it?": an item name search across every member's last bank,
@@ -150,37 +151,11 @@ final class GroupSearch
 	static List<String> historyStyled(String query, List<StorageChange> log, ItemLookup items, long now, int limit,
 		FindStyle style)
 	{
-		List<String> out = new ArrayList<>();
-		ItemQuery q = ItemQuery.parse(query);
-		if (q == null)
+		return historyLines(query, log, items, limit, (c, what) ->
 		{
-			return out;
-		}
-		for (StorageChange c : log)
-		{
-			if (out.size() >= limit)
-			{
-				break;
-			}
-			Map<Integer, Integer> took = matching(c.took(), q, items);
-			Map<Integer, Integer> deposited = matching(c.deposited(), q, items);
-			List<String> parts = new ArrayList<>();
-			if (!took.isEmpty())
-			{
-				parts.add("took " + StorageLog.describe(took, items) + " from storage");
-			}
-			if (!deposited.isEmpty())
-			{
-				parts.add("deposited " + StorageLog.describe(deposited, items) + " into storage");
-			}
-			if (!parts.isEmpty())
-			{
-				String who = style.isYou(c.member()) ? "You" : c.member();
-				out.add(FindStyle.paint(who + " " + String.join(", ", parts), style.storage)
-					+ " (" + BoostText.ago(now, c.at()) + ")");
-			}
-		}
-		return out;
+			String who = style.isYou(c.member()) ? "You" : c.member();
+			return FindStyle.paint(who + " " + what, style.storage) + " (" + BoostText.ago(now, c.at()) + ")";
+		});
 	}
 
 	/**
@@ -190,6 +165,17 @@ final class GroupSearch
 	 * already newest first.
 	 */
 	static List<String> history(String query, List<StorageChange> log, ItemLookup items, long now, int limit)
+	{
+		return historyLines(query, log, items, limit,
+			(c, what) -> c.member() + " " + what + " (" + BoostText.ago(now, c.at()) + ")");
+	}
+
+	/**
+	 * The shared walk behind {@link #history} and {@link #historyStyled}:
+	 * {@code line} gets each matching visit and its "took ..., deposited ..." text.
+	 */
+	private static List<String> historyLines(String query, List<StorageChange> log, ItemLookup items, int limit,
+		BiFunction<StorageChange, String, String> line)
 	{
 		List<String> out = new ArrayList<>();
 		ItemQuery q = ItemQuery.parse(query);
@@ -216,7 +202,7 @@ final class GroupSearch
 			}
 			if (!parts.isEmpty())
 			{
-				out.add(c.member() + " " + String.join(", ", parts) + " (" + BoostText.ago(now, c.at()) + ")");
+				out.add(line.apply(c, String.join(", ", parts)));
 			}
 		}
 		return out;

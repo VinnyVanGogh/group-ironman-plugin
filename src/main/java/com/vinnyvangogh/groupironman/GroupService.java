@@ -785,24 +785,8 @@ class GroupService
 	/** Client thread. Run energy, special attack and location fire no StatChanged; poll the cheap ints. */
 	private void pollStats(GroupOutbox.Switches s)
 	{
-		int run = client.getEnergy() / 100;
-		int spec = client.getVarpValue(VarPlayerID.SA_ENERGY) / 10;
-		int world = client.getWorld();
-		WorldPoint at = position();
-		int region = at == null ? 0 : at.getRegionID();
-		int x = at == null ? 0 : at.getX();
-		int y = at == null ? 0 : at.getY();
-		int plane = at == null ? 0 : at.getPlane();
-		if (run != lastRun || spec != lastSpec || world != lastWorld || region != lastRegion
-			|| plane != lastPlane || Math.abs(x - lastX) + Math.abs(y - lastY) >= MOVE_TILES)
+		if (statsMoved())
 		{
-			lastRun = run;
-			lastSpec = spec;
-			lastWorld = world;
-			lastRegion = region;
-			lastX = x;
-			lastY = y;
-			lastPlane = plane;
 			statsDirty = true;
 		}
 		if (ticksSinceStats >= STATS_HEARTBEAT_TICKS)
@@ -816,6 +800,34 @@ class GroupService
 			statsDirty = false;
 			sendStats(s);
 		}
+	}
+
+	/** Records run, spec, world and position; true when any changed enough to resend. */
+	private boolean statsMoved()
+	{
+		int run = client.getEnergy() / 100;
+		int spec = client.getVarpValue(VarPlayerID.SA_ENERGY) / 10;
+		int world = client.getWorld();
+		WorldPoint p = position();
+		// Not placed yet: 0,0,0 (region 0), as before.
+		WorldPoint at = p == null ? new WorldPoint(0, 0, 0) : p;
+		int region = at.getRegionID();
+		int x = at.getX();
+		int y = at.getY();
+		int plane = at.getPlane();
+		if (run == lastRun && spec == lastSpec && world == lastWorld && region == lastRegion
+			&& plane == lastPlane && Math.abs(x - lastX) + Math.abs(y - lastY) < MOVE_TILES)
+		{
+			return false;
+		}
+		lastRun = run;
+		lastSpec = spec;
+		lastWorld = world;
+		lastRegion = region;
+		lastX = x;
+		lastY = y;
+		lastPlane = plane;
+		return true;
 	}
 
 	/** Someone joined and asked for a resend. */
