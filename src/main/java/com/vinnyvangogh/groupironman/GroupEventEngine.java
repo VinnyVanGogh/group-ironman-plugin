@@ -344,7 +344,7 @@ class GroupEventEngine
 			{
 				names.add(itemManager.getItemComposition(stack.getId()).getName());
 			}
-			dry.drop(event.getNpc().getName(), names);
+			dry.drop(event.getNpc().getName(), names, System.currentTimeMillis());
 			saveProfile(DRY_KEY, dry.save());
 		}
 	}
@@ -418,9 +418,8 @@ class GroupEventEngine
 		}
 		if (wanted(GroupEvent.Type.DRY_STREAK))
 		{
-			GroupEvent streak = dry.kill(count.name, now, me);
+			dry.kill(count.name, now, me);
 			saveProfile(DRY_KEY, dry.save());
-			own(streak);
 		}
 	}
 
@@ -640,6 +639,7 @@ class GroupEventEngine
 		{
 			clueReward(now);
 		}
+		dry.due(now).forEach(this::own);
 		watch(now, me);
 	}
 

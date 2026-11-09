@@ -1,64 +1,110 @@
 package com.vinnyvangogh.groupironman;
 
 import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class DryStreakTest
 {
 	private static final int RATE = DryStreak.RATES.get("zulrah").oneIn;
 
-	private static GroupEvent killTo(DryStreak d, int kills)
+	private static final long AFTER_HOLD = NOW + DryStreak.HOLD_MS + 1;
+	private static final Set<String> UNIQUE = Collections.singleton("Tanzanite fang");
+
+	private static void killTo(DryStreak d, int kills)
 	{
-		GroupEvent last = null;
 		for (int i = 0; i < kills; i++)
 		{
-			last = d.kill("Zulrah", NOW, "Alex");
+			d.kill("Zulrah", NOW, "Alex");
 		}
-		return last;
 	}
 
 	@Test
 	public void callsOutOnceAtEachMultipleOfTheRate()
 	{
 		DryStreak d = DryStreak.parse("");
-		assertNull(killTo(d, RATE - 1));
-		GroupEvent e = d.kill("Zulrah", NOW, "Alex");
-		assertNotNull(e);
+		killTo(d, RATE - 1);
+		assertTrue(d.due(AFTER_HOLD).isEmpty());
+		d.kill("Zulrah", NOW, "Alex");
+		List<GroupEvent> out = d.due(AFTER_HOLD);
+		assertEquals(1, out.size());
+		GroupEvent e = out.get(0);
 		assertEquals(GroupEvent.Type.DRY_STREAK, e.type);
 		assertEquals("Zulrah", e.text);
 		assertEquals(RATE, e.number);
-		assertNull("not again on the next kill", d.kill("Zulrah", NOW, "Alex"));
-		assertEquals(2L * RATE, killTo(d, RATE - 1).number);
+		assertTrue("fires once", d.due(AFTER_HOLD).isEmpty());
+		d.kill("Zulrah", NOW, "Alex");
+		assertTrue("not again on the next kill", d.due(AFTER_HOLD).isEmpty());
+		killTo(d, RATE - 1);
+		assertEquals(2L * RATE, d.due(AFTER_HOLD).get(0).number);
 	}
 
 	@Test
-	public void theUniqueResetsTheStreak()
+	public void theCallOutWaitsForTheKillsLoot()
+	{
+		DryStreak d = DryStreak.parse("");
+		killTo(d, RATE);
+		assertTrue(d.due(NOW).isEmpty());
+		assertTrue(d.due(NOW + DryStreak.HOLD_MS).isEmpty());
+		assertEquals(1, d.due(AFTER_HOLD).size());
+	}
+
+	@Test
+	public void aUniqueOnTheCallOutKillCancelsIt_lineFirst()
+	{
+		DryStreak d = DryStreak.parse("");
+		killTo(d, RATE);
+		d.drop("Zulrah", UNIQUE, NOW + 1000);
+		assertTrue(d.due(AFTER_HOLD).isEmpty());
+		assertEquals(0, d.kills("Zulrah"));
+	}
+
+	@Test
+	public void aUniqueOnTheCallOutKillCancelsIt_lootFirst()
 	{
 		DryStreak d = DryStreak.parse("");
 		killTo(d, RATE - 1);
-		d.drop("Zulrah", Collections.singleton("Tanzanite fang"));
-		assertNull(d.kill("Zulrah", NOW, "Alex"));
-		assertEquals(1, d.kills("Zulrah"));
+		d.drop("Zulrah", UNIQUE, NOW);
+		d.kill("Zulrah", NOW + 1000, "Alex");
+		assertTrue(d.due(AFTER_HOLD + 1000).isEmpty());
+		assertEquals("the line belongs to the kill that gave the unique", 0, d.kills("Zulrah"));
+	}
+
+	@Test
+	public void theNextKillAfterAUniqueCountsOne()
+	{
+		DryStreak d = DryStreak.parse("");
+		d.drop("Zulrah", UNIQUE, NOW);
+		d.kill("Zulrah", AFTER_HOLD, "Alex");
+		assertEquals("a unique whose line never came does not eat a later kill", 1, d.kills("Zulrah"));
+
+		DryStreak lineFirst = DryStreak.parse("");
+		killTo(lineFirst, 3);
+		lineFirst.drop("Zulrah", UNIQUE, NOW + 1000);
+		lineFirst.kill("Zulrah", NOW + 2000, "Alex");
+		assertEquals("line then loot leaves nothing behind", 1, lineFirst.kills("Zulrah"));
 	}
 
 	@Test
 	public void otherDropsDoNotReset()
 	{
 		DryStreak d = DryStreak.parse("");
-		killTo(d, 5);
-		d.drop("Zulrah", Collections.singleton("Zulrah's scales"));
-		assertEquals(5, d.kills("Zulrah"));
+		killTo(d, RATE);
+		d.drop("Zulrah", Collections.singleton("Zulrah's scales"), NOW + 1000);
+		assertEquals(RATE, d.kills("Zulrah"));
+		assertEquals("nor cancel the call-out", 1, d.due(AFTER_HOLD).size());
 	}
 
 	@Test
 	public void bossesWithoutARateAreNotTracked()
 	{
 		DryStreak d = DryStreak.parse("");
-		assertNull(d.kill("Goblin", NOW, "Alex"));
+		d.kill("Goblin", NOW, "Alex");
+		assertTrue(d.due(AFTER_HOLD).isEmpty());
 		assertEquals(0, d.kills("Goblin"));
 	}
 
