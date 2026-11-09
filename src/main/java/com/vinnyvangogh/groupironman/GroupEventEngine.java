@@ -681,11 +681,14 @@ class GroupEventEngine
 	{
 		ZoneId zone = ZoneId.systemDefault();
 		int hour = settings.digestHour;
-		long lastDigest = savedTime(DIGEST_LAST_KEY, now);
-		if (Digest.dailyDue(lastDigest, now, hour, zone))
+		if (!settings.digest.isEmpty())
 		{
-			flushDigest();
-			saveProfile(DIGEST_LAST_KEY, Long.toString(now));
+			long lastDigest = savedTime(DIGEST_LAST_KEY, now);
+			if (Digest.dailyDue(lastDigest, now, hour, zone))
+			{
+				flushDigest();
+				saveProfile(DIGEST_LAST_KEY, Long.toString(now));
+			}
 		}
 		if (!wanted(GroupEvent.Type.WEEKLY_RECAP))
 		{
@@ -731,7 +734,11 @@ class GroupEventEngine
 		for (GroupEvent.Category category : settings.digest)
 		{
 			String url = DiscordWebhook.route(category, overrides, config.discordWebhookUrl());
-			sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category)), null);
+			// Draining first would lose held lines when the webhook has been cleared.
+			if (url != null)
+			{
+				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category)), null);
+			}
 		}
 		saveProfile(DIGEST_KEY, digest.save());
 	}
