@@ -21,7 +21,13 @@ jobs:
           cache: gradle
 
       - run: chmod +x ./gradlew
-      - run: ./gradlew build --no-daemon
+      - run: |
+          set -o pipefail
+          ./gradlew build --no-daemon --console=plain 2>&1 | tee gradle.log
+
+      - if: failure()
+        run: |
+          grep -E 'error:|FAILED|symbol:|location:|AssertionError|ComparisonFailure|Exception' gradle.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
 
       # The Plugin Hub builds against its current client, which can be ahead
       # of the pin in build.gradle.
