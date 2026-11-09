@@ -68,7 +68,10 @@ public class ConfigKeysTest
 		}
 		for (Method m : items())
 		{
-			assertTrue(m.getName() + " is never read", code.contains("config." + m.getName() + "()"));
+			// EventSettings reads the per-event switches as method references.
+			assertTrue(m.getName() + " is never read", code.contains("config." + m.getName() + "()")
+				|| code.contains("GroupIronmanConfig::" + m.getName() + ",")
+				|| code.contains("GroupIronmanConfig::" + m.getName() + ")"));
 		}
 	}
 

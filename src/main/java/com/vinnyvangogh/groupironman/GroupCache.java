@@ -82,7 +82,7 @@ final class GroupCache
 		for (GroupEvent e : roster.events().entries())
 		{
 			JsonObject entry = new JsonObject();
-			entry.addProperty("t", e.type == GroupEvent.Type.DROP ? "d" : "c");
+			entry.addProperty("t", e.type.code);
 			entry.addProperty("ts", e.at);
 			entry.addProperty("by", e.member);
 			entry.addProperty("s", e.text);
@@ -251,19 +251,13 @@ final class GroupCache
 					continue;
 				}
 				JsonObject entry = item.getAsJsonObject();
-				Long ts = ItemCounts.longValue(entry.get("ts"));
-				JsonElement t = entry.get("t");
 				JsonElement by = entry.get("by");
-				JsonElement s = entry.get("s");
-				if (ts == null || t == null || !t.isJsonPrimitive() || by == null || !by.isJsonPrimitive()
-					|| s == null || !s.isJsonPrimitive())
+				GroupEvent event = by == null || !by.isJsonPrimitive() ? null
+					: GroupCodec.eventFrom(entry, by.getAsString());
+				if (event != null && event.type.logged())
 				{
-					continue;
+					roster.events().add(event);
 				}
-				roster.events().add("d".equals(t.getAsString())
-					? GroupEvent.drop(ts, by.getAsString(), s.getAsString(),
-						ItemCounts.fromJson(entry.get("i"), GroupEvent.MAX_DROP_ITEMS))
-					: GroupEvent.clog(ts, by.getAsString(), s.getAsString()));
 			}
 		}
 

@@ -34,8 +34,9 @@ import net.runelite.client.ui.NavigationButton;
  * markers. The features live in {@link GroupService}, which this plugin
  * registers on the event bus; this class owns the side panel and its button.
  *
- * <p>Party traffic goes only through RuneLite's own {@code PartyService}; this
- * plugin makes no network calls of its own and runs no server. It joins the
+ * <p>Party traffic goes only through RuneLite's own {@code PartyService}. The
+ * plugin's only network call of its own is the optional Discord webhook the
+ * player sets ({@link GroupEventEngine}); it runs no server. It joins the
  * group's party by itself once there is a group key, so the Party plugin can
  * stay off. The key travels outside the game: "Copy group key" puts it on the
  * computer's clipboard for the player to send (e.g. in Discord) and "Paste
@@ -66,6 +67,9 @@ public class GroupIronmanPlugin extends Plugin
 
 	@Inject
 	private GroupService group;
+
+	@Inject
+	private GroupEventEngine events;
 
 	@Inject
 	private MemberMapMarkers markers;
@@ -153,6 +157,8 @@ public class GroupIronmanPlugin extends Plugin
 			.panel(panel)
 			.build();
 		group.startUp(this::redraw);
+		events.startUp(group);
+		eventBus.register(events);
 		updateNavButton();
 	}
 
@@ -160,6 +166,8 @@ public class GroupIronmanPlugin extends Plugin
 	protected void shutDown()
 	{
 		wsClient.unregisterMessage(VvgGroupIronmanMessage.class);
+		eventBus.unregister(events);
+		events.shutDown();
 		eventBus.unregister(group);
 		group.shutDown();
 		partyDataService.unsubscribe(this, PartyDataType.values());
@@ -177,6 +185,7 @@ public class GroupIronmanPlugin extends Plugin
 			return;
 		}
 		group.reloadConfig();
+		events.reloadConfig();
 		updateNavButton();
 	}
 

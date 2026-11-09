@@ -24,10 +24,24 @@ to share, and only sees other members' data for what they share themselves.
   collection log slots since you last played.
 - Storage minimums with a desktop notification, and optional world map
   markers.
+- **Group events** (new, every one its own switch): valuable drops, pets, new
+  collection log slots, untradeable uniques, deaths, big storage deposits and
+  withdrawals, storage visit summaries, storage minimums, "took the last one",
+  level ups, 99s and max total, XP milestones, combat and total level, quests
+  and quest points, online / offline, "back after a break", and Barrows
+  chests. Each can go to:
+  - **Discord**, through a webhook you set (one per category if you like),
+    as rich embeds or plain text, with an optional screenshot, a mention for
+    big events, and quiet hours. Each member's client posts only that
+    member's own events, so nothing is posted twice.
+  - **In-game banners**, yours and your group's, plus an optional group box
+    with who is online and the latest events.
 
-No server and no network calls of its own: party data goes only through
-RuneLite's Party service, and only names on your in-game group roster are
-shown.
+No server of its own. Party data goes only through RuneLite's Party service,
+and only names on your in-game group roster are shown. **Only the optional
+Discord webhook you set** is a network call of the plugin's own: it is off
+until you turn on *Post to Discord* and paste a webhook URL, and it sends your
+own events and your IP address to Discord.
 
 ## Quick start
 
@@ -49,7 +63,8 @@ Anyone with the key can join your sync, so keep it inside your group.
   load their party servers). We may add auto-join once we have our own
   hosting for group sync; that would be optional, and the Plugin Hub would
   mark the plugin as using a third-party service.
-- Optional posts to your group's Discord (drops, storage changes, level-ups).
+- More group events (raids, clues, diaries, combat tasks and others), and
+  banners that only show where they matter.
 
 ## License
 

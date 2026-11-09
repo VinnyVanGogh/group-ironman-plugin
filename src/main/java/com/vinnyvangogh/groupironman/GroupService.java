@@ -162,6 +162,8 @@ class GroupService
 	private final Map<Integer, Integer> slots = new ConcurrentHashMap<>();
 	private Runnable onChange = () -> { };
 	private GroupSync sync;
+	/** The group event engine, told about storage visits, minimums and members' events; null when not running. */
+	private volatile GroupEventEngine events;
 
 	private volatile LowStock lowStock = LowStock.parse("");
 	private volatile GroupMembers members = GroupMembers.UNKNOWN;
@@ -278,6 +280,36 @@ class GroupService
 	GroupRoster roster()
 	{
 		return roster;
+	}
+
+	void events(GroupEventEngine engine)
+	{
+		events = engine;
+	}
+
+	/** This player's name, as events are filed under it. */
+	String localPlayer()
+	{
+		return localName();
+	}
+
+	/** Client thread. Names and prices for items an event is about to describe. */
+	void resolveItems(Collection<Integer> ids)
+	{
+		resolveNow(ids);
+	}
+
+	/** Client thread. One of this player's group events (not a drop or log slot) for the party, when shared. */
+	void shareGroupEvent(GroupEvent event, boolean share)
+	{
+		if (!syncing())
+		{
+			return;
+		}
+		for (String payload : GroupOutbox.groupEvents(gson, share, Collections.singletonList(event)))
+		{
+			partyService.send(new VvgGroupIronmanMessage(payload));
+		}
 	}
 
 	GroupOutbox.Switches switches()
@@ -922,6 +954,7 @@ class GroupService
 					resolve(change.took().keySet());
 					resolve(change.deposited().keySet());
 					checkLowStock(change.after());
+					memberStorage(change);
 					saveCache();
 				}
 				break;
@@ -949,22 +982,9 @@ class GroupService
 				}
 				break;
 			case EVENTS:
-				if (!s.drops)
+				if (!receiveEvents(name, decoded.events, s))
 				{
 					return;
-				}
-				boolean added = false;
-				for (GroupEvent e : decoded.events)
-				{
-					if (roster.events().add(e.withMember(name)))
-					{
-						resolve(e.items.keySet());
-						added = true;
-					}
-				}
-				if (added)
-				{
-					saveCache();
 				}
 				break;
 			default:
@@ -973,6 +993,53 @@ class GroupService
 		// Anything accepted from a member means their client is running and in the party.
 		roster.heard(name, now);
 		onChange.run();
+	}
+
+	/**
+	 * A member's events. Drops and log slots go in the log under the drops
+	 * switch, as in 1.0.0; the rest only under "Share group events". Each new
+	 * one goes on to the engine for the overlays. False when this client
+	 * takes none of them, so the member is not marked heard.
+	 */
+	private boolean receiveEvents(String name, List<GroupEvent> received, GroupOutbox.Switches s)
+	{
+		boolean share = config.groupShareEvents();
+		if (!s.drops && !share)
+		{
+			return false;
+		}
+		boolean added = false;
+		GroupEventEngine engine = events;
+		for (GroupEvent e : received)
+		{
+			GroupEvent mine = e.withMember(name);
+			boolean logged = e.type.logged();
+			if (logged ? !s.drops || !roster.events().add(mine) : !share)
+			{
+				continue;
+			}
+			resolve(e.items.keySet());
+			added |= logged;
+			if (engine != null)
+			{
+				engine.member(mine);
+			}
+		}
+		if (added)
+		{
+			saveCache();
+		}
+		return true;
+	}
+
+	private void memberStorage(StorageChange change)
+	{
+		GroupEventEngine engine = events;
+		if (engine != null)
+		{
+			// Names resolve on the client thread; the value of a big move needs them.
+			clientThread.invokeLater(() -> engine.storage(change, false));
+		}
 	}
 
 	/**
@@ -991,7 +1058,12 @@ class GroupService
 		resolveNow(change.deposited().keySet());
 
 		// Minimums are checked on every own save, shared or not: the alert is for this player.
-		checkLowStockNow(change.after());
+		checkLowStockNow(change.after(), true);
+		GroupEventEngine engine = events;
+		if (engine != null)
+		{
+			engine.storage(change, true);
+		}
 
 		GroupOutbox.Switches s = switches();
 		if (!s.storage)
@@ -1185,20 +1257,25 @@ class GroupService
 			return;
 		}
 		// Names only resolve on the client thread, and the check matches by name.
-		clientThread.invokeLater(() -> checkLowStockNow(storage));
+		clientThread.invokeLater(() -> checkLowStockNow(storage, false));
 	}
 
-	/** Client thread. */
-	private void checkLowStockNow(Map<Integer, Integer> storage)
+	/** Client thread. {@code own}: this player's visit, the one whose client posts the event. */
+	private void checkLowStockNow(Map<Integer, Integer> storage, boolean own)
 	{
 		if (lowStock.isEmpty())
 		{
 			return;
 		}
 		resolveNow(storage.keySet());
+		GroupEventEngine engine = events;
 		for (LowStock.Alert alert : lowStock.check(storage, lookup))
 		{
 			notifier.notify(GroupIronmanPlugin.NAME + ": " + alert.message());
+			if (engine != null)
+			{
+				engine.minimum(alert, own);
+			}
 		}
 	}
 

@@ -1,6 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -94,6 +95,28 @@ final class GroupOutbox
 			return null;
 		}
 		return GroupCodec.encodeExtras(gson, extras);
+	}
+
+	/**
+	 * Pets, deaths, levels, quests, logins and Barrows chests: empty unless
+	 * "Share group events" is on. Drops and collection log slots never go
+	 * this way; they keep their own switch, {@link #events}.
+	 */
+	static List<String> groupEvents(Gson gson, boolean share, List<GroupEvent> events)
+	{
+		if (!share || events == null)
+		{
+			return Collections.emptyList();
+		}
+		List<GroupEvent> kept = new ArrayList<>();
+		for (GroupEvent e : events)
+		{
+			if (e.type.travels() && !e.type.logged())
+			{
+				kept.add(e);
+			}
+		}
+		return GroupCodec.encodeEvents(gson, kept);
 	}
 
 	/** Empty when drop sharing is off or there is nothing to send. */
