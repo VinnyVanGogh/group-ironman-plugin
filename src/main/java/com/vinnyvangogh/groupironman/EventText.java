@@ -26,6 +26,8 @@ final class EventText
 	/** "Your Vorkath kill count is: 120." and "Your Barrows chest count is: 41." */
 	private static final Pattern KILL_COUNT = Pattern.compile(
 		"^Your (.+?) (?:kill|chest|success|completion|completed) count is: ?([0-9,]+)\\.?$");
+	/** "Your completed Chambers of Xeric count is: 12." The word order is unverified: see {@link EventChat}. */
+	private static final Pattern RAID_COUNT = Pattern.compile("^Your completed (.+?) count is: ?([0-9,]+)\\.?$");
 	/** "You have completed Cook's Assistant!" and "You have completed the Restless Ghost Quest!" */
 	private static final Pattern QUEST = Pattern.compile(
 		"^You (?:have|'ve) (?:completed|been|rebuilt|achieved|helped|defeated|restored|freed|found|learned|solved)"
@@ -69,6 +71,33 @@ final class EventText
 		line(GroupEvent.Type.BACK, "Back", (e, l) -> "is back after " + e.number + (e.number == 1 ? " day" : " days"));
 		line(GroupEvent.Type.BARROWS, "Barrows chest", (e, l) -> "Barrows chest" + (e.number > 0 ? " " + e.number : "")
 			+ ": " + items(e, l) + (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
+		line(GroupEvent.Type.RAID_UNIQUE, "Raid unique", (e, l) -> "purple! " + e.text
+			+ (e.number > 0 ? ", raid count " + e.number : "") + (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
+		line(GroupEvent.Type.CLUE, "Clue reward", (e, l) -> e.text + " clue reward: " + items(e, l)
+			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
+		line(GroupEvent.Type.DRY_STREAK, "Dry streak", (e, l) -> e.number + " " + e.text + " kills without a unique"
+			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
+		line(GroupEvent.Type.DEATH_VALUE, "Lost on death", EventText::deathValue);
+		line(GroupEvent.Type.GRAVESTONE_EXPIRING, "Gravestone expiring", (e, l) -> "gravestone"
+			+ (e.location.isEmpty() ? "" : " at " + e.location) + (e.world > 0 ? " on world " + e.world : "")
+			+ " has about " + e.number + " min left");
+		line(GroupEvent.Type.HC_LIFE_LOST, "Group life lost", (e, l) -> "lost a Hardcore group life, " + e.number
+			+ (e.number == 1 ? " life" : " lives") + " left");
+		line(GroupEvent.Type.WILDERNESS, "Wilderness", (e, l) -> e.text);
+		line(GroupEvent.Type.DIARY, "Achievement diary", (e, l) -> "completed the " + e.text + " diary");
+		line(GroupEvent.Type.COMBAT_TASK, "Combat achievement", (e, l) -> "combat task: " + e.text
+			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
+		line(GroupEvent.Type.KC_MILESTONE, "Kill count milestone", (e, l) -> e.number + " " + e.text + " kills");
+		line(GroupEvent.Type.PERSONAL_BEST, "New personal best", (e, l) -> "new personal best: " + e.text);
+		line(GroupEvent.Type.WEEKLY_RECAP, "Weekly recap", (e, l) -> "this week: +" + BoostText.gp(e.number) + " XP, "
+			+ e.text);
+		line(GroupEvent.Type.SLAYER, "Slayer", (e, l) -> "slayer " + e.text + (e.number > 0 ? " (" + e.number + ")" : ""));
+	}
+
+	private static String deathValue(GroupEvent e, ItemLookup lookup)
+	{
+		return "lost about " + BoostText.gp(e.number) + " gp on death" + (e.location.isEmpty() ? "" : " at " + e.location)
+			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")");
 	}
 
 	private EventText()
@@ -186,10 +215,15 @@ final class EventText
 	/** A kill or chest count line: the name ("Vorkath", "Barrows") and the count; null when not one. */
 	static Count killCount(String message)
 	{
-		Matcher m = KILL_COUNT.matcher(plain(message));
+		String text = plain(message);
+		Matcher m = KILL_COUNT.matcher(text);
 		if (!m.matches())
 		{
-			return null;
+			m = RAID_COUNT.matcher(text);
+			if (!m.matches())
+			{
+				return null;
+			}
 		}
 		try
 		{

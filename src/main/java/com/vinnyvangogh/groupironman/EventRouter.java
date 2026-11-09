@@ -58,6 +58,8 @@ final class EventRouter
 					}
 				}
 				return valuable.isEmpty() ? null : event.toBuilder().items(valuable).build();
+			case CLUE:
+				return event.number >= settings.clueMin ? event : null;
 			case LEVEL_UP:
 				return event.number >= settings.levelMin ? event : null;
 			case STORAGE_DEPOSIT:

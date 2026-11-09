@@ -73,7 +73,20 @@ final class GroupEvent
 		QUEST_POINTS("qp", Category.PROGRESS, Need.NOTHING, false),
 		ONLINE("on", Category.GROUP, Need.TEXT, false),
 		BACK("bk", Category.GROUP, Need.NOTHING, false),
-		BARROWS("br", Category.ACTIVITIES, Need.ITEMS, false);
+		BARROWS("br", Category.ACTIVITIES, Need.ITEMS, false),
+		RAID_UNIQUE("ru", Category.DROPS, Need.TEXT, true),
+		CLUE("cl", Category.ACTIVITIES, Need.TEXT, false),
+		DRY_STREAK("dr", Category.DROPS, Need.TEXT, false),
+		DEATH_VALUE("dv", Category.DEATHS, Need.NOTHING, false),
+		GRAVESTONE_EXPIRING("ge", Category.DEATHS, Need.NOTHING, false),
+		HC_LIFE_LOST("hl", Category.DEATHS, Need.NOTHING, true),
+		WILDERNESS("wl", Category.GROUP, Need.TEXT, false),
+		DIARY("di", Category.PROGRESS, Need.TEXT, false),
+		COMBAT_TASK("ca", Category.PROGRESS, Need.TEXT, false),
+		KC_MILESTONE("km", Category.ACTIVITIES, Need.TEXT, false),
+		PERSONAL_BEST("pb", Category.ACTIVITIES, Need.TEXT, false),
+		WEEKLY_RECAP("wr", Category.GROUP, Need.TEXT, false),
+		SLAYER("sy", Category.ACTIVITIES, Need.TEXT, false);
 
 		private static final Map<String, Type> BY_CODE = new HashMap<>();
 

@@ -220,6 +220,41 @@ messages ~:111-113, kill count ~:102, quest title ~:286). Storage events are
 derived from the storage change each member already shares (#9), so they
 never cross the party themselves.
 
+### Phase 0 addendum — medium events, part C (2026-11-09)
+
+Board, 2026-11-04. Every kind is the player's own, off by default, one Discord
+and one overlay switch each, and is read only from chat lines, varbits and
+events the game gives this client. No reflection and no network beyond #18.
+
+**Status of the evidence.** RuneLite core and Dink sources could not be read in
+this run: the download and the client jar inspection are held for the Board
+(gates `d438e539fb5a5d76ef3eaa5f`, `6f83adf23933ee15dcea1391`,
+`8478e7e747a1ddd1e14be5b8`). So "unverified" below means written from memory,
+never checked against source or the live game. A wrong line fails silent. Names
+marked gameval were read from `runelite-api` 1.13.5; what each value means is
+assumed from its name.
+
+| # | Kind | Detected from | Nearest rule and note | Evidence |
+| --- | --- | --- | --- | --- |
+| 4 | Raid unique | "found something special", Chambers' "Special loot:" lines | Data & Privacy, #18: only when the line names this player; team members outside the group are counted, never named | Unverified wording |
+| 5 | Clue reward, counts by tier | "You have completed N tier Treasure Trails", reward container | As #20 | Unverified wording |
+| 7 | Dry streak | Kill count line, drop names | Adds no game information; display of past kills | Wiki rates read 2026-11-09, Vorkath and Zulrah only (`DryStreak`) |
+| 9 | Value lost on death, gravestone | `ActorDeath`, carried items before and after | Own items only | [Gravestone](https://oldschool.runescape.wiki/w/Gravestone): 15 min, paused logged out |
+| 10 | Gravestone expiring | Tick count, `GRAVESTONE_VISIBLE` | Own grave only. Idle pauses are not modelled, so it warns early, never late | Gameval name; meaning assumed |
+| 11 | Hardcore life lost | `GIM_HARDCORE_DEATHS`, `GIM_GROUPSIZE` | Own group's own varbits | Gameval names; [one life per player](https://oldschool.runescape.wiki/w/Group_Ironman_Mode) |
+| 12 | Wilderness, skulled | `INSIDE_WILDERNESS`, own skull icon | PvP Restrictions: this player's own state only, nothing about any opponent. Situational overlays are display only | Gameval name |
+| 30 | Diary tier | `*_DIARY_*_COMPLETE`, `ATJUN_*_DONE` | Own progress | Gameval names; `ATJUN_HARD_DONE` not confirmed |
+| 31 | Combat task | "you've completed an X combat task" | Own progress. Tier is the task's tier, not the overall rank | Unverified wording |
+| 32 | KC milestone | Kill count line (#20) | Not an attack counter: a total after the kill | As #20 |
+| 33 | Personal best | "(new personal best)" | Own time, after the fight | Unverified wording |
+| 36 | Weekly recap | This player's own tally | **Corrected from the brief:** #18 forbids posting another player's data, so each member posts their own week, not one group total | Pure logic |
+| 37 | Daily digest | Held own lines, per category | Sent only while logged in | Pure logic |
+| 39 | Slayer | "You've completed N tasks", "new Slayer assignment" | Own task | Unverified wording |
+
+**Not built: #40 farming and #41 birdhouses / Hespori.** Both need Time
+Tracking's `PatchImplementation` and `BirdHouseTracker` tables, held above.
+Guessing a varbit table would report crops ready when they are not.
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection**, and therefore any integration that reads another plugin's
