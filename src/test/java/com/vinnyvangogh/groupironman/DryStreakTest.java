@@ -67,7 +67,11 @@ public class DryStreakTest
 	public void aUniqueOnTheCallOutKillCancelsIt_lootFirst()
 	{
 		DryStreak d = DryStreak.parse("");
-		killTo(d, RATE - 1);
+		long earlierKill = NOW - DryStreak.HOLD_MS - 1;
+		for (int i = 0; i < RATE - 1; i++)
+		{
+			d.kill("Zulrah", earlierKill, "Alex");
+		}
 		d.drop("Zulrah", UNIQUE, NOW);
 		d.kill("Zulrah", NOW + 1000, "Alex");
 		assertTrue(d.due(AFTER_HOLD + 1000).isEmpty());
