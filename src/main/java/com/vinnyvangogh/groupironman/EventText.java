@@ -92,6 +92,13 @@ final class EventText
 		line(GroupEvent.Type.WEEKLY_RECAP, "Weekly recap", (e, l) -> "this week: +" + BoostText.gp(e.number) + " XP, "
 			+ e.text);
 		line(GroupEvent.Type.SLAYER, "Slayer", (e, l) -> "slayer " + e.text + (e.number > 0 ? " (" + e.number + ")" : ""));
+		line(GroupEvent.Type.FARMING, "Farming run", (e, l) -> ready(e));
+		line(GroupEvent.Type.BIRDHOUSE, "Bird houses and Hespori", (e, l) -> ready(e));
+	}
+
+	private static String ready(GroupEvent e)
+	{
+		return e.text + " ready" + (e.detail.isEmpty() ? "" : ": " + e.detail);
 	}
 
 	private static String deathValue(GroupEvent e, ItemLookup lookup)

@@ -88,7 +88,7 @@ public class PluginIdentityTest
 		// round 2): it does nothing without a group key, and even with one nothing is sent until the player
 		// presses Join. Part A of the group events adds 44 more, every one off: "Share group events", "Post to
 		// Discord", "Attach a screenshot", "Group box", and a Discord and an overlay switch per event kind.
-		// Part C adds 13 kinds (a Discord and an overlay switch each) and one digest switch per category.
+		// Part C adds 15 kinds (a Discord and an overlay switch each) and one digest switch per category.
 		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length, switches);
 		assertEquals(86, switches);
 		assertEquals(Collections.singletonList("groupSync"), on);

@@ -226,11 +226,10 @@ Board, 2026-11-04. Every kind is the player's own, off by default, one Discord
 and one overlay switch each, and is read only from chat lines, varbits and
 events the game gives this client. No reflection and no network beyond #18.
 
-**Status of the evidence.** RuneLite core and Dink sources could not be read in
-this run: the download and the client jar inspection are held for the Board
-(gates `d438e539fb5a5d76ef3eaa5f`, `6f83adf23933ee15dcea1391`,
-`8478e7e747a1ddd1e14be5b8`). So "unverified" below means written from memory,
-never checked against source or the live game. A wrong line fails silent. Names
+**Status of the evidence.** RuneLite's Time Tracking sources were read for #40
+and #41. The chat wording was not checked against RuneLite core or Dink sources.
+So "unverified" below means written from memory, never checked against source
+or the live game. A wrong line fails silent. Names
 marked gameval were read from `runelite-api` 1.13.5; what each value means is
 assumed from its name.
 
@@ -250,10 +249,13 @@ assumed from its name.
 | 36 | Weekly recap | This player's own tally | **Corrected from the brief:** #18 forbids posting another player's data, so each member posts their own week, not one group total | Pure logic |
 | 37 | Daily digest | Held own lines, per category | Sent only while logged in | Pure logic |
 | 39 | Slayer | "You've completed N tasks", "new Slayer assignment" | Own task | Unverified wording |
+| 40 | Farming runs ready (herbs, trees) | `FARMING_TRANSMIT_*`, read only in the patch's own region | Own patches only. *Precedent:* the base client's Time Tracking plugin reports the same. Fruit trees and other patch types not included | Time Tracking source, master, read 2026-11-09 (THIRD_PARTY_NOTICES.md). Not checked in game |
+| 41 | Bird houses, Hespori | `BIRDHOUSE_TRANSMIT_*` on Fossil Island's ground, `FARMING_TRANSMIT_J` | Own patches only, as #40 | As #40 |
 
-**Not built: #40 farming and #41 birdhouses / Hespori.** Both need Time
-Tracking's `PatchImplementation` and `BirdHouseTracker` tables, held above.
-Guessing a varbit table would report crops ready when they are not.
+Crop ready times use Time Tracking's formula without its learned per-account
+offset, so a crop's post can come late but not early. Bird houses use Time
+Tracking's 50 minute average. A crop that catches disease out of sight is still
+reported, as it is in Time Tracking.
 
 ### Out of scope — do not implement, do not propose workarounds
 

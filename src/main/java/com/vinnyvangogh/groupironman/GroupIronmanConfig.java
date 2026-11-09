@@ -888,6 +888,20 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "discordFarming", name = "Farming runs ready", description = "Your herb or tree patches have"
+		+ " finished growing, going by when you last saw them.", section = mediumDiscordSection, position = 13)
+	default boolean discordFarming()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordBirdhouse", name = "Bird houses, Hespori", description = "Your bird houses or Hespori"
+		+ " have finished, going by when you last saw them.", section = mediumDiscordSection, position = 14)
+	default boolean discordBirdhouse()
+	{
+		return false;
+	}
+
 	@ConfigItem(keyName = "overlayRaidUnique", name = "Raid unique", description = "A raid purple.",
 		section = mediumOverlaySection, position = 0)
 	default boolean overlayRaidUnique()
@@ -975,6 +989,20 @@ public interface GroupIronmanConfig extends Config
 	@ConfigItem(keyName = "overlaySlayer", name = "Slayer task", description = "A task done, and a new task.",
 		section = mediumOverlaySection, position = 12)
 	default boolean overlaySlayer()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayFarming", name = "Farming runs ready", description = "Your herb or tree patches have"
+		+ " finished growing, going by when you last saw them.", section = mediumOverlaySection, position = 13)
+	default boolean overlayFarming()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayBirdhouse", name = "Bird houses, Hespori", description = "Your bird houses or Hespori"
+		+ " have finished, going by when you last saw them.", section = mediumOverlaySection, position = 14)
+	default boolean overlayBirdhouse()
 	{
 		return false;
 	}

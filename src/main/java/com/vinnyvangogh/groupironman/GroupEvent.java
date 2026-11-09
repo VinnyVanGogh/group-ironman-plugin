@@ -86,7 +86,9 @@ final class GroupEvent
 		KC_MILESTONE("km", Category.ACTIVITIES, Need.TEXT, false),
 		PERSONAL_BEST("pb", Category.ACTIVITIES, Need.TEXT, false),
 		WEEKLY_RECAP("wr", Category.GROUP, Need.TEXT, false),
-		SLAYER("sy", Category.ACTIVITIES, Need.TEXT, false);
+		SLAYER("sy", Category.ACTIVITIES, Need.TEXT, false),
+		FARMING("fr", Category.ACTIVITIES, Need.TEXT, false),
+		BIRDHOUSE("bh", Category.ACTIVITIES, Need.TEXT, false);
 
 		private static final Map<String, Type> BY_CODE = new HashMap<>();
 

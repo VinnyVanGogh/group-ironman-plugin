@@ -90,6 +90,7 @@ class GroupEventEngine
 	static final String DIGEST_KEY = "digestLines";
 	static final String DIGEST_LAST_KEY = "digestLastAt";
 	static final String RECAP_LAST_KEY = "recapLastAt";
+	static final String FARM_KEY = "farmTimers";
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
 		GroupEvent.Type.WILDERNESS, GroupEvent.Type.HC_LIFE_LOST);
 
@@ -132,6 +133,7 @@ class GroupEventEngine
 	private volatile Digest digest = new Digest();
 	private DryStreak dry = DryStreak.parse("");
 	private Digest.Week week = Digest.Week.parse("");
+	private FarmRuns farm = new FarmRuns(this::own, this::wanted);
 	private int varWait = -1;
 	private int scheduleTicks;
 	private DiscordSender sender;
@@ -669,6 +671,7 @@ class GroupEventEngine
 		{
 			watchers.graveTick(client.getVarbitValue(VarbitID.GRAVESTONE_VISIBLE), settings.graveWarnMinutes, now, name);
 		}
+		farmTick(now, me);
 		if (++scheduleTicks >= SCHEDULE_EVERY_TICKS)
 		{
 			scheduleTicks = 0;
@@ -676,9 +679,31 @@ class GroupEventEngine
 		}
 	}
 
+	/** Reads the patches and bird houses where the player is standing, when either kind is switched on. */
+	private void farmTick(long now, Player me)
+	{
+		if (wanted(GroupEvent.Type.FARMING) || wanted(GroupEvent.Type.BIRDHOUSE))
+		{
+			WorldPoint at = me.getWorldLocation();
+			farm.observe(at.getRegionID(), at.getX(), at.getY(), at.getPlane(), client::getVarbitValue,
+				client::getVarpValue, now / 1000L);
+			saveFarm();
+		}
+	}
+
+	private void saveFarm()
+	{
+		if (farm.takeDirty())
+		{
+			saveProfile(FARM_KEY, farm.save());
+		}
+	}
+
 	/** Sends the daily digest and the weekly recap when due. A first run records the time and sends nothing. */
 	private void schedule(long now, String name)
 	{
+		farm.due(now / 1000L, name);
+		saveFarm();
 		ZoneId zone = ZoneId.systemDefault();
 		int hour = settings.digestHour;
 		if (!settings.digest.isEmpty())
@@ -748,6 +773,7 @@ class GroupEventEngine
 		dry = DryStreak.parse(profile(DRY_KEY));
 		week = Digest.Week.parse(profile(WEEK_KEY));
 		digest = Digest.parse(profile(DIGEST_KEY));
+		farm = FarmRuns.parse(profile(FARM_KEY), this::own, this::wanted);
 		if (varWait < 0)
 		{
 			varWait = VAR_WAIT_TICKS;

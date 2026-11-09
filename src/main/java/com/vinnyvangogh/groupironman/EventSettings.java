@@ -66,6 +66,8 @@ final class EventSettings
 			GroupIronmanConfig::overlayPersonalBest);
 		both(GroupEvent.Type.WEEKLY_RECAP, GroupIronmanConfig::discordWeeklyRecap, GroupIronmanConfig::overlayWeeklyRecap);
 		both(GroupEvent.Type.SLAYER, GroupIronmanConfig::discordSlayer, GroupIronmanConfig::overlaySlayer);
+		both(GroupEvent.Type.FARMING, GroupIronmanConfig::discordFarming, GroupIronmanConfig::overlayFarming);
+		both(GroupEvent.Type.BIRDHOUSE, GroupIronmanConfig::discordBirdhouse, GroupIronmanConfig::overlayBirdhouse);
 
 		DIGEST.put(GroupEvent.Category.DROPS, GroupIronmanConfig::digestDrops);
 		DIGEST.put(GroupEvent.Category.DEATHS, GroupIronmanConfig::digestDeaths);
