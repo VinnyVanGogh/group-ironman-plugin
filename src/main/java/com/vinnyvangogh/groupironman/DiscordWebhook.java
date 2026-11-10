@@ -5,6 +5,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.time.Instant;
 import java.util.EnumMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -26,6 +28,8 @@ final class DiscordWebhook
 		+ " verified by RuneLite developers";
 	static final String USERNAME = "GIM Utilities";
 	static final String SCREENSHOT = "screenshot.png";
+	/** Discord refuses {@code content} over 2,000 characters; lines past this wait out the day and are dropped. */
+	static final int MAX_DIGEST = 1_900;
 	private static final String ICON = "https://static.runelite.net/cache/item/icon/%d.png";
 	/** discord.com (and the old discordapp.com, and the ptb/canary clients' hosts), /api/webhooks/id/token. */
 	private static final Pattern URL = Pattern.compile(
@@ -61,6 +65,31 @@ final class DiscordWebhook
 		out.put(GroupEvent.Category.GROUP, config.discordGroupUrl());
 		out.put(GroupEvent.Category.ACTIVITIES, config.discordActivitiesUrl());
 		return out;
+	}
+
+	/** One day's held lines for a category as a plain post; null when there are none. Mentions nobody. */
+	static String digest(Gson gson, GroupEvent.Category category, List<String> lines)
+	{
+		if (lines.isEmpty())
+		{
+			return null;
+		}
+		StringBuilder text = new StringBuilder("Daily digest, ").append(category.name().toLowerCase(Locale.ROOT));
+		for (String line : lines)
+		{
+			if (text.length() + line.length() + 1 > MAX_DIGEST)
+			{
+				break;
+			}
+			text.append('\n').append(line);
+		}
+		JsonObject o = new JsonObject();
+		o.addProperty("username", USERNAME);
+		o.addProperty("content", text.toString());
+		JsonObject allowed = new JsonObject();
+		allowed.add("parse", new JsonArray());
+		o.add("allowed_mentions", allowed);
+		return gson.toJson(o);
 	}
 
 	/** The JSON body ({@code payload_json} when a screenshot is attached). */

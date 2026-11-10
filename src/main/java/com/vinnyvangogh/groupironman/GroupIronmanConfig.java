@@ -757,4 +757,303 @@ public interface GroupIronmanConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigSection(name = "Medium events: Discord", description = "Each event is its own switch, all off until you"
+		+ " tick it. Only your own events are posted.", position = 8, closedByDefault = true)
+	String mediumDiscordSection = "mediumDiscord";
+
+	@ConfigSection(name = "Medium events: overlays", description = "Each event is its own switch, all off until you"
+		+ " tick it.", position = 9, closedByDefault = true)
+	String mediumOverlaySection = "mediumOverlay";
+
+	@ConfigSection(name = "Medium events: settings", description = "Thresholds for clue rewards, kill counts and the"
+		+ " gravestone warning.", position = 10, closedByDefault = true)
+	String mediumSettingsSection = "mediumSettings";
+
+	@ConfigSection(name = "Discord: daily digest", description = "Tick a category to hold its posts and send them as"
+		+ " one message a day, while you are logged in.", position = 11, closedByDefault = true)
+	String digestSection = "digest";
+
+	@ConfigItem(keyName = "eventClueMinValue", name = "Clue reward at least (gp)", description = "A clue reward counts"
+		+ " when it is worth at least this much.", section = mediumSettingsSection, position = 0)
+	default int eventClueMinValue()
+	{
+		return 1_000_000;
+	}
+
+	@ConfigItem(keyName = "eventKcEvery", name = "Kill count milestone every", description = "A boss kill count"
+		+ " milestone every this many kills. 0 turns them off.", section = mediumSettingsSection, position = 1)
+	default int eventKcEvery()
+	{
+		return 100;
+	}
+
+	@ConfigItem(keyName = "eventGravestoneWarnMinutes", name = "Gravestone warning (minutes left)", description = "How"
+		+ " long before a gravestone's 15 minutes run out to warn.", section = mediumSettingsSection, position = 2)
+	@Range(min = 1, max = 14)
+	default int eventGravestoneWarnMinutes()
+	{
+		return 5;
+	}
+
+	@ConfigItem(keyName = "discordRaidUnique", name = "Raid unique", description = "Your purple in Chambers, Theatre"
+		+ " or Tombs, with kill count. Team members outside your group are only counted.",
+		section = mediumDiscordSection, position = 0)
+	default boolean discordRaidUnique()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordClue", name = "Clue reward", description = "A clue reward over the threshold, with"
+		+ " clue counts by tier.", section = mediumDiscordSection, position = 1)
+	default boolean discordClue()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordDryStreak", name = "Dry streak", description = "Kills past a boss's unique rate."
+		+ " Vorkath and Zulrah for now.", section = mediumDiscordSection, position = 2)
+	default boolean discordDryStreak()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordDeathValue", name = "Value lost on death", description = "What a death cost, and"
+		+ " where the gravestone is.", section = mediumDiscordSection, position = 3)
+	default boolean discordDeathValue()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordGravestone", name = "Gravestone about to expire", description = "Before the"
+		+ " gravestone's items go to Death's Office.", section = mediumDiscordSection, position = 4)
+	default boolean discordGravestone()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordHardcoreLife", name = "Hardcore life lost", description = "The group lost a life,"
+		+ " and how many are left.", section = mediumDiscordSection, position = 5)
+	default boolean discordHardcoreLife()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordWilderness", name = "Wilderness and skull", description = "You entered the"
+		+ " Wilderness or got skulled.", section = mediumDiscordSection, position = 6)
+	default boolean discordWilderness()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordDiary", name = "Achievement diary tier", description = "A diary tier completed.",
+		section = mediumDiscordSection, position = 7)
+	default boolean discordDiary()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordCombatTask", name = "Combat achievement", description = "A combat task and its tier.",
+		section = mediumDiscordSection, position = 8)
+	default boolean discordCombatTask()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordKcMilestone", name = "Kill count milestone", description = "Every 'milestone every'"
+		+ " kills of a boss.", section = mediumDiscordSection, position = 9)
+	default boolean discordKcMilestone()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordPersonalBest", name = "New personal best", description = "A new boss or raid best"
+		+ " time.", section = mediumDiscordSection, position = 10)
+	default boolean discordPersonalBest()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordWeeklyRecap", name = "Weekly recap", description = "Each Monday, your week: XP,"
+		+ " drops, kills and storage visits.", section = mediumDiscordSection, position = 11)
+	default boolean discordWeeklyRecap()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordSlayer", name = "Slayer task", description = "A task done, and a new task.",
+		section = mediumDiscordSection, position = 12)
+	default boolean discordSlayer()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordFarming", name = "Farming runs ready", description = "Your herb or tree patches have"
+		+ " finished growing, going by when you last saw them.", section = mediumDiscordSection, position = 13)
+	default boolean discordFarming()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordBirdhouse", name = "Bird houses, Hespori", description = "Your bird houses or Hespori"
+		+ " have finished, going by when you last saw them.", section = mediumDiscordSection, position = 14)
+	default boolean discordBirdhouse()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayRaidUnique", name = "Raid unique", description = "A raid purple.",
+		section = mediumOverlaySection, position = 0)
+	default boolean overlayRaidUnique()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayClue", name = "Clue reward", description = "A clue reward over the threshold.",
+		section = mediumOverlaySection, position = 1)
+	default boolean overlayClue()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayDryStreak", name = "Dry streak", description = "Kills past a boss's unique rate.",
+		section = mediumOverlaySection, position = 2)
+	default boolean overlayDryStreak()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayDeathValue", name = "Value lost on death", description = "What a death cost.",
+		section = mediumOverlaySection, position = 3)
+	default boolean overlayDeathValue()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayGravestone", name = "Gravestone about to expire", description = "A gravestone is"
+		+ " about to expire.", section = mediumOverlaySection, position = 4)
+	default boolean overlayGravestone()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayHardcoreLife", name = "Hardcore life lost", description = "The group lost a life.",
+		section = mediumOverlaySection, position = 5)
+	default boolean overlayHardcoreLife()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayWilderness", name = "Wilderness and skull", description = "A member entered the"
+		+ " Wilderness or got skulled.", section = mediumOverlaySection, position = 6)
+	default boolean overlayWilderness()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayDiary", name = "Achievement diary tier", description = "A diary tier completed.",
+		section = mediumOverlaySection, position = 7)
+	default boolean overlayDiary()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayCombatTask", name = "Combat achievement", description = "A combat task.",
+		section = mediumOverlaySection, position = 8)
+	default boolean overlayCombatTask()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayKcMilestone", name = "Kill count milestone", description = "A boss kill count"
+		+ " milestone.", section = mediumOverlaySection, position = 9)
+	default boolean overlayKcMilestone()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayPersonalBest", name = "New personal best", description = "A new best time.",
+		section = mediumOverlaySection, position = 10)
+	default boolean overlayPersonalBest()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayWeeklyRecap", name = "Weekly recap", description = "A member's week.",
+		section = mediumOverlaySection, position = 11)
+	default boolean overlayWeeklyRecap()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlaySlayer", name = "Slayer task", description = "A task done, and a new task.",
+		section = mediumOverlaySection, position = 12)
+	default boolean overlaySlayer()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayFarming", name = "Farming runs ready", description = "Your herb or tree patches have"
+		+ " finished growing, going by when you last saw them.", section = mediumOverlaySection, position = 13)
+	default boolean overlayFarming()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayBirdhouse", name = "Bird houses, Hespori", description = "Your bird houses or Hespori"
+		+ " have finished, going by when you last saw them.", section = mediumOverlaySection, position = 14)
+	default boolean overlayBirdhouse()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordDigestHour", name = "Digest hour", description = "Hour (0-23) the daily digest and"
+		+ " the Monday recap are sent, once you are logged in.", section = digestSection, position = 0)
+	@Range(max = 23)
+	default int discordDigestHour()
+	{
+		return 20;
+	}
+
+	@ConfigItem(keyName = "digestDrops", name = "Drops", description = "Hold drop posts for the digest.",
+		section = digestSection, position = 1)
+	default boolean digestDrops()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "digestDeaths", name = "Deaths", description = "Hold death posts for the digest.",
+		section = digestSection, position = 2)
+	default boolean digestDeaths()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "digestStorage", name = "Storage", description = "Hold storage posts for the digest.",
+		section = digestSection, position = 3)
+	default boolean digestStorage()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "digestProgress", name = "Progress", description = "Hold progress posts for the digest.",
+		section = digestSection, position = 4)
+	default boolean digestProgress()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "digestGroup", name = "Group", description = "Hold group posts for the digest.",
+		section = digestSection, position = 5)
+	default boolean digestGroup()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "digestActivities", name = "Activities", description = "Hold activity posts for the digest.",
+		section = digestSection, position = 6)
+	default boolean digestActivities()
+	{
+		return false;
+	}
 }

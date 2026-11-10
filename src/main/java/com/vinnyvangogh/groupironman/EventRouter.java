@@ -49,22 +49,34 @@ final class EventRouter
 		switch (event.type)
 		{
 			case DROP:
-				Map<Integer, Integer> valuable = new TreeMap<>();
-				for (Map.Entry<Integer, Integer> e : event.items.entrySet())
-				{
-					if (lookup.price(e.getKey()) * e.getValue() >= settings.dropMin)
-					{
-						valuable.put(e.getKey(), e.getValue());
-					}
-				}
-				return valuable.isEmpty() ? null : event.toBuilder().items(valuable).build();
+				return valuableStacks(event, settings.dropMin, lookup);
+			case CLUE:
+				return atLeast(event, settings.clueMin);
 			case LEVEL_UP:
-				return event.number >= settings.levelMin ? event : null;
+				return atLeast(event, settings.levelMin);
 			case STORAGE_DEPOSIT:
 			case STORAGE_WITHDRAWAL:
-				return event.number >= settings.storageMin ? event : null;
+				return atLeast(event, settings.storageMin);
 			default:
 				return event;
 		}
+	}
+
+	private static GroupEvent atLeast(GroupEvent event, long min)
+	{
+		return event.number >= min ? event : null;
+	}
+
+	private static GroupEvent valuableStacks(GroupEvent event, long min, ItemLookup lookup)
+	{
+		Map<Integer, Integer> valuable = new TreeMap<>();
+		for (Map.Entry<Integer, Integer> e : event.items.entrySet())
+		{
+			if (lookup.price(e.getKey()) * e.getValue() >= min)
+			{
+				valuable.put(e.getKey(), e.getValue());
+			}
+		}
+		return valuable.isEmpty() ? null : event.toBuilder().items(valuable).build();
 	}
 }
