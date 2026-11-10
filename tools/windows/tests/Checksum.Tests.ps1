@@ -82,6 +82,16 @@ try {
         if ($cmd -notmatch "gradlew\.bat'\) --console=plain \`$gradleTask") { throw 'gradlew.bat is not given $gradleTask' }
     }
 
+    # Started from a PowerShell 7 window, powershell.exe inherits pwsh's
+    # PSModulePath and cannot load Get-FileHash (seen on windows-latest).
+    Check 'the .cmd clears PSModulePath before starting powershell' {
+        $lines = (Get-Content -Raw $launcher) -split "`r?`n"
+        $clear = [array]::IndexOf($lines, 'set "PSModulePath="')
+        $start = @(0..($lines.Count - 1) | Where-Object { $lines[$_] -like 'powershell *' })
+        if ($clear -lt 0) { throw 'no set "PSModulePath=" line' }
+        if ($start.Count -ne 1 -or $clear -gt $start[0]) { throw 'PSModulePath is not cleared before the powershell line' }
+    }
+
     Check 'the .cmd parses as PowerShell' {
         $errors = $null
         $text = Get-Content -Raw $launcher

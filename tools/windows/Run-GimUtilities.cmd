@@ -7,6 +7,10 @@ rem which skips them as a comment. Nothing here needs admin rights, and
 rem nothing changes system settings or PATH: everything is kept under
 rem %LOCALAPPDATA%\GimUtilities and every variable set is for this window only.
 set "GU_SELF=%~f0"
+rem Started from a PowerShell 7 window, Windows PowerShell would inherit
+rem PowerShell 7's module path and fail to load Get-FileHash. Left empty, it
+rem uses its own defaults.
+set "PSModulePath="
 powershell -NoProfile -ExecutionPolicy Bypass -Command "iex ([IO.File]::ReadAllText($env:GU_SELF))"
 set "GU_EXIT=%ERRORLEVEL%"
 if not "%GU_EXIT%"=="0" (
