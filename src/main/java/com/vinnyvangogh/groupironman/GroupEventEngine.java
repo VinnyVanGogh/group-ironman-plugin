@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
@@ -128,6 +129,8 @@ class GroupEventEngine
 	private final ProgressTracker progress = new ProgressTracker(Skill.values().length - 1);
 	private final PresenceDebounce presence = new PresenceDebounce();
 	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()));
+	/** Client thread: Discord events waiting for the rest of their moment. */
+	private final DiscordBatch batch = new DiscordBatch();
 	private volatile EventSettings settings = EventSettings.OFF;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
 	private volatile Digest digest = new Digest();
@@ -184,6 +187,8 @@ class GroupEventEngine
 		{
 			sender.clear();
 		}
+		// Unsent posts are dropped at shutdown, as the sender's queue is.
+		batch.drain();
 		toasts.clear();
 		progress.reset();
 		settings = EventSettings.OFF;
@@ -241,6 +246,11 @@ class GroupEventEngine
 		for (GroupEvent e : EventDetect.storage(change, group.lookup))
 		{
 			router.route(e, own, settings, group.lookup);
+			if (own && e.type == GroupEvent.Type.STORAGE_SUMMARY)
+			{
+				// A big move's post lists the whole visit, whether or not the summary is switched on.
+				batch.attach(e);
+			}
 		}
 		if (own && wanted(GroupEvent.Type.WEEKLY_RECAP))
 		{
@@ -593,6 +603,8 @@ class GroupEventEngine
 		}
 		else if (state == GameState.HOPPING || state == GameState.LOGIN_SCREEN)
 		{
+			// No more ticks until the next login: post what is held now.
+			batch.drain().forEach(this::flush);
 			synchronized (presence)
 			{
 				presence.logout(System.currentTimeMillis());
@@ -612,6 +624,7 @@ class GroupEventEngine
 	public void onGameTick(GameTick tick)
 	{
 		long now = System.currentTimeMillis();
+		batch.due(now).forEach(this::flush);
 		Player me = client.getLocalPlayer();
 		if (me == null || me.getName() == null)
 		{
@@ -876,37 +889,94 @@ class GroupEventEngine
 
 	// ---- Discord ----
 
-	/** Router output: one of this player's events for Discord, when posting is on and a webhook is set. */
+	/**
+	 * Router output: one of this player's events for Discord, when posting is on and a webhook is set. Kinds
+	 * that share a moment with others wait in {@link #batch} so the moment is one post.
+	 */
 	private void toDiscord(GroupEvent event)
+	{
+		String url = discordUrl(event.type.category);
+		if (url == null)
+		{
+			return;
+		}
+		List<GroupEvent> alone = Collections.singletonList(event);
+		if (settings.digest.contains(event.type.category) && event.type != GroupEvent.Type.WEEKLY_RECAP)
+		{
+			// A 0 gp death has no value line; without an egg there is nothing left to say.
+			String words = DiscordWebhook.words(event, group.lookup, egg(alone));
+			if (words != null)
+			{
+				digest.add(event.type.category, event.member + ": " + words.replace('\n', ' '));
+				saveProfile(DIGEST_KEY, digest.save());
+			}
+			return;
+		}
+		DiscordMerge.Family family = DiscordMerge.family(event.type);
+		if (family == null)
+		{
+			// A logout settles at the login screen: nothing worth a picture.
+			post(url, DiscordMerge.single(event, group.lookup), alone, event.type != GroupEvent.Type.ONLINE, null);
+			return;
+		}
+		List<DiscordBatch.Pending> done = new ArrayList<>();
+		DiscordBatch.Pending moment = batch.add(event, System.currentTimeMillis(),
+			DiscordMerge.window(family, settings), done);
+		if (moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot())
+		{
+			// The frame of the moment itself, not of whenever the post goes out (a death's respawn).
+			drawManager.requestNextFrameListener(image -> executor.execute(() -> moment.screenshot = png(image)));
+		}
+		done.forEach(this::flush);
+	}
+
+	/** The webhook for a category; null when posting is off or no webhook is set. */
+	private String discordUrl(GroupEvent.Category category)
 	{
 		if (!config.discordEnabled() || sender == null)
 		{
-			return;
+			return null;
 		}
-		String url = DiscordWebhook.route(event.type.category, DiscordWebhook.overrides(config),
-			config.discordWebhookUrl());
-		String egg = EasterEggs.line(event, group.lookup, EasterEggs.Settings.of(config));
-		// A 0 gp death has no value line; without an egg there is nothing left to post.
-		String words = DiscordWebhook.words(event, group.lookup, egg);
-		if (url == null || words == null)
+		return DiscordWebhook.route(category, DiscordWebhook.overrides(config), config.discordWebhookUrl());
+	}
+
+	/** Client thread. One held moment as one post. */
+	private void flush(DiscordBatch.Pending moment)
+	{
+		DiscordMerge.Post post = DiscordMerge.merge(moment.events, settings, group.lookup);
+		String url = post == null ? null : discordUrl(post.lead.type.category);
+		if (url != null)
 		{
-			return;
+			post(url, post, moment.events, true, moment.screenshot);
 		}
-		if (settings.digest.contains(event.type.category) && event.type != GroupEvent.Type.WEEKLY_RECAP)
-		{
-			digest.add(event.type.category, event.member + ": " + words.replace('\n', ' '));
-			saveProfile(DIGEST_KEY, digest.save());
-			return;
-		}
+	}
+
+	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
+	private String egg(List<GroupEvent> events)
+	{
+		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(config));
+	}
+
+	/**
+	 * {@code shot}: a frame already taken; when a picture is wanted and none is ready, the next frame. Nothing is
+	 * posted when the post has nothing to say (a 0 gp death on its own, no egg).
+	 */
+	private void post(String url, DiscordMerge.Post post, List<GroupEvent> events, boolean picture, byte[] shot)
+	{
 		DiscordStyle style = config.discordStyle();
 		String mention = config.discordMention();
-		// A logout settles at the login screen: nothing worth a picture.
-		if (!config.discordScreenshot() || event.type == GroupEvent.Type.ONLINE)
+		String egg = egg(events);
+		boolean picked = picture && config.discordScreenshot();
+		String json = DiscordWebhook.payload(gson, post, group.lookup, style, mention, picked, egg);
+		if (json == null)
 		{
-			sender.post(url, DiscordWebhook.payload(gson, event, group.lookup, style, mention, false, egg), null);
 			return;
 		}
-		String json = DiscordWebhook.payload(gson, event, group.lookup, style, mention, true, egg);
+		if (!picked || shot != null)
+		{
+			sender.post(url, json, picked ? shot : null);
+			return;
+		}
 		// The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread.
 		drawManager.requestNextFrameListener(image -> executor.execute(() ->
 			sender.post(url, json, png(image))));

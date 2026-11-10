@@ -69,6 +69,20 @@ final class EasterEggs
 	{
 	}
 
+	/** The egg for one Discord post's events (a merged moment): the first event with one wins. */
+	static String line(List<GroupEvent> events, ItemLookup lookup, Settings settings)
+	{
+		for (GroupEvent e : events)
+		{
+			String line = line(e, lookup, settings);
+			if (line != null)
+			{
+				return line;
+			}
+		}
+		return null;
+	}
+
 	/** The egg for this event, or null: the toggle is off or no rule applies. */
 	static String line(GroupEvent e, ItemLookup lookup, Settings settings)
 	{

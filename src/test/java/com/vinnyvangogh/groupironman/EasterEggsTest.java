@@ -74,6 +74,26 @@ public class EasterEggsTest
 	}
 
 	@Test
+	public void aMergedDeathDropsTheZeroGpLineAndTakesTheEgg()
+	{
+		GroupEvent died = GroupEvent.of(GroupEvent.Type.DEATH, NOW, "Alex").text("Goblin").location("Lumbridge")
+			.build();
+		List<GroupEvent> moment = Arrays.asList(died, deathValue(items(), 0));
+		DiscordMerge.Post post = DiscordMerge.merge(moment,
+			EventFixtures.settings(EventFixtures.all(), EventFixtures.none()), lookup);
+		assertEquals(died, post.lead);
+		assertTrue("no 'lost about 0 gp' field", post.extras.isEmpty());
+		String egg = EasterEggs.line(moment, lookup, ON);
+		assertTrue(egg, Arrays.asList(EasterEggLines.FREE_TRIP).contains(egg));
+		assertNull(EasterEggs.line(moment, lookup, OFF));
+		JsonObject embed = embed(DiscordWebhook.payload(gson, post, lookup, DiscordStyle.EMBED, "", false, egg));
+		assertEquals("died at Lumbridge, killed by Goblin\n" + egg, embed.get("description").getAsString());
+		String plain = new JsonParser().parse(DiscordWebhook.payload(gson, post, lookup, DiscordStyle.PLAIN, "",
+			false, egg)).getAsJsonObject().get("content").getAsString();
+		assertEquals("Alex: died at Lumbridge, killed by Goblin\n" + egg, plain);
+	}
+
+	@Test
 	public void aDeathThatCostSomethingKeepsItsValueLine()
 	{
 		String words = DiscordWebhook.words(deathValue(items(WHIP, 1), 1_500_000), lookup, null);

@@ -10,9 +10,25 @@
   drop, about ten well-known drops, and big group storage visits.
 - **Legend at (gp)** and **Freeloader at (gp)** (default 1M each, 0 turns it
   off) set when a deposit or withdrawal gets its line.
-- A death that cost 0 gp no longer posts "lost about 0 gp". With Easter eggs
-  off it posts nothing; with them on it posts only the egg line.
+- A death that cost 0 gp no longer posts "lost about 0 gp". In a death's post
+  the line is left out; on its own it posts nothing with Easter eggs off, and
+  only the egg line with them on.
 - The lines are all in `EasterEggLines.java`; a new egg is one table row.
+
+### One Discord post per moment
+
+- A group storage visit is one Discord post. With a big deposit or withdrawal
+  it is titled "Big storage withdrawal", "Big storage deposit" or "Big storage
+  visit" (both), lists every item moved with the big stacks marked, and shows
+  the visit's total value. With nothing big it is the "Group storage visit"
+  summary, when that is switched on. "Storage minimum hit" and "Took the last
+  one" from the same visit are lines in that post, not posts of their own.
+- The same rule elsewhere: a kill's drop, untradeable unique, collection log
+  slot and pet; a tick's level up, 99, XP milestone, total level and combat
+  level; a death, its Hardcore group life and the value it cost. Each is one
+  post, titled after the biggest of them, with the rest as fields and one
+  screenshot taken when the moment began.
+- Discord only: banners, the group box and chat are unchanged.
 
 ### Windows launcher in CI
 
