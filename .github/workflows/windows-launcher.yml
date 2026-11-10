@@ -105,8 +105,19 @@ jobs:
 
           $env:GU_BUILD_ONLY = '1'
           # < NUL so the launcher's `pause` on failure cannot wait for a key.
-          cmd.exe /d /c "$env:GU_LAUNCHER < NUL" 2>&1 | Tee-Object -FilePath $log
-          $code = $LASTEXITCODE
+          # Output goes to files, not a pipe: a Gradle daemon left running
+          # could hold a pipe open and the step would never end.
+          $err = Join-Path $env:RUNNER_TEMP 'launcher.err.log'
+          $p = Start-Process -FilePath cmd.exe -ArgumentList '/d', '/c', "$env:GU_LAUNCHER < NUL" -RedirectStandardOutput $log -RedirectStandardError $err -NoNewWindow -PassThru
+          $null = $p.Handle  # keeps ExitCode readable after exit
+          $finished = $p.WaitForExit(35 * 60 * 1000)
+          if (Test-Path -LiteralPath $err) { Get-Content -LiteralPath $err | Add-Content -LiteralPath $log }
+          Get-Content -LiteralPath $log | Write-Host
+          if (-not $finished) {
+            & taskkill.exe /T /F /PID $p.Id | Out-Null
+            Fail 'launcher still running after 35 minutes'
+          }
+          $code = $p.ExitCode
           Write-Host "launcher exit code: $code"
           if ($code -ne 0) { Fail "launcher exited $code" }
 
