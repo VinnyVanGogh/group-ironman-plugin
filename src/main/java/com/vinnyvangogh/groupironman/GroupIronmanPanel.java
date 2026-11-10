@@ -599,9 +599,18 @@ class GroupIronmanPanel extends PluginPanel
 
 	private JComponent smallItem(PanelModel.ItemCell item)
 	{
-		AsyncBufferedImage image = itemManager.getImage(item.id, (int) Math.min(Integer.MAX_VALUE, item.quantity),
-			item.quantity > 1);
-		return new SmallItem(image, item.tooltip());
+		return new SmallItem(icon(item.id, item.quantity), item.tooltip());
+	}
+
+	/**
+	 * The item as the game draws a stack of it. The quantity picks the count
+	 * variant (a bigger coin pile, more arrows): ItemManager passes it to the
+	 * client's createItemSprite. {@code stackable} only turns the stack number
+	 * on, so a single item shows none, as in the inventory.
+	 */
+	private AsyncBufferedImage icon(int id, long quantity)
+	{
+		return itemManager.getImage(id, (int) Math.min(Integer.MAX_VALUE, quantity), quantity > 1);
 	}
 
 	private static JComponent emptySlot()
@@ -677,9 +686,8 @@ class GroupIronmanPanel extends PluginPanel
 			JLabel cell = new JLabel();
 			cell.setPreferredSize(new Dimension(36, 32));
 			cell.setHorizontalAlignment(SwingConstants.CENTER);
-			cell.setToolTipText(item.tooltip() + (item.value > 0 ? " (" + BoostText.gp(item.value) + " gp)" : ""));
-			itemManager.getImage(item.id, (int) Math.min(Integer.MAX_VALUE, item.quantity), item.quantity > 1)
-				.addTo(cell);
+			cell.setToolTipText(item.tooltip() + (item.value > 0 ? " (" + Amounts.EXACT.of(item.value) + " gp)" : ""));
+			icon(item.id, item.quantity).addTo(cell);
 			grid.add(cell);
 		}
 		wrap.add(grid);
@@ -712,7 +720,7 @@ class GroupIronmanPanel extends PluginPanel
 			JLabel name = new JLabel(mine ? "Your bank (" + b.member + ")" : b.member + "'s bank");
 			name.setFont(FontManager.getRunescapeBoldFont());
 			card.add(name);
-			card.add(text(b.summary, MUTED));
+			card.add(tip(text(b.summary, MUTED), b.exact));
 			card.add(b.items.isEmpty() ? text("No item matches the filter.", MUTED) : itemGrid(b.items));
 			tab.add(card);
 		}
@@ -736,7 +744,8 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		else
 		{
-			contents.add(text(s.snapshot + ", " + BoostText.gp(s.value) + " gp", MUTED));
+			contents.add(tip(text(s.snapshot + ", " + Amounts.GAME.of(s.value) + " gp", MUTED),
+				Amounts.EXACT.of(s.value) + " gp"));
 			contents.add(s.items.isEmpty() ? text("Empty, or no item matches the filter.", MUTED) : itemGrid(s.items));
 		}
 		tab.add(contents);
@@ -752,7 +761,7 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		for (PanelModel.LogRow row : s.log)
 		{
-			log.add(text(row.text + " (" + row.ago + ")", Color.WHITE));
+			log.add(tip(text(row.text + " (" + row.ago + ")", Color.WHITE), row.exact));
 		}
 		tab.add(log);
 	}
@@ -779,13 +788,17 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			JLabel row = new JLabel(r.text + (r.ago.isEmpty() ? "" : " (" + r.ago + ")"));
 			row.setFont(FontManager.getRunescapeSmallFont());
-			itemManager.getImage(r.itemId).addTo(row);
+			icon(r.itemId, r.quantity).addTo(row);
+			row.setToolTipText(r.tooltip);
 			row.setBorder(new EmptyBorder(1, 0, 1, 0));
 			tab.add(row);
 		}
-		for (String s : GroupSearch.history(q, v.group.log().entries(), v.items, now, FindCommand.HISTORY_LIMIT))
+		List<String> history = GroupSearch.history(q, v.group.log().entries(), v.items, now, FindCommand.HISTORY_LIMIT);
+		List<String> exact = GroupSearch.history(q, v.group.log().entries(), Amounts.EXACT.words(v.items), now,
+			FindCommand.HISTORY_LIMIT);
+		for (int i = 0; i < history.size(); i++)
 		{
-			tab.add(text(s, MUTED));
+			tab.add(tip(text(history.get(i), MUTED), exact.get(i)));
 		}
 	}
 
@@ -806,7 +819,8 @@ class GroupIronmanPanel extends PluginPanel
 			for (int i = 0; i < changes.size() && i < GroupService.MAX_EVENT_LINES; i++)
 			{
 				StorageChange c = changes.get(i);
-				tab.add(text(PanelModel.change(c, v.items, "") + " (" + BoostText.ago(now, c.at()) + ")", Color.WHITE));
+				tab.add(tip(text(PanelModel.change(c, v.items, "") + " (" + BoostText.ago(now, c.at()) + ")", Color.WHITE),
+					PanelModel.change(c, Amounts.EXACT.words(v.items), "")));
 			}
 		}
 		if (!v.switches.drops)
@@ -832,9 +846,10 @@ class GroupIronmanPanel extends PluginPanel
 			return;
 		}
 		List<String> lines = new ArrayList<>(DropLog.lines(events, v.items, now));
+		List<String> exact = DropLog.lines(events, Amounts.EXACT.words(v.items), now);
 		for (int i = 0; i < lines.size() && i < GroupService.MAX_EVENT_LINES; i++)
 		{
-			tab.add(text(lines.get(i), Color.WHITE));
+			tab.add(tip(text(lines.get(i), Color.WHITE), exact.get(i)));
 		}
 		if (lines.size() > GroupService.MAX_EVENT_LINES)
 		{
@@ -875,6 +890,13 @@ class GroupIronmanPanel extends PluginPanel
 		label.setFont(FontManager.getRunescapeSmallFont());
 		label.setForeground(color);
 		label.setBorder(new EmptyBorder(1, 0, 1, 0));
+		return label;
+	}
+
+	/** {@code label} with the exact amounts in its tooltip; the label shows the game's short ones. */
+	private static JLabel tip(JLabel label, String exact)
+	{
+		label.setToolTipText(exact);
 		return label;
 	}
 

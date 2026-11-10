@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Amounts read like the game
+
+- Quantities and gp values use the game's stack text everywhere: *Coins -
+  450K in group storage*, *took 40K Coins*, *13.2K*, *10M* (RuneLite's
+  `QuantityFormatter.quantityToStackSize`). The panel, chat lines, `::find`,
+  overlays and storage alerts all read this way.
+- The panel shows the exact amount in a tooltip (*450,001*) on item icons,
+  Find rows, storage and log lines, and bank and storage totals.
+- Discord keeps every digit after the short form: *450K (450,001)*, in
+  descriptions, plain posts, the Value field and daily digests (titles carry
+  no amounts).
+- Item icons show the stack's own picture: a big coin pile for big stacks.
+  The panel's Find rows now draw the stack too, and Discord thumbnails use
+  the coin pile for the amount.
+
 ### Online and offline posts
 
 - New setting **Offline grace (minutes)**, 0 to 10, default 2. A logout waits

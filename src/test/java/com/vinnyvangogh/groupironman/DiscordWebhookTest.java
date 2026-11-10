@@ -64,9 +64,30 @@ public class DiscordWebhookTest
 			embed.getAsJsonObject("thumbnail").get("url").getAsString());
 		assertEquals("2023-11-14T22:13:20Z", embed.get("timestamp").getAsString());
 		assertEquals("Value", embed.getAsJsonArray("fields").get(0).getAsJsonObject().get("name").getAsString());
-		assertEquals("1.5M gp", embed.getAsJsonArray("fields").get(0).getAsJsonObject().get("value").getAsString());
+		assertEquals("1.5M (1,500,000) gp",
+			embed.getAsJsonArray("fields").get(0).getAsJsonObject().get("value").getAsString());
 		assertEquals("302", embed.getAsJsonArray("fields").get(1).getAsJsonObject().get("value").getAsString());
 		assertFalse(embed.has("image"));
+	}
+
+	@Test
+	public void coinsReadLikeTheGameWithTheExactAmountAndAPileIcon()
+	{
+		GroupEvent took = GroupEvent.of(GroupEvent.Type.STORAGE_WITHDRAWAL, NOW, "Alex")
+			.items(items(FakeItems.COINS, 40_000)).build();
+		JsonObject embed = parse(DiscordWebhook.payload(gson, took, items, DiscordStyle.EMBED, "", false))
+			.getAsJsonArray("embeds").get(0).getAsJsonObject();
+		// The exact total is in the Value field; the line's own total stays short so parentheses don't nest.
+		assertEquals("took 40K (40,000) x Coins (40K gp) from group storage",
+			embed.get("description").getAsString());
+		assertEquals("40K (40,000) gp", embed.getAsJsonArray("fields").get(0).getAsJsonObject().get("value")
+			.getAsString());
+		assertEquals("the 10,000 coin pile, not one coin", "https://static.runelite.net/cache/item/icon/1004.png",
+			embed.getAsJsonObject("thumbnail").get("url").getAsString());
+
+		JsonObject plain = parse(DiscordWebhook.payload(gson, took, items, DiscordStyle.PLAIN, "", false));
+		assertEquals("Alex: took 40K (40,000) x Coins (40K gp) from group storage",
+			plain.get("content").getAsString());
 	}
 
 	@Test

@@ -116,7 +116,8 @@ final class GroupSearch
 		for (Hit h : hits(query, sources, items))
 		{
 			String when = h.seenAt < 0 ? "" : " (" + BoostText.ago(now, h.seenAt) + ")";
-			lines.computeIfAbsent(h.name, k -> new ArrayList<>()).add(h.member + " " + h.where + " " + h.quantity + when);
+			lines.computeIfAbsent(h.name, k -> new ArrayList<>()).add(h.member + " " + h.where + " " + items.amount(h.quantity)
+				+ when);
 		}
 		List<String> out = new ArrayList<>();
 		for (Map.Entry<String, List<String>> e : lines.entrySet())

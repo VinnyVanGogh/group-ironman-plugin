@@ -38,26 +38,4 @@ final class BoostText
 		}
 		return TimeUnit.MILLISECONDS.toDays(ms) + "d ago";
 	}
-
-	/** "12.3M", "45.6K", "999": a gp total short enough for the side panel. */
-	static String gp(long value)
-	{
-		if (value >= 10_000_000_000L)
-		{
-			return (value / 1_000_000_000L) + "B";
-		}
-		if (value >= 1_000_000_000L)
-		{
-			return String.format(java.util.Locale.ROOT, "%.1fB", value / 1e9);
-		}
-		if (value >= 1_000_000L)
-		{
-			return String.format(java.util.Locale.ROOT, "%.1fM", value / 1e6);
-		}
-		if (value >= 10_000L)
-		{
-			return String.format(java.util.Locale.ROOT, "%.1fK", value / 1e3);
-		}
-		return Long.toString(value);
-	}
 }

@@ -16,6 +16,7 @@ final class FakeItems implements ItemLookup
 	static final int GRIMY_GUAM = 199;
 	static final int GUAM_LEAF = 249;
 	static final int GUAM_UNF = 91;
+	static final int COINS = 995;
 
 	private final Map<Integer, String> names = new HashMap<>();
 	private final Map<Integer, Long> prices = new HashMap<>();
@@ -32,6 +33,7 @@ final class FakeItems implements ItemLookup
 		add(GRIMY_GUAM, "Grimy guam leaf", 20);
 		add(GUAM_LEAF, "Guam leaf", 25);
 		add(GUAM_UNF, "Guam potion (unf)", 15);
+		add(COINS, "Coins", 1);
 	}
 
 	private void add(int id, String name, long price)
