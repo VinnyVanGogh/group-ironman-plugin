@@ -66,8 +66,8 @@ final class EventText
 			+ (e.number > 0 ? " (" + e.number + " QP)" : ""));
 		line(GroupEvent.Type.QUEST_POINTS, "Quest points", (e, l) -> e.text.isEmpty()
 			? e.number + " quest points" : e.text + ", " + e.number + " quest points");
-		line(GroupEvent.Type.ONLINE, "Online", (e, l) -> "is " + e.text
-			+ (e.world > 0 ? " on world " + e.world : ""));
+		line(GroupEvent.Type.ONLINE, "Online", (e, l) -> isOffline(e) ? offline(e) : "is " + e.text
+			+ onWorld(e));
 		line(GroupEvent.Type.BACK, "Back", (e, l) -> "is back after " + e.number + (e.number == 1 ? " day" : " days"));
 		line(GroupEvent.Type.BARROWS, "Barrows chest", (e, l) -> "Barrows chest" + (e.number > 0 ? " " + e.number : "")
 			+ ": " + items(e, l) + (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
@@ -94,6 +94,24 @@ final class EventText
 		line(GroupEvent.Type.SLAYER, "Slayer", (e, l) -> "slayer " + e.text + (e.number > 0 ? " (" + e.number + ")" : ""));
 		line(GroupEvent.Type.FARMING, "Farming run", (e, l) -> ready(e));
 		line(GroupEvent.Type.BIRDHOUSE, "Bird houses and Hespori", (e, l) -> ready(e));
+	}
+
+	private static boolean isOffline(GroupEvent e)
+	{
+		return e.type == GroupEvent.Type.ONLINE && "offline".equals(e.text);
+	}
+
+	private static String onWorld(GroupEvent e)
+	{
+		return e.world > 0 ? " on world " + e.world : "";
+	}
+
+	/** "offline, played 1h 12m on world 303, logged off at 1:35 PM": the clock is the logout, not the post. */
+	private static String offline(GroupEvent e)
+	{
+		// 0 is also an older client's offline, from the party: no session known, so none said.
+		return "offline" + (e.number > 0 ? ", played " + PresenceDebounce.played(e.number) : "") + onWorld(e)
+			+ (e.detail.isEmpty() ? "" : ", logged off at " + e.detail);
 	}
 
 	private static String ready(GroupEvent e)
@@ -133,6 +151,12 @@ final class EventText
 	static String title(GroupEvent.Type type)
 	{
 		return TITLES.get(type);
+	}
+
+	/** The heading for this event: "Offline" for a logout, where the type alone would say "Online". */
+	static String title(GroupEvent e)
+	{
+		return isOffline(e) ? "Offline" : title(e.type);
 	}
 
 	/** Every type has words; a new type without them fails EventTextTest, not a player's client. */
