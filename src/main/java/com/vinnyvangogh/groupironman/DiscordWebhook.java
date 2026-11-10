@@ -111,22 +111,61 @@ final class DiscordWebhook
 		return gson.toJson(o);
 	}
 
-	/** The JSON body ({@code payload_json} when a screenshot is attached). */
-	static String payload(Gson gson, GroupEvent e, ItemLookup items, DiscordStyle style, String mention,
-		boolean screenshot)
+	/** One event's post text; see {@link #words(DiscordMerge.Post, String)}. */
+	static String words(GroupEvent e, ItemLookup lookup, String egg)
 	{
-		// "450K (450,001)": the game's words, and nothing lost (Board 2026-11-10).
-		ItemLookup lookup = Amounts.BOTH.words(items);
-		return payload(gson, DiscordMerge.single(e, lookup), lookup, style, mention, screenshot);
+		return words(DiscordMerge.single(e, lookup), egg);
 	}
 
 	/**
-	 * One moment's post: its lead event's title and line, the other events' lines as fields. {@code lookup}
-	 * already words amounts the Discord way ({@link Amounts#BOTH}), as the post's text was built with it.
+	 * What the post's description says: the lead's line, then the Easter egg under it. A death that cost 0 gp has
+	 * no value line, so it says only the egg, or is null (nothing to post) when there is no egg.
 	 */
+	static String words(DiscordMerge.Post post, String egg)
+	{
+		String extra = egg == null || egg.trim().isEmpty() ? null : egg.trim();
+		if (EasterEggs.nothingLost(post.lead))
+		{
+			return extra;
+		}
+		return extra == null ? post.description : post.description + "\n" + extra;
+	}
+
+	/** The JSON body ({@code payload_json} when a screenshot is attached), without an Easter egg. */
+	static String payload(Gson gson, GroupEvent e, ItemLookup items, DiscordStyle style, String mention,
+		boolean screenshot)
+	{
+		return payload(gson, e, items, style, mention, screenshot, null);
+	}
+
+	/** One event's post; null when there is nothing to post. */
+	static String payload(Gson gson, GroupEvent e, ItemLookup items, DiscordStyle style, String mention,
+		boolean screenshot, String egg)
+	{
+		// "450K (450,001)": the game's words, and nothing lost (Board 2026-11-10).
+		ItemLookup lookup = Amounts.BOTH.words(items);
+		return payload(gson, DiscordMerge.single(e, lookup), lookup, style, mention, screenshot, egg);
+	}
+
 	static String payload(Gson gson, DiscordMerge.Post post, ItemLookup lookup, DiscordStyle style, String mention,
 		boolean screenshot)
 	{
+		return payload(gson, post, lookup, style, mention, screenshot, null);
+	}
+
+	/**
+	 * One moment's post: its lead event's title and line, the other events' lines as fields, and the Easter egg
+	 * under the line. {@code lookup} already words amounts the Discord way ({@link Amounts#BOTH}), as the post's
+	 * text was built with it. Null when there is nothing to post.
+	 */
+	static String payload(Gson gson, DiscordMerge.Post post, ItemLookup lookup, DiscordStyle style, String mention,
+		boolean screenshot, String egg)
+	{
+		String words = words(post, egg);
+		if (words == null)
+		{
+			return null;
+		}
 		JsonObject o = new JsonObject();
 		o.addProperty("username", USERNAME);
 		String tag = post.big && mention != null && !mention.trim().isEmpty() ? mention.trim() : "";
@@ -142,7 +181,7 @@ final class DiscordWebhook
 		o.add("allowed_mentions", allowed);
 		if (style == DiscordStyle.PLAIN)
 		{
-			o.addProperty("content", (tag.isEmpty() ? "" : tag + " ") + plain(post));
+			o.addProperty("content", (tag.isEmpty() ? "" : tag + " ") + plain(post, words));
 			return gson.toJson(o);
 		}
 		if (!tag.isEmpty())
@@ -150,28 +189,30 @@ final class DiscordWebhook
 			o.addProperty("content", tag);
 		}
 		JsonArray embeds = new JsonArray();
-		embeds.add(embed(post, lookup, screenshot));
+		embeds.add(embed(post, words, lookup, screenshot));
 		o.add("embeds", embeds);
 		return gson.toJson(o);
 	}
 
-	/** "Alex: died; lost about 1.5M gp on death": the lead's sentence, then each merged fact. */
-	private static String plain(DiscordMerge.Post post)
+	/** "Alex: died; lost about 1.5M gp on death": the lead's sentence, each merged fact, then the egg's line. */
+	private static String plain(DiscordMerge.Post post, String words)
 	{
-		StringBuilder text = new StringBuilder(post.lead.member).append(": ").append(post.description);
+		int egg = words.indexOf('\n');
+		StringBuilder text = new StringBuilder(post.lead.member).append(": ")
+			.append(egg < 0 ? words : words.substring(0, egg));
 		for (String[] extra : post.extras)
 		{
 			text.append("; ").append(extra[1]);
 		}
-		return text.toString();
+		return egg < 0 ? text.toString() : text.append(words.substring(egg)).toString();
 	}
 
-	private static JsonObject embed(DiscordMerge.Post post, ItemLookup lookup, boolean screenshot)
+	private static JsonObject embed(DiscordMerge.Post post, String words, ItemLookup lookup, boolean screenshot)
 	{
 		GroupEvent e = post.lead;
 		JsonObject embed = new JsonObject();
 		embed.addProperty("title", e.member + ": " + post.title);
-		embed.addProperty("description", post.description);
+		embed.addProperty("description", words);
 		embed.addProperty("color", e.type.category.colour);
 		embed.addProperty("timestamp", Instant.ofEpochMilli(e.at).toString());
 		JsonArray fields = fields(post, lookup);

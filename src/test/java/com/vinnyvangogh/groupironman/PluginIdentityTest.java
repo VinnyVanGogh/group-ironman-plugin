@@ -89,8 +89,10 @@ public class PluginIdentityTest
 		// presses Join. Part A of the group events adds 44 more, every one off: "Share group events", "Post to
 		// Discord", "Attach a screenshot", "Group box", and a Discord and an overlay switch per event kind.
 		// Part C adds 15 kinds (a Discord and an overlay switch each) and one digest switch per category.
-		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length, switches);
-		assertEquals(90, switches);
+		// "Easter eggs" (Discord section) adds one more, off.
+		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1,
+			switches);
+		assertEquals(91, switches);
 		assertEquals(Collections.singletonList("groupSync"), on);
 		assertEquals("", DEFAULTS.groupLowStock());
 		assertEquals("no key on a fresh install", "", DEFAULTS.groupKey());

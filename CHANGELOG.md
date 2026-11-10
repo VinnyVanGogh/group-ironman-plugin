@@ -44,6 +44,19 @@
   change. Surrounding whitespace and quotes are stripped before checking, so
   a link pasted with its quotes works.
 
+### Discord Easter eggs
+
+- New **Easter eggs** switch in the Discord section, off by default. When on,
+  some posts get one short funny line under the facts: a 0 gp death, a death
+  that lost only a spade (and clue items), a pet, a Bones-only "valuable"
+  drop, about ten well-known drops, and big group storage visits.
+- **Legend at (gp)** and **Freeloader at (gp)** (default 1M each, 0 turns it
+  off) set when a deposit or withdrawal gets its line.
+- A death that cost 0 gp no longer posts "lost about 0 gp". In a death's post
+  the line is left out; on its own it posts nothing with Easter eggs off, and
+  only the egg line with them on. The daily digest follows the same rule.
+- The lines are all in `EasterEggLines.java`; a new egg is one table row.
+
 ### One Discord post per moment
 
 - A group storage visit is one Discord post. With a big deposit or withdrawal

@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
@@ -998,8 +999,14 @@ class GroupEventEngine
 		{
 			return;
 		}
-		// A Discord line: "450K (450,001)", as the webhook's own posts read.
-		digest.add(event.type.category, EventText.sentence(event, discordWords()));
+		// A Discord line: "450K (450,001)", as the webhook's own posts read. A 0 gp death has no value
+		// line, so without an egg there is nothing left to say ("lost about 0 gp" is never listed).
+		String words = DiscordWebhook.words(event, discordWords(), egg(Collections.singletonList(event)));
+		if (words == null)
+		{
+			return;
+		}
+		digest.add(event.type.category, event.member + ": " + words.replace('\n', ' '));
 		saveProfile(DIGEST_KEY, digest.save());
 	}
 
@@ -1018,7 +1025,8 @@ class GroupEventEngine
 		if (family == null)
 		{
 			// A logout settles at the login screen: nothing worth a picture.
-			post(url, DiscordMerge.single(event, discordWords()), event.type != GroupEvent.Type.ONLINE, null);
+			post(url, DiscordMerge.single(event, discordWords()), Collections.singletonList(event),
+				event.type != GroupEvent.Type.ONLINE, null);
 			return;
 		}
 		List<DiscordBatch.Pending> done = new ArrayList<>();
@@ -1045,25 +1053,33 @@ class GroupEventEngine
 		String url = post == null ? null : webhook(post.lead.type.category);
 		if (url != null)
 		{
-			post(url, post, true, moment.screenshot);
+			post(url, post, moment.events, true, moment.screenshot);
 		}
 	}
 
-	/** {@code shot}: a frame already taken; when a picture is wanted and none is ready, the next frame. */
-	private void post(String url, DiscordMerge.Post post, boolean picture, byte[] shot)
+	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
+	private String egg(List<GroupEvent> events)
+	{
+		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(config));
+	}
+
+	/**
+	 * {@code shot}: a frame already taken; when a picture is wanted and none is ready, the next frame. Nothing is
+	 * posted when the post has nothing to say (a 0 gp death on its own, no egg).
+	 */
+	private void post(String url, DiscordMerge.Post post, List<GroupEvent> events, boolean picture, byte[] shot)
 	{
 		DiscordStyle style = config.discordStyle();
 		String mention = config.discordMention();
-		ItemLookup words = discordWords();
-		if (!picture || !config.discordScreenshot())
+		boolean picked = picture && config.discordScreenshot();
+		String json = DiscordWebhook.payload(gson, post, discordWords(), style, mention, picked, egg(events));
+		if (json == null)
 		{
-			sender.post(url, DiscordWebhook.payload(gson, post, words, style, mention, false), null);
 			return;
 		}
-		String json = DiscordWebhook.payload(gson, post, words, style, mention, true);
-		if (shot != null)
+		if (!picked || shot != null)
 		{
-			sender.post(url, json, shot);
+			sender.post(url, json, picked ? shot : null);
 			return;
 		}
 		// The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread.

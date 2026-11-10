@@ -423,6 +423,30 @@ public interface GroupIronmanConfig extends Config
 		return 0;
 	}
 
+	@ConfigItem(keyName = "discordEasterEggs", name = "Easter eggs", description = "Add one short funny line under"
+		+ " some posts: a 0 gp death, a pet, a famous drop, a big storage visit. The facts stay as they are.",
+		section = discordSection, position = 13)
+	default boolean discordEasterEggs()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordLegendAt", name = "Legend at (gp)", description = "With Easter eggs on, a group"
+		+ " storage deposit worth at least this much gets a line. 0 turns it off.", section = discordSection,
+		position = 14)
+	default int discordLegendAt()
+	{
+		return 1_000_000;
+	}
+
+	@ConfigItem(keyName = "discordFreeloaderAt", name = "Freeloader at (gp)", description = "With Easter eggs on, a"
+		+ " group storage withdrawal worth more than this gets a line. 0 turns it off.", section = discordSection,
+		position = 15)
+	default int discordFreeloaderAt()
+	{
+		return 1_000_000;
+	}
+
 	@ConfigSection(name = "Discord: which events", description = "Each event is its own switch, all off until you"
 		+ " tick it.", position = 5, closedByDefault = true)
 	String discordEventsSection = "discordEvents";

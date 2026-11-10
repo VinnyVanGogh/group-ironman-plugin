@@ -141,6 +141,11 @@ final class DiscordMerge
 				kept.add(e);
 			}
 		}
+		if (kept.size() > 1)
+		{
+			// A death that cost 0 gp adds no line to its death's post; alone, DiscordWebhook decides.
+			kept.removeIf(EasterEggs::nothingLost);
+		}
 		if (kept.isEmpty())
 		{
 			return null;
