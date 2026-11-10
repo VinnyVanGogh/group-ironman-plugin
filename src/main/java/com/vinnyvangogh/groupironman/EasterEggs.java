@@ -6,7 +6,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 
 /**
@@ -14,8 +13,8 @@ import java.util.Set;
  * first rule with lines wins; the words live in {@link EasterEggLines}. The line is extra, never a replacement:
  * the post keeps every fact it had.
  *
- * <p>The phrasing is picked by a {@link Random} seeded from the event, so the same event always gets the same line
- * and a test with a fixed seed is stable. {@code java.util.Random}'s sequence is fixed by its own javadoc.
+ * <p>The phrasing is picked by {@link #pick}, a fixed hash of a seed taken from the event, so the same event always
+ * gets the same line on every client and a test with a fixed seed is stable.
  */
 final class EasterEggs
 {
@@ -100,10 +99,23 @@ final class EasterEggs
 			String[] lines = rule.lines(e, lookup, settings);
 			if (lines != null && lines.length > 0)
 			{
-				return lines[new Random(seed).nextInt(lines.length)];
+				return lines[pick(seed, lines.length)];
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Which of {@code n} phrasings a seed picks. MurmurHash3's 64-bit finalizer, so nearby seeds spread out;
+	 * {@code new Random(seed).nextInt(n)} does not: its first value barely moves between close seeds.
+	 */
+	static int pick(long seed, int n)
+	{
+		long z = seed;
+		z = (z ^ (z >>> 33)) * 0xff51afd7ed558ccdL;
+		z = (z ^ (z >>> 33)) * 0xc4ceb9fe1a85ec53L;
+		z ^= z >>> 33;
+		return (int) Math.floorMod(z, (long) n);
 	}
 
 	/** The same on every client that sees the event: the sender's time, the member and the kind. */
