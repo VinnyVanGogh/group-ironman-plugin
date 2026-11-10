@@ -214,6 +214,14 @@ before friends run it. To test a different tag, change `$SourceRef` at the
 top of the launcher. The checksum step has its own tests:
 `pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1`.
 
+The `windows-launcher` GitHub Actions workflow runs the launcher end to end
+on a clean Windows runner with `GU_BUILD_ONLY=1` set, which makes `[3/3]` run
+`gradlew build` instead of opening RuneLite. It runs both the `.cmd` in the
+commit and the `.cmd` attached to the `gim-test-1` release, byte for byte.
+**Whenever `tools/windows/Run-GimUtilities.cmd` changes, re-upload it to the
+release** (as committed, with CRLF line endings), or the `release-asset` leg
+fails and players keep downloading the old one.
+
 ### What to look at
 
 Banks, storage and stats (two or more members with the same switch on):

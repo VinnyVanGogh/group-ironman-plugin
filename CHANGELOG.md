@@ -20,6 +20,15 @@
   it read "Not seen yet". Sends still wait for sync and the share switches.
 - The group box lists other members online, not you.
 
+### Windows launcher in CI
+
+- `Run-GimUtilities.cmd` takes an opt-in `GU_BUILD_ONLY=1` that builds
+  without opening RuneLite. Unset, it behaves exactly as before.
+- New `windows-launcher` workflow runs the launcher on `windows-latest` the
+  way a player would (no Java, no checkout, both the committed `.cmd` and the
+  `gim-test-1` release asset) and runs the launcher tests on Windows
+  PowerShell 5.1 and PowerShell 7.
+
 ### Group events, part A
 
 - One event model (`GroupEvent`, now typed) feeds two outputs, each with its
