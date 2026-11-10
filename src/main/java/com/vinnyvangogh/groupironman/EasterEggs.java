@@ -8,7 +8,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import net.runelite.api.gameval.ItemID;
 
 /**
  * The optional funny line under a Discord post. Pure and table-driven: {@link #RULES} is checked in order and the
@@ -57,7 +56,7 @@ final class EasterEggs
 		GroupEvent.Type.RAID_UNIQUE, GroupEvent.Type.CLOG));
 
 	/** Checked in order; the first that applies wins. Deaths are first so a spade outranks a free trip. */
-	private static final List<Rule> RULES = Collections.unmodifiableList(Arrays.asList(
+	private static final List<Rule> RULES = Collections.unmodifiableList(Arrays.<Rule>asList(
 		(e, l, s) -> clueDeath(e, l) ? EasterEggLines.CLUE_HUNTERS : null,
 		(e, l, s) -> nothingLost(e) ? EasterEggLines.FREE_TRIP : null,
 		(e, l, s) -> e.type == GroupEvent.Type.PET ? EasterEggLines.PET : null,
@@ -107,13 +106,13 @@ final class EasterEggs
 
 	private static boolean clueDeath(GroupEvent e, ItemLookup lookup)
 	{
-		if (e.type != GroupEvent.Type.DEATH_VALUE || !e.items.containsKey(ItemID.SPADE))
+		if (e.type != GroupEvent.Type.DEATH_VALUE || !e.items.containsKey(EasterEggLines.SPADE))
 		{
 			return false;
 		}
 		for (int id : e.items.keySet())
 		{
-			if (id != ItemID.SPADE && !clueItem(lookup.name(id)))
+			if (id != EasterEggLines.SPADE && !clueItem(lookup.name(id)))
 			{
 				return false;
 			}
@@ -129,7 +128,7 @@ final class EasterEggs
 
 	private static boolean bonesOnly(GroupEvent e)
 	{
-		return e.type == GroupEvent.Type.DROP && e.items.size() == 1 && e.items.containsKey(ItemID.BONES);
+		return e.type == GroupEvent.Type.DROP && e.items.size() == 1 && e.items.containsKey(EasterEggLines.BONES);
 	}
 
 	private static String[] itemRow(GroupEvent e, ItemLookup lookup, Settings settings)

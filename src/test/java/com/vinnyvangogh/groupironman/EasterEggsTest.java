@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import net.runelite.api.gameval.ItemID;
 import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
 import static com.vinnyvangogh.groupironman.EventFixtures.items;
@@ -258,6 +257,15 @@ public class EasterEggsTest
 	{
 		assertNotNull(json);
 		return new JsonParser().parse(json).getAsJsonObject().getAsJsonArray("embeds").get(0).getAsJsonObject();
+	}
+
+	/** The ids the eggs key on, from the one table that holds them. */
+	private static final class ItemID
+	{
+		static final int SPADE = EasterEggLines.SPADE;
+		static final int BONES = EasterEggLines.BONES;
+		static final int TWISTED_BOW = EasterEggLines.TWISTED_BOW;
+		static final int COINS = 995;
 	}
 
 	/** FakeItems plus the items the eggs look at. */
