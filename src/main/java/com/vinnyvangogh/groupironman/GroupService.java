@@ -716,6 +716,12 @@ class GroupService
 	 */
 	private void capture(String me, GroupOutbox.Switches s, boolean sync)
 	{
+		if (sync && ticksSinceStats >= STATS_HEARTBEAT_TICKS)
+		{
+			// Nothing sent for a minute: send the same again so members still see us online.
+			selfCard.resendStats();
+			statsDirty = true;
+		}
 		pollStats(me, s, sync);
 		if (carriedDirty && ticksSinceCarried >= CARRIED_INTERVAL_TICKS)
 		{
@@ -802,12 +808,6 @@ class GroupService
 			lastX = x;
 			lastY = y;
 			lastPlane = plane;
-			statsDirty = true;
-		}
-		if (sync && ticksSinceStats >= STATS_HEARTBEAT_TICKS)
-		{
-			// Nothing sent for a minute: send the same again so members still see us online.
-			selfCard.resendStats();
 			statsDirty = true;
 		}
 		if (statsDirty && ticksSinceStats >= STATS_INTERVAL_TICKS)

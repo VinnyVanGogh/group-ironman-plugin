@@ -11,6 +11,15 @@
 - A save over 1 MiB is skipped and the previous save stands.
 - The old file is not read: each member's bank comes back on their next visit.
 
+### Your own card is always live
+
+- While you are logged in, your card in the Group tab shows your stats,
+  location, inventory, worn items, rune pouch and quiver from your own
+  client, with or without group sync and whatever the share switches say.
+  It used to fill only after a send to a connected group, so with sync off
+  it read "Not seen yet". Sends still wait for sync and the share switches.
+- The group box lists other members online, not you.
+
 ### Group events, part A
 
 - One event model (`GroupEvent`, now typed) feeds two outputs, each with its
