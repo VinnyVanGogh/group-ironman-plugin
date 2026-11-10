@@ -84,21 +84,31 @@ jobs:
       - name: Run it like a player, build only
         shell: pwsh
         run: |
+          $log = Join-Path $env:RUNNER_TEMP 'launcher.log'
+          # Failures become an annotation carrying the log tail, so the reason
+          # shows on the PR without opening the raw log.
+          function Fail([string]$msg) {
+            $tail = ''
+            if (Test-Path -LiteralPath $log) { $tail = (Get-Content -LiteralPath $log -Tail 30) -join "`n" }
+            $body = ("$msg`n$tail" -replace '%', '%25' -replace "`r", '') -replace "`n", '%0A'
+            Write-Host "::error title=launcher ${{ matrix.launcher }}::$body"
+            exit 1
+          }
+
           # A player has no Java: hide the runner's so step [1/3] downloads and
           # checksums Temurin 11 itself.
           $env:JAVA_HOME = $null
           $env:Path = (($env:Path -split ';') | Where-Object { $_ -and -not (Test-Path -LiteralPath (Join-Path $_ 'java.exe')) }) -join ';'
-          if (Get-Command java.exe -ErrorAction SilentlyContinue) { throw 'java.exe is still on PATH' }
+          if (Get-Command java.exe -ErrorAction SilentlyContinue) { Fail 'java.exe is still on PATH' }
           $managed = Join-Path $env:LOCALAPPDATA 'GimUtilities'
-          if (Test-Path -LiteralPath $managed) { throw "$managed already exists; this is not a first run" }
+          if (Test-Path -LiteralPath $managed) { Fail "$managed already exists; this is not a first run" }
 
           $env:GU_BUILD_ONLY = '1'
-          $log = Join-Path $env:RUNNER_TEMP 'launcher.log'
           # < NUL so the launcher's `pause` on failure cannot wait for a key.
           cmd.exe /d /c "$env:GU_LAUNCHER < NUL" 2>&1 | Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           Write-Host "launcher exit code: $code"
-          if ($code -ne 0) { throw "launcher exited $code" }
+          if ($code -ne 0) { Fail "launcher exited $code" }
 
           $text = Get-Content -Raw -LiteralPath $log
           $expected = @(
@@ -111,11 +121,11 @@ jobs:
             'BUILD SUCCESSFUL'
           )
           $missing = @($expected | Where-Object { -not $text.Contains($_) })
-          if ($missing.Count -gt 0) { throw "launcher output is missing: $($missing -join ' | ')" }
-          if ($text.Contains('ERROR:')) { throw 'launcher printed ERROR:' }
+          if ($missing.Count -gt 0) { Fail "launcher output is missing: $($missing -join ' | ')" }
+          if ($text.Contains('ERROR:')) { Fail 'launcher printed ERROR:' }
 
           $jars = Get-ChildItem -Path (Join-Path $managed 'src\gim-test-1\build\libs') -Filter *.jar -ErrorAction SilentlyContinue
-          if (-not $jars) { throw 'no jar under src\gim-test-1\build\libs' }
+          if (-not $jars) { Fail 'no jar under src\gim-test-1\build\libs' }
           $jars | ForEach-Object { Write-Host "built $($_.FullName) ($($_.Length) bytes)" }
 
       - name: Keep the launcher log
