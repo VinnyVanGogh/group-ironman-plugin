@@ -93,7 +93,11 @@ final class EventSettings
 	/** A kill count milestone every this many kills; 0 for none. */
 	final int kcEvery;
 	final int graveWarnMinutes;
-	/** Categories whose Discord posts wait for the daily digest. */
+	/**
+	 * Categories with a once-a-day summary post. In addition to the instant
+	 * posts, never instead of them: a category's digest lists every event of
+	 * it, ticked for instant posting or not.
+	 */
 	final Set<GroupEvent.Category> digest;
 	final int digestHour;
 
@@ -173,6 +177,12 @@ final class EventSettings
 	/** Some output wants this kind; when none does, it is not even detected. */
 	boolean wants(GroupEvent.Type type)
 	{
-		return discord.contains(type) || overlay.contains(type);
+		return discord.contains(type) || overlay.contains(type) || digests(type);
+	}
+
+	/** This kind goes in its category's daily digest. The weekly recap is a post of its own. */
+	boolean digests(GroupEvent.Type type)
+	{
+		return type != GroupEvent.Type.WEEKLY_RECAP && digest.contains(type.category);
 	}
 }

@@ -12,9 +12,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The daily digest: lines held per category instead of posted one by one, and
- * when the digest and the weekly recap are due. Pure and clock-free, so the
- * schedule is tested with fixed times.
+ * The daily digest: each category's lines since the last digest, collected
+ * alongside the instant posts (never instead of them), and when the digest
+ * and the weekly recap are due. Pure and clock-free, so the schedule is
+ * tested with fixed times.
  *
  * <p>Only this player's own lines are ever held, the same rule as every post
  * (BRIEF.md #18), so a group's digests are one per member.

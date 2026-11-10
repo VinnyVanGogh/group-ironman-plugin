@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Daily digest is in addition to instant posts
+
+- Ticking a daily digest category no longer holds that category's posts.
+  Instant posts follow "Discord: which events" exactly as set; each ticked
+  digest category adds one summary a day at the digest hour, listing every
+  event of that category since the last digest, ticked for instant posts or
+  not. Untick a category's instant events to make it digest-only.
+- The digest switches are now "Include in daily digest: Drops" and so on.
+  Setting keys are unchanged.
+- A webhook field that is set but is not a Discord webhook link now gets one
+  game chat line naming the field (never the link), on login or a settings
+  change. Surrounding whitespace and quotes are stripped before checking, so
+  a link pasted with its quotes works.
+
 ### Windows launcher in CI
 
 - `Run-GimUtilities.cmd` takes an opt-in `GU_BUILD_ONLY=1` that builds

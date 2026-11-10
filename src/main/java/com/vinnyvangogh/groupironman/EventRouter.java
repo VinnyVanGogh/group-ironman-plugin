@@ -18,11 +18,25 @@ final class EventRouter
 {
 	private final Consumer<GroupEvent> discord;
 	private final Consumer<GroupEvent> overlay;
+	private final Consumer<GroupEvent> digest;
 
 	EventRouter(Consumer<GroupEvent> discord, Consumer<GroupEvent> overlay)
 	{
+		this(discord, overlay, e ->
+		{
+		});
+	}
+
+	/**
+	 * {@code digest} takes this player's own events for the daily digest. It
+	 * is a separate output: an event can post now and be in tonight's digest,
+	 * and a ticked digest never holds an instant post back.
+	 */
+	EventRouter(Consumer<GroupEvent> discord, Consumer<GroupEvent> overlay, Consumer<GroupEvent> digest)
+	{
 		this.discord = discord;
 		this.overlay = overlay;
+		this.digest = digest;
 	}
 
 	/** {@code own}: this player's event, from this client; false for a member's from the party. */
@@ -40,6 +54,10 @@ final class EventRouter
 		if (own && settings.discord.contains(kept.type))
 		{
 			discord.accept(kept);
+		}
+		if (own && settings.digests(kept.type))
+		{
+			digest.accept(kept);
 		}
 	}
 
