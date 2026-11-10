@@ -628,6 +628,14 @@ class GroupEventEngine
 		{
 			own(combat);
 		}
+		readInterfaces(now);
+		dry.due(now).forEach(this::own);
+		watch(now, me);
+	}
+
+	/** The quest, Barrows and clue interfaces, a tick or two after they loaded. */
+	private void readInterfaces(long now)
+	{
 		if (questPending)
 		{
 			questPending = false;
@@ -641,8 +649,6 @@ class GroupEventEngine
 		{
 			clueReward(now);
 		}
-		dry.due(now).forEach(this::own);
-		watch(now, me);
 	}
 
 	/** Each tick, once a login has settled: variables, death, the gravestone and the schedule. */
