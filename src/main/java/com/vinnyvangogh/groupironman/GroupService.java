@@ -1,11 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -53,7 +48,6 @@ import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.Notifier;
-import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
@@ -119,10 +113,6 @@ class GroupService
 			POUCH_VARBITS.add(POUCH_AMOUNTS[i]);
 		}
 	}
-
-	/** Its own folder, never Build Guard's: both plugins may run side by side. */
-	static final String CACHE_DIR = "gim-utilities";
-	private static final String CACHE_FILE = "group-cache.json";
 
 	@Inject
 	private Client client;
@@ -1351,29 +1341,20 @@ class GroupService
 		});
 	}
 
-	/** Executor thread. False when there is no file or it cannot be read. */
+	/** Executor thread. False when nothing is saved or it cannot be read. */
 	private boolean readCache()
 	{
-		File file = cacheFile();
-		if (!file.isFile())
+		String json = configManager.getConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_CACHE);
+		if (json == null)
 		{
 			return false;
 		}
-		try
+		if (!GroupCache.read(gson, json, roster))
 		{
-			String json = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
-			if (!GroupCache.read(gson, json, roster))
-			{
-				log.debug("group cache unreadable, starting empty");
-				return false;
-			}
-			return true;
-		}
-		catch (IOException e)
-		{
-			log.debug("could not read group cache", e);
+			log.debug("group cache unreadable, starting empty");
 			return false;
 		}
+		return true;
 	}
 
 	private void saveCache()
@@ -1383,27 +1364,14 @@ class GroupService
 			// Whatever arrived meanwhile is in the roster and goes out with the first save after loading.
 			return;
 		}
-		String json = GroupCache.write(gson, roster);
-		executor.execute(() ->
+		String json = GroupCache.writeForConfig(gson, roster);
+		if (json == null)
 		{
-			File file = cacheFile();
-			try
-			{
-				Files.createDirectories(file.getParentFile().toPath());
-				File tmp = new File(file.getParentFile(), CACHE_FILE + ".tmp");
-				Files.write(tmp.toPath(), json.getBytes(StandardCharsets.UTF_8));
-				Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
-			}
-			catch (IOException e)
-			{
-				log.debug("could not write group cache", e);
-			}
-		});
-	}
-
-	private static File cacheFile()
-	{
-		return new File(new File(RuneLite.RUNELITE_DIR, CACHE_DIR), CACHE_FILE);
+			log.debug("group cache too large to save, keeping the last save");
+			return;
+		}
+		// In memory only: ConfigManager flushes to disk on its own schedule, so this is safe on the client thread.
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_CACHE, json);
 	}
 
 	/** Kept for the panel: is any group feature on, so the panel button should show. */

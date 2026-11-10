@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Saved data moves into RuneLite settings
+
+- Banks, the storage log and the rest of the saved group data now live in one
+  RuneLite config value (`gimutilities.groupCache`) instead of
+  `.runelite/gim-utilities/group-cache.json`, so the plugin does no file i/o
+  of its own (the Plugin Hub holds plugins that do for extra review).
+- A save over 1 MiB is skipped and the previous save stands.
+- The old file is not read: each member's bank comes back on their next visit.
+
 ### Group events, part A
 
 - One event model (`GroupEvent`, now typed) feeds two outputs, each with its

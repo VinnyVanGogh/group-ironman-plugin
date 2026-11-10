@@ -34,7 +34,8 @@ fresh install has every feature off. It sends nothing either way.
 ## Display name and config group — durable · 2026-11-04
 
 **Board decided: "GIM Utilities"**, config group `gimutilities`, saved data in
-`.runelite/gim-utilities/`. "Group Ironman" clashes with the Hub's
+that group's `groupCache` value (moved from `.runelite/gim-utilities/` on
+2026-11-09: the Hub bot holds plugins doing file i/o). "Group Ironman" clashes with the Hub's
 "Group Iron Man" (slug `group-ironman`) and 20+ `gim-*` plugins exist; no
 `gim-util*` slug does. The Java package (`com.vinnyvangogh.groupironman`) and
 the party message class (`VvgGroupIronmanMessage`) stay as they are: both are

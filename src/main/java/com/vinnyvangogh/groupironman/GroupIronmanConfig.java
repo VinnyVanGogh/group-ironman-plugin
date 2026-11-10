@@ -46,6 +46,9 @@ public interface GroupIronmanConfig extends Config
 	/** Frozen. */
 	String KEY_GROUP_KEY = "groupKey";
 
+	/** Frozen. Not a setting: {@link GroupCache}'s saved JSON, written through ConfigManager and never shown. */
+	String KEY_GROUP_CACHE = "groupCache";
+
 	@ConfigItem(
 		keyName = "groupSync",
 		name = "Sync with my group",
