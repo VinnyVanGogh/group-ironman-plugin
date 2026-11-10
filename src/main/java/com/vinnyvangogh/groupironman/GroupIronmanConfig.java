@@ -558,21 +558,21 @@ public interface GroupIronmanConfig extends Config
 	@Range(max = 10)
 	@ConfigItem(keyName = "discordOfflineGrace", name = "Offline grace (minutes)", description = "How long a"
 		+ " logout waits before it is posted. Logging back in within it posts nothing. At most one online and"
-		+ " offline per 10 minutes.", section = discordEventsSection, position = 17)
+		+ " offline per 10 minutes.", section = discordEventsSection, position = 18)
 	default int discordOfflineGrace()
 	{
 		return 2;
 	}
 
 	@ConfigItem(keyName = "discordBack", name = "Back after a break", description = "Logging in after the 'Back"
-		+ " after' days.", section = discordEventsSection, position = 18)
+		+ " after' days.", section = discordEventsSection, position = 19)
 	default boolean discordBack()
 	{
 		return false;
 	}
 
 	@ConfigItem(keyName = "discordBarrows", name = "Barrows chest", description = "The chest's loot, chest count and"
-		+ " set progress.", section = discordEventsSection, position = 19)
+		+ " set progress.", section = discordEventsSection, position = 20)
 	default boolean discordBarrows()
 	{
 		return false;
@@ -779,8 +779,9 @@ public interface GroupIronmanConfig extends Config
 		+ " gravestone warning.", position = 10, closedByDefault = true)
 	String mediumSettingsSection = "mediumSettings";
 
-	@ConfigSection(name = "Discord: daily digest", description = "Tick a category to hold its posts and send them as"
-		+ " one message a day, while you are logged in.", position = 11, closedByDefault = true)
+	@ConfigSection(name = "Discord: daily digest", description = "Tick a category to add a once-a-day summary of it,"
+		+ " sent while you are logged in. Instant posts still go out as set above; the digest never delays"
+		+ " them.", position = 11, closedByDefault = true)
 	String digestSection = "digest";
 
 	@ConfigItem(keyName = "eventClueMinValue", name = "Clue reward at least (gp)", description = "A clue reward counts"
@@ -1024,43 +1025,49 @@ public interface GroupIronmanConfig extends Config
 		return 20;
 	}
 
-	@ConfigItem(keyName = "digestDrops", name = "Drops", description = "Hold drop posts for the digest.",
-		section = digestSection, position = 1)
+	@ConfigItem(keyName = "digestDrops", name = "Include in daily digest: Drops", description = "Adds a daily"
+		+ " summary of every drop event since the last digest, ticked for instant posts or not. Never delays"
+		+ " instant posts.", section = digestSection, position = 1)
 	default boolean digestDrops()
 	{
 		return false;
 	}
 
-	@ConfigItem(keyName = "digestDeaths", name = "Deaths", description = "Hold death posts for the digest.",
-		section = digestSection, position = 2)
+	@ConfigItem(keyName = "digestDeaths", name = "Include in daily digest: Deaths", description = "Adds a daily"
+		+ " summary of every death event since the last digest, ticked for instant posts or not. Never delays"
+		+ " instant posts.", section = digestSection, position = 2)
 	default boolean digestDeaths()
 	{
 		return false;
 	}
 
-	@ConfigItem(keyName = "digestStorage", name = "Storage", description = "Hold storage posts for the digest.",
-		section = digestSection, position = 3)
+	@ConfigItem(keyName = "digestStorage", name = "Include in daily digest: Storage", description = "Adds a daily"
+		+ " summary of every storage event since the last digest, ticked for instant posts or not. Never delays"
+		+ " instant posts.", section = digestSection, position = 3)
 	default boolean digestStorage()
 	{
 		return false;
 	}
 
-	@ConfigItem(keyName = "digestProgress", name = "Progress", description = "Hold progress posts for the digest.",
-		section = digestSection, position = 4)
+	@ConfigItem(keyName = "digestProgress", name = "Include in daily digest: Progress", description = "Adds a"
+		+ " daily summary of every progress event since the last digest, ticked for instant posts or not. Never"
+		+ " delays instant posts.", section = digestSection, position = 4)
 	default boolean digestProgress()
 	{
 		return false;
 	}
 
-	@ConfigItem(keyName = "digestGroup", name = "Group", description = "Hold group posts for the digest.",
-		section = digestSection, position = 5)
+	@ConfigItem(keyName = "digestGroup", name = "Include in daily digest: Group", description = "Adds a daily"
+		+ " summary of every group event since the last digest, ticked for instant posts or not. Never delays"
+		+ " instant posts.", section = digestSection, position = 5)
 	default boolean digestGroup()
 	{
 		return false;
 	}
 
-	@ConfigItem(keyName = "digestActivities", name = "Activities", description = "Hold activity posts for the digest.",
-		section = digestSection, position = 6)
+	@ConfigItem(keyName = "digestActivities", name = "Include in daily digest: Activities", description = "Adds a"
+		+ " daily summary of every activity event since the last digest, ticked for instant posts or not. Never"
+		+ " delays instant posts.", section = digestSection, position = 6)
 	default boolean digestActivities()
 	{
 		return false;

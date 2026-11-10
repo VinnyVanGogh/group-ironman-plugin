@@ -247,7 +247,7 @@ assumed from its name.
 | 32 | KC milestone | Kill count line (#20) | Not an attack counter: a total after the kill | As #20 |
 | 33 | Personal best | "(new personal best)" | Own time, after the fight | Unverified wording |
 | 36 | Weekly recap | This player's own tally | **Corrected from the brief:** #18 forbids posting another player's data, so each member posts their own week, not one group total | Pure logic |
-| 37 | Daily digest | Held own lines, per category | Sent only while logged in | Pure logic |
+| 37 | Daily digest | Own lines per category, a summary on top of instant posts (never holds them; Board 2026-11-10) | Sent only while logged in | Pure logic |
 | 39 | Slayer | "You've completed N tasks", "new Slayer assignment" | Own task | Unverified wording |
 | 40 | Farming runs ready (herbs, trees) | `FARMING_TRANSMIT_*`, read only in the patch's own region | Own patches only. *Precedent:* the base client's Time Tracking plugin reports the same. Fruit trees and other patch types not included | Time Tracking source, master, read 2026-11-09 (THIRD_PARTY_NOTICES.md). Not checked in game |
 | 41 | Bird houses, Hespori | `BIRDHOUSE_TRANSMIT_*` on Fossil Island's ground, `FARMING_TRANSMIT_J` | Own patches only, as #40 | As #40 |

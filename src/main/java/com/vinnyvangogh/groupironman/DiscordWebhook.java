@@ -36,13 +36,31 @@ final class DiscordWebhook
 	private static final Pattern URL = Pattern.compile(
 		"^https://(?:(?:ptb|canary)\\.)?discord(?:app)?\\.com/api/webhooks/\\d+/[A-Za-z0-9_-]+/?$");
 
+	/** Quotes a pasted link may come wrapped in: straight, backtick and curly. */
+	private static final String QUOTES = "\"'`“”‘’";
+
 	private DiscordWebhook()
 	{
 	}
 
 	static boolean valid(String url)
 	{
-		return url != null && URL.matcher(url.trim()).matches();
+		return URL.matcher(clean(url)).matches();
+	}
+
+	/**
+	 * The field as typed, without surrounding whitespace or quotes: a link
+	 * pasted with its quotes, straight or curly, is the common mistake. Empty
+	 * for null.
+	 */
+	static String clean(String url)
+	{
+		String s = url == null ? "" : url.trim();
+		while (s.length() >= 2 && QUOTES.indexOf(s.charAt(0)) >= 0 && QUOTES.indexOf(s.charAt(s.length() - 1)) >= 0)
+		{
+			s = s.substring(1, s.length() - 1).trim();
+		}
+		return s;
 	}
 
 	/** The category's own webhook when it is set and valid, else the main one, else null: nothing is posted. */
@@ -51,9 +69,9 @@ final class DiscordWebhook
 		String own = overrides.get(category);
 		if (valid(own))
 		{
-			return own.trim();
+			return clean(own);
 		}
-		return valid(main) ? main.trim() : null;
+		return valid(main) ? clean(main) : null;
 	}
 
 	static Map<GroupEvent.Category, String> overrides(GroupIronmanConfig config)

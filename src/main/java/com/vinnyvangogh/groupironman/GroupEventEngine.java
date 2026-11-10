@@ -46,6 +46,8 @@ import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
@@ -129,12 +131,17 @@ class GroupEventEngine
 	@Inject
 	private OverlayManager overlayManager;
 
+	@Inject
+	private ChatMessageManager chatMessageManager;
+
 	private final ToastQueue toasts = new ToastQueue();
+	private final WebhookWarnings webhookWarnings = new WebhookWarnings();
 	private final ProgressTracker progress = new ProgressTracker(Skill.values().length - 1);
 	/** Guards {@link #presence}: the client thread logs in and out, the executor polls. */
 	private final Object presenceLock = new Object();
 	private PresenceDebounce presence = new PresenceDebounce(ZoneId.systemDefault());
-	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()));
+	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()),
+		this::toDigest);
 	private volatile EventSettings settings = EventSettings.OFF;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
 	private volatile Digest digest = new Digest();
@@ -216,6 +223,27 @@ class GroupEventEngine
 		if (toastOverlay != null)
 		{
 			toastOverlay.reposition();
+		}
+		warnBadWebhooks();
+	}
+
+	/**
+	 * A webhook field that is set but not a Discord webhook link gets one
+	 * chat line, on login or a config change, naming the field and never the
+	 * URL. Logged out, it waits for the login.
+	 */
+	private void warnBadWebhooks()
+	{
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+		for (String line : webhookWarnings.check(WebhookWarnings.fields(config)))
+		{
+			chatMessageManager.queue(QueuedMessage.builder()
+				.type(ChatMessageType.GAMEMESSAGE)
+				.runeLiteFormattedMessage(line)
+				.build());
 		}
 	}
 
@@ -776,15 +804,10 @@ class GroupEventEngine
 
 	private void flushDigest()
 	{
-		if (sender == null || !config.discordEnabled())
-		{
-			return;
-		}
-		Map<GroupEvent.Category, String> overrides = DiscordWebhook.overrides(config);
 		for (GroupEvent.Category category : settings.digest)
 		{
-			String url = DiscordWebhook.route(category, overrides, config.discordWebhookUrl());
-			// Draining first would lose held lines when the webhook has been cleared.
+			String url = webhook(category);
+			// Draining first would lose the day's lines when the webhook has been cleared.
 			if (url != null)
 			{
 				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category)), null);
@@ -799,6 +822,7 @@ class GroupEventEngine
 		week = Digest.Week.parse(profile(WEEK_KEY));
 		digest = Digest.parse(profile(DIGEST_KEY));
 		farm = FarmRuns.parse(profile(FARM_KEY), this::own, this::wanted);
+		warnBadWebhooks();
 		if (varWait < 0)
 		{
 			varWait = VAR_WAIT_TICKS;
@@ -936,24 +960,38 @@ class GroupEventEngine
 
 	// ---- Discord ----
 
-	/** Router output: one of this player's events for Discord, when posting is on and a webhook is set. */
-	private void toDiscord(GroupEvent event)
+	/** Where a category posts: null when Discord is off or no valid webhook is set. */
+	private String webhook(GroupEvent.Category category)
 	{
 		if (!config.discordEnabled() || sender == null)
 		{
+			return null;
+		}
+		return DiscordWebhook.route(category, DiscordWebhook.overrides(config), config.discordWebhookUrl());
+	}
+
+	/**
+	 * Router output: one of this player's events for its category's daily
+	 * digest. Separate from {@link #toDiscord}, which posts it now when its
+	 * kind is ticked: the digest is a summary on top, never a hold.
+	 */
+	private void toDigest(GroupEvent event)
+	{
+		if (webhook(event.type.category) == null)
+		{
 			return;
 		}
-		String url = DiscordWebhook.route(event.type.category, DiscordWebhook.overrides(config),
-			config.discordWebhookUrl());
+		// A Discord line: "450K (450,001)", as the webhook's own posts read.
+		digest.add(event.type.category, EventText.sentence(event, Amounts.BOTH.words(group.lookup)));
+		saveProfile(DIGEST_KEY, digest.save());
+	}
+
+	/** Router output: one of this player's events posted now, when posting is on and a webhook is set. */
+	private void toDiscord(GroupEvent event)
+	{
+		String url = webhook(event.type.category);
 		if (url == null)
 		{
-			return;
-		}
-		if (settings.digest.contains(event.type.category) && event.type != GroupEvent.Type.WEEKLY_RECAP)
-		{
-			// A Discord line: "450K (450,001)", as the webhook's own posts read.
-			digest.add(event.type.category, EventText.sentence(event, Amounts.BOTH.words(group.lookup)));
-			saveProfile(DIGEST_KEY, digest.save());
 			return;
 		}
 		DiscordStyle style = config.discordStyle();
