@@ -19,7 +19,8 @@ import java.util.regex.Pattern;
  * a file goes in a multipart form beside {@code payload_json}). Item icons are
  * RuneLite's static item cache, the URL Dink uses
  * ({@code https://static.runelite.net/cache/item/icon/<id>.png},
- * pajlads/DinkPlugin {@code ItemUtils.ITEM_CACHE_BASE_URL}).
+ * pajlads/DinkPlugin {@code ItemUtils.ITEM_CACHE_BASE_URL}), at the stack's own
+ * pile ({@link StackIcons}). Amounts read "450K (450,001)" ({@link Amounts#BOTH}).
  */
 final class DiscordWebhook
 {
@@ -93,9 +94,11 @@ final class DiscordWebhook
 	}
 
 	/** The JSON body ({@code payload_json} when a screenshot is attached). */
-	static String payload(Gson gson, GroupEvent e, ItemLookup lookup, DiscordStyle style, String mention,
+	static String payload(Gson gson, GroupEvent e, ItemLookup items, DiscordStyle style, String mention,
 		boolean screenshot)
 	{
+		// "450K (450,001)": the game's words, and nothing lost (Board 2026-11-10).
+		ItemLookup lookup = Amounts.BOTH.words(items);
 		JsonObject o = new JsonObject();
 		o.addProperty("username", USERNAME);
 		String tag = e.isBig() && mention != null && !mention.trim().isEmpty() ? mention.trim() : "";
@@ -135,7 +138,7 @@ final class DiscordWebhook
 		long value = EventText.value(e.items, lookup);
 		if (value > 0)
 		{
-			fields.add(field("Value", BoostText.gp(value) + " gp"));
+			fields.add(field("Value", lookup.amount(value) + " gp"));
 		}
 		if (e.world > 0)
 		{
@@ -153,7 +156,7 @@ final class DiscordWebhook
 		if (icon != null)
 		{
 			JsonObject thumb = new JsonObject();
-			thumb.addProperty("url", String.format(ICON, icon));
+			thumb.addProperty("url", String.format(ICON, StackIcons.variant(icon, e.items.get(icon))));
 			embed.add("thumbnail", thumb);
 		}
 		if (screenshot)

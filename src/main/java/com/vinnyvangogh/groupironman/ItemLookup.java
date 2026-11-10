@@ -21,4 +21,14 @@ interface ItemLookup
 	{
 		return -1;
 	}
+
+	/**
+	 * An item quantity or gp value as text: the game's "450K" here, the exact
+	 * number or both through {@link Amounts#words}. Every line built from this
+	 * lookup reads its amounts the same way.
+	 */
+	default String amount(long amount)
+	{
+		return Amounts.GAME.of(amount);
+	}
 }

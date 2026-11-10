@@ -90,9 +90,10 @@ final class PanelModel
 			this.value = value;
 		}
 
+		/** "450,001 x Coins": the exact amount, which the icon's own stack text shortens. */
 		String tooltip()
 		{
-			return quantity > 1 ? quantity + " x " + name : name;
+			return quantity > 1 ? Amounts.EXACT.of(quantity) + " x " + name : name;
 		}
 	}
 
@@ -141,13 +142,16 @@ final class PanelModel
 		final String member;
 		/** "812 items, 45.2M gp, seen 2h ago". */
 		final String summary;
+		/** {@link #summary} with every digit, for its tooltip: "812 items, 45,201,337 gp, seen 2h ago". */
+		final String exact;
 		final long value;
 		final List<ItemCell> items;
 
-		BankCard(String member, String summary, long value, List<ItemCell> items)
+		BankCard(String member, String summary, String exact, long value, List<ItemCell> items)
 		{
 			this.member = member;
 			this.summary = summary;
+			this.exact = exact;
 			this.value = value;
 			this.items = items;
 		}
@@ -155,13 +159,16 @@ final class PanelModel
 
 	static final class LogRow
 	{
-		/** "You deposited 5 Trout" or "Alex took 2 Shark, deposited 100 Coal". */
+		/** "You deposited 5 Trout" or "Alex took 40K Coins". */
 		final String text;
+		/** {@link #text} with every digit, for its tooltip: "Alex took 40,000 Coins". */
+		final String exact;
 		final String ago;
 
-		LogRow(String text, String ago)
+		LogRow(String text, String exact, String ago)
 		{
 			this.text = text;
+			this.exact = exact;
 			this.ago = ago;
 		}
 	}
@@ -186,15 +193,21 @@ final class PanelModel
 	static final class FindRow
 	{
 		final int itemId;
-		/** "Grimy guam leaf 15 - GroupShip bank". */
+		/** The stack's size, so the icon is the game's own pile for it. */
+		final long quantity;
+		/** "Coins - 450K in group storage". */
 		final String text;
+		/** {@link #text} with every digit: "Coins - 450,001 in group storage". */
+		final String tooltip;
 		/** "2h ago", or "" for live data. */
 		final String ago;
 
-		FindRow(int itemId, String text, String ago)
+		FindRow(int itemId, long quantity, String text, String tooltip, String ago)
 		{
 			this.itemId = itemId;
+			this.quantity = quantity;
 			this.text = text;
+			this.tooltip = tooltip;
 			this.ago = ago;
 		}
 	}
@@ -351,8 +364,8 @@ final class PanelModel
 		{
 			seeds += n;
 		}
-		return "Seed vault: " + x.seedVault.size() + " kinds, " + seeds + " seeds (seen " + BoostText.ago(now, x.seedVaultAt)
-			+ ")";
+		return "Seed vault: " + x.seedVault.size() + " kinds, " + Amounts.GAME.of(seeds) + " seeds (seen "
+			+ BoostText.ago(now, x.seedVaultAt) + ")";
 	}
 
 	/**
@@ -402,9 +415,10 @@ final class PanelModel
 				count += n;
 			}
 			long value = total(bank, items);
-			String summary = count + " items, " + BoostText.gp(value) + " gp, seen "
-				+ BoostText.ago(now, e.getValue().takenAt());
-			out.add(new BankCard(e.getKey(), summary, value, cells(bank, items, filter, true)));
+			String seen = " gp, seen " + BoostText.ago(now, e.getValue().takenAt());
+			String summary = Amounts.GAME.of(count) + " items, " + Amounts.GAME.of(value) + seen;
+			String exact = Amounts.EXACT.of(count) + " items, " + Amounts.EXACT.of(value) + seen;
+			out.add(new BankCard(e.getKey(), summary, exact, value, cells(bank, items, filter, true)));
 		}
 		return out;
 	}
@@ -415,7 +429,8 @@ final class PanelModel
 		List<LogRow> log = new ArrayList<>();
 		for (StorageChange c : group.log().entries())
 		{
-			log.add(new LogRow(change(c, items, self), BoostText.ago(now, c.at())));
+			log.add(new LogRow(change(c, items, self), change(c, Amounts.EXACT.words(items), self),
+				BoostText.ago(now, c.at())));
 		}
 		long at = group.storageAt();
 		if (at < 0)
@@ -445,13 +460,13 @@ final class PanelModel
 		return who + " " + String.join(", ", parts);
 	}
 
-	/** "5 Trout, 2 Shark". */
+	/** "5 Trout, 40K Coins", amounts in {@code items}' style. */
 	static String counts(Map<Integer, Integer> counts, ItemLookup items)
 	{
 		List<String> parts = new ArrayList<>();
 		for (Map.Entry<Integer, Integer> e : counts.entrySet())
 		{
-			parts.add(e.getValue() + " " + items.name(e.getKey()));
+			parts.add(items.amount(e.getValue()) + " " + items.name(e.getKey()));
 		}
 		return String.join(", ", parts);
 	}
@@ -469,8 +484,8 @@ final class PanelModel
 		List<FindRow> out = new ArrayList<>();
 		for (GroupSearch.Hit h : GroupSearch.hits(query, group.searchSources(), items))
 		{
-			out.add(new FindRow(h.itemId, h.name + " - " + words.place(h),
-				h.seenAt < 0 ? "" : BoostText.ago(now, h.seenAt)));
+			out.add(new FindRow(h.itemId, h.quantity, h.name + " - " + words.place(h, Amounts.GAME),
+				h.name + " - " + words.place(h, Amounts.EXACT), h.seenAt < 0 ? "" : BoostText.ago(now, h.seenAt)));
 		}
 		return out;
 	}

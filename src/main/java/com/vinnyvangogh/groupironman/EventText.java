@@ -53,13 +53,13 @@ final class EventText
 			+ items(e, l) + " from group storage");
 		line(GroupEvent.Type.STORAGE_SUMMARY, "Group storage visit", EventText::summary);
 		line(GroupEvent.Type.STORAGE_MINIMUM, "Storage minimum hit", (e, l) -> "group storage is low on " + e.text
-			+ ": " + e.number + " left" + (e.detail.isEmpty() ? "" : ", " + e.detail));
+			+ ": " + l.amount(e.number) + " left" + (e.detail.isEmpty() ? "" : ", " + e.detail));
 		line(GroupEvent.Type.STORAGE_LAST, "Took the last one", (e, l) -> "took the last of "
 			+ StorageLog.describe(e.items, l) + " from group storage");
 		line(GroupEvent.Type.LEVEL_UP, "Level up", (e, l) -> e.text + " level " + e.number);
 		line(GroupEvent.Type.MAXED, "99!", (e, l) -> "total".equalsIgnoreCase(e.text)
 			? "maxed, total level " + e.number : "99 " + e.text + "!");
-		line(GroupEvent.Type.XP_MILESTONE, "XP milestone", (e, l) -> BoostText.gp(e.number) + " " + e.text + " XP");
+		line(GroupEvent.Type.XP_MILESTONE, "XP milestone", (e, l) -> l.amount(e.number) + " " + e.text + " XP");
 		line(GroupEvent.Type.COMBAT_LEVEL, "Combat level", (e, l) -> "combat level " + e.number);
 		line(GroupEvent.Type.TOTAL_LEVEL, "Total level", (e, l) -> "total level " + e.number);
 		line(GroupEvent.Type.QUEST, "Quest complete", (e, l) -> "completed " + e.text
@@ -89,7 +89,7 @@ final class EventText
 			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
 		line(GroupEvent.Type.KC_MILESTONE, "Kill count milestone", (e, l) -> e.number + " " + e.text + " kills");
 		line(GroupEvent.Type.PERSONAL_BEST, "New personal best", (e, l) -> "new personal best: " + e.text);
-		line(GroupEvent.Type.WEEKLY_RECAP, "Weekly recap", (e, l) -> "this week: +" + BoostText.gp(e.number) + " XP, "
+		line(GroupEvent.Type.WEEKLY_RECAP, "Weekly recap", (e, l) -> "this week: +" + l.amount(e.number) + " XP, "
 			+ e.text);
 		line(GroupEvent.Type.SLAYER, "Slayer", (e, l) -> "slayer " + e.text + (e.number > 0 ? " (" + e.number + ")" : ""));
 		line(GroupEvent.Type.FARMING, "Farming run", (e, l) -> ready(e));
@@ -121,7 +121,7 @@ final class EventText
 
 	private static String deathValue(GroupEvent e, ItemLookup lookup)
 	{
-		return "lost about " + BoostText.gp(e.number) + " gp on death" + (e.location.isEmpty() ? "" : " at " + e.location)
+		return "lost about " + lookup.amount(e.number) + " gp on death" + (e.location.isEmpty() ? "" : " at " + e.location)
 			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")");
 	}
 
@@ -165,11 +165,15 @@ final class EventText
 		return LINES.containsKey(type) && TITLES.containsKey(type);
 	}
 
-	/** "1 x Draconic visage (1.2M gp)": the items and their total value when any is known. */
+	/**
+	 * "1 x Draconic visage (1.2M gp)": the items and their total value when any is known. The total is
+	 * always the game's short form: Discord's exact total is its own Value field, and a short total keeps
+	 * "40K (40,000) x Coins (40K gp)" from nesting parentheses.
+	 */
 	static String items(GroupEvent e, ItemLookup lookup)
 	{
 		long value = value(e.items, lookup);
-		return StorageLog.describe(e.items, lookup) + (value > 0 ? " (" + BoostText.gp(value) + " gp)" : "");
+		return StorageLog.describe(e.items, lookup) + (value > 0 ? " (" + Amounts.GAME.of(value) + " gp)" : "");
 	}
 
 	/** Total value at the lookup's prices. */

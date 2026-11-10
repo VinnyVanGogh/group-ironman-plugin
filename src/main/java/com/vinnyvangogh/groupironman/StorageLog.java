@@ -57,13 +57,13 @@ final class StorageLog
 		entries.clear();
 	}
 
-	/** "5 x Shark, 100 x Coal", for {@code ::find}'s storage history. */
+	/** "5 x Shark, 40K x Coins", for {@code ::find}'s storage history; amounts in {@code items}' style. */
 	static String describe(Map<Integer, Integer> counts, ItemLookup items)
 	{
 		List<String> parts = new ArrayList<>();
 		for (Map.Entry<Integer, Integer> e : counts.entrySet())
 		{
-			parts.add(e.getValue() + " x " + items.name(e.getKey()));
+			parts.add(items.amount(e.getValue()) + " x " + items.name(e.getKey()));
 		}
 		return String.join(", ", parts);
 	}

@@ -66,7 +66,7 @@ final class EventDetect
 	static GroupEvent minimum(long at, String member, LowStock.Alert alert)
 	{
 		return GroupEvent.of(GroupEvent.Type.STORAGE_MINIMUM, at, member).text(alert.item).number(alert.have)
-			.detail("minimum " + alert.minimum).build();
+			.detail("minimum " + Amounts.GAME.of(alert.minimum)).build();
 	}
 
 	/** The untradeable items in a drop, less the ignored names; empty when there are none. */

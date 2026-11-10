@@ -59,17 +59,24 @@ final class FindStyle
 	 */
 	String place(GroupSearch.Hit h)
 	{
+		return place(h, Amounts.GAME);
+	}
+
+	/** {@link #place(GroupSearch.Hit)} with the amount in {@code amounts}: "450K in group storage". */
+	String place(GroupSearch.Hit h, Amounts amounts)
+	{
+		String amount = amounts.of(h.quantity);
 		if ("Group".equals(h.member))
 		{
-			return paint(h.quantity + " in group " + h.where, storage);
+			return paint(amount + " in group " + h.where, storage);
 		}
 		boolean you = isYou(h.member);
 		if ("equipped".equals(h.where))
 		{
-			return paint(h.quantity + " equipped by " + (you ? "you" : h.member), carried);
+			return paint(amount + " equipped by " + (you ? "you" : h.member), carried);
 		}
 		String owner = you ? "your" : h.member + "'s";
 		Color colour = "bank".equals(h.where) ? (you ? yourBank : memberBank) : carried;
-		return paint(h.quantity + " in " + owner + " " + h.where, colour);
+		return paint(amount + " in " + owner + " " + h.where, colour);
 	}
 }

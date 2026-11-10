@@ -951,7 +951,8 @@ class GroupEventEngine
 		}
 		if (settings.digest.contains(event.type.category) && event.type != GroupEvent.Type.WEEKLY_RECAP)
 		{
-			digest.add(event.type.category, EventText.sentence(event, group.lookup));
+			// A Discord line: "450K (450,001)", as the webhook's own posts read.
+			digest.add(event.type.category, EventText.sentence(event, Amounts.BOTH.words(group.lookup)));
 			saveProfile(DIGEST_KEY, digest.save());
 			return;
 		}
