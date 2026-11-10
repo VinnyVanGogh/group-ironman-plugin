@@ -16,18 +16,28 @@ import java.util.Map;
  * card shows where they were and what they had the last time you were both
  * online.
  *
- * <p>Pure, {@code String} in and out. The plugin reads and writes the file
- * ({@code .runelite/gim-utilities/group-cache.json}) off the client thread. A
- * file this build cannot read is treated as empty, never as an error: losing
- * a cache costs one bank visit per member.
+ * <p>Pure, {@code String} in and out. The plugin keeps the text in one
+ * ConfigManager value ({@link GroupIronmanConfig#KEY_GROUP_CACHE}). Text this
+ * build cannot read is treated as empty, never as an error: losing a cache
+ * costs one bank visit per member.
  */
 final class GroupCache
 {
 	static final int VERSION = 1;
 	static final int MAX_MEMBERS = 50;
 
+	/** Five members with full banks are about 160K; RuneLite may upload this value with a synced profile. */
+	static final int MAX_SAVED_CHARS = 1 << 20;
+
 	private GroupCache()
 	{
+	}
+
+	/** The text to save, or null when it is over {@link #MAX_SAVED_CHARS} and the last save should stand. */
+	static String writeForConfig(Gson gson, GroupRoster roster)
+	{
+		String json = write(gson, roster);
+		return json.length() > MAX_SAVED_CHARS ? null : json;
 	}
 
 	static String write(Gson gson, GroupRoster roster)

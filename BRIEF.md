@@ -117,7 +117,7 @@ repos:
 | --- | --- | --- |
 | Config group | `gimutilities` | `groupironman` is already the `@ConfigGroup` of the Hub plugin **Group Iron Man** (Spedwards, slug `group-ironman`, `GroupIronManConfig.java:9` at `8700097`). Sharing it would read and write that plugin's settings. |
 | Party message type | `VvgGroupIronmanMessage` | The relay routes by simple class name, so the name is shared by every plugin on the client. Build Guard uses `BuildGuardGroupMessage`; a generic `GroupIronmanMessage` could meet another group plugin's. A GitHub-wide code search to prove the generic name free was held at the gate, so the author prefix makes it moot. |
-| Saved data | `.runelite/gim-utilities/` | Build Guard's is `.runelite/build-guard/`. |
+| Saved data | `gimutilities.groupCache` (config value; was `.runelite/gim-utilities/` until 2026-11-09) | Build Guard's is `.runelite/build-guard/`. |
 | Display name | `GIM Utilities` (Board, 2026-11-04) | "Group Ironman" **clashes on the Hub**: slug `group-ironman` exists, display name "Group Iron Man", and 20+ `gim-*` slugs exist. No `gim-util*` slug does. |
 
 ### Phase 0 addendum — round 2, no Party panel (2026-11-04)
@@ -277,6 +277,27 @@ reported, as it is in Time Tracking.
 (`gim-party-share`) and **Group Iron Party** (`group-iron-party`); the Board
 chose **GIM Utilities** with config group `gimutilities`. The message type
 does not depend on the display name.
+
+### Phase 0 addendum — saved data moves into config (2026-11-09)
+
+The Hub bot on plugin-hub#20149 held the plugin for file i/o: "Plugins
+performing file i/o (such as with java.io or java.nio) are subject to
+additional review by maintainers. If possible, use the RuneLite Filepath API
+instead." The flagged commit already wrote under `RuneLite.RUNELITE_DIR`, so
+that path alone does not clear it.
+
+**Group cache in ConfigManager — allowed, with precedent.** What the player
+knows does not change; only where the same data is kept. *Nearest rules:*
+Data & Privacy, "no exposing player information over HTTP" and "no
+crowdsourcing data about other players": members' data is still only what they
+chose to share with their own group. The value leaves the machine only through
+RuneLite's own profile sync, if the player turned that on for the profile.
+*Precedent:* the base client's Bank Tags plugin keeps player data in config
+(`TagManager`: `configManager.getConfiguration` / `setConfiguration`).
+
+**Global config, not RS profile.** `getRSProfileConfiguration` returns null
+until a profile key exists, and the cache loads at `startUp`, usually before
+login. The old file was per install too.
 
 ---
 

@@ -22,7 +22,6 @@ import static org.junit.Assert.assertTrue;
 public class PluginIdentityTest
 {
 	private static final String BUILD_GUARD_CONFIG_GROUP = "build-guard";
-	private static final String BUILD_GUARD_CACHE_DIR = "build-guard";
 	private static final String[] BUILD_GUARD_MESSAGE_TYPES = {"BuildGuardPartyMessage", "BuildGuardGroupMessage"};
 	/** The Hub plugin "Group Iron Man" (Spedwards, slug group-ironman) already owns this group. */
 	private static final String HUB_GROUP_IRON_MAN_CONFIG_GROUP = "groupironman";
@@ -54,10 +53,10 @@ public class PluginIdentityTest
 	}
 
 	@Test
-	public void cacheFolderIsNotBuildGuards()
+	public void savedDataKeyIsFrozen()
 	{
-		assertEquals("gim-utilities", GroupService.CACHE_DIR);
-		assertNotEquals(BUILD_GUARD_CACHE_DIR, GroupService.CACHE_DIR);
+		// Lives under the config group pinned above, so it cannot meet Build Guard's saved data.
+		assertEquals("groupCache", GroupIronmanConfig.KEY_GROUP_CACHE);
 	}
 
 	@Test

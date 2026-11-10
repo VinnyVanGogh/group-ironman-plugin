@@ -1,5 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
+import java.io.ByteArrayInputStream;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -24,6 +25,19 @@ public class RegionNamesTest
 	{
 		assertNull(RegionNames.load().name(1));
 		assertNull(RegionNames.load().name(0));
+	}
+
+	@Test
+	public void theTableIsReadAsUtf8() throws Exception
+	{
+		byte[] bytes = "Café Å=7\n".getBytes("UTF-8");
+		assertEquals("Café Å", RegionNames.read(new ByteArrayInputStream(bytes)).name(7));
+	}
+
+	@Test
+	public void aMissingTableIsEmpty() throws Exception
+	{
+		assertEquals(0, RegionNames.read(null).size());
 	}
 
 	@Test

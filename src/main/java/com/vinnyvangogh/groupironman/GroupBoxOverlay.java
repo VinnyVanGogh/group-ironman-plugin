@@ -37,7 +37,7 @@ final class GroupBoxOverlay extends OverlayPanel
 		}
 		long now = System.currentTimeMillis();
 		panelComponent.getChildren().add(TitleComponent.builder().text("Group").build());
-		Map<String, MemberStats> online = group.roster().onlineStats(now);
+		Map<String, MemberStats> online = group.roster().othersOnlineStats(group.self(), now);
 		if (online.isEmpty())
 		{
 			panelComponent.getChildren().add(LineComponent.builder().left("Nobody else online").leftColor(Color.GRAY)

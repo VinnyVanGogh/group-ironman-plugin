@@ -6,6 +6,8 @@ import java.util.TreeMap;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static com.vinnyvangogh.groupironman.FakeItems.*;
 
@@ -65,5 +67,57 @@ public class GroupCacheTest
 		assertTrue(GroupCache.read(GSON,
 			"{\"v\":3,\"banks\":{\"Alex\":{\"ts\":5,\"i\":[385,2],\"tabs\":[1]}},\"pets\":[]}", roster));
 		assertEquals(items(SHARK, 2), roster.banks().get("Alex").items());
+	}
+
+	private static Map<Integer, Integer> fullBank()
+	{
+		Map<Integer, Integer> out = new TreeMap<>();
+		for (int id = 1; id <= GroupCodec.MAX_BANK_ITEMS; id++)
+		{
+			out.put(ItemCounts.MAX_ITEM_ID - id, Integer.MAX_VALUE);
+		}
+		return out;
+	}
+
+	@Test
+	public void aFullGroupFitsInOneConfigValueAndComesBack()
+	{
+		GroupRoster before = new GroupRoster();
+		for (int member = 0; member < 5; member++)
+		{
+			before.putBank("Member " + member, new BankSnapshot(100 + member, fullBank()));
+		}
+		for (int entry = 0; entry < StorageLog.MAX_ENTRIES; entry++)
+		{
+			before.putStorage(new StorageChange(entry, "Sam", items(SHARK, 1), items(COAL, 9), items(SHARK, 40)));
+		}
+
+		String saved = GroupCache.writeForConfig(GSON, before);
+
+		assertNotNull("a five-member group with full banks must be saved", saved);
+		GroupRoster after = new GroupRoster();
+		assertTrue(GroupCache.read(GSON, saved, after));
+		assertEquals(before.banks(), after.banks());
+		assertEquals(StorageLog.MAX_ENTRIES, after.log().entries().size());
+	}
+
+	@Test
+	public void aRosterTooBigForConfigIsNotWritten()
+	{
+		GroupRoster roster = new GroupRoster();
+		for (int member = 0; member < GroupCache.MAX_MEMBERS; member++)
+		{
+			roster.putBank("Member " + member, new BankSnapshot(member, fullBank()));
+		}
+		assertNull(GroupCache.writeForConfig(GSON, roster));
+	}
+
+	@Test
+	public void savingTheCacheIsNotASettingChange()
+	{
+		// reloadConfig drops live stats and resends everything, so a save must not trigger it.
+		assertFalse(GroupIronmanPlugin.isSettingChange(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_CACHE));
+		assertTrue(GroupIronmanPlugin.isSettingChange(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_KEY));
+		assertFalse(GroupIronmanPlugin.isSettingChange("some-other-plugin", GroupIronmanConfig.KEY_GROUP_KEY));
 	}
 }

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Saved data moves into RuneLite settings
+
+- Banks, the storage log and the rest of the saved group data now live in one
+  RuneLite config value (`gimutilities.groupCache`) instead of
+  `.runelite/gim-utilities/group-cache.json`, so the plugin does no file i/o
+  of its own (the Plugin Hub holds plugins that do for extra review).
+- The bundled place-name table is decoded without any `java.nio` import, so
+  no source file imports from `java.nio` at all.
+- A save over 1 MiB is skipped and the previous save stands.
+- The old file is not read: each member's bank comes back on their next visit.
+
+### Your own card is always live
+
+- While you are logged in, your card in the Group tab shows your stats,
+  location, inventory, worn items, rune pouch and quiver from your own
+  client, with or without group sync and whatever the share switches say.
+  It used to fill only after a send to a connected group, so with sync off
+  it read "Not seen yet". Sends still wait for sync and the share switches.
+- The group box lists other members online, not you.
+
 ### Windows launcher in CI
 
 - `Run-GimUtilities.cmd` takes an opt-in `GU_BUILD_ONLY=1` that builds

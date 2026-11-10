@@ -1,11 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -13,7 +8,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,7 +47,6 @@ import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.Notifier;
-import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
@@ -120,10 +113,6 @@ class GroupService
 		}
 	}
 
-	/** Its own folder, never Build Guard's: both plugins may run side by side. */
-	static final String CACHE_DIR = "gim-utilities";
-	private static final String CACHE_FILE = "group-cache.json";
-
 	@Inject
 	private Client client;
 
@@ -183,11 +172,10 @@ class GroupService
 	private int lastX;
 	private int lastY;
 	private int lastPlane;
-	private String lastStatsSent;
-	private String lastCarriedSent;
 	private boolean extrasDirty;
 	private int ticksSinceExtras = EXTRAS_INTERVAL_TICKS;
-	private String lastExtrasSent;
+	/** Your own card and what of it was last sent; built in {@link #startUp}, once Gson is injected. */
+	private SelfCard selfCard;
 	private Map<Integer, Integer> seedVault = new TreeMap<>();
 	private long seedVaultAt = -1;
 	private boolean session;
@@ -238,6 +226,8 @@ class GroupService
 				partyService.changeParty(passphrase);
 			}
 		});
+		selfCard = new SelfCard(roster, gson, payload -> partyService.send(new VvgGroupIronmanMessage(payload)),
+			() -> this.onChange.run());
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
@@ -265,15 +255,12 @@ class GroupService
 		session = false;
 		seedVault = new TreeMap<>();
 		seedVaultAt = -1;
-		lastExtrasSent = null;
 		roster.clearAll();
 		assembler.clear();
 		names.clear();
 		prices.clear();
 		storage.close(0, "");
 		lastBank = null;
-		lastStatsSent = null;
-		lastCarriedSent = null;
 		onChange = () -> { };
 	}
 
@@ -434,16 +421,17 @@ class GroupService
 		{
 			roster.clearExtras();
 		}
-		clientThread.invokeLater(() ->
-		{
-			lastStatsSent = null;
-			lastCarriedSent = null;
-			lastExtrasSent = null;
-			statsDirty = true;
-			carriedDirty = true;
-			extrasDirty = true;
-		});
+		clientThread.invokeLater(this::recaptureAll);
 		onChange.run();
+	}
+
+	/** Client thread. Capture and, while syncing, send everything again on the next ticks. */
+	private void recaptureAll()
+	{
+		selfCard.resend();
+		statsDirty = true;
+		carriedDirty = true;
+		extrasDirty = true;
 	}
 
 	@Subscribe
@@ -688,45 +676,62 @@ class GroupService
 		long now = System.currentTimeMillis();
 		if (!session)
 		{
-			session = true;
-			extrasDirty = true;
-			Player player = client.getLocalPlayer();
-			if (player != null && player.getName() != null)
-			{
-				self = player.getName();
-			}
-			if (cacheLoaded)
-			{
-				// Before this tick's mark: the last time seen in the previous session.
-				since = roster.lastPlayed();
-			}
+			startSession();
 		}
 		if (cacheLoaded)
 		{
 			roster.markPlayed(now);
 		}
 		refreshRoster();
-		if (!syncing())
+		Player player = client.getLocalPlayer();
+		if (player == null || player.getName() == null)
 		{
+			// No name yet to file your card under; the next tick has it.
 			return;
 		}
-		GroupOutbox.Switches s = switches();
+		String me = player.getName();
+		self = me;
+		selfCard.seen(me, now);
+		capture(me, switches(), syncing());
+	}
 
-		if (s.stats)
+	/** Client thread. The first logged-in tick of a session. */
+	private void startSession()
+	{
+		session = true;
+		// Fill your card now: turning the plugin on while logged in fires no container or stat events.
+		statsDirty = true;
+		carriedDirty = true;
+		extrasDirty = true;
+		if (cacheLoaded)
 		{
-			pollStats(s);
+			// Before this tick's mark: the last time seen in the previous session.
+			since = roster.lastPlayed();
 		}
+	}
 
-		if (s.carried && carriedDirty && ticksSinceCarried >= CARRIED_INTERVAL_TICKS)
+	/**
+	 * Client thread. Your stats, carried items and extras go on your own card
+	 * every time, sync or not; {@link SelfCard} sends them only while syncing.
+	 */
+	private void capture(String me, GroupOutbox.Switches s, boolean sync)
+	{
+		if (sync && ticksSinceStats >= STATS_HEARTBEAT_TICKS)
+		{
+			// Nothing sent for a minute: send the same again so members still see us online.
+			selfCard.resendStats();
+			statsDirty = true;
+		}
+		pollStats(me, s, sync);
+		if (carriedDirty && ticksSinceCarried >= CARRIED_INTERVAL_TICKS)
 		{
 			carriedDirty = false;
-			sendCarried(s);
+			sendCarried(me, s, sync);
 		}
-
-		if (s.extras && extrasDirty && ticksSinceExtras >= EXTRAS_INTERVAL_TICKS)
+		if (extrasDirty && ticksSinceExtras >= EXTRAS_INTERVAL_TICKS)
 		{
 			extrasDirty = false;
-			sendExtras(s);
+			sendExtras(me, s, sync);
 		}
 	}
 
@@ -783,7 +788,7 @@ class GroupService
 	}
 
 	/** Client thread. Run energy, special attack and location fire no StatChanged; poll the cheap ints. */
-	private void pollStats(GroupOutbox.Switches s)
+	private void pollStats(String me, GroupOutbox.Switches s, boolean sync)
 	{
 		int run = client.getEnergy() / 100;
 		int spec = client.getVarpValue(VarPlayerID.SA_ENERGY) / 10;
@@ -805,16 +810,10 @@ class GroupService
 			lastPlane = plane;
 			statsDirty = true;
 		}
-		if (ticksSinceStats >= STATS_HEARTBEAT_TICKS)
-		{
-			// Nothing changed for a minute: send the same again so members still see us online.
-			lastStatsSent = null;
-			statsDirty = true;
-		}
 		if (statsDirty && ticksSinceStats >= STATS_INTERVAL_TICKS)
 		{
 			statsDirty = false;
-			sendStats(s);
+			sendStats(me, s, sync);
 		}
 	}
 
@@ -824,12 +823,7 @@ class GroupService
 	{
 		clientThread.invokeLater(() ->
 		{
-			lastStatsSent = null;
-			lastCarriedSent = null;
-			lastExtrasSent = null;
-			statsDirty = true;
-			carriedDirty = true;
-			extrasDirty = true;
+			recaptureAll();
 			if (!syncing())
 			{
 				return;
@@ -862,12 +856,7 @@ class GroupService
 	{
 		assembler.clear();
 		roster.clearStrangers();
-		lastStatsSent = null;
-		lastCarriedSent = null;
-		lastExtrasSent = null;
-		statsDirty = true;
-		carriedDirty = true;
-		extrasDirty = true;
+		clientThread.invokeLater(this::recaptureAll);
 		onChange.run();
 	}
 
@@ -1114,8 +1103,8 @@ class GroupService
 		onChange.run();
 	}
 
-	/** Client thread. */
-	private void sendStats(GroupOutbox.Switches s)
+	/** Client thread. Your card always; the party only while syncing (the send resets the heartbeat). */
+	private void sendStats(String me, GroupOutbox.Switches s, boolean sync)
 	{
 		Map<String, MemberStats.Level> skills = new LinkedHashMap<>();
 		for (Skill skill : Skill.values())
@@ -1128,36 +1117,24 @@ class GroupService
 				client.getBoostedSkillLevel(skill)));
 		}
 		MemberStats stats = new MemberStats(skills, lastRun, lastSpec, lastWorld, lastRegion, lastX, lastY, lastPlane);
-		String payload = GroupOutbox.stats(gson, s, stats);
-		if (payload == null || Objects.equals(payload, lastStatsSent))
+		if (selfCard.stats(me, stats, s, sync))
 		{
-			return;
+			ticksSinceStats = 0;
 		}
-		partyService.send(new VvgGroupIronmanMessage(payload));
-		lastStatsSent = payload;
-		ticksSinceStats = 0;
-		roster.putStats(localName(), stats);
-		roster.heard(localName(), System.currentTimeMillis());
-		onChange.run();
 	}
 
 	/** Client thread. */
-	private void sendExtras(GroupOutbox.Switches s)
+	private void sendExtras(String me, GroupOutbox.Switches s, boolean sync)
 	{
 		MemberExtras extras = new MemberExtras(runePouch(), quiver(), seedVault, seedVaultAt);
-		String payload = GroupOutbox.extras(gson, s, extras);
-		if (payload == null || Objects.equals(payload, lastExtrasSent))
-		{
-			return;
-		}
-		partyService.send(new VvgGroupIronmanMessage(payload));
-		lastExtrasSent = payload;
-		ticksSinceExtras = 0;
+		// Names first: a changed card redraws straight away.
 		resolveNow(extras.runePouch.keySet());
 		resolveNow(extras.quiver.keySet());
 		resolveNow(extras.seedVault.keySet());
-		roster.putExtras(localName(), extras);
-		onChange.run();
+		if (selfCard.extras(me, extras, s, sync))
+		{
+			ticksSinceExtras = 0;
+		}
 	}
 
 	/** Client thread. Rune type varbits index the RUNEPOUCH_RUNE enum, the way the base rune pouch plugin reads them. */
@@ -1191,22 +1168,16 @@ class GroupService
 	}
 
 	/** Client thread. */
-	private void sendCarried(GroupOutbox.Switches s)
+	private void sendCarried(String me, GroupOutbox.Switches s, boolean sync)
 	{
 		Map<Integer, Integer> inventory = counts(client.getItemContainer(InventoryID.INV));
 		Map<Integer, Integer> worn = counts(client.getItemContainer(InventoryID.WORN));
-		String payload = GroupOutbox.carried(gson, s, inventory, worn);
-		if (payload == null || Objects.equals(payload, lastCarriedSent))
-		{
-			return;
-		}
-		partyService.send(new VvgGroupIronmanMessage(payload));
-		lastCarriedSent = payload;
-		ticksSinceCarried = 0;
 		resolveNow(inventory.keySet());
 		resolveNow(worn.keySet());
-		roster.putCarried(localName(), new GroupCodec.Carried(inventory, worn));
-		onChange.run();
+		if (selfCard.carried(me, inventory, worn, s, sync))
+		{
+			ticksSinceCarried = 0;
+		}
 	}
 
 	/** Client thread. Counts by canonical id; bank fillers and placeholders are not items. */
@@ -1351,29 +1322,20 @@ class GroupService
 		});
 	}
 
-	/** Executor thread. False when there is no file or it cannot be read. */
+	/** Executor thread. False when nothing is saved or it cannot be read. */
 	private boolean readCache()
 	{
-		File file = cacheFile();
-		if (!file.isFile())
+		String json = configManager.getConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_CACHE);
+		if (json == null)
 		{
 			return false;
 		}
-		try
+		if (!GroupCache.read(gson, json, roster))
 		{
-			String json = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
-			if (!GroupCache.read(gson, json, roster))
-			{
-				log.debug("group cache unreadable, starting empty");
-				return false;
-			}
-			return true;
-		}
-		catch (IOException e)
-		{
-			log.debug("could not read group cache", e);
+			log.debug("group cache unreadable, starting empty");
 			return false;
 		}
+		return true;
 	}
 
 	private void saveCache()
@@ -1383,27 +1345,14 @@ class GroupService
 			// Whatever arrived meanwhile is in the roster and goes out with the first save after loading.
 			return;
 		}
-		String json = GroupCache.write(gson, roster);
-		executor.execute(() ->
+		String json = GroupCache.writeForConfig(gson, roster);
+		if (json == null)
 		{
-			File file = cacheFile();
-			try
-			{
-				Files.createDirectories(file.getParentFile().toPath());
-				File tmp = new File(file.getParentFile(), CACHE_FILE + ".tmp");
-				Files.write(tmp.toPath(), json.getBytes(StandardCharsets.UTF_8));
-				Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
-			}
-			catch (IOException e)
-			{
-				log.debug("could not write group cache", e);
-			}
-		});
-	}
-
-	private static File cacheFile()
-	{
-		return new File(new File(RuneLite.RUNELITE_DIR, CACHE_DIR), CACHE_FILE);
+			log.debug("group cache too large to save, keeping the last save");
+			return;
+		}
+		// In memory only: ConfigManager flushes to disk on its own schedule, so this is safe on the client thread.
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_CACHE, json);
 	}
 
 	/** Kept for the panel: is any group feature on, so the panel button should show. */

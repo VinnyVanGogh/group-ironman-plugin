@@ -180,13 +180,19 @@ public class GroupIronmanPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (!GroupIronmanConfig.GROUP.equals(event.getGroup()))
+		if (!isSettingChange(event.getGroup(), event.getKey()))
 		{
 			return;
 		}
 		group.reloadConfig();
 		events.reloadConfig();
 		updateNavButton();
+	}
+
+	/** Saving the cache also lands here; reloading on it would drop live stats and resend everything. */
+	static boolean isSettingChange(String configGroup, String key)
+	{
+		return GroupIronmanConfig.GROUP.equals(configGroup) && !GroupIronmanConfig.KEY_GROUP_CACHE.equals(key);
 	}
 
 	@Subscribe

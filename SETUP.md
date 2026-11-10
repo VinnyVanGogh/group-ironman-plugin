@@ -116,9 +116,12 @@ What it can and cannot see:
   wand, `::find` still shows Alex's last bank until Sam's next sync.
 
 Banks, the storage log, rune pouches, quivers, seed vaults, drops, last seen
-times and when you last played are saved in
-`.runelite/gim-utilities/group-cache.json`. It is one file per computer, not
-per group: if you switch groups, delete it to forget the old group's data.
+times and when you last played are saved in your RuneLite settings profile,
+under the `gimutilities` group's `groupCache` value. The save belongs to the
+profile, not to a group, and it is uploaded with the rest of that profile if
+you have turned on cloud sync for it. Banks, storage and drops saved from
+before this change (`.runelite/gim-utilities/group-cache.json`) are not read:
+each member's bank comes back on their next bank visit.
 
 ## Running it next to Build Guard
 
@@ -133,7 +136,7 @@ never touch each other:
   name, so neither plugin receives or decodes the other's traffic. A member on
   Build Guard's group features and a member on GIM Utilities do not see each
   other: the whole group should use the same one.
-- **Saved data.** `.runelite/gim-utilities/` here, `.runelite/build-guard/`
+- **Saved data.** The `gimutilities` config group here, `.runelite/build-guard/`
   there. Build Guard's saved banks and storage log are not imported.
 
 ## Testing with friends

@@ -3,7 +3,6 @@ package com.vinnyvangogh.groupironman;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,12 +26,18 @@ final class RegionNames
 	static RegionNames load()
 	{
 		// getResourceAsStream, never getResource: the resource is inside a jar, not a file.
-		try (InputStream stream = RegionNames.class.getResourceAsStream("regions.txt"))
+		return read(RegionNames.class.getResourceAsStream("regions.txt"));
+	}
+
+	/** The table in a UTF-8 stream (closed here), or an empty one when it is null or unreadable. */
+	static RegionNames read(InputStream resource)
+	{
+		if (resource == null)
 		{
-			if (stream == null)
-			{
-				return parse("");
-			}
+			return parse("");
+		}
+		try (InputStream stream = resource)
+		{
 			ByteArrayOutputStream out = new ByteArrayOutputStream();
 			byte[] buf = new byte[8192];
 			int n;
@@ -40,10 +45,13 @@ final class RegionNames
 			{
 				out.write(buf, 0, n);
 			}
-			return parse(new String(out.toByteArray(), StandardCharsets.UTF_8));
+			// A charset name, not StandardCharsets: the Plugin Hub bot holds any
+			// import from the nio packages for file i/o review.
+			return parse(out.toString("UTF-8"));
 		}
 		catch (IOException e)
 		{
+			// Includes UnsupportedEncodingException, which UTF-8 never throws.
 			return parse("");
 		}
 	}

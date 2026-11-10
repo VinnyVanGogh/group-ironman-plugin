@@ -21,6 +21,21 @@ public class GroupRosterTest
 	}
 
 	@Test
+	public void theGroupBoxListsOthersOnlineNotYou()
+	{
+		GroupRoster roster = new GroupRoster();
+		MemberStats s = new MemberStats(Collections.emptyMap(), 0, 0, 302, 0);
+		roster.putStats("GroupShip", s);
+		roster.heard("GroupShip", 1000);
+		roster.putStats("Alex", s);
+		roster.heard("Alex", 1000);
+		roster.putStats("Zed", s);
+		roster.heard("Zed", 1000 - Presence.ONLINE_MS - 1);
+
+		assertEquals(Collections.singleton("Alex"), roster.othersOnlineStats("groupship", 1000).keySet());
+	}
+
+	@Test
 	public void anOlderBankDoesNotReplaceANewerOne()
 	{
 		GroupRoster roster = new GroupRoster();
