@@ -117,9 +117,19 @@ final class DiscordWebhook
 	{
 		// "450K (450,001)": the game's words, and nothing lost (Board 2026-11-10).
 		ItemLookup lookup = Amounts.BOTH.words(items);
+		return payload(gson, DiscordMerge.single(e, lookup), lookup, style, mention, screenshot);
+	}
+
+	/**
+	 * One moment's post: its lead event's title and line, the other events' lines as fields. {@code lookup}
+	 * already words amounts the Discord way ({@link Amounts#BOTH}), as the post's text was built with it.
+	 */
+	static String payload(Gson gson, DiscordMerge.Post post, ItemLookup lookup, DiscordStyle style, String mention,
+		boolean screenshot)
+	{
 		JsonObject o = new JsonObject();
 		o.addProperty("username", USERNAME);
-		String tag = e.isBig() && mention != null && !mention.trim().isEmpty() ? mention.trim() : "";
+		String tag = post.big && mention != null && !mention.trim().isEmpty() ? mention.trim() : "";
 		// Only the configured mention may ping; a member or item name can never.
 		JsonObject allowed = new JsonObject();
 		JsonArray parse = new JsonArray();
@@ -132,7 +142,7 @@ final class DiscordWebhook
 		o.add("allowed_mentions", allowed);
 		if (style == DiscordStyle.PLAIN)
 		{
-			o.addProperty("content", (tag.isEmpty() ? "" : tag + " ") + EventText.sentence(e, lookup));
+			o.addProperty("content", (tag.isEmpty() ? "" : tag + " ") + plain(post));
 			return gson.toJson(o);
 		}
 		if (!tag.isEmpty())
@@ -140,41 +150,40 @@ final class DiscordWebhook
 			o.addProperty("content", tag);
 		}
 		JsonArray embeds = new JsonArray();
-		embeds.add(embed(e, lookup, screenshot));
+		embeds.add(embed(post, lookup, screenshot));
 		o.add("embeds", embeds);
 		return gson.toJson(o);
 	}
 
-	private static JsonObject embed(GroupEvent e, ItemLookup lookup, boolean screenshot)
+	/** "Alex: died; lost about 1.5M gp on death": the lead's sentence, then each merged fact. */
+	private static String plain(DiscordMerge.Post post)
 	{
+		StringBuilder text = new StringBuilder(post.lead.member).append(": ").append(post.description);
+		for (String[] extra : post.extras)
+		{
+			text.append("; ").append(extra[1]);
+		}
+		return text.toString();
+	}
+
+	private static JsonObject embed(DiscordMerge.Post post, ItemLookup lookup, boolean screenshot)
+	{
+		GroupEvent e = post.lead;
 		JsonObject embed = new JsonObject();
-		embed.addProperty("title", e.member + ": " + EventText.title(e));
-		embed.addProperty("description", EventText.describe(e, lookup));
+		embed.addProperty("title", e.member + ": " + post.title);
+		embed.addProperty("description", post.description);
 		embed.addProperty("color", e.type.category.colour);
 		embed.addProperty("timestamp", Instant.ofEpochMilli(e.at).toString());
-		JsonArray fields = new JsonArray();
-		long value = EventText.value(e.items, lookup);
-		if (value > 0)
-		{
-			fields.add(field("Value", lookup.amount(value) + " gp"));
-		}
-		if (e.world > 0)
-		{
-			fields.add(field("World", Integer.toString(e.world)));
-		}
-		if (!e.location.isEmpty())
-		{
-			fields.add(field("Where", e.location));
-		}
+		JsonArray fields = fields(post, lookup);
 		if (fields.size() > 0)
 		{
 			embed.add("fields", fields);
 		}
-		Integer icon = e.items.isEmpty() ? null : mostValuable(e.items, lookup);
+		Integer icon = post.items.isEmpty() ? null : mostValuable(post.items, lookup);
 		if (icon != null)
 		{
 			JsonObject thumb = new JsonObject();
-			thumb.addProperty("url", String.format(ICON, StackIcons.variant(icon, e.items.get(icon))));
+			thumb.addProperty("url", String.format(ICON, StackIcons.variant(icon, post.items.get(icon))));
 			embed.add("thumbnail", thumb);
 		}
 		if (screenshot)
@@ -189,12 +198,37 @@ final class DiscordWebhook
 		return embed;
 	}
 
-	private static JsonObject field(String name, String value)
+	/** Value, World and Where (inline), then one full-width field per merged fact. */
+	private static JsonArray fields(DiscordMerge.Post post, ItemLookup lookup)
+	{
+		GroupEvent e = post.lead;
+		JsonArray fields = new JsonArray();
+		long value = EventText.value(post.items, lookup);
+		if (value > 0)
+		{
+			fields.add(field("Value", lookup.amount(value) + " gp", true));
+		}
+		if (e.world > 0)
+		{
+			fields.add(field("World", Integer.toString(e.world), true));
+		}
+		if (!e.location.isEmpty())
+		{
+			fields.add(field("Where", e.location, true));
+		}
+		for (String[] extra : post.extras)
+		{
+			fields.add(field(extra[0], extra[1], false));
+		}
+		return fields;
+	}
+
+	private static JsonObject field(String name, String value, boolean inline)
 	{
 		JsonObject f = new JsonObject();
 		f.addProperty("name", name);
 		f.addProperty("value", value);
-		f.addProperty("inline", true);
+		f.addProperty("inline", inline);
 		return f;
 	}
 
