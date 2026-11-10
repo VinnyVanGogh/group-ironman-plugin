@@ -117,9 +117,10 @@ final class DiscordMerge
 		}
 	}
 
+	/** {@code lookup} words amounts the Discord way ({@link Amounts#BOTH}); the title says "Offline" for a logout. */
 	static Post single(GroupEvent e, ItemLookup lookup)
 	{
-		return new Post(e, EventText.title(e.type), EventText.describe(e, lookup), e.items,
+		return new Post(e, EventText.title(e), EventText.describe(e, lookup), e.items,
 			Collections.emptyList(), e.isBig());
 	}
 
@@ -147,7 +148,7 @@ final class DiscordMerge
 		kept.sort(Comparator.comparingInt(e -> RANK.getOrDefault(e.type, 0)));
 		GroupEvent lead = kept.get(0);
 		List<GroupEvent> rest = kept.subList(1, kept.size());
-		return new Post(lead, EventText.title(lead.type), EventText.describe(lead, lookup), richest(kept, lookup),
+		return new Post(lead, EventText.title(lead), EventText.describe(lead, lookup), richest(kept, lookup),
 			extras(rest, lookup), anyBig(kept));
 	}
 
@@ -201,7 +202,11 @@ final class DiscordMerge
 		return rest;
 	}
 
-	/** " took 40000 x Coins (big, 40.0K gp), 5 x Lobster", after a "; " when something came before. */
+	/**
+	 * " took 40K (40,000) x Coins (big, 40K gp), 5 x Lobster", after a "; " when something came before. The
+	 * stack's amount is in {@code lookup}'s words; the big value is the game's short form, as
+	 * {@link EventText#items} keeps it, so parentheses never nest.
+	 */
 	private static void moved(StringBuilder text, String verb, Map<Integer, Integer> items, long min,
 		ItemLookup lookup)
 	{
@@ -213,9 +218,9 @@ final class DiscordMerge
 		List<String> parts = new ArrayList<>();
 		for (Map.Entry<Integer, Integer> e : items.entrySet())
 		{
-			long value = lookup.price(e.getKey()) * e.getValue();
-			String part = e.getValue() + " x " + lookup.name(e.getKey());
-			parts.add(value >= min && value > 0 ? part + " (big, " + BoostText.gp(value) + " gp)" : part);
+			long worth = lookup.price(e.getKey()) * e.getValue();
+			String part = lookup.amount(e.getValue()) + " x " + lookup.name(e.getKey());
+			parts.add(worth >= min && worth > 0 ? part + " (big, " + Amounts.GAME.of(worth) + " gp)" : part);
 		}
 		text.append(String.join(", ", parts));
 	}
@@ -242,7 +247,7 @@ final class DiscordMerge
 				break;
 			}
 			String line = EventText.describe(e, lookup);
-			out.add(new String[]{EventText.title(e.type), line.length() > MAX_FIELD ? line.substring(0, MAX_FIELD) : line});
+			out.add(new String[]{EventText.title(e), line.length() > MAX_FIELD ? line.substring(0, MAX_FIELD) : line});
 		}
 		return out;
 	}

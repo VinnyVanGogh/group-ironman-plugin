@@ -31,6 +31,8 @@ public class DiscordMergeTest
 		GroupEvent.Type.STORAGE_LAST);
 
 	private final FakeItems items = new FakeItems();
+	/** The engine builds Discord posts with every digit kept: "40K (40,000)". */
+	private final ItemLookup words = Amounts.BOTH.words(items);
 	private final Gson gson = new Gson();
 	private final DiscordBatch batch = new DiscordBatch();
 	private final List<DiscordBatch.Pending> done = new ArrayList<>();
@@ -66,7 +68,7 @@ public class DiscordMergeTest
 		List<DiscordMerge.Post> out = new ArrayList<>();
 		for (DiscordBatch.Pending p : all)
 		{
-			DiscordMerge.Post post = DiscordMerge.merge(p.events, settings, items);
+			DiscordMerge.Post post = DiscordMerge.merge(p.events, settings, words);
 			if (post != null)
 			{
 				out.add(post);
@@ -77,7 +79,7 @@ public class DiscordMergeTest
 
 	private JsonObject embed(DiscordMerge.Post post)
 	{
-		String json = DiscordWebhook.payload(gson, post, items, DiscordStyle.EMBED, "", true);
+		String json = DiscordWebhook.payload(gson, post, words, DiscordStyle.EMBED, "", true);
 		return new JsonParser().parse(json).getAsJsonObject().getAsJsonArray("embeds").get(0).getAsJsonObject();
 	}
 
@@ -111,7 +113,7 @@ public class DiscordMergeTest
 		JsonObject embed = embed(posts.get(0));
 		assertEquals("Alex: Big storage withdrawal", embed.get("title").getAsString());
 		assertTrue(embed.get("description").getAsString(), embed.get("description").getAsString()
-			.contains("took 40000 x Coins (big"));
+			.contains("took 40K (40,000) x Coins (big, 40K gp)"));
 		assertEquals("attachment://screenshot.png", embed.getAsJsonObject("image").get("url").getAsString());
 	}
 
@@ -125,11 +127,11 @@ public class DiscordMergeTest
 		assertEquals(1, posts.size());
 		DiscordMerge.Post post = posts.get(0);
 		assertEquals("Big storage withdrawal", post.title);
-		assertTrue(post.description, post.description.contains("40000 x Coins (big"));
+		assertTrue(post.description, post.description.contains("40K (40,000) x Coins (big"));
 		assertTrue(post.description, post.description.contains("deposited 5 x Lobster"));
 		assertFalse("a small move is not marked", post.description.contains("Lobster (big"));
 		assertTrue(fieldNames(embed(post)).contains("Value"));
-		assertEquals("the visit's total", "40.5K gp", embed(post).getAsJsonArray("fields").get(0).getAsJsonObject()
+		assertEquals("the visit's total", "40.5K (40,500) gp", embed(post).getAsJsonArray("fields").get(0).getAsJsonObject()
 			.get("value").getAsString());
 	}
 
@@ -298,9 +300,29 @@ public class DiscordMergeTest
 	{
 		GroupEvent pet = GroupEvent.of(GroupEvent.Type.PET, NOW, "Alex").build();
 		settings = discord(EnumSet.of(GroupEvent.Type.PET));
-		DiscordMerge.Post post = DiscordMerge.merge(Collections.singletonList(pet), settings, items);
+		DiscordMerge.Post post = DiscordMerge.merge(Collections.singletonList(pet), settings, words);
 		assertEquals(DiscordWebhook.payload(gson, pet, items, DiscordStyle.EMBED, "<@1>", false),
-			DiscordWebhook.payload(gson, post, items, DiscordStyle.EMBED, "<@1>", false));
+			DiscordWebhook.payload(gson, post, words, DiscordStyle.EMBED, "<@1>", false));
+	}
+
+	@Test
+	public void aLogoutPostsAsOfflineNotOnline()
+	{
+		// #11's fix: the type alone would title a logout "Online".
+		GroupEvent logout = GroupEvent.of(GroupEvent.Type.ONLINE, NOW, "Alex").text("offline").world(303).build();
+		assertEquals("Offline", DiscordMerge.single(logout, words).title);
+		JsonObject embed = new JsonParser().parse(DiscordWebhook.payload(gson, logout, items, DiscordStyle.EMBED, "",
+			false)).getAsJsonObject().getAsJsonArray("embeds").get(0).getAsJsonObject();
+		assertEquals("Alex: Offline", embed.get("title").getAsString());
+	}
+
+	@Test
+	public void theThumbnailIsTheStackOfThePostsOwnItems()
+	{
+		settings = discord(STORAGE_ALL);
+		visit(change(items(FakeItems.COINS, 40_000), items(), items(FakeItems.COINS, 5)));
+		String url = embed(posts().get(0)).getAsJsonObject("thumbnail").get("url").getAsString();
+		assertTrue(url, url.endsWith("/" + StackIcons.variant(FakeItems.COINS, 40_000) + ".png"));
 	}
 
 	@Test
@@ -310,7 +332,7 @@ public class DiscordMergeTest
 		router.route(GroupEvent.of(GroupEvent.Type.DEATH, now, "Alex").build(), true, settings, items);
 		router.route(GroupEvent.of(GroupEvent.Type.DEATH_VALUE, now, "Alex").number(2_000).build(), true, settings,
 			items);
-		String json = DiscordWebhook.payload(gson, posts().get(0), items, DiscordStyle.PLAIN, "", false);
+		String json = DiscordWebhook.payload(gson, posts().get(0), words, DiscordStyle.PLAIN, "", false);
 		String content = new JsonParser().parse(json).getAsJsonObject().get("content").getAsString();
 		assertTrue(content, content.startsWith("Alex: died; lost about "));
 	}
