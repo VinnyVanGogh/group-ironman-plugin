@@ -1,0 +1,127 @@
+name: windows-launcher
+
+# Runs tools/windows/Run-GimUtilities.cmd on a real Windows machine the way a
+# player would: the .cmd alone in a Downloads folder, no Java installed, no
+# checkout next to it. GU_BUILD_ONLY=1 makes step [3/3] run `gradlew build`
+# instead of opening RuneLite, so the job ends on its own.
+#
+# Two launchers are run:
+#   this-commit   - the .cmd in this commit (what a re-upload would ship)
+#   release-asset - the .cmd attached to the gim-test-1 release, byte for byte
+#                   (what a player downloads today)
+# A release-asset failure that says "re-upload" means the Board has to attach
+# tools/windows/Run-GimUtilities.cmd from this commit to the gim-test-1 release.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tools/windows/**'
+      - '.github/workflows/windows-launcher.yml'
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_ASSET_URL: https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/gim-test-1/Run-GimUtilities.cmd
+
+jobs:
+  launcher-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Windows PowerShell 5.1 is what a player's machine runs the .cmd with.
+      - name: Tests on Windows PowerShell 5.1
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/windows/tests/Checksum.Tests.ps1; exit $LASTEXITCODE
+      - name: Tests on PowerShell 7
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1; exit $LASTEXITCODE
+
+  launcher-e2e:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        launcher: [this-commit, release-asset]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Put the launcher in a Downloads folder
+        shell: pwsh
+        run: |
+          $dl = Join-Path $env:RUNNER_TEMP 'player\Downloads'
+          New-Item -ItemType Directory -Force -Path $dl | Out-Null
+          $cmd = Join-Path $dl 'Run-GimUtilities.cmd'
+          $ours = 'tools/windows/Run-GimUtilities.cmd'
+          if ('${{ matrix.launcher }}' -eq 'release-asset') {
+            Invoke-WebRequest -UseBasicParsing -Uri $env:RELEASE_ASSET_URL -OutFile $cmd
+          } else {
+            Copy-Item -LiteralPath $ours -Destination $cmd
+          }
+          $bytes = [IO.File]::ReadAllBytes($cmd)
+          $lines = @($bytes | Where-Object { $_ -eq 10 }).Count
+          $crs = @($bytes | Where-Object { $_ -eq 13 }).Count
+          $sha = (Get-FileHash -LiteralPath $cmd -Algorithm SHA256).Hash.ToLowerInvariant()
+          $oursSha = (Get-FileHash -LiteralPath $ours -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "launcher: $cmd"
+          Write-Host "bytes $($bytes.Length), lines $lines, CRs $crs, sha256 $sha"
+          Write-Host "this commit's .cmd sha256 $oursSha"
+          if ($crs -ne $lines) {
+            Write-Host "::warning::${{ matrix.launcher }} launcher has $lines lines but $crs CRLF endings; .gitattributes wants CRLF because cmd.exe mis-parses some LF-only batch files."
+          }
+          if ($sha -ne $oursSha) {
+            Write-Host "::warning::${{ matrix.launcher }} launcher differs from tools/windows/Run-GimUtilities.cmd in this commit. Re-upload it to the gim-test-1 release."
+          }
+          # An old launcher ignores GU_BUILD_ONLY and would open RuneLite and never exit.
+          if (-not ([IO.File]::ReadAllText($cmd)).Contains('GU_BUILD_ONLY')) {
+            Write-Host "::error::${{ matrix.launcher }} launcher predates GU_BUILD_ONLY, so it cannot be run headless. Re-upload tools/windows/Run-GimUtilities.cmd to the gim-test-1 release."
+            exit 1
+          }
+          "GU_LAUNCHER=$cmd" >> $env:GITHUB_ENV
+
+      - name: Run it like a player, build only
+        shell: pwsh
+        run: |
+          # A player has no Java: hide the runner's so step [1/3] downloads and
+          # checksums Temurin 11 itself.
+          $env:JAVA_HOME = $null
+          $env:Path = (($env:Path -split ';') | Where-Object { $_ -and -not (Test-Path -LiteralPath (Join-Path $_ 'java.exe')) }) -join ';'
+          if (Get-Command java.exe -ErrorAction SilentlyContinue) { throw 'java.exe is still on PATH' }
+          $managed = Join-Path $env:LOCALAPPDATA 'GimUtilities'
+          if (Test-Path -LiteralPath $managed) { throw "$managed already exists; this is not a first run" }
+
+          $env:GU_BUILD_ONLY = '1'
+          $log = Join-Path $env:RUNNER_TEMP 'launcher.log'
+          # < NUL so the launcher's `pause` on failure cannot wait for a key.
+          cmd.exe /d /c "$env:GU_LAUNCHER < NUL" 2>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          Write-Host "launcher exit code: $code"
+          if ($code -ne 0) { throw "launcher exited $code" }
+
+          $text = Get-Content -Raw -LiteralPath $log
+          $expected = @(
+            '[1/3] Looking for Java 11 or newer',
+            'Downloading Java 11 (Eclipse Temurin',
+            'Checksum verified. Unpacking Java',
+            '[2/3] Getting the plugin source',
+            'Downloading GIM Utilities source (gim-test-1) from GitHub',
+            '[3/3] Building GIM Utilities only (GU_BUILD_ONLY=1)',
+            'BUILD SUCCESSFUL'
+          )
+          $missing = @($expected | Where-Object { -not $text.Contains($_) })
+          if ($missing.Count -gt 0) { throw "launcher output is missing: $($missing -join ' | ')" }
+          if ($text.Contains('ERROR:')) { throw 'launcher printed ERROR:' }
+
+          $jars = Get-ChildItem -Path (Join-Path $managed 'src\gim-test-1\build\libs') -Filter *.jar -ErrorAction SilentlyContinue
+          if (-not $jars) { throw 'no jar under src\gim-test-1\build\libs' }
+          $jars | ForEach-Object { Write-Host "built $($_.FullName) ($($_.Length) bytes)" }
+
+      - name: Keep the launcher log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-log-${{ matrix.launcher }}
+          path: ${{ runner.temp }}/launcher.log
+          if-no-files-found: ignore
