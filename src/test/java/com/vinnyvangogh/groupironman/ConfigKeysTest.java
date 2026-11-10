@@ -77,16 +77,21 @@ public class ConfigKeysTest
 		}
 	}
 
-	/** The Plugin Hub holds a plugin that does file i/o for extra maintainer review. */
+	/**
+	 * The Plugin Hub holds a plugin that does file i/o for extra maintainer
+	 * review; its bot matches any java.io / java.nio file use, java.nio.charset
+	 * included. java.io streams over getResourceAsStream are not file i/o.
+	 */
 	@Test
 	public void noSourceTouchesTheFileSystem() throws IOException
 	{
-		try (Stream<Path> files = Files.list(SOURCES))
+		String[] bannedWords = {"java.nio", "java.io.File", "RandomAccessFile", "Files.", "new File(", "RUNELITE_DIR"};
+		try (Stream<Path> files = Files.walk(SOURCES))
 		{
-			for (Path path : (Iterable<Path>) files::iterator)
+			for (Path path : (Iterable<Path>) files.filter(Files::isRegularFile)::iterator)
 			{
 				String code = read(path);
-				for (String banned : new String[]{"java.io.File", "java.nio.file", "RUNELITE_DIR"})
+				for (String banned : bannedWords)
 				{
 					assertFalse(path.getFileName() + " uses " + banned, code.contains(banned));
 				}
