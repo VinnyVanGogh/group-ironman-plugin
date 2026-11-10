@@ -8,6 +8,8 @@
   RuneLite config value (`gimutilities.groupCache`) instead of
   `.runelite/gim-utilities/group-cache.json`, so the plugin does no file i/o
   of its own (the Plugin Hub holds plugins that do for extra review).
+- The bundled place-name table is decoded without any `java.nio` import, so
+  no source file imports from `java.nio` at all.
 - A save over 1 MiB is skipped and the previous save stands.
 - The old file is not read: each member's bank comes back on their next visit.
 
