@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Discord Easter eggs
+
+- New **Easter eggs** switch in the Discord section, off by default. When on,
+  some posts get one short funny line under the facts: a 0 gp death, a death
+  that lost only a spade (and clue items), a pet, a Bones-only "valuable"
+  drop, about ten well-known drops, and big group storage visits.
+- **Legend at (gp)** and **Freeloader at (gp)** (default 1M each, 0 turns it
+  off) set when a deposit or withdrawal gets its line.
+- A death that cost 0 gp no longer posts "lost about 0 gp". With Easter eggs
+  off it posts nothing; with them on it posts only the egg line.
+- The lines are all in `EasterEggLines.java`; a new egg is one table row.
+
 ### Windows launcher in CI
 
 - `Run-GimUtilities.cmd` takes an opt-in `GU_BUILD_ONLY=1` that builds

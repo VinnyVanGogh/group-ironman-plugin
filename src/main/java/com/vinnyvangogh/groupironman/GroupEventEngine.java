@@ -885,13 +885,16 @@ class GroupEventEngine
 		}
 		String url = DiscordWebhook.route(event.type.category, DiscordWebhook.overrides(config),
 			config.discordWebhookUrl());
-		if (url == null)
+		String egg = EasterEggs.line(event, group.lookup, EasterEggs.Settings.of(config));
+		// A 0 gp death has no value line; without an egg there is nothing left to post.
+		String words = DiscordWebhook.words(event, group.lookup, egg);
+		if (url == null || words == null)
 		{
 			return;
 		}
 		if (settings.digest.contains(event.type.category) && event.type != GroupEvent.Type.WEEKLY_RECAP)
 		{
-			digest.add(event.type.category, EventText.sentence(event, group.lookup));
+			digest.add(event.type.category, event.member + ": " + words.replace('\n', ' '));
 			saveProfile(DIGEST_KEY, digest.save());
 			return;
 		}
@@ -900,10 +903,10 @@ class GroupEventEngine
 		// A logout settles at the login screen: nothing worth a picture.
 		if (!config.discordScreenshot() || event.type == GroupEvent.Type.ONLINE)
 		{
-			sender.post(url, DiscordWebhook.payload(gson, event, group.lookup, style, mention, false), null);
+			sender.post(url, DiscordWebhook.payload(gson, event, group.lookup, style, mention, false, egg), null);
 			return;
 		}
-		String json = DiscordWebhook.payload(gson, event, group.lookup, style, mention, true);
+		String json = DiscordWebhook.payload(gson, event, group.lookup, style, mention, true, egg);
 		// The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread.
 		drawManager.requestNextFrameListener(image -> executor.execute(() ->
 			sender.post(url, json, png(image))));

@@ -92,10 +92,37 @@ final class DiscordWebhook
 		return gson.toJson(o);
 	}
 
-	/** The JSON body ({@code payload_json} when a screenshot is attached). */
+	/**
+	 * What the post says: the event's line, then the Easter egg under it. A death that cost 0 gp has no value line,
+	 * so it says only the egg, or is null (nothing to post) when there is no egg.
+	 */
+	static String words(GroupEvent e, ItemLookup lookup, String egg)
+	{
+		boolean hasEgg = egg != null && !egg.trim().isEmpty();
+		if (EasterEggs.nothingLost(e))
+		{
+			return hasEgg ? egg.trim() : null;
+		}
+		String line = EventText.describe(e, lookup);
+		return hasEgg ? line + "\n" + egg.trim() : line;
+	}
+
+	/** The JSON body without an Easter egg; null when there is nothing to post. */
 	static String payload(Gson gson, GroupEvent e, ItemLookup lookup, DiscordStyle style, String mention,
 		boolean screenshot)
 	{
+		return payload(gson, e, lookup, style, mention, screenshot, null);
+	}
+
+	/** The JSON body ({@code payload_json} when a screenshot is attached); null when there is nothing to post. */
+	static String payload(Gson gson, GroupEvent e, ItemLookup lookup, DiscordStyle style, String mention,
+		boolean screenshot, String egg)
+	{
+		String words = words(e, lookup, egg);
+		if (words == null)
+		{
+			return null;
+		}
 		JsonObject o = new JsonObject();
 		o.addProperty("username", USERNAME);
 		String tag = e.isBig() && mention != null && !mention.trim().isEmpty() ? mention.trim() : "";
@@ -111,7 +138,7 @@ final class DiscordWebhook
 		o.add("allowed_mentions", allowed);
 		if (style == DiscordStyle.PLAIN)
 		{
-			o.addProperty("content", (tag.isEmpty() ? "" : tag + " ") + EventText.sentence(e, lookup));
+			o.addProperty("content", (tag.isEmpty() ? "" : tag + " ") + e.member + ": " + words);
 			return gson.toJson(o);
 		}
 		if (!tag.isEmpty())
@@ -119,16 +146,16 @@ final class DiscordWebhook
 			o.addProperty("content", tag);
 		}
 		JsonArray embeds = new JsonArray();
-		embeds.add(embed(e, lookup, screenshot));
+		embeds.add(embed(e, lookup, words, screenshot));
 		o.add("embeds", embeds);
 		return gson.toJson(o);
 	}
 
-	private static JsonObject embed(GroupEvent e, ItemLookup lookup, boolean screenshot)
+	private static JsonObject embed(GroupEvent e, ItemLookup lookup, String words, boolean screenshot)
 	{
 		JsonObject embed = new JsonObject();
 		embed.addProperty("title", e.member + ": " + EventText.title(e.type));
-		embed.addProperty("description", EventText.describe(e, lookup));
+		embed.addProperty("description", words);
 		embed.addProperty("color", e.type.category.colour);
 		embed.addProperty("timestamp", Instant.ofEpochMilli(e.at).toString());
 		JsonArray fields = new JsonArray();
