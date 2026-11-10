@@ -56,6 +56,15 @@ function Assert-Sha256 {
 
 function Say([string]$text) { Write-Host $text }
 
+# BEGIN Get-GradleTask
+# GU_BUILD_ONLY=1 builds without opening RuneLite; CI uses it. Only the exact
+# value 1 counts, so nothing a user is likely to have set changes behaviour.
+function Get-GradleTask([string]$buildOnly) {
+    if ($buildOnly -eq '1') { return 'build' }
+    return 'run'
+}
+# END Get-GradleTask
+
 # The Java major version of a JDK home, or 0 when it is not a usable JDK.
 # Both java.exe and javac.exe must exist: Gradle compiles the plugin.
 function Get-JdkMajor([string]$javaHome) {
@@ -194,14 +203,19 @@ try {
     Say '[2/3] Getting the plugin source...'
     $src = Find-Source
 
-    Say '[3/3] Building and starting RuneLite with GIM Utilities. The first run downloads Gradle and RuneLite (a few minutes); later runs are quick.'
-    Say '      Close the RuneLite window when you are done; this window closes with it.'
+    $gradleTask = Get-GradleTask $env:GU_BUILD_ONLY
+    if ($gradleTask -eq 'build') {
+        Say '[3/3] Building GIM Utilities only (GU_BUILD_ONLY=1); RuneLite will not open.'
+    } else {
+        Say '[3/3] Building and starting RuneLite with GIM Utilities. The first run downloads Gradle and RuneLite (a few minutes); later runs are quick.'
+        Say '      Close the RuneLite window when you are done; this window closes with it.'
+    }
     $env:JAVA_HOME = $jdk
     $env:GRADLE_USER_HOME = Join-Path $GuHome 'gradle'
     $env:Path = (Join-Path $jdk 'bin') + ';' + $env:Path
     Push-Location -LiteralPath $src
     try {
-        & (Join-Path $src 'gradlew.bat') --console=plain run
+        & (Join-Path $src 'gradlew.bat') --console=plain $gradleTask
         $code = $LASTEXITCODE
     } finally {
         Pop-Location
