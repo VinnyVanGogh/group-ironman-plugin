@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Online and offline posts
+
+- New setting **Offline grace (minutes)**, 0 to 10, default 2. A logout waits
+  that long; logging back in within it (a disconnect, a quick relog) posts
+  nothing for either. A world hop is never a logout, whatever the grace.
+- The offline post says *Offline* with your name, how long you played and
+  when you logged off: *GroupShip: Offline* / *offline, played 1h 12m on
+  world 303, logged off at 1:35 PM*. It used to say *You: Online*.
+- At most one online and offline pair per 10 minutes: a flaky connection
+  posts nothing until it settles.
+- A client closed during the grace posts the offline on the next start only
+  when that is within 15 minutes; never a stale one hours later.
+
 ### Windows launcher in CI
 
 - `Run-GimUtilities.cmd` takes an opt-in `GU_BUILD_ONLY=1` that builds

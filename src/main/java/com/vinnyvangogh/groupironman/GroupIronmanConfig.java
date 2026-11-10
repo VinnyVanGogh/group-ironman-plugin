@@ -548,11 +548,20 @@ public interface GroupIronmanConfig extends Config
 	}
 
 	@ConfigItem(keyName = "discordOnline", name = "Online and offline", description = "Login and logout with the"
-		+ " world. A logout followed by a login within 10 minutes (a hop) is not posted.",
+		+ " world and how long you played. A world hop, or a relog within the offline grace, is not posted.",
 		section = discordEventsSection, position = 17)
 	default boolean discordOnline()
 	{
 		return false;
+	}
+
+	@Range(max = 10)
+	@ConfigItem(keyName = "discordOfflineGrace", name = "Offline grace (minutes)", description = "How long a"
+		+ " logout waits before it is posted. Logging back in within it posts nothing. At most one online and"
+		+ " offline per 10 minutes.", section = discordEventsSection, position = 17)
+	default int discordOfflineGrace()
+	{
+		return 2;
 	}
 
 	@ConfigItem(keyName = "discordBack", name = "Back after a break", description = "Logging in after the 'Back"

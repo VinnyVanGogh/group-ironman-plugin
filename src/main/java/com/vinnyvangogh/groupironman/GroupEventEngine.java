@@ -91,6 +91,11 @@ class GroupEventEngine
 	static final String DIGEST_LAST_KEY = "digestLastAt";
 	static final String RECAP_LAST_KEY = "recapLastAt";
 	static final String FARM_KEY = "farmTimers";
+	/**
+	 * Config key (not per profile: there is none before a login) for a logout still in its grace, so a
+	 * client closed in it can post the offline on the next start. Not a setting: never shown.
+	 */
+	static final String PRESENCE_KEY = "presencePending";
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
 		GroupEvent.Type.WILDERNESS, GroupEvent.Type.HC_LIFE_LOST);
 
@@ -126,7 +131,9 @@ class GroupEventEngine
 
 	private final ToastQueue toasts = new ToastQueue();
 	private final ProgressTracker progress = new ProgressTracker(Skill.values().length - 1);
-	private final PresenceDebounce presence = new PresenceDebounce();
+	/** Guards {@link #presence}: the client thread logs in and out, the executor polls. */
+	private final Object presenceLock = new Object();
+	private PresenceDebounce presence = new PresenceDebounce(ZoneId.systemDefault());
 	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()));
 	private volatile EventSettings settings = EventSettings.OFF;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
@@ -157,6 +164,7 @@ class GroupEventEngine
 		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient), System::currentTimeMillis,
 			() -> LocalTime.now().getHour());
 		reloadConfig();
+		restorePresence();
 		toastOverlay = new EventToastOverlay(toasts, config, group.lookup);
 		boxOverlay = new GroupBoxOverlay(toasts, config, group);
 		overlayManager.add(toastOverlay);
@@ -167,6 +175,15 @@ class GroupEventEngine
 
 	void shutDown()
 	{
+		synchronized (presenceLock)
+		{
+			// The client closing (or the plugin stopping) while logged in: the one moment its logout time is known.
+			if (client.getGameState() == GameState.LOGGED_IN)
+			{
+				presence.logout(System.currentTimeMillis());
+			}
+			savePresence();
+		}
 		if (pump != null)
 		{
 			pump.cancel(false);
@@ -209,12 +226,15 @@ class GroupEventEngine
 		{
 			sender.pump();
 			GroupEvent offline;
-			synchronized (presence)
+			synchronized (presenceLock)
 			{
-				offline = presence.poll(System.currentTimeMillis(), group.localPlayer());
+				// The name is the one the login gave: after a logout localPlayer() is "You".
+				offline = presence.poll(System.currentTimeMillis(), config.discordOfflineGrace());
+				savePresence();
 			}
 			if (offline != null)
 			{
+				// Not own(): that is client thread only. The router is fine here, as before.
 				router.route(offline, true, settings, group.lookup);
 			}
 		}
@@ -591,20 +611,19 @@ class GroupEventEngine
 		{
 			loginPending = true;
 		}
-		else if (state == GameState.HOPPING || state == GameState.LOGIN_SCREEN)
+		else if (state == GameState.LOGIN_SCREEN)
 		{
-			synchronized (presence)
+			// A world hop (HOPPING) is never a logout: it posts nothing, whatever the grace.
+			synchronized (presenceLock)
 			{
 				presence.logout(System.currentTimeMillis());
+				savePresence();
 			}
-			if (state == GameState.LOGIN_SCREEN)
-			{
-				// Another account may log in next: start every baseline over.
-				progress.reset();
-				watchers.reset();
-				backWait = -1;
-				varWait = -1;
-			}
+			// Another account may log in next: start every baseline over.
+			progress.reset();
+			watchers.reset();
+			backWait = -1;
+			varWait = -1;
 		}
 	}
 
@@ -784,18 +803,59 @@ class GroupEventEngine
 		{
 			varWait = VAR_WAIT_TICKS;
 		}
-		GroupEvent online;
-		synchronized (presence)
+		List<GroupEvent> posts;
+		synchronized (presenceLock)
 		{
-			online = presence.login(now, client.getWorld(), name);
+			posts = presence.login(now, client.getWorld(), name, config.discordOfflineGrace());
+			savePresence();
 		}
-		if (online != null && wanted(online.type))
+		for (GroupEvent e : posts)
 		{
-			own(online);
+			if ("online".equals(e.text))
+			{
+				own(e);
+			}
+			else
+			{
+				// The last account's offline: routed like the timer's, never sent to this account's party.
+				router.route(e, true, settings, group.lookup);
+			}
 		}
 		if (backWait < 0)
 		{
 			backWait = BACK_WAIT_TICKS;
+		}
+	}
+
+	/** Startup: a logout saved by the last client, still in its grace; a restart while logged in is not one. */
+	private void restorePresence()
+	{
+		synchronized (presenceLock)
+		{
+			presence = PresenceDebounce.parse(configManager.getConfiguration(GroupIronmanConfig.GROUP, PRESENCE_KEY),
+				ZoneId.systemDefault());
+			if (client.getGameState() == GameState.LOGGED_IN)
+			{
+				presence.resume();
+			}
+		}
+	}
+
+	/** Holding {@link #presenceLock}: writes the pending logout only when it changed. */
+	private void savePresence()
+	{
+		if (!presence.takeDirty())
+		{
+			return;
+		}
+		String saved = presence.save();
+		if (saved.isEmpty())
+		{
+			configManager.unsetConfiguration(GroupIronmanConfig.GROUP, PRESENCE_KEY);
+		}
+		else
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, PRESENCE_KEY, saved);
 		}
 	}
 

@@ -127,7 +127,7 @@ final class DiscordWebhook
 	private static JsonObject embed(GroupEvent e, ItemLookup lookup, boolean screenshot)
 	{
 		JsonObject embed = new JsonObject();
-		embed.addProperty("title", e.member + ": " + EventText.title(e.type));
+		embed.addProperty("title", e.member + ": " + EventText.title(e));
 		embed.addProperty("description", EventText.describe(e, lookup));
 		embed.addProperty("color", e.type.category.colour);
 		embed.addProperty("timestamp", Instant.ofEpochMilli(e.at).toString());
