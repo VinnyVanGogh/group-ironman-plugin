@@ -164,14 +164,31 @@ final class DiscordMerge
 		{
 			return null;
 		}
-		String title = deposit && withdrawal ? BIG_VISIT : EventText.title(withdrawal
-			? GroupEvent.Type.STORAGE_WITHDRAWAL : deposit ? GroupEvent.Type.STORAGE_DEPOSIT
-			: GroupEvent.Type.STORAGE_SUMMARY);
 		StringBuilder text = new StringBuilder("group storage:");
 		moved(text, "took", summary.taken, settings.storageMin, lookup);
 		moved(text, "deposited", summary.items, settings.storageMin, lookup);
 		Map<Integer, Integer> all = new TreeMap<>(summary.taken);
 		summary.items.forEach((id, n) -> all.merge(id, n, Integer::sum));
+		return new Post(summary, visitTitle(deposit, withdrawal), text.toString(), all,
+			extras(folded(events), lookup), anyBig(events));
+	}
+
+	private static String visitTitle(boolean deposit, boolean withdrawal)
+	{
+		if (deposit && withdrawal)
+		{
+			return BIG_VISIT;
+		}
+		if (withdrawal)
+		{
+			return EventText.title(GroupEvent.Type.STORAGE_WITHDRAWAL);
+		}
+		return EventText.title(deposit ? GroupEvent.Type.STORAGE_DEPOSIT : GroupEvent.Type.STORAGE_SUMMARY);
+	}
+
+	/** A visit's minimum and last-one events, best first: lines in its post. */
+	private static List<GroupEvent> folded(List<GroupEvent> events)
+	{
 		List<GroupEvent> rest = new ArrayList<>();
 		for (GroupEvent e : events)
 		{
@@ -181,7 +198,7 @@ final class DiscordMerge
 			}
 		}
 		rest.sort(Comparator.comparingInt(e -> RANK.get(e.type)));
-		return new Post(summary, title, text.toString(), all, extras(rest, lookup), anyBig(events));
+		return rest;
 	}
 
 	/** " took 40000 x Coins (big, 40.0K gp), 5 x Lobster", after a "; " when something came before. */
