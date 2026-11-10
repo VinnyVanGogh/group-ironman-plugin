@@ -123,6 +123,14 @@ final class GroupRoster
 		return out;
 	}
 
+	/** {@link #onlineStats} without {@code self}: your own card is always live, the box is about everyone else. */
+	Map<String, MemberStats> othersOnlineStats(String self, long now)
+	{
+		Map<String, MemberStats> out = onlineStats(now);
+		out.keySet().removeIf(name -> name.equalsIgnoreCase(self));
+		return out;
+	}
+
 	/** Keeps the newer of the two, so a stale resend cannot replace a fresher bank. */
 	boolean putBank(String member, BankSnapshot bank)
 	{
