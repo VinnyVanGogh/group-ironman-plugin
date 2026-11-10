@@ -5,8 +5,13 @@ import java.awt.Image;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -17,6 +22,9 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.clan.ClanID;
+import net.runelite.api.clan.ClanMember;
+import net.runelite.api.clan.ClanSettings;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
@@ -72,6 +80,19 @@ class GroupEventEngine
 	static final String BARROWS_KEY = "barrowsPieces";
 	/** How long, at most, a login waits for "last played" to load before "back after" is skipped. */
 	static final int BACK_WAIT_TICKS = 100;
+	/** Ticks after a login before variables are read: the login's burst of values has settled by then. */
+	static final int VAR_WAIT_TICKS = 5;
+	/** The digest and recap schedule is checked this often, not every tick. */
+	static final int SCHEDULE_EVERY_TICKS = 100;
+	// RuneLite profile keys for saved progress. Not settings: never shown, read only here.
+	static final String DRY_KEY = "dryStreaks";
+	static final String WEEK_KEY = "weekTally";
+	static final String DIGEST_KEY = "digestLines";
+	static final String DIGEST_LAST_KEY = "digestLastAt";
+	static final String RECAP_LAST_KEY = "recapLastAt";
+	static final String FARM_KEY = "farmTimers";
+	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
+		GroupEvent.Type.WILDERNESS, GroupEvent.Type.HC_LIFE_LOST);
 
 	@Inject
 	private Client client;
@@ -108,6 +129,13 @@ class GroupEventEngine
 	private final PresenceDebounce presence = new PresenceDebounce();
 	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()));
 	private volatile EventSettings settings = EventSettings.OFF;
+	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
+	private volatile Digest digest = new Digest();
+	private DryStreak dry = DryStreak.parse("");
+	private Digest.Week week = Digest.Week.parse("");
+	private FarmRuns farm = new FarmRuns(this::own, this::wanted);
+	private int varWait = -1;
+	private int scheduleTicks;
 	private DiscordSender sender;
 	private ScheduledFuture<?> pump;
 	private EventToastOverlay toastOverlay;
@@ -117,6 +145,7 @@ class GroupEventEngine
 	private EventText.Count lastKc;
 	private long lastKcAt;
 	private int barrowsTicks = -1;
+	private int clueTicks = -1;
 	private boolean questPending;
 	private boolean loginPending;
 	private int backWait = -1;
@@ -213,6 +242,28 @@ class GroupEventEngine
 		{
 			router.route(e, own, settings, group.lookup);
 		}
+		if (own && wanted(GroupEvent.Type.WEEKLY_RECAP))
+		{
+			if (!change.deposited().isEmpty())
+			{
+				week.storage(true);
+			}
+			if (!change.took().isEmpty())
+			{
+				week.storage(false);
+			}
+			saveProfile(WEEK_KEY, week.save());
+		}
+	}
+
+	private void saveProfile(String key, String value)
+	{
+		configManager.setRSProfileConfiguration(GroupIronmanConfig.GROUP, key, value);
+	}
+
+	private String profile(String key)
+	{
+		return configManager.getRSProfileConfiguration(GroupIronmanConfig.GROUP, key);
 	}
 
 	/** Client thread. A storage minimum hit; own when this player's visit caused it. */
@@ -250,7 +301,12 @@ class GroupEventEngine
 	@Subscribe
 	public void onNpcLootReceived(NpcLootReceived event)
 	{
-		if (event.getNpc() == null || !wanted(GroupEvent.Type.DROP) && !wanted(GroupEvent.Type.UNIQUE))
+		if (event.getNpc() == null)
+		{
+			return;
+		}
+		tallyDrop(event);
+		if (!wanted(GroupEvent.Type.DROP) && !wanted(GroupEvent.Type.UNIQUE))
 		{
 			return;
 		}
@@ -275,6 +331,26 @@ class GroupEventEngine
 		}
 	}
 
+	/** The week's drop count, and whether this drop ends a dry streak. */
+	private void tallyDrop(NpcLootReceived event)
+	{
+		if (wanted(GroupEvent.Type.WEEKLY_RECAP))
+		{
+			week.drop();
+			saveProfile(WEEK_KEY, week.save());
+		}
+		if (wanted(GroupEvent.Type.DRY_STREAK))
+		{
+			Set<String> names = new HashSet<>();
+			for (ItemStack stack : event.getItems())
+			{
+				names.add(itemManager.getItemComposition(stack.getId()).getName());
+			}
+			dry.drop(event.getNpc().getName(), names, System.currentTimeMillis());
+			saveProfile(DRY_KEY, dry.save());
+		}
+	}
+
 	private boolean tradeable(int id)
 	{
 		ItemComposition item = itemManager.getItemComposition(id);
@@ -291,23 +367,31 @@ class GroupEventEngine
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
+		long now = System.currentTimeMillis();
+		String message = event.getMessage();
+		if (event.getType() == ChatMessageType.FRIENDSCHATNOTIFICATION)
+		{
+			// Chambers announces its loot here.
+			watchChat(message, now);
+			return;
+		}
 		if (event.getType() != ChatMessageType.GAMEMESSAGE && event.getType() != ChatMessageType.SPAM)
 		{
 			return;
 		}
-		long now = System.currentTimeMillis();
-		String message = event.getMessage();
 		EventText.Count count = EventText.killCount(message);
 		if (count != null)
 		{
 			lastKc = count;
 			lastKcAt = now;
+			counted(count, now);
 			return;
 		}
 		if (event.getType() != ChatMessageType.GAMEMESSAGE)
 		{
 			return;
 		}
+		watchChat(message, now);
 		if (EventText.isPet(message) && wanted(GroupEvent.Type.PET))
 		{
 			own(GroupEvent.of(GroupEvent.Type.PET, now, group.localPlayer()).build());
@@ -320,17 +404,113 @@ class GroupEventEngine
 		}
 	}
 
+	/** A kill or raid count line: the raid's name, a milestone, the week's count and the dry streak. */
+	private void counted(EventText.Count count, long now)
+	{
+		String me = group.localPlayer();
+		if (isRaid(count.name))
+		{
+			watchers.raidCount(count.name, count.count);
+		}
+		watchers.kill(count.name, count.count, settings.kcEvery, now, me);
+		if (wanted(GroupEvent.Type.WEEKLY_RECAP))
+		{
+			week.kill();
+			saveProfile(WEEK_KEY, week.save());
+		}
+		if (wanted(GroupEvent.Type.DRY_STREAK))
+		{
+			dry.kill(count.name, now, me);
+			saveProfile(DRY_KEY, dry.save());
+		}
+	}
+
+	private static boolean isRaid(String name)
+	{
+		return name.contains("Chambers of Xeric") || name.contains("Theatre of Blood") || name.contains("Tombs of Amascut");
+	}
+
+	private void watchChat(String message, long now)
+	{
+		watchers.chat(message, now, group.localPlayer(), groupMembers(), playersHere());
+	}
+
+	/** This group's in-game roster, from the client's own clan data. */
+	private Set<String> groupMembers()
+	{
+		Set<String> names = new HashSet<>();
+		ClanSettings clan = client.getClanSettings(ClanID.GROUP_IRONMAN);
+		if (clan != null)
+		{
+			for (ClanMember member : clan.getMembers())
+			{
+				names.add(member.getName());
+			}
+		}
+		return names;
+	}
+
+	private List<String> playersHere()
+	{
+		List<String> names = new ArrayList<>();
+		for (Player player : client.getTopLevelWorldView().players())
+		{
+			if (player.getName() != null)
+			{
+				names.add(player.getName());
+			}
+		}
+		return names;
+	}
+
+	private Map<Integer, Integer> carried()
+	{
+		Map<Integer, Integer> items = new TreeMap<>();
+		addAll(items, client.getItemContainer(InventoryID.INV));
+		addAll(items, client.getItemContainer(InventoryID.WORN));
+		return items;
+	}
+
+	private void addAll(Map<Integer, Integer> items, ItemContainer container)
+	{
+		if (container != null)
+		{
+			for (Item item : container.getItems())
+			{
+				if (item.getId() >= 0 && item.getQuantity() > 0)
+				{
+					ItemCounts.add(items, item.getId(), item.getQuantity(), itemManager::canonicalize);
+				}
+			}
+		}
+	}
+
+	private String whereIs(Player me)
+	{
+		WorldPoint at = me.getLocalLocation() == null ? null : WorldPoint.fromLocalInstance(client, me.getLocalLocation());
+		return at == null ? null : group.regions().describe(at.getRegionID());
+	}
+
 	@Subscribe
 	public void onActorDeath(ActorDeath event)
 	{
 		Player me = client.getLocalPlayer();
-		if (me == null || event.getActor() != me || !wanted(GroupEvent.Type.DEATH))
+		if (me == null || event.getActor() != me)
+		{
+			return;
+		}
+		String where = whereIs(me);
+		if (wanted(GroupEvent.Type.DEATH_VALUE) || wanted(GroupEvent.Type.GRAVESTONE_EXPIRING))
+		{
+			Map<Integer, Integer> items = carried();
+			group.resolveItems(items.keySet());
+			watchers.died(items, where == null ? "" : where, client.getWorld());
+		}
+		if (!wanted(GroupEvent.Type.DEATH))
 		{
 			return;
 		}
 		Actor killer = me.getInteracting();
-		WorldPoint at = me.getLocalLocation() == null ? null : WorldPoint.fromLocalInstance(client, me.getLocalLocation());
-		String where = at == null ? null : group.regions().describe(at.getRegionID());
 		boolean hardcore = client.getVarbitValue(VarbitID.IRONMAN) == EventDetect.HARDCORE_GROUP_IRONMAN;
 		own(GroupEvent.of(GroupEvent.Type.DEATH, System.currentTimeMillis(), group.localPlayer())
 			.text(killer == null ? null : killer.getName())
@@ -384,6 +564,23 @@ class GroupEventEngine
 		{
 			barrowsTicks = BARROWS_WAIT_TICKS;
 		}
+		else if (event.getGroupId() == InterfaceID.TRAIL_REWARDSCREEN)
+		{
+			clueTicks = BARROWS_WAIT_TICKS;
+		}
+	}
+
+	private void clueReward(long now)
+	{
+		ItemContainer chest = client.getItemContainer(InventoryID.TRAIL_REWARDINV);
+		if (chest == null || !wanted(GroupEvent.Type.CLUE))
+		{
+			return;
+		}
+		Map<Integer, Integer> items = new TreeMap<>();
+		addAll(items, chest);
+		group.resolveItems(items.keySet());
+		watchers.clueReward(items, EventText.value(items, group.lookup), now, group.localPlayer());
 	}
 
 	@Subscribe
@@ -404,7 +601,9 @@ class GroupEventEngine
 			{
 				// Another account may log in next: start every baseline over.
 				progress.reset();
+				watchers.reset();
 				backWait = -1;
+				varWait = -1;
 			}
 		}
 	}
@@ -429,6 +628,14 @@ class GroupEventEngine
 		{
 			own(combat);
 		}
+		readInterfaces(now);
+		dry.due(now).forEach(this::own);
+		watch(now, me);
+	}
+
+	/** The quest, Barrows and clue interfaces, a tick or two after they loaded. */
+	private void readInterfaces(long now)
+	{
 		if (questPending)
 		{
 			questPending = false;
@@ -438,10 +645,145 @@ class GroupEventEngine
 		{
 			barrows(now);
 		}
+		if (clueTicks >= 0 && clueTicks-- == 0)
+		{
+			clueReward(now);
+		}
+	}
+
+	/** Each tick, once a login has settled: variables, death, the gravestone and the schedule. */
+	private void watch(long now, Player me)
+	{
+		if (varWait > 0)
+		{
+			varWait--;
+			return;
+		}
+		if (varWait < 0)
+		{
+			return;
+		}
+		String name = me.getName();
+		if (POLLED.stream().anyMatch(this::wanted))
+		{
+			watchers.poll(id -> id == EventWatchers.SKULL ? (me.getSkullIcon() != -1 ? 1 : 0) : client.getVarbitValue(id),
+				now, name);
+		}
+		if (wanted(GroupEvent.Type.DEATH_VALUE))
+		{
+			watchers.deathTick(carried(), group.lookup, now, name);
+		}
+		if (wanted(GroupEvent.Type.GRAVESTONE_EXPIRING))
+		{
+			watchers.graveTick(client.getVarbitValue(VarbitID.GRAVESTONE_VISIBLE), settings.graveWarnMinutes, now, name);
+		}
+		farmTick(now, me);
+		if (++scheduleTicks >= SCHEDULE_EVERY_TICKS)
+		{
+			scheduleTicks = 0;
+			schedule(now, name);
+		}
+	}
+
+	/** Reads the patches and bird houses where the player is standing, when either kind is switched on. */
+	private void farmTick(long now, Player me)
+	{
+		if (wanted(GroupEvent.Type.FARMING) || wanted(GroupEvent.Type.BIRDHOUSE))
+		{
+			WorldPoint at = me.getWorldLocation();
+			farm.observe(at.getRegionID(), at.getX(), at.getY(), at.getPlane(), client::getVarbitValue,
+				client::getVarpValue, now / 1000L);
+			saveFarm();
+		}
+	}
+
+	private void saveFarm()
+	{
+		if (farm.takeDirty())
+		{
+			saveProfile(FARM_KEY, farm.save());
+		}
+	}
+
+	/** Sends the daily digest and the weekly recap when due. A first run records the time and sends nothing. */
+	private void schedule(long now, String name)
+	{
+		farm.due(now / 1000L, name);
+		saveFarm();
+		ZoneId zone = ZoneId.systemDefault();
+		int hour = settings.digestHour;
+		if (!settings.digest.isEmpty())
+		{
+			long lastDigest = savedTime(DIGEST_LAST_KEY, now);
+			if (Digest.dailyDue(lastDigest, now, hour, zone))
+			{
+				flushDigest();
+				saveProfile(DIGEST_LAST_KEY, Long.toString(now));
+			}
+		}
+		if (!wanted(GroupEvent.Type.WEEKLY_RECAP))
+		{
+			return;
+		}
+		week.xp(client.getOverallExperience());
+		long lastRecap = savedTime(RECAP_LAST_KEY, now);
+		if (Digest.weeklyDue(lastRecap, now, hour, zone))
+		{
+			own(week.recap(now, name));
+			week.startOver();
+			saveProfile(RECAP_LAST_KEY, Long.toString(now));
+		}
+		saveProfile(WEEK_KEY, week.save());
+	}
+
+	/** The saved time; when none is saved yet, saves {@code now} and returns 0, which only sets the baseline. */
+	private long savedTime(String key, long now)
+	{
+		try
+		{
+			String saved = profile(key);
+			if (saved != null)
+			{
+				return Long.parseLong(saved);
+			}
+		}
+		catch (NumberFormatException e)
+		{
+			log.debug("saved schedule time unreadable: {}", key);
+		}
+		saveProfile(key, Long.toString(now));
+		return 0;
+	}
+
+	private void flushDigest()
+	{
+		if (sender == null || !config.discordEnabled())
+		{
+			return;
+		}
+		Map<GroupEvent.Category, String> overrides = DiscordWebhook.overrides(config);
+		for (GroupEvent.Category category : settings.digest)
+		{
+			String url = DiscordWebhook.route(category, overrides, config.discordWebhookUrl());
+			// Draining first would lose held lines when the webhook has been cleared.
+			if (url != null)
+			{
+				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category)), null);
+			}
+		}
+		saveProfile(DIGEST_KEY, digest.save());
 	}
 
 	private void login(long now, String name)
 	{
+		dry = DryStreak.parse(profile(DRY_KEY));
+		week = Digest.Week.parse(profile(WEEK_KEY));
+		digest = Digest.parse(profile(DIGEST_KEY));
+		farm = FarmRuns.parse(profile(FARM_KEY), this::own, this::wanted);
+		if (varWait < 0)
+		{
+			varWait = VAR_WAIT_TICKS;
+		}
 		GroupEvent online;
 		synchronized (presence)
 		{
@@ -545,6 +887,12 @@ class GroupEventEngine
 			config.discordWebhookUrl());
 		if (url == null)
 		{
+			return;
+		}
+		if (settings.digest.contains(event.type.category) && event.type != GroupEvent.Type.WEEKLY_RECAP)
+		{
+			digest.add(event.type.category, EventText.sentence(event, group.lookup));
+			saveProfile(DIGEST_KEY, digest.save());
 			return;
 		}
 		DiscordStyle style = config.discordStyle();

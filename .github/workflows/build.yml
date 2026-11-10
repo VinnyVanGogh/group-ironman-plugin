@@ -22,3 +22,7 @@ jobs:
 
       - run: chmod +x ./gradlew
       - run: ./gradlew build --no-daemon
+
+      # The Plugin Hub builds against its current client, which can be ahead
+      # of the pin in build.gradle.
+      - run: ./gradlew test --no-daemon -PruneLiteVersion=1.13.6
