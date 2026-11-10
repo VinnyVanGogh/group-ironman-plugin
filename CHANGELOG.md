@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### One Discord post per moment
+
+- A group storage visit is one Discord post. With a big deposit or withdrawal
+  it is titled "Big storage withdrawal", "Big storage deposit" or "Big storage
+  visit" (both), lists every item moved with the big stacks marked, and shows
+  the visit's total value. With nothing big it is the "Group storage visit"
+  summary, when that is switched on. "Storage minimum hit" and "Took the last
+  one" from the same visit are lines in that post, not posts of their own.
+- The same rule elsewhere: a kill's drop, untradeable unique, collection log
+  slot and pet; a tick's level up, 99, XP milestone, total level and combat
+  level; a death, its Hardcore group life and the value it cost. Each is one
+  post, titled after the biggest of them, with the rest as fields and one
+  screenshot taken when the moment began.
+- Discord only: banners, the group box and chat are unchanged.
+
 ### Windows launcher in CI
 
 - `Run-GimUtilities.cmd` takes an opt-in `GU_BUILD_ONLY=1` that builds

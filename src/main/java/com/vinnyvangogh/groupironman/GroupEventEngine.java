@@ -128,6 +128,8 @@ class GroupEventEngine
 	private final ProgressTracker progress = new ProgressTracker(Skill.values().length - 1);
 	private final PresenceDebounce presence = new PresenceDebounce();
 	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()));
+	/** Client thread: Discord events waiting for the rest of their moment. */
+	private final DiscordBatch batch = new DiscordBatch();
 	private volatile EventSettings settings = EventSettings.OFF;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
 	private volatile Digest digest = new Digest();
@@ -184,6 +186,8 @@ class GroupEventEngine
 		{
 			sender.clear();
 		}
+		// Unsent posts are dropped at shutdown, as the sender's queue is.
+		batch.drain();
 		toasts.clear();
 		progress.reset();
 		settings = EventSettings.OFF;
@@ -241,6 +245,11 @@ class GroupEventEngine
 		for (GroupEvent e : EventDetect.storage(change, group.lookup))
 		{
 			router.route(e, own, settings, group.lookup);
+			if (own && e.type == GroupEvent.Type.STORAGE_SUMMARY)
+			{
+				// A big move's post lists the whole visit, whether or not the summary is switched on.
+				batch.attach(e);
+			}
 		}
 		if (own && wanted(GroupEvent.Type.WEEKLY_RECAP))
 		{
@@ -593,6 +602,8 @@ class GroupEventEngine
 		}
 		else if (state == GameState.HOPPING || state == GameState.LOGIN_SCREEN)
 		{
+			// No more ticks until the next login: post what is held now.
+			batch.drain().forEach(this::flush);
 			synchronized (presence)
 			{
 				presence.logout(System.currentTimeMillis());
@@ -612,6 +623,7 @@ class GroupEventEngine
 	public void onGameTick(GameTick tick)
 	{
 		long now = System.currentTimeMillis();
+		batch.due(now).forEach(this::flush);
 		Player me = client.getLocalPlayer();
 		if (me == null || me.getName() == null)
 		{
@@ -876,15 +888,13 @@ class GroupEventEngine
 
 	// ---- Discord ----
 
-	/** Router output: one of this player's events for Discord, when posting is on and a webhook is set. */
+	/**
+	 * Router output: one of this player's events for Discord, when posting is on and a webhook is set. Kinds
+	 * that share a moment with others wait in {@link #batch} so the moment is one post.
+	 */
 	private void toDiscord(GroupEvent event)
 	{
-		if (!config.discordEnabled() || sender == null)
-		{
-			return;
-		}
-		String url = DiscordWebhook.route(event.type.category, DiscordWebhook.overrides(config),
-			config.discordWebhookUrl());
+		String url = discordUrl(event.type.category);
 		if (url == null)
 		{
 			return;
@@ -895,15 +905,61 @@ class GroupEventEngine
 			saveProfile(DIGEST_KEY, digest.save());
 			return;
 		}
-		DiscordStyle style = config.discordStyle();
-		String mention = config.discordMention();
-		// A logout settles at the login screen: nothing worth a picture.
-		if (!config.discordScreenshot() || event.type == GroupEvent.Type.ONLINE)
+		DiscordMerge.Family family = DiscordMerge.family(event.type);
+		if (family == null)
 		{
-			sender.post(url, DiscordWebhook.payload(gson, event, group.lookup, style, mention, false), null);
+			// A logout settles at the login screen: nothing worth a picture.
+			post(url, DiscordMerge.single(event, group.lookup), event.type != GroupEvent.Type.ONLINE, null);
 			return;
 		}
-		String json = DiscordWebhook.payload(gson, event, group.lookup, style, mention, true);
+		List<DiscordBatch.Pending> done = new ArrayList<>();
+		DiscordBatch.Pending moment = batch.add(event, System.currentTimeMillis(),
+			DiscordMerge.window(family, settings), done);
+		if (moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot())
+		{
+			// The frame of the moment itself, not of whenever the post goes out (a death's respawn).
+			drawManager.requestNextFrameListener(image -> executor.execute(() -> moment.screenshot = png(image)));
+		}
+		done.forEach(this::flush);
+	}
+
+	/** The webhook for a category; null when posting is off or no webhook is set. */
+	private String discordUrl(GroupEvent.Category category)
+	{
+		if (!config.discordEnabled() || sender == null)
+		{
+			return null;
+		}
+		return DiscordWebhook.route(category, DiscordWebhook.overrides(config), config.discordWebhookUrl());
+	}
+
+	/** Client thread. One held moment as one post. */
+	private void flush(DiscordBatch.Pending moment)
+	{
+		DiscordMerge.Post post = DiscordMerge.merge(moment.events, settings, group.lookup);
+		String url = post == null ? null : discordUrl(post.lead.type.category);
+		if (url != null)
+		{
+			post(url, post, true, moment.screenshot);
+		}
+	}
+
+	/** {@code shot}: a frame already taken; when a picture is wanted and none is ready, the next frame. */
+	private void post(String url, DiscordMerge.Post post, boolean picture, byte[] shot)
+	{
+		DiscordStyle style = config.discordStyle();
+		String mention = config.discordMention();
+		if (!picture || !config.discordScreenshot())
+		{
+			sender.post(url, DiscordWebhook.payload(gson, post, group.lookup, style, mention, false), null);
+			return;
+		}
+		String json = DiscordWebhook.payload(gson, post, group.lookup, style, mention, true);
+		if (shot != null)
+		{
+			sender.post(url, json, shot);
+			return;
+		}
 		// The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread.
 		drawManager.requestNextFrameListener(image -> executor.execute(() ->
 			sender.post(url, json, png(image))));
