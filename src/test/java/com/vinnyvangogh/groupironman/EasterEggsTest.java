@@ -128,7 +128,7 @@ public class EasterEggsTest
 	public void aBonesOnlyValuableDropIsCalledOut()
 	{
 		GroupEvent bones = GroupEvent.drop(NOW, "Alex", "Goblin", items(ItemID.BONES, 1));
-		assertTrue(Arrays.asList(EasterEggLines.BONES).contains(EasterEggs.line(bones, lookup, ON)));
+		assertTrue(Arrays.asList(EasterEggLines.BONES_ONLY).contains(EasterEggs.line(bones, lookup, ON)));
 	}
 
 	// ---- group storage ----

@@ -30,7 +30,7 @@ final class EasterEggLines
 		"Look who followed you home.",
 	};
 	/** A "valuable" drop that is only Bones: the drop threshold is set very low. */
-	static final String[] BONES = {
+	static final String[] BONES_ONLY = {
 		"Bones. Truly valuable.",
 		"Someone check the valuable drop setting.",
 	};
@@ -91,7 +91,7 @@ final class EasterEggLines
 	static List<String> all()
 	{
 		List<String> out = new ArrayList<>();
-		for (String[] lines : Arrays.asList(FREE_TRIP, CLUE_HUNTERS, PET, BONES, LEGEND, FREELOADER))
+		for (String[] lines : Arrays.asList(FREE_TRIP, CLUE_HUNTERS, PET, BONES_ONLY, LEGEND, FREELOADER))
 		{
 			out.addAll(Arrays.asList(lines));
 		}

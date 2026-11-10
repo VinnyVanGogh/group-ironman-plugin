@@ -60,7 +60,7 @@ final class EasterEggs
 		(e, l, s) -> clueDeath(e, l) ? EasterEggLines.CLUE_HUNTERS : null,
 		(e, l, s) -> nothingLost(e) ? EasterEggLines.FREE_TRIP : null,
 		(e, l, s) -> e.type == GroupEvent.Type.PET ? EasterEggLines.PET : null,
-		(e, l, s) -> bonesOnly(e) ? EasterEggLines.BONES : null,
+		(e, l, s) -> bonesOnly(e) ? EasterEggLines.BONES_ONLY : null,
 		EasterEggs::itemRow,
 		(e, l, s) -> freeloader(e, l, s) ? EasterEggLines.FREELOADER : null,
 		(e, l, s) -> legend(e, l, s) ? EasterEggLines.LEGEND : null));
