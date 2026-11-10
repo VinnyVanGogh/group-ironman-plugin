@@ -15,6 +15,8 @@ import java.util.stream.Stream;
 import net.runelite.client.config.ConfigItem;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -72,6 +74,32 @@ public class ConfigKeysTest
 			assertTrue(m.getName() + " is never read", code.contains("config." + m.getName() + "()")
 				|| code.contains("GroupIronmanConfig::" + m.getName() + ",")
 				|| code.contains("GroupIronmanConfig::" + m.getName() + ")"));
+		}
+	}
+
+	/** The Plugin Hub holds a plugin that does file i/o for extra maintainer review. */
+	@Test
+	public void noSourceTouchesTheFileSystem() throws IOException
+	{
+		try (Stream<Path> files = Files.list(SOURCES))
+		{
+			for (Path path : (Iterable<Path>) files::iterator)
+			{
+				String code = read(path);
+				for (String banned : new String[]{"java.io.File", "java.nio.file", "RUNELITE_DIR"})
+				{
+					assertFalse(path.getFileName() + " uses " + banned, code.contains(banned));
+				}
+			}
+		}
+	}
+
+	@Test
+	public void theSavedCacheIsNotAVisibleSetting()
+	{
+		for (Method m : items())
+		{
+			assertNotEquals(GroupIronmanConfig.KEY_GROUP_CACHE, m.getAnnotation(ConfigItem.class).keyName());
 		}
 	}
 
