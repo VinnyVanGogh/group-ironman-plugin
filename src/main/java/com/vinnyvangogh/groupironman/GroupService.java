@@ -1,10 +1,10 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
@@ -53,7 +54,6 @@ import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.Notifier;
-import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
@@ -66,6 +66,7 @@ import net.runelite.client.game.ItemStack;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.events.UserPart;
+import net.runelite.client.util.Filepath;
 import net.runelite.client.party.messages.UserSync;
 
 /**
@@ -120,7 +121,11 @@ class GroupService
 		}
 	}
 
-	/** Its own folder, never Build Guard's: both plugins may run side by side. */
+	/**
+	 * The folder under .runelite the cache used before the Filepath API. Now only the
+	 * PluginDescriptor's legacyDataDirectory, which RuneLite migrates into the plugin's data
+	 * directory. Never Build Guard's: both plugins may run side by side.
+	 */
 	static final String CACHE_DIR = "gim-utilities";
 	private static final String CACHE_FILE = "group-cache.json";
 
@@ -161,6 +166,10 @@ class GroupService
 	/** Equipment slot per item, read on the client thread with the name (ItemManager stats need it). */
 	private final Map<Integer, Integer> slots = new ConcurrentHashMap<>();
 	private Runnable onChange = () -> { };
+	private Callable<Filepath> dataDirectory = () ->
+	{
+		throw new IOException("plugin data directory not set");
+	};
 	private GroupSync sync;
 	/** The group event engine, told about storage visits, minimums and members' events; null when not running. */
 	private volatile GroupEventEngine events;
@@ -221,9 +230,14 @@ class GroupService
 		}
 	};
 
-	void startUp(Runnable onChange)
+	/**
+	 * @param dataDirectory the plugin's own data directory (Plugin#getPluginDirectory). Called on
+	 *                      the executor, since the first call may migrate the legacy folder.
+	 */
+	void startUp(Runnable onChange, Callable<Filepath> dataDirectory)
 	{
 		this.onChange = onChange;
+		this.dataDirectory = dataDirectory;
 		sync = new GroupSync(new GroupSync.Party()
 		{
 			@Override
@@ -1354,14 +1368,18 @@ class GroupService
 	/** Executor thread. False when there is no file or it cannot be read. */
 	private boolean readCache()
 	{
-		File file = cacheFile();
-		if (!file.isFile())
-		{
-			return false;
-		}
 		try
 		{
-			String json = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+			Filepath file = cacheFile();
+			if (!file.isFile())
+			{
+				return false;
+			}
+			String json;
+			try (InputStream in = file.openInputStream())
+			{
+				json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+			}
 			if (!GroupCache.read(gson, json, roster))
 			{
 				log.debug("group cache unreadable, starting empty");
@@ -1369,7 +1387,7 @@ class GroupService
 			}
 			return true;
 		}
-		catch (IOException e)
+		catch (Exception e)
 		{
 			log.debug("could not read group cache", e);
 			return false;
@@ -1386,24 +1404,37 @@ class GroupService
 		String json = GroupCache.write(gson, roster);
 		executor.execute(() ->
 		{
-			File file = cacheFile();
 			try
 			{
-				Files.createDirectories(file.getParentFile().toPath());
-				File tmp = new File(file.getParentFile(), CACHE_FILE + ".tmp");
-				Files.write(tmp.toPath(), json.getBytes(StandardCharsets.UTF_8));
-				Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+				Filepath file = cacheFile();
+				Filepath dir = file.getParent();
+				dir.createDirectories();
+				// Write a temp file beside the cache, then move it over, so a crash never leaves half a file.
+				Filepath tmp = dir.createTempFile("group-cache", ".tmp");
+				try
+				{
+					try (OutputStream out = tmp.openOutputStream())
+					{
+						out.write(json.getBytes(StandardCharsets.UTF_8));
+					}
+					tmp.moveTo(file, StandardCopyOption.REPLACE_EXISTING);
+				}
+				finally
+				{
+					tmp.deleteIfExists();
+				}
 			}
-			catch (IOException e)
+			catch (Exception e)
 			{
 				log.debug("could not write group cache", e);
 			}
 		});
 	}
 
-	private static File cacheFile()
+	/** Executor thread. The cache inside the plugin's data directory (.runelite/plugin-data/gim-utilities). */
+	private Filepath cacheFile() throws Exception
 	{
-		return new File(new File(RuneLite.RUNELITE_DIR, CACHE_DIR), CACHE_FILE);
+		return dataDirectory.call().joinSegment(CACHE_FILE);
 	}
 
 	/** Kept for the panel: is any group feature on, so the panel button should show. */

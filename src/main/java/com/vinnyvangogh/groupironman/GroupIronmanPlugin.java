@@ -45,6 +45,10 @@ import net.runelite.client.ui.NavigationButton;
 @Slf4j
 @PluginDescriptor(
 	name = GroupIronmanPlugin.NAME,
+	// The Plugin Hub name; getPluginDirectory() keeps the cache in .runelite/plugin-data/gim-utilities.
+	internalName = "gim-utilities",
+	// RuneLite moves the pre-Filepath cache folder (.runelite/gim-utilities) there on first use.
+	legacyDataDirectory = GroupService.CACHE_DIR,
 	description = "Share banks, group storage changes, stats and drops with your Group Ironman team over RuneLite Party",
 	tags = {"group", "ironman", "gim", "party", "bank", "storage", "shared"}
 )
@@ -156,7 +160,7 @@ public class GroupIronmanPlugin extends Plugin
 			.priority(9)
 			.panel(panel)
 			.build();
-		group.startUp(this::redraw);
+		group.startUp(this::redraw, this::getPluginDirectory);
 		events.startUp(group);
 		eventBus.register(events);
 		updateNavButton();
