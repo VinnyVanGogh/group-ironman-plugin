@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -191,6 +192,37 @@ final class DiscordWebhook
 		JsonArray embeds = new JsonArray();
 		embeds.add(embed(post, words, lookup, screenshot));
 		o.add("embeds", embeds);
+		return gson.toJson(o);
+	}
+
+	/** A level streak's post ("Prayer 23 → 25 (+2) in 4 min"), as a new message: it never mentions anyone. */
+	static String levels(Gson gson, GroupEvent latest, String text, ItemLookup lookup, DiscordStyle style,
+		boolean screenshot)
+	{
+		DiscordMerge.Post post = new DiscordMerge.Post(latest, EventText.title(latest), text,
+			Collections.emptyMap(), Collections.emptyList(), false);
+		return payload(gson, post, lookup, style, null, screenshot, null);
+	}
+
+	/**
+	 * The same, as an edit of the streak's message (Discord "Edit Webhook Message"): no {@code username}, which
+	 * that endpoint does not take. A new screenshot replaces the old one: files sent with an edit are appended
+	 * unless {@code attachments} lists every file the message keeps, here only the new upload.
+	 */
+	static String levelsEdit(Gson gson, GroupEvent latest, String text, ItemLookup lookup, DiscordStyle style,
+		boolean screenshot)
+	{
+		JsonObject o = gson.fromJson(levels(gson, latest, text, lookup, style, screenshot), JsonObject.class);
+		o.remove("username");
+		if (screenshot)
+		{
+			JsonObject upload = new JsonObject();
+			upload.addProperty("id", 0);
+			upload.addProperty("filename", SCREENSHOT);
+			JsonArray attachments = new JsonArray();
+			attachments.add(upload);
+			o.add("attachments", attachments);
+		}
 		return gson.toJson(o);
 	}
 

@@ -145,6 +145,8 @@ class GroupEventEngine
 		this::toDigest);
 	/** Client thread: Discord events waiting for the rest of their moment. */
 	private final DiscordBatch batch = new DiscordBatch();
+	/** Level-ups of one skill as one post, edited in place. Any thread; message ids in memory only. */
+	private LevelPosts levels;
 	private volatile EventSettings settings = EventSettings.OFF;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
 	/** The death's frame for the gravestone warning; memory only, so a restart loses it. */
@@ -173,8 +175,9 @@ class GroupEventEngine
 	{
 		this.group = group;
 		group.events(this);
-		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient), System::currentTimeMillis,
+		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient, gson), System::currentTimeMillis,
 			() -> LocalTime.now().getHour());
+		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords);
 		reloadConfig();
 		restorePresence();
 		toastOverlay = new EventToastOverlay(toasts, config, group.lookup);
@@ -215,6 +218,10 @@ class GroupEventEngine
 		}
 		// Unsent posts are dropped at shutdown, as the sender's queue is.
 		batch.drain();
+		if (levels != null)
+		{
+			levels.clear();
+		}
 		toasts.clear();
 		progress.reset();
 		settings = EventSettings.OFF;
@@ -259,6 +266,7 @@ class GroupEventEngine
 	{
 		try
 		{
+			levels.tick();
 			sender.pump();
 			GroupEvent offline;
 			synchronized (presenceLock)
@@ -678,6 +686,8 @@ class GroupEventEngine
 		{
 			// No more ticks until the next login: post what is held now.
 			batch.drain().forEach(this::flush);
+			// A logout ends every level streak; an edit already owed still goes.
+			levels.close();
 			// A world hop (HOPPING) is never a logout: it posts nothing, whatever the grace.
 			synchronized (presenceLock)
 			{
@@ -1101,10 +1111,42 @@ class GroupEventEngine
 	{
 		DiscordMerge.Post post = DiscordMerge.merge(moment.events, settings, discordWords());
 		String url = post == null ? null : webhook(post.lead.type.category);
-		if (url != null)
+		if (url != null && !combineLevels(url, moment))
 		{
 			post(url, post, moment.events, true, moment.screenshot);
 		}
+	}
+
+	/**
+	 * A moment that is one skill's level-up joins that skill's post when the combine window is on: the first
+	 * posts and is kept, later ones edit it ({@link LevelThreads}). False when the moment posts as usual.
+	 */
+	private boolean combineLevels(String url, DiscordBatch.Pending moment)
+	{
+		long window = TimeUnit.MINUTES.toMillis(config.discordCombineLevels());
+		GroupEvent level = window > 0 ? LevelThreads.combinable(moment.events) : null;
+		if (level == null)
+		{
+			return false;
+		}
+		// The egg reads the item cache: on the client thread, as every other post's does.
+		String egg = egg(moment.events);
+		if (!config.discordScreenshot() || moment.screenshot != null)
+		{
+			levelUp(url, level, window, moment.screenshot, egg);
+			return true;
+		}
+		drawManager.requestNextFrameListener(image -> executor.execute(() ->
+			levelUp(url, level, window, png(image), egg)));
+		return true;
+	}
+
+	/** Any thread. A level-up into its streak, with the usual level-up post should it start a new one. */
+	private void levelUp(String url, GroupEvent level, long window, byte[] png, String egg)
+	{
+		String json = DiscordWebhook.payload(gson, DiscordMerge.single(level, discordWords()), discordWords(),
+			config.discordStyle(), config.discordMention(), png != null, egg);
+		levels.level(url, level, window, png, json);
 	}
 
 	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
