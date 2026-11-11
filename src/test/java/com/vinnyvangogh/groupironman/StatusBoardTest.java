@@ -279,6 +279,11 @@ public class StatusBoardTest
 			}.discordOnlineStatus());
 		assertFalse("the board is not a post", EventSettings.from(new GroupIronmanConfig()
 		{
+			@Override
+			public OnlineStatus discordOnlineStatus()
+			{
+				return OnlineStatus.LIVE_BOARD;
+			}
 		}).discord.contains(GroupEvent.Type.ONLINE));
 	}
 }
