@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### One Discord post per skill's level streak
+
+- New setting **Combine level-ups within (minutes)**, default 30, 0 turns it
+  off. The first level-up in a skill posts as before; more levels in that
+  skill within the window edit that same post in place: *Prayer 23 → 25 (+2)
+  in 4 min*, with a fresh screenshot when screenshots are on.
+- A 99, a total-level milestone, maxing and a combat level still get their own
+  post. The overlay and the Log still show every level.
+- At most one edit every 10 seconds per post; quicker levels fold into the
+  next edit. A logout or the window running out starts a new post.
+- If the post was deleted or the webhook changed, the next update is posted as
+  a new message, and that one is edited from then on. Message ids are kept in
+  memory only.
+
 ### Amounts read like the game
 
 - Quantities and gp values use the game's stack text everywhere: *Coins -

@@ -27,19 +27,36 @@ final class DiscordQueue
 	static final int MAX_ATTEMPTS = 3;
 	private static final long MINUTE = TimeUnit.MINUTES.toMillis(1);
 
+	/** The final outcome of a post the caller wants to hear about: its status, and the created message's id. */
+	interface Result
+	{
+		void done(int status, String messageId);
+	}
+
 	static final class Post
 	{
 		final String url;
 		final String json;
 		/** A PNG to attach, or null. */
 		final byte[] png;
+		/** The message this post edits in place, or null for a new message. */
+		final String edit;
+		/** Told once how it went (never for a retry); null when nobody asks. A new post with one waits for its id. */
+		final Result result;
 		int attempts;
 
 		Post(String url, String json, byte[] png)
 		{
+			this(url, json, png, null, null);
+		}
+
+		Post(String url, String json, byte[] png, String edit, Result result)
+		{
 			this.url = url;
 			this.json = json;
 			this.png = png;
+			this.edit = edit;
+			this.result = result;
 		}
 	}
 
@@ -81,27 +98,29 @@ final class DiscordQueue
 
 	/**
 	 * How the in-flight post went: an HTTP status, or 0 for a network failure.
-	 * {@code retryAfterMs} is the 429's Retry-After, negative when absent.
+	 * {@code retryAfterMs} is the 429's Retry-After, negative when absent. True when the post will be tried again.
 	 */
-	synchronized void done(int status, long retryAfterMs, long now)
+	synchronized boolean done(int status, long retryAfterMs, long now)
 	{
 		Post post = inFlight;
 		inFlight = null;
 		if (post == null || status >= 200 && status < 300)
 		{
-			return;
+			return false;
 		}
 		if (status == 429)
 		{
 			notBefore = now + (retryAfterMs >= 0 ? retryAfterMs : RETRY_MS);
 			waiting.addFirst(post);
-			return;
+			return true;
 		}
 		if ((status == 0 || status >= 500) && post.attempts < MAX_ATTEMPTS)
 		{
 			notBefore = now + RETRY_MS;
 			waiting.addFirst(post);
+			return true;
 		}
+		return false;
 	}
 
 	synchronized void clear()
