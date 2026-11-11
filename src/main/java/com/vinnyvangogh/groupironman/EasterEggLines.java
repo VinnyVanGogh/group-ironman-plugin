@@ -34,13 +34,20 @@ final class EasterEggLines
 		"Bones. Truly valuable.",
 		"Someone check the valuable drop setting.",
 	};
+	// Emoji are written as Java unicode escapes (surrogate pairs) so the source compiles the same whatever the build host's encoding.
 	/** A group storage deposit worth at least the 'Legend at' value. */
 	static final String[] LEGEND = {
-		"Legend of the group.",
+		"Feeding the group like a true ironmom/irondad. 🫶", // U+1FAF6 heart hands
+		"Gringotts thanks you for your service.",
+		"Generosity level: 99.",
+		"The group storage is eating good tonight.",
 	};
-	/** A group storage withdrawal worth more than the 'Freeloader at' value. */
+	/** A group storage withdrawal worth at least the 'Freeloader at' value. */
 	static final String[] FREELOADER = {
-		"Freeloader detected.",
+		"Gringotts is watching you. 👀", // U+1F440 eyes
+		"Borrowing, not stealing. Right?",
+		"The group storage will remember this.",
+		"Taking from the pile like a true group ironman.",
 	};
 
 	/** Drops by item id, first row wins when a drop has several. */

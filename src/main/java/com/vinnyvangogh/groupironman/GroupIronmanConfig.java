@@ -477,7 +477,7 @@ public interface GroupIronmanConfig extends Config
 	}
 
 	@ConfigItem(keyName = "discordFreeloaderAt", name = "Freeloader at (gp)", description = "With Easter eggs on, a"
-		+ " group storage withdrawal worth more than this gets a line. 0 turns it off.", section = discordSection,
+		+ " group storage withdrawal worth at least this much gets a line. 0 turns it off.", section = discordSection,
 		position = 15)
 	default int discordFreeloaderAt()
 	{
