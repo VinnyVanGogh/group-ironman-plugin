@@ -2,10 +2,7 @@ package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -14,16 +11,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
-import lombok.extern.slf4j.Slf4j;
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 
 /**
  * The live online board (Board 2026-11-10): one message in the Group channel, one line per member, edited on
@@ -41,11 +30,13 @@ import okhttp3.ResponseBody;
  * and only when they changed.</li>
  * <li>"Last seen" is Discord's own relative timestamp ({@code <t:...:R>}), so the board stays right as time
  * passes without an edit.</li>
+ * <li>Requests go through the {@link DiscordSender}'s queue like every post (its edit path for an edit), so the
+ * board shares the queue's {@link DiscordQueue#PER_MINUTE} limit, its 429 and retry handling, and its
+ * {@code thread_id}-keeping URLs. One request is with the queue at a time.</li>
  * </ul>
  *
  * The send state is guarded by this object: the timer sends, OkHttp's thread answers.
  */
-@Slf4j
 final class StatusBoard
 {
 	static final long MIN_GAP_MS = TimeUnit.SECONDS.toMillis(10);
@@ -53,19 +44,7 @@ final class StatusBoard
 	static final String ONLINE = "🟢";
 	static final String OFFLINE = "🔴";
 	static final String UNKNOWN = "⚪";
-	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 	private static final String SEP = "\t";
-
-	interface Transport
-	{
-		/** Sends the request and calls {@code done} once: the status (0 for a network failure), body and Retry-After. */
-		void send(Send send, String json, Done done);
-	}
-
-	interface Done
-	{
-		void done(int status, String body, String retryAfter);
-	}
 
 	/** This client's own player, which it knows better than the party does. */
 	static final class Self
@@ -105,11 +84,6 @@ final class StatusBoard
 		boolean create()
 		{
 			return messageId == null;
-		}
-
-		String endpoint()
-		{
-			return create() ? url + "?wait=true" : url + "/messages/" + messageId;
 		}
 	}
 
@@ -298,14 +272,17 @@ final class StatusBoard
 		return "**" + name.replaceAll("([\\\\*_~`|>])", "\\\\$1") + "**";
 	}
 
-	/** The request body. Only the lines and the edit time go in: never the webhook. */
-	static String payload(Gson gson, Send send, DiscordStyle style)
+	/**
+	 * The request body. Only the lines and the edit time go in: never the webhook. A new board is posted under
+	 * {@code username}, the Group poster name ({@link PosterNames}), none when null; an edit takes no username.
+	 */
+	static String payload(Gson gson, Send send, DiscordStyle style, String username)
 	{
 		String text = send.lines + "\nUpdated " + when(send.changedAt);
 		JsonObject o = new JsonObject();
-		if (send.create())
+		if (send.create() && username != null)
 		{
-			o.addProperty("username", DiscordWebhook.USERNAME);
+			o.addProperty("username", username);
 		}
 		JsonObject allowed = new JsonObject();
 		allowed.add("parse", new JsonArray());
@@ -339,51 +316,17 @@ final class StatusBoard
 		return gson.toJson(o);
 	}
 
-	/** The new message's id from Discord's answer to a post, or null. */
-	static String messageId(Gson gson, String body)
+	/** Queues {@code send} with the sender: a post that waits for its id, or an edit; the outcome to {@link #done}. */
+	void send(DiscordSender sender, Send send, String json, LongSupplier clock)
 	{
-		try
+		DiscordQueue.Result result = (status, id) -> done(send, status, id, -1, clock.getAsLong());
+		if (send.create())
 		{
-			JsonObject o = body == null ? null : gson.fromJson(body, JsonObject.class);
-			JsonElement id = o == null ? null : o.get("id");
-			return id != null && id.isJsonPrimitive() && id.getAsString().matches("\\d+") ? id.getAsString() : null;
+			sender.post(send.url, json, null, result);
 		}
-		catch (JsonParseException | IllegalStateException e)
+		else
 		{
-			return null;
+			sender.edit(send.url, send.messageId, json, null, result);
 		}
-	}
-
-	/** The client's transport: RuneLite's own OkHttpClient, asynchronous. Never logs the URL. */
-	static Transport okHttp(OkHttpClient http)
-	{
-		return (send, json, done) ->
-		{
-			RequestBody body = RequestBody.create(JSON, json);
-			Request.Builder request = new Request.Builder().url(send.endpoint());
-			http.newCall(send.create() ? request.post(body).build() : request.patch(body).build()).enqueue(new Callback()
-			{
-				@Override
-				public void onFailure(Call call, IOException e)
-				{
-					log.debug("discord status board unreachable: {}", e.getClass().getSimpleName());
-					done.done(0, null, null);
-				}
-
-				@Override
-				public void onResponse(Call call, Response response)
-				{
-					try (Response r = response)
-					{
-						ResponseBody b = r.body();
-						done.done(r.code(), b == null ? null : b.string(), r.header("Retry-After"));
-					}
-					catch (IOException e)
-					{
-						done.done(0, null, null);
-					}
-				}
-			});
-		};
 	}
 }

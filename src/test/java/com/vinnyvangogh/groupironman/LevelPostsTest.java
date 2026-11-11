@@ -30,12 +30,20 @@ public class LevelPostsTest
 		sent.add(post);
 		pending.add(done);
 	}, () -> now, () -> 12);
+	/** The Progress poster name the replacement post is sent under. */
+	private String poster = "Iron Pals";
 	private final LevelPosts levels = new LevelPosts(sender, gson, () -> now, () -> DiscordStyle.EMBED,
-		FakeItems::new);
+		FakeItems::new, () -> poster);
 
 	private static GroupEvent level(String skill, int n)
 	{
 		return GroupEvent.of(GroupEvent.Type.LEVEL_UP, 0, "Alex").text(skill).number(n).build();
+	}
+
+	/** A level-up that knows the level before it, as the tracker's own events do. */
+	private static GroupEvent level(String skill, int from, int n)
+	{
+		return GroupEvent.of(GroupEvent.Type.LEVEL_UP, 0, "Alex").text(skill).number(n).previous(from).build();
 	}
 
 	private void gain(int n)
@@ -133,7 +141,8 @@ public class LevelPostsTest
 		assertNull("posted anew", sent.get(2).edit);
 		assertTrue(DiscordSender.target(sent.get(2)).endsWith("?wait=true"));
 		assertEquals("Prayer 23 → 25 (+2) in under a minute", description(sent.get(2)));
-		assertTrue("a new post keeps its username", sent.get(2).json.contains("username"));
+		assertEquals("a new post is sent under the Progress poster name", "Iron Pals",
+			gson.fromJson(sent.get(2).json, JsonObject.class).get("username").getAsString());
 		reply(200, "m2");
 
 		now += 15 * SEC;
@@ -204,6 +213,149 @@ public class LevelPostsTest
 		assertEquals("first 26", sent.get(1).json);
 		assertEquals("the owed edit", "m1", sent.get(2).edit);
 		assertEquals("Prayer 23 → 25 (+2) in under a minute", description(sent.get(2)));
+	}
+
+	@Test
+	public void severalLevelsFromOneActionReadFromTheLevelBefore()
+	{
+		ProgressTracker tracker = new ProgressTracker(23);
+		tracker.skill("Prayer", 3, 0, 0, "Alex");
+		GroupEvent bones = tracker.skill("Prayer", 6, 1_000, 1, "Alex").get(0);
+		assertEquals("the tracker carries the level before", 3, bones.previous);
+		assertEquals(3, bones.toBuilder().build().previous);
+
+		levels.level(URL, bones, WINDOW, null, "first 6");
+		tick();
+		reply(200, "m1");
+		now += 15 * SEC;
+		levels.level(URL, level("Prayer", 6, 7), WINDOW, null, "first 7");
+		tick();
+		assertEquals("Prayer 3 → 7 (+4) in under a minute", description(sent.get(1)));
+	}
+
+	@Test
+	public void aMembersLevelWithoutTheLevelBeforeReadsOneBelow()
+	{
+		assertEquals(0, level("Prayer", 25).previous);
+		gain(25);
+		tick();
+		reply(200, "m1");
+		now += 15 * SEC;
+		gain(26);
+		tick();
+		assertEquals("Prayer 24 → 26 (+2) in under a minute", description(sent.get(1)));
+	}
+
+	@Test
+	public void theWebhooksOwnNameSendsNoUsername()
+	{
+		poster = null;
+		gain(24);
+		tick();
+		reply(200, "m1");
+		now += 15 * SEC;
+		gain(25);
+		tick();
+		reply(404, null);
+		tick();
+		assertNull(sent.get(2).edit);
+		assertFalse(sent.get(2).json.contains("username"));
+	}
+
+	/** Posts Prayer 24 as m1, then gains 25 so its edit is in flight. */
+	private void editInFlight()
+	{
+		gain(24);
+		tick();
+		reply(200, "m1");
+		now += 15 * SEC;
+		gain(25);
+		tick();
+		assertEquals("m1", sent.get(sent.size() - 1).edit);
+	}
+
+	/**
+	 * The edit in flight lost for good: every one of the queue's {@link DiscordQueue#MAX_ATTEMPTS} tries answered
+	 * 503. Returns how many requests went meanwhile: the retries, plus the streak's next edit if it lives on.
+	 */
+	private int loseEdit()
+	{
+		int before = sent.size();
+		for (int attempt = 1; attempt <= DiscordQueue.MAX_ATTEMPTS; attempt++)
+		{
+			assertEquals("m1", sent.get(sent.size() - 1).edit);
+			reply(503, null);
+			now += LevelThreads.EDIT_GAP;
+			tick();
+		}
+		return sent.size() - before;
+	}
+
+	@Test
+	public void threeLostEditsEndTheStreakAndTheNextLevelPostsFresh()
+	{
+		editInFlight();
+		assertEquals("lost once: tried again", DiscordQueue.MAX_ATTEMPTS, loseEdit());
+		assertEquals("lost twice: tried again", DiscordQueue.MAX_ATTEMPTS, loseEdit());
+		assertEquals("lost a third time: the streak ends", DiscordQueue.MAX_ATTEMPTS - 1, loseEdit());
+		now += LevelThreads.EDIT_GAP;
+		tick();
+		assertTrue(pending.isEmpty());
+
+		now += 15 * SEC;
+		gain(28);
+		tick();
+		assertNull("a fresh post", sent.get(sent.size() - 1).edit);
+		assertEquals("first 28", sent.get(sent.size() - 1).json);
+	}
+
+	@Test
+	public void anEditThatGoesThroughResetsTheFailureCount()
+	{
+		editInFlight();
+		loseEdit();
+		loseEdit();
+		reply(200, null);
+		now += 15 * SEC;
+		gain(27);
+		tick();
+		assertEquals("one more loss is the first in a row: tried again", DiscordQueue.MAX_ATTEMPTS, loseEdit());
+		assertEquals("m1", sent.get(sent.size() - 1).edit);
+	}
+
+	@Test
+	public void aFirstPostAFullQueueDropsReleasesTheStreak()
+	{
+		gain(24);
+		for (int i = 0; i < DiscordQueue.MAX_QUEUED; i++)
+		{
+			sender.post(URL, "filler " + i, null);
+		}
+		gain(25);
+		while (sender.queued() > 0)
+		{
+			now += 60 * SEC;
+			sender.pump();
+			reply(204, null);
+		}
+		for (DiscordQueue.Post post : sent)
+		{
+			assertFalse("the dropped post never went", "first 24".equals(post.json));
+		}
+		assertEquals("the next level posted fresh", "first 25", sent.get(sent.size() - 1).json);
+	}
+
+	@Test
+	public void aDroppedEditEndsTheStreak()
+	{
+		LevelThreads threads = new LevelThreads();
+		LevelThreads.Streak s = threads.level(level("Prayer", 24), URL, 0, WINDOW, null);
+		threads.posted(s, 200, "m1", 0);
+		assertNull("joins", threads.level(level("Prayer", 25), URL, SEC, WINDOW, null));
+		LevelThreads.Edit edit = threads.due(LevelThreads.EDIT_GAP).get(0);
+		assertNull(threads.edited(edit.streak, DiscordQueue.DROPPED));
+		assertTrue(threads.due(2 * LevelThreads.EDIT_GAP).isEmpty());
+		assertNotNull("the next level posts fresh", threads.level(level("Prayer", 26), URL, 2 * SEC, WINDOW, null));
 	}
 
 	@Test

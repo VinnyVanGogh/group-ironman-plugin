@@ -164,7 +164,6 @@ class GroupEventEngine
 	private int scheduleTicks;
 	private DiscordSender sender;
 	private final StatusBoard board = new StatusBoard();
-	private StatusBoard.Transport boardTransport;
 	/** This player for the live board: set on the client thread, read by the timer. Null before a login. */
 	private volatile StatusBoard.Self boardSelf;
 	private ScheduledFuture<?> pump;
@@ -186,8 +185,8 @@ class GroupEventEngine
 		group.events(this);
 		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient, gson), System::currentTimeMillis,
 			() -> LocalTime.now().getHour());
-		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords);
-		boardTransport = StatusBoard.okHttp(okHttpClient);
+		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords,
+			() -> PosterNames.name(config, GroupEvent.Category.PROGRESS));
 		chooseOnlineStatus();
 		reloadConfig();
 		restorePresence();
@@ -227,6 +226,8 @@ class GroupEventEngine
 		{
 			sender.clear();
 		}
+		// The queue's board request is gone with it: forget it was out, so a restart sends again.
+		board.target(null, () -> null);
 		// Unsent posts are dropped at shutdown, as the sender's queue is.
 		batch.drain();
 		if (levels != null)
@@ -323,9 +324,8 @@ class GroupEventEngine
 			StatusBoard.Send send = board.next(now, quiet);
 			if (send != null)
 			{
-				boardTransport.send(send, StatusBoard.payload(gson, send, config.discordStyle()), (status, body, retry) ->
-					board.done(send, status, StatusBoard.messageId(gson, body), DiscordQueue.retryAfterMs(retry),
-						System.currentTimeMillis()));
+				board.send(sender, send, StatusBoard.payload(gson, send, config.discordStyle(),
+					PosterNames.name(config, GroupEvent.Category.GROUP)), System::currentTimeMillis);
 			}
 		}
 		String saved = board.takeSaved();
@@ -1252,7 +1252,8 @@ class GroupEventEngine
 	private void levelUp(String url, GroupEvent level, long window, byte[] png, String egg)
 	{
 		String json = DiscordWebhook.payload(gson, DiscordMerge.single(level, discordWords()), discordWords(),
-			config.discordStyle(), config.discordMention(), png != null, egg);
+			config.discordStyle(), config.discordMention(), png != null, egg,
+			PosterNames.name(config, GroupEvent.Category.PROGRESS));
 		levels.level(url, level, window, png, json);
 	}
 

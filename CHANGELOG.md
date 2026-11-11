@@ -15,6 +15,11 @@
 - If the post was deleted or the webhook changed, the next update is posted as
   a new message, and that one is edited from then on. Message ids are kept in
   memory only.
+- One action that gains several levels (low Prayer from bones) reads from the
+  level before it: *Prayer 3 → 6 (+3)*, not *5 → 6*.
+- After three edits in a row lost to Discord or the network, or a post pushed
+  out of a full queue, the streak ends and the next level posts fresh.
+- Level-up posts use the Progress poster name.
 
 ### The Log shows every group event
 
@@ -51,7 +56,7 @@
 - New setting **Online status**: *Posts*, *Live board* or *Off*. It replaces
   the "Online and offline" switch; an install that had it ticked stays on
   *Posts*, one that used Discord without it is *Off*, and a new install starts
-  on *Live board*.
+  on *Posts*: a member opts into *Live board*.
 - *Live board* keeps one message in the Group channel listing each member:
   online (with the world) or offline (last seen, kept current by Discord). It
   is edited on each login, logout and hop, at most once every 10 seconds and
@@ -60,7 +65,9 @@
   *unknown*. The webhook and the message id stay on your client: neither is
   sent to the group.
 - Each member with *Live board* and a Group webhook keeps their own board, so
-  in a shared channel one member having it on is enough.
+  only one member sharing a Group webhook should turn it on.
+- The board's posts and edits share the Discord queue with every other post
+  (at most 20 a minute) and use the Group poster name.
 
 ### Slayer posts fixed
 

@@ -22,7 +22,7 @@ public enum OnlineStatus
 	/**
 	 * What an install that had the older "Online and offline" switch keeps, the first time this setting exists:
 	 * posts when it posted them, nothing when it used Discord without them. Null for an install that never used
-	 * Discord, which takes the default, the live board.
+	 * Discord, which takes the default, posts (Board 2026-11-10: a member opts into the live board).
 	 */
 	static OnlineStatus upgrading(boolean postedOnline, boolean usedDiscord)
 	{

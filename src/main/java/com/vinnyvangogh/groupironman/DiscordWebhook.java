@@ -213,13 +213,16 @@ final class DiscordWebhook
 		return gson.toJson(o);
 	}
 
-	/** A level streak's post ("Prayer 23 → 25 (+2) in 4 min"), as a new message: it never mentions anyone. */
+	/**
+	 * A level streak's post ("Prayer 23 → 25 (+2) in 4 min"), as a new message under {@code username} (null for
+	 * the webhook's own, {@link PosterNames}): it never mentions anyone.
+	 */
 	static String levels(Gson gson, GroupEvent latest, String text, ItemLookup lookup, DiscordStyle style,
-		boolean screenshot)
+		boolean screenshot, String username)
 	{
 		DiscordMerge.Post post = new DiscordMerge.Post(latest, EventText.title(latest), text,
 			Collections.emptyMap(), Collections.emptyList(), false);
-		return payload(gson, post, lookup, style, null, screenshot, null);
+		return payload(gson, post, lookup, style, null, screenshot, null, username);
 	}
 
 	/**
@@ -230,8 +233,7 @@ final class DiscordWebhook
 	static String levelsEdit(Gson gson, GroupEvent latest, String text, ItemLookup lookup, DiscordStyle style,
 		boolean screenshot)
 	{
-		JsonObject o = gson.fromJson(levels(gson, latest, text, lookup, style, screenshot), JsonObject.class);
-		o.remove("username");
+		JsonObject o = gson.fromJson(levels(gson, latest, text, lookup, style, screenshot, null), JsonObject.class);
 		if (screenshot)
 		{
 			JsonObject upload = new JsonObject();

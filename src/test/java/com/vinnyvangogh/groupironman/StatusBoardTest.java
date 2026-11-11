@@ -2,9 +2,11 @@ package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
@@ -36,7 +38,6 @@ public class StatusBoardTest
 		board.show(lines, at);
 		StatusBoard.Send send = board.next(at, false);
 		assertTrue("the first send posts", send.create());
-		assertEquals(URL + "?wait=true", send.endpoint());
 		board.done(send, 200, "111", -1, at);
 		saved = board.takeSaved();
 	}
@@ -51,7 +52,7 @@ public class StatusBoardTest
 		board.show("b", NOW + GAP);
 		StatusBoard.Send edit = board.next(NOW + GAP, false);
 		assertFalse(edit.create());
-		assertEquals(URL + "/messages/111", edit.endpoint());
+		assertEquals("111", edit.messageId);
 		assertEquals("b", edit.lines);
 		board.done(edit, 200, null, -1, NOW + GAP);
 		assertNull("an edit keeps the id", board.takeSaved());
@@ -64,7 +65,7 @@ public class StatusBoardTest
 		StatusBoard restarted = new StatusBoard();
 		restarted.target(URL, () -> saved);
 		restarted.show("a", NOW);
-		assertEquals(URL + "/messages/111", restarted.next(NOW, false).endpoint());
+		assertEquals("111", restarted.next(NOW, false).messageId);
 
 		StatusBoard moved = new StatusBoard();
 		moved.target(OTHER, () -> saved);
@@ -142,11 +143,13 @@ public class StatusBoardTest
 		{
 			for (DiscordStyle style : DiscordStyle.values())
 			{
-				String json = StatusBoard.payload(GSON, send, style);
+				String json = StatusBoard.payload(GSON, send, style, "Iron Pals");
 				assertFalse(json, json.contains("secretTOKEN") || json.contains("123456") || json.contains("webhooks"));
 				JsonObject o = GSON.fromJson(json, JsonObject.class);
 				assertEquals("mentions nobody", 0, o.getAsJsonObject("allowed_mentions").getAsJsonArray("parse").size());
 				assertEquals("an edit takes no username", send.create(), o.has("username"));
+				assertFalse("the webhook's own name sends none",
+					StatusBoard.payload(GSON, send, style, null).contains("username"));
 				String text = style == DiscordStyle.PLAIN ? o.get("content").getAsString()
 					: o.getAsJsonArray("embeds").get(0).getAsJsonObject().get("description").getAsString();
 				assertEquals("line\nUpdated <t:" + NOW / 1000 + ":R>", text.substring(text.indexOf("line")));
@@ -188,13 +191,80 @@ public class StatusBoardTest
 			NOW));
 	}
 
-	@Test
-	public void theNewMessagesIdIsReadFromDiscordsAnswer()
+	/** The board through the real sender, with a fake transport: the requests it makes, and their answers. */
+	private final List<DiscordQueue.Post> requests = new ArrayList<>();
+	private final List<DiscordSender.Done> answers = new ArrayList<>();
+	private long now = NOW;
+	private final DiscordSender sender = new DiscordSender((post, done) ->
 	{
-		assertEquals("1234567890", StatusBoard.messageId(GSON, "{\"id\":\"1234567890\",\"content\":\"\"}"));
-		assertNull(StatusBoard.messageId(GSON, "not json"));
-		assertNull(StatusBoard.messageId(GSON, null));
-		assertNull(StatusBoard.messageId(GSON, "{\"message\":\"Unknown Webhook\"}"));
+		requests.add(post);
+		answers.add(done);
+	}, () -> now, () -> 12);
+
+	private void sendNext()
+	{
+		StatusBoard.Send send = board.next(now, false);
+		board.send(sender, send, StatusBoard.payload(GSON, send, DiscordStyle.EMBED, null), () -> now);
+		sender.pump();
+	}
+
+	@Test
+	public void theBoardGoesThroughTheSendersQueuePostThenEdit()
+	{
+		String thread = URL + "?thread_id=42";
+		board.target(thread, () -> null);
+		board.show("a", now);
+		sendNext();
+		DiscordQueue.Post post = requests.get(0);
+		assertNull("a new board is a post", post.edit);
+		assertEquals("waits for the id, keeps the thread", URL + "?thread_id=42&wait=true", DiscordSender.target(post));
+		answers.remove(0).done(200, null, "111");
+		assertTrue(board.takeSaved().endsWith("\t111"));
+
+		now += GAP;
+		board.show("b", now);
+		sendNext();
+		DiscordQueue.Post edit = requests.get(1);
+		assertEquals("then edits it in place", "111", edit.edit);
+		assertEquals(URL + "/messages/111?thread_id=42", DiscordSender.target(edit));
+		answers.remove(0).done(404, null);
+		assertEquals("a deleted board is forgotten", "", board.takeSaved());
+		now += GAP;
+		sendNext();
+		assertNull("and posted again", requests.get(2).edit);
+	}
+
+	@Test
+	public void theBoardSharesThePerMinuteLimit()
+	{
+		for (int i = 0; i < DiscordQueue.PER_MINUTE; i++)
+		{
+			sender.post(URL, "post " + i, null);
+			sender.pump();
+			answers.remove(0).done(204, null);
+		}
+		target(URL);
+		board.show("a", now);
+		sendNext();
+		assertEquals("the minute's posts used the limit", DiscordQueue.PER_MINUTE, requests.size());
+		now += 60_000;
+		sender.pump();
+		assertEquals("the board goes when the minute is up", DiscordQueue.PER_MINUTE + 1, requests.size());
+	}
+
+	@Test
+	public void aBoardRequestAFullQueueDropsIsSentAgain()
+	{
+		target(URL);
+		board.show("a", now);
+		StatusBoard.Send send = board.next(now, false);
+		board.send(sender, send, "{}", () -> now);
+		for (int i = 0; i < DiscordQueue.MAX_QUEUED; i++)
+		{
+			sender.post(URL, "post " + i, null);
+		}
+		assertNull("not before the gap", board.next(now + 1, false));
+		assertTrue("dropped, so tried again", board.next(now + GAP, false).create());
 	}
 
 	@Test
@@ -203,9 +273,10 @@ public class StatusBoardTest
 		assertEquals(OnlineStatus.POSTS, OnlineStatus.upgrading(true, true));
 		assertEquals(OnlineStatus.OFF, OnlineStatus.upgrading(false, true));
 		assertNull("a new install takes the default", OnlineStatus.upgrading(false, false));
-		assertEquals(OnlineStatus.LIVE_BOARD, new GroupIronmanConfig()
-		{
-		}.discordOnlineStatus());
+		assertEquals("a new install posts; a member opts into the board (Board 2026-11-10)", OnlineStatus.POSTS,
+			new GroupIronmanConfig()
+			{
+			}.discordOnlineStatus());
 		assertFalse("the board is not a post", EventSettings.from(new GroupIronmanConfig()
 		{
 		}).discord.contains(GroupEvent.Type.ONLINE));

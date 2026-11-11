@@ -16,15 +16,18 @@ final class LevelPosts
 	private final LongSupplier clock;
 	private final Supplier<DiscordStyle> style;
 	private final Supplier<ItemLookup> lookup;
+	/** The Progress poster name ({@link PosterNames}); null for the webhook's own. */
+	private final Supplier<String> poster;
 
 	LevelPosts(DiscordSender sender, Gson gson, LongSupplier clock, Supplier<DiscordStyle> style,
-		Supplier<ItemLookup> lookup)
+		Supplier<ItemLookup> lookup, Supplier<String> poster)
 	{
 		this.sender = sender;
 		this.gson = gson;
 		this.clock = clock;
 		this.style = style;
 		this.lookup = lookup;
+		this.poster = poster;
 	}
 
 	/**
@@ -68,7 +71,7 @@ final class LevelPosts
 		if (again != null)
 		{
 			post(again.streak, again.url, DiscordWebhook.levels(gson, again.latest, again.text, lookup.get(),
-				style.get(), again.png != null), again.png);
+				style.get(), again.png != null, poster.get()), again.png);
 		}
 	}
 

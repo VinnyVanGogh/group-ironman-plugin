@@ -61,7 +61,13 @@ Five more sections, all closed and all off by default:
   out under the webhook's own name, not the main custom name. Every embed's
   footer still says GIM Utilities.
 - **Discord: which events** and **Overlays: which events**: one switch per
-  event, for each output.
+  event, for each output. *Online status* is *Posts* (the default: a post per
+  login and logout), *Live board* (one Group-channel message listing each
+  member, edited in place) or *Off*. Only one member sharing a Group webhook
+  should turn on *Live board*: each member who has it on keeps a board of
+  their own in that channel. Level-up posts use the Progress poster name and
+  the board the Group one; the board's edits count toward the same 20 posts
+  a minute.
 - **Overlays**: *Banner time*, *Banner position*, *Most banners at once*, the
   *Group box* (who is online and on which world, and the latest events) and
   how many events it lists.

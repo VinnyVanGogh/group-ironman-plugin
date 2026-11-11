@@ -52,7 +52,8 @@ final class ProgressTracker
 		Long xpBefore = xp.put(skill, experience);
 		if (before != null && level > before)
 		{
-			out.add(GroupEvent.of(GroupEvent.Type.LEVEL_UP, at, member).text(skill).number(level).build());
+			out.add(GroupEvent.of(GroupEvent.Type.LEVEL_UP, at, member).text(skill).number(level).previous(before)
+				.build());
 			if (level >= MAX_LEVEL && before < MAX_LEVEL)
 			{
 				out.add(GroupEvent.of(GroupEvent.Type.MAXED, at, member).text(skill).number(MAX_LEVEL).build());

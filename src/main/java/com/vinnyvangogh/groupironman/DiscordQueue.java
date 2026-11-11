@@ -1,7 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -10,7 +12,8 @@ import java.util.concurrent.TimeUnit;
  * a network.
  *
  * <ul>
- * <li>At most {@link #MAX_QUEUED} wait; a new post past that drops the oldest.</li>
+ * <li>At most {@link #MAX_QUEUED} wait; a new post past that drops the oldest, whose {@link Result} hears
+ * {@link #DROPPED}.</li>
  * <li>At most {@link #PER_MINUTE} go in any minute, well under Discord's own
  * per-webhook limit, so a busy evening never trips it.</li>
  * <li>A 429 waits its Retry-After and tries the same post again; a 5xx or a
@@ -25,6 +28,8 @@ final class DiscordQueue
 	static final int PER_MINUTE = 20;
 	static final long RETRY_MS = TimeUnit.SECONDS.toMillis(5);
 	static final int MAX_ATTEMPTS = 3;
+	/** The status a {@link Result} hears when its post was dropped from a full queue, never sent. */
+	static final int DROPPED = -1;
 	private static final long MINUTE = TimeUnit.MINUTES.toMillis(1);
 
 	/** The final outcome of a post the caller wants to hear about: its status, and the created message's id. */
@@ -65,13 +70,23 @@ final class DiscordQueue
 	private long notBefore;
 	private Post inFlight;
 
-	synchronized void offer(Post post)
+	/**
+	 * Queues {@code post}; the oldest waiting go when the queue is full. Returns those dropped that wanted their
+	 * outcome, for the caller to tell {@link #DROPPED} outside this lock.
+	 */
+	synchronized List<Post> offer(Post post)
 	{
+		List<Post> dropped = new ArrayList<>();
 		while (waiting.size() >= MAX_QUEUED)
 		{
-			waiting.pollFirst();
+			Post old = waiting.pollFirst();
+			if (old.result != null)
+			{
+				dropped.add(old);
+			}
 		}
 		waiting.addLast(post);
+		return dropped;
 	}
 
 	synchronized int size()
