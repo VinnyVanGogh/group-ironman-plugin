@@ -257,14 +257,65 @@ offset, so a crop's post can come late but not early. Bird houses use Time
 Tracking's 50 minute average. A crop that catches disease out of sight is still
 reported, as it is in Time Tracking.
 
+### Phase 0 addendum — optional server sync (2026-11-11, RUNELITE-117)
+
+Board, 2026-11-11: an optional server of our own (Cloudflare Workers + D1)
+for group sync without Party, a web settings page, Discord bot settings and a
+group dashboard. Design and threat model: `docs/plans/gim-server.md`. The
+server lives in its own repo; the plugin side lives on the long-lived
+`server-sync` branch until the Board merges it. **None of #22–#25 is on
+`main`.** Numbers start at #22 because open PR #19 takes #21.
+
+**22. Group sync through our own server — allowed, with precedent, under
+conditions.** *Nearest rules:* Data & Privacy, "no exposing player
+information over HTTP" and "no crowdsourcing data about other players".
+*Verdict* (runelite-compliance, Board session 2026-11-11): allowed **only
+if** (a) it is opt-in (`serverSync`, off by default, with the third-party
+warning in its description); (b) a group's data is readable only by that
+group: a group secret derived from the group key, per-member tokens, no
+public pages, no lookups by player name and no cross-group queries; and
+(c) nothing about non-members is stored. Each member's client sends only its
+own player's data, the same subset Party carries today (#8–#17).
+*Precedent:* Hub plugin **Group Ironmen Tracker**
+(`christoabrown/group-ironmen-tracker`, 21,557 installs) syncs banks,
+storage, stats and location to its own server and site, without Party. Its
+Hub manifest carries `warning=This plugin submits your IP address, and may
+submit various account data, to a 3rd party server not controlled or
+verified by the RuneLite Developers.` Expect the same warning on ours, and
+document it in the README and the Hub PR. Connecting on login without a click
+is an HTTP call, not a party join or a game action, so the "joining a party
+without a click" line below does not cover it. Plugin rules still hold:
+injected `OkHttpClient` with `enqueue` (or its `newWebSocket`), never the
+client thread, no reflection, `Filepath` for local files (main `6c7036a`).
+
+**23. Settings changed remotely (web page, Discord) — allowed, no precedent.**
+No rule was found that covers it, and no precedent was found. *Reasoning:*
+the settings change only what this plugin displays and posts. None of them
+touches game input, menus, combat information or other players' data.
+Applying them is a second opt-in per member (`serverAllowRemoteSettings`, off
+by default). An allowlist excludes the sync opt-ins, the group key and every
+webhook URL; webhook URLs never leave the client. Revisit if a reviewer
+objects.
+
+**24. Group web dashboard — allowed, with precedent.** It shows a group only
+its own shared data (#22 conditions). *Precedent:* Group Ironmen Tracker's
+site.
+
+**25. Discord bot that edits settings — allowed.** It runs outside the game
+client (HTTP interactions on the Worker) and never posts game data. Its
+commands are limited to Manage Server by default and re-checked on the
+server. Same reasoning as #23.
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection**, and therefore any integration that reads another plugin's
   state. If integration is ever wanted, the channel is
   `net.runelite.client.events.PluginMessage`.
 - **Every network call** of our own but the optional Discord webhook the
-  player sets (#18), and any server. Group Ironmen Tracker needs a website;
-  this plugin's point is that it does not.
+  player sets (#18), and any server, **on `main`**. Group Ironmen Tracker
+  needs a website; this plugin's point is that it does not. *Amended
+  2026-11-11 (Board):* the opt-in server sync in #22–#25 is the one exception,
+  on the `server-sync` branch only, until the Board merges it.
 - **Automating anything**: moving items, withdrawing, walking. Input
   Restrictions.
 - **Joining a party without a click**, on login or on a timer, and **putting
