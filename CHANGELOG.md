@@ -51,7 +51,9 @@
   that lost only a spade (and clue items), a pet, a Bones-only "valuable"
   drop, about ten well-known drops, and big group storage visits.
 - **Legend at (gp)** and **Freeloader at (gp)** (default 1M each, 0 turns it
-  off) set when a deposit or withdrawal gets its line.
+  off) set when a deposit or withdrawal gets its line. Both fire at exactly
+  the value: 10K taken with Freeloader at 10K gets a line. Each has four
+  rotating phrasings, picked the same way on every client.
 - A death that cost 0 gp no longer posts "lost about 0 gp". In a death's post
   the line is left out; on its own it posts nothing with Easter eggs off, and
   only the egg line with them on. The daily digest follows the same rule.
