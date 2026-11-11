@@ -468,6 +468,70 @@ public interface GroupIronmanConfig extends Config
 		return 30;
 	}
 
+	@ConfigItem(keyName = "discordPosterName", name = "Poster name", description = "Whose name posts show. The"
+		+ " webhook's own: the name and avatar set on each webhook in Discord. Custom: the names below.",
+		section = discordSection, position = 17)
+	default DiscordPosterName discordPosterName()
+	{
+		return DiscordPosterName.WEBHOOK;
+	}
+
+	@ConfigItem(keyName = "discordNameMain", name = "Custom name: main", description = "With Poster name on Custom,"
+		+ " posts to the main webhook use this name, unless their category has its own below. Blank uses the"
+		+ " webhook's own. At most 80 characters, without"
+		+ " 'discord' or 'clyde'.", section = discordSection, position = 18)
+	default String discordNameMain()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameDrops", name = "Custom name: Drops", description = "With Poster name on"
+		+ " Custom, drop posts use this name. Blank uses the webhook's own.", section = discordSection, position = 19)
+	default String discordNameDrops()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameDeaths", name = "Custom name: Deaths", description = "With Poster name on"
+		+ " Custom, death posts use this name. Blank uses the webhook's own.", section = discordSection,
+		position = 20)
+	default String discordNameDeaths()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameStorage", name = "Custom name: Storage", description = "With Poster name on"
+		+ " Custom, group storage posts use this name. Blank uses the webhook's own.", section = discordSection,
+		position = 21)
+	default String discordNameStorage()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameProgress", name = "Custom name: Progress", description = "With Poster name on"
+		+ " Custom, level, XP and quest posts use this name. Blank uses the webhook's own.", section = discordSection,
+		position = 22)
+	default String discordNameProgress()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameGroup", name = "Custom name: Group", description = "With Poster name on"
+		+ " Custom, online, offline and 'back after' posts use this name. Blank uses the webhook's own.",
+		section = discordSection, position = 23)
+	default String discordNameGroup()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameActivities", name = "Custom name: Activities", description = "With Poster name"
+		+ " on Custom, Barrows posts use this name. Blank uses the webhook's own.", section = discordSection,
+		position = 24)
+	default String discordNameActivities()
+	{
+		return "";
+	}
+
 	@ConfigSection(name = "Discord: which events", description = "Each event is its own switch, all off until you"
 		+ " tick it.", position = 5, closedByDefault = true)
 	String discordEventsSection = "discordEvents";
