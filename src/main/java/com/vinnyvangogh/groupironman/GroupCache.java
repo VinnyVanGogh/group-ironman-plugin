@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  * What survives a restart: members' last banks, the storage log, the last
  * group storage contents, members' rune pouch, quiver and seed vault, the
- * drops log, when each member was last heard from and when this player last
+ * drops log, the Log tab's feed of every event ({@code feed}), when each member was last heard from and when this player last
  * played, as one JSON document. Each member's last stats (world, place, HP,
  * prayer, run, levels) and carried items are kept too, so an offline member's
  * card shows where they were and what they had the last time you were both
@@ -90,6 +90,7 @@ final class GroupCache
 			events.add(entry);
 		}
 		out.add("events", events);
+		out.add("feed", feedJson(roster));
 
 		JsonObject heard = new JsonObject();
 		for (Map.Entry<String, Long> e : roster.lastHeard().entrySet())
@@ -114,6 +115,58 @@ final class GroupCache
 		}
 		out.add("carried", carried);
 		return gson.toJson(out);
+	}
+
+	/**
+	 * The Log tab's feed: every event as the party sends it ({@link GroupCodec#eventJson}),
+	 * plus {@code by} and, for a storage summary, {@code tk} its withdrawals.
+	 */
+	private static JsonArray feedJson(GroupRoster roster)
+	{
+		JsonArray feed = new JsonArray();
+		for (GroupEvent e : roster.feed().entries())
+		{
+			JsonObject entry = GroupCodec.eventJson(e);
+			entry.addProperty("by", e.member);
+			if (!e.taken.isEmpty())
+			{
+				entry.add("tk", ItemCounts.toJson(e.taken));
+			}
+			feed.add(entry);
+		}
+		return feed;
+	}
+
+	/**
+	 * The feed. A file from before it existed has none: the feed starts from
+	 * that file's drops log and storage log, so the Log tab keeps its history.
+	 */
+	private static void readFeed(JsonElement feed, GroupRoster roster)
+	{
+		if (feed == null || !feed.isJsonArray())
+		{
+			for (GroupEvent e : roster.events().entries())
+			{
+				roster.feed().add(e);
+			}
+			for (StorageChange c : roster.log().entries())
+			{
+				roster.feed().add(GroupEvent.of(GroupEvent.Type.STORAGE_SUMMARY, c.at(), c.member())
+					.items(c.deposited()).taken(c.took()).build());
+			}
+			return;
+		}
+		for (JsonElement item : feed.getAsJsonArray())
+		{
+			JsonElement by = item.isJsonObject() ? item.getAsJsonObject().get("by") : null;
+			GroupEvent event = by == null || !by.isJsonPrimitive() ? null
+				: GroupCodec.eventFrom(item.getAsJsonObject(), by.getAsString());
+			if (event != null)
+			{
+				roster.feed().add(event.toBuilder()
+					.taken(ItemCounts.fromJson(item.getAsJsonObject().get("tk"), GroupCodec.MAX_STORAGE_ITEMS)).build());
+			}
+		}
 	}
 
 	private static void readPayloads(Gson gson, JsonElement in, GroupRoster roster)
@@ -260,6 +313,9 @@ final class GroupCache
 				}
 			}
 		}
+
+		// After "log" and "events": an older file's feed starts from them.
+		readFeed(in.get("feed"), roster);
 
 		JsonElement heard = in.get("heard");
 		if (heard != null && heard.isJsonObject())

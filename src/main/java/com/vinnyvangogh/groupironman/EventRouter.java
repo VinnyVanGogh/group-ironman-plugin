@@ -19,6 +19,7 @@ final class EventRouter
 	private final Consumer<GroupEvent> discord;
 	private final Consumer<GroupEvent> overlay;
 	private final Consumer<GroupEvent> digest;
+	private final Consumer<GroupEvent> log;
 
 	EventRouter(Consumer<GroupEvent> discord, Consumer<GroupEvent> overlay)
 	{
@@ -34,9 +35,23 @@ final class EventRouter
 	 */
 	EventRouter(Consumer<GroupEvent> discord, Consumer<GroupEvent> overlay, Consumer<GroupEvent> digest)
 	{
+		this(discord, overlay, digest, e ->
+		{
+		});
+	}
+
+	/**
+	 * {@code log} is the sidebar Log tab. It takes every event that passes the
+	 * thresholds, yours and members', whichever Discord and overlay switches
+	 * are on (Board 2026-11-10): the Log has no switch of its own.
+	 */
+	EventRouter(Consumer<GroupEvent> discord, Consumer<GroupEvent> overlay, Consumer<GroupEvent> digest,
+		Consumer<GroupEvent> log)
+	{
 		this.discord = discord;
 		this.overlay = overlay;
 		this.digest = digest;
+		this.log = log;
 	}
 
 	/** {@code own}: this player's event, from this client; false for a member's from the party. */
@@ -47,6 +62,7 @@ final class EventRouter
 		{
 			return;
 		}
+		log.accept(kept);
 		if (settings.overlay.contains(kept.type))
 		{
 			overlay.accept(kept);
