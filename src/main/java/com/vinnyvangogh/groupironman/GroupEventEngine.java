@@ -142,7 +142,7 @@ class GroupEventEngine
 	private final Object presenceLock = new Object();
 	private PresenceDebounce presence = new PresenceDebounce(ZoneId.systemDefault());
 	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()),
-		this::toDigest);
+		this::toDigest, this::toLog);
 	/** Client thread: Discord events waiting for the rest of their moment. */
 	private final DiscordBatch batch = new DiscordBatch();
 	private volatile EventSettings settings = EventSettings.OFF;
@@ -349,11 +349,11 @@ class GroupEventEngine
 		}
 	}
 
-	/** Worth noticing at all: an output wants it, or members get it from us. */
+	/** Worth noticing at all: an output (the Log takes every kind) wants it, or members get it from us. */
 	private boolean wanted(GroupEvent.Type type)
 	{
 		EventSettings s = settings;
-		return s.wants(type) || s.share && type.travels() && !type.logged();
+		return s.detects(type) || s.share && type.travels() && !type.logged();
 	}
 
 	@Subscribe
@@ -993,6 +993,16 @@ class GroupEventEngine
 	 * digest. Separate from {@link #toDiscord}, which posts it now when its
 	 * kind is ticked: the digest is a summary on top, never a hold.
 	 */
+	/** The sidebar Log: every routed event, yours and members'. */
+	private void toLog(GroupEvent event)
+	{
+		GroupService g = group;
+		if (g != null)
+		{
+			g.logEvent(event);
+		}
+	}
+
 	private void toDigest(GroupEvent event)
 	{
 		if (webhook(event.type.category) == null)

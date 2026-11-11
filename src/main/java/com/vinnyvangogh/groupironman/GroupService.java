@@ -94,8 +94,6 @@ class GroupService
 	static final int MOVE_TILES = 8;
 	static final int CARRIED_INTERVAL_TICKS = 5;
 	static final int EXTRAS_INTERVAL_TICKS = 5;
-	/** How many drops and log slots the panel lists. */
-	static final int MAX_EVENT_LINES = 50;
 	/** How often the group roster is re-read from the game's clan data. */
 	static final int ROSTER_INTERVAL_TICKS = 10;
 	/** The chatFilterCheck script callback the base chat filter plugin uses to drop a line. */
@@ -635,6 +633,21 @@ class GroupService
 		{
 			tell(line);
 		}
+	}
+
+	/**
+	 * Any thread. One routed event, yours or a member's, into the Log tab's
+	 * feed. Kept on disk with the rest of the cache; duplicates (a resend) are
+	 * dropped by the feed.
+	 */
+	void logEvent(GroupEvent event)
+	{
+		if (!roster.feed().add(event))
+		{
+			return;
+		}
+		saveCache();
+		onChange.run();
 	}
 
 	/** Client thread. Logs one of this player's own events and tells the party. */
