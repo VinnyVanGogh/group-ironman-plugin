@@ -38,9 +38,11 @@ final class EasterEggs
 			this.freeloaderAt = freeloaderAt;
 		}
 
-		static Settings of(GroupIronmanConfig config)
+		/** The group's Easter egg settings when it has them, else this member's own. */
+		static Settings of(GroupSettingsSchema.Resolved values)
 		{
-			return new Settings(config.discordEasterEggs(), config.discordLegendAt(), config.discordFreeloaderAt());
+			return new Settings(values.on("discordEasterEggs"), values.value("discordLegendAt"),
+				values.value("discordFreeloaderAt"));
 		}
 	}
 

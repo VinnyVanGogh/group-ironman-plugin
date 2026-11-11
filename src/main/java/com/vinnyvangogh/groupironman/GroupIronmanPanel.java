@@ -65,8 +65,8 @@ import net.runelite.client.ui.components.IconTextField;
 @Slf4j
 class GroupIronmanPanel extends PluginPanel
 {
-	/** What the buttons in the header do. */
-	interface Actions
+	/** What the buttons in the header, and in the Settings tab, do. */
+	interface Actions extends GroupSettingsTab.Actions
 	{
 		void join();
 
@@ -95,10 +95,13 @@ class GroupIronmanPanel extends PluginPanel
 		/** When this player last played before this session, 0 when not known. */
 		final long since;
 		final String self;
+		/** The Settings tab's view, or null before the plugin has started its group settings. */
+		final GroupSettingsTab.View settings;
 
 		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
-			GroupOutbox.Switches switches, RegionNames regions, long since, String self)
+			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GroupSettingsTab.View settings)
 		{
+			this.settings = settings;
 			this.sync = sync;
 			this.group = group;
 			this.members = members;
@@ -124,6 +127,7 @@ class GroupIronmanPanel extends PluginPanel
 	/** The minimap orbs' own icons, by bar label; filled in as the sprites load. */
 	private final Map<String, BufferedImage> orbIcons = new ConcurrentHashMap<>();
 	private final Actions actions;
+	private final GroupSettingsTab settingsTab;
 
 	private final JPanel header = new Column();
 	private final CardLayout cards = new CardLayout();
@@ -149,12 +153,13 @@ class GroupIronmanPanel extends PluginPanel
 		this.itemManager = itemManager;
 		this.skillIcons = skillIcons;
 		this.actions = actions;
+		this.settingsTab = new GroupSettingsTab(actions, this::redraw);
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
 
 		JPanel top = new Column();
 		top.add(header);
-		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log"));
+		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Settings"));
 		add(top, BorderLayout.NORTH);
 
 		addTab("Group", null);
@@ -162,6 +167,7 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Storage", storageFilter);
 		addTab("Find", findQuery);
 		addTab("Log", null);
+		addTab("Settings", null);
 		add(views, BorderLayout.CENTER);
 	}
 
@@ -199,6 +205,10 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		drawHeader(v);
 		JPanel tab = tabs.get(current);
+		if (settingsUnchanged(tab, v))
+		{
+			return;
+		}
 		tab.removeAll();
 		long now = System.currentTimeMillis();
 		try
@@ -217,6 +227,9 @@ class GroupIronmanPanel extends PluginPanel
 				case "Log":
 					drawLog(tab, v, now);
 					break;
+				case "Settings":
+					drawSettings(tab, v, now);
+					break;
 				default:
 					drawGroup(tab, v, now);
 					break;
@@ -234,9 +247,30 @@ class GroupIronmanPanel extends PluginPanel
 		tab.repaint();
 	}
 
+	/** The Settings tab is on screen and shows the same as before: rebuilding would lose a half-typed number. */
+	private boolean settingsUnchanged(JPanel tab, View v)
+	{
+		if (!"Settings".equals(current) || tab.getComponentCount() == 0)
+		{
+			return false;
+		}
+		return v.settings == null || !settingsTab.changed(v.settings);
+	}
+
+	private void drawSettings(JPanel tab, View v, long now)
+	{
+		if (v.settings == null)
+		{
+			empty(tab, "Group settings are starting.", "Open this tab again in a moment.");
+			return;
+		}
+		settingsTab.draw(tab, v.settings, now);
+	}
+
 	private JPanel tabBar(String... names)
 	{
-		JPanel bar = new JPanel(new GridLayout(1, names.length, 2, 0));
+		// Two rows of three: six tabs in one row cut their names off at the panel's width.
+		JPanel bar = new JPanel(new GridLayout(0, 3, 2, 2));
 		bar.setBorder(new EmptyBorder(6, 0, 6, 0));
 		ButtonGroup group = new ButtonGroup();
 		for (String name : names)
@@ -873,7 +907,7 @@ class GroupIronmanPanel extends PluginPanel
 		tab.add(text(next, MUTED));
 	}
 
-	private static JLabel heading(String text)
+	static JLabel heading(String text)
 	{
 		JLabel label = new JLabel(text);
 		label.setFont(FontManager.getRunescapeBoldFont());
@@ -882,7 +916,7 @@ class GroupIronmanPanel extends PluginPanel
 		return label;
 	}
 
-	private static JLabel text(String text, Color color)
+	static JLabel text(String text, Color color)
 	{
 		// The html wrapper makes long lines wrap at the panel width. Text from
 		// peers is escaped first: a display name or item name is data, not markup.

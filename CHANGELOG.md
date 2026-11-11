@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Group settings, a leader and editors
+
+- New **Settings** tab in the panel. Thresholds, which events post to
+  Discord and show as overlays, the daily digest, Easter eggs, quiet hours
+  and the offline grace can now be the group's: the leader (or an editor)
+  saves them once and every member's client uses them.
+- The member who creates the group key leads a group that has no leader; a
+  group made before this update gets a **Claim leadership** button. The
+  leader makes and removes editors. Roles and settings are signed, so a
+  member cannot promote themselves or send settings of their own.
+- Each save is a new version; who changed what, and when, is listed under
+  *Recent changes*. A member who was offline picks up the latest when they
+  join.
+- The first save copies the leader's own current settings. Until then each
+  member keeps using their own, as before.
+- Yours alone, whatever the group says: **Don't post my events**, and per
+  event kind *Post* and *Show*. The leader and editors see a read-only grid
+  of who posts what.
+- Webhook URLs, the mention, *Post to Discord* and every *Share* switch stay
+  each member's own and are never sent to the group.
+- New group setting **Post every N levels** (default 1): from *Level ups from
+  level*, only every Nth level posts or shows (5: 60, 65, 70). 99s, max
+  total, total level milestones and combat levels always do.
+
 ### Amounts read like the game
 
 - Quantities and gp values use the game's stack text everywhere: *Coins -
