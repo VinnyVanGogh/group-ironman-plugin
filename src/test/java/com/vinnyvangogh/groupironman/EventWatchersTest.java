@@ -153,15 +153,19 @@ public class EventWatchersTest
 
 		on.add(GroupEvent.Type.COMBAT_TASK);
 		out.clear();
+		chat("You have completed your task! You killed 19 Icefiends. You gained 1,520 xp.");
+		assertTrue("waits for its streak line", out.isEmpty());
 		chat("You've completed 123 tasks and received 15 points, giving you a total of 240; return to a Slayer master.");
 		GroupEvent done = only();
 		assertEquals(GroupEvent.Type.SLAYER, done.type);
-		assertEquals("task done", done.text);
-		assertEquals(123, done.number);
+		assertEquals("Slayer task done: Icefiends (streak 123, 15 points)", EventText.describe(done, new FakeItems()));
 		out.clear();
 		chat("You have received a new Slayer assignment from Konar: Hellhounds (150)");
-		assertEquals("new task: Hellhounds", only().text);
+		assertEquals("Hellhounds", only().text);
 		assertEquals(150, out.get(0).number);
+		out.clear();
+		chat("You're assigned to kill hellhounds; only 150 more to go.");
+		assertTrue("the gem repeats the task it was given", out.isEmpty());
 		silentWhenOff(GroupEvent.Type.SLAYER, "You have received a new Slayer assignment from Konar: Hellhounds (150)");
 	}
 

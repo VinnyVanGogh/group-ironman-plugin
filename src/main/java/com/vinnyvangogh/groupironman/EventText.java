@@ -94,7 +94,7 @@ final class EventText
 		line(GroupEvent.Type.PERSONAL_BEST, "New personal best", (e, l) -> "new personal best: " + e.text);
 		line(GroupEvent.Type.WEEKLY_RECAP, "Weekly recap", (e, l) -> "this week: +" + l.amount(e.number) + " XP, "
 			+ e.text);
-		line(GroupEvent.Type.SLAYER, "Slayer", (e, l) -> "slayer " + e.text + (e.number > 0 ? " (" + e.number + ")" : ""));
+		line(GroupEvent.Type.SLAYER, "Slayer", (e, l) -> slayer(e));
 		line(GroupEvent.Type.FARMING, "Farming run", (e, l) -> ready(e));
 		line(GroupEvent.Type.BIRDHOUSE, "Bird houses and Hespori", (e, l) -> ready(e));
 	}
@@ -115,6 +115,20 @@ final class EventText
 		// 0 is also an older client's offline, from the party: no session known, so none said.
 		return "offline" + (e.number > 0 ? ", played " + PresenceDebounce.played(e.number) : "") + onWorld(e)
 			+ (e.detail.isEmpty() ? "" : ", logged off at " + e.detail);
+	}
+
+	/**
+	 * "New Slayer task: 19 x Icefiends (Turael)" or "Slayer task done: Icefiends (streak 1, 2 points)"
+	 * ({@link SlayerWatch}). An older member's client sends "task done" and "new task: X", worded as it was.
+	 */
+	private static String slayer(GroupEvent e)
+	{
+		if ("task done".equals(e.text) || e.text.startsWith("new task: "))
+		{
+			return "slayer " + e.text + (e.number > 0 ? " (" + e.number + ")" : "");
+		}
+		String extra = e.detail.isEmpty() ? "" : " (" + e.detail + ")";
+		return e.number > 0 ? "New Slayer task: " + e.number + " x " + e.text + extra : "Slayer task done: " + e.text + extra;
 	}
 
 	private static String ready(GroupEvent e)

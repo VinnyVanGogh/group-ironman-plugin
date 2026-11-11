@@ -47,7 +47,7 @@ final class EventSettings
 		both(GroupEvent.Type.TOTAL_LEVEL, GroupIronmanConfig::discordTotalLevel, GroupIronmanConfig::overlayTotalLevel);
 		both(GroupEvent.Type.QUEST, GroupIronmanConfig::discordQuest, GroupIronmanConfig::overlayQuest);
 		both(GroupEvent.Type.QUEST_POINTS, GroupIronmanConfig::discordQuestPoints, GroupIronmanConfig::overlayQuestPoints);
-		both(GroupEvent.Type.ONLINE, GroupIronmanConfig::discordOnline, GroupIronmanConfig::overlayOnline);
+		both(GroupEvent.Type.ONLINE, EventSettings::postsOnline, GroupIronmanConfig::overlayOnline);
 		both(GroupEvent.Type.BACK, GroupIronmanConfig::discordBack, GroupIronmanConfig::overlayBack);
 		both(GroupEvent.Type.BARROWS, GroupIronmanConfig::discordBarrows, GroupIronmanConfig::overlayBarrows);
 		both(GroupEvent.Type.RAID_UNIQUE, GroupIronmanConfig::discordRaidUnique, GroupIronmanConfig::overlayRaidUnique);
@@ -132,6 +132,12 @@ final class EventSettings
 	{
 		DISCORD.put(type, discord);
 		OVERLAY.put(type, overlay);
+	}
+
+	/** Logins and logouts are posts only in that mode; the live board edits one message instead. */
+	private static boolean postsOnline(GroupIronmanConfig config)
+	{
+		return config.discordOnlineStatus() == OnlineStatus.POSTS;
 	}
 
 	private static Set<GroupEvent.Type> copy(Set<GroupEvent.Type> types)

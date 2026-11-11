@@ -99,6 +99,10 @@ class GroupEventEngine
 	 * client closed in it can post the offline on the next start. Not a setting: never shown.
 	 */
 	static final String PRESENCE_KEY = "presencePending";
+	/** Config key: the live board's message id, with a hash of its webhook. Not a setting; never sent to the party. */
+	static final String BOARD_KEY = "statusBoardMessage";
+	/** Config key: set once 'Online status' has been chosen for this install, so an upgrade keeps its old choice. */
+	static final String ONLINE_STATUS_CHOSEN_KEY = "onlineStatusChosen";
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
 		GroupEvent.Type.WILDERNESS, GroupEvent.Type.HC_LIFE_LOST);
 
@@ -159,6 +163,10 @@ class GroupEventEngine
 	private int varWait = -1;
 	private int scheduleTicks;
 	private DiscordSender sender;
+	private final StatusBoard board = new StatusBoard();
+	private StatusBoard.Transport boardTransport;
+	/** This player for the live board: set on the client thread, read by the timer. Null before a login. */
+	private volatile StatusBoard.Self boardSelf;
 	private ScheduledFuture<?> pump;
 	private EventToastOverlay toastOverlay;
 	private GroupBoxOverlay boxOverlay;
@@ -179,6 +187,8 @@ class GroupEventEngine
 		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient, gson), System::currentTimeMillis,
 			() -> LocalTime.now().getHour());
 		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords);
+		boardTransport = StatusBoard.okHttp(okHttpClient);
+		chooseOnlineStatus();
 		reloadConfig();
 		restorePresence();
 		toastOverlay = new EventToastOverlay(toasts, config, group.lookup);
@@ -283,12 +293,65 @@ class GroupEventEngine
 				// Not own(): that is client thread only. The router is fine here, as before.
 				router.route(offline, true, settings, group.lookup);
 			}
+			boardTick(System.currentTimeMillis());
 		}
 		catch (RuntimeException e)
 		{
 			// A scheduled task that throws is never run again; keep the pump alive.
 			log.debug("group event tick failed", e);
 		}
+	}
+
+	/**
+	 * Timer: the live board, when 'Online status' is the board and the Group category has a webhook. Members are
+	 * read from the roster the party fills; the webhook and the message id stay in this client.
+	 */
+	private void boardTick(long now)
+	{
+		String url = config.discordOnlineStatus() == OnlineStatus.LIVE_BOARD ? webhook(GroupEvent.Category.GROUP) : null;
+		board.target(url, () -> configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY));
+		if (url != null)
+		{
+			String lines = StatusBoard.lines(group.members(), group.roster().lastHeard(), group.roster().allStats(),
+				boardSelf, now);
+			if (!lines.isEmpty())
+			{
+				board.show(lines, now);
+			}
+			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), config.discordQuietStart(),
+				config.discordQuietEnd());
+			StatusBoard.Send send = board.next(now, quiet);
+			if (send != null)
+			{
+				boardTransport.send(send, StatusBoard.payload(gson, send, config.discordStyle()), (status, body, retry) ->
+					board.done(send, status, StatusBoard.messageId(gson, body), DiscordQueue.retryAfterMs(retry),
+						System.currentTimeMillis()));
+			}
+		}
+		String saved = board.takeSaved();
+		if (saved != null && saved.isEmpty())
+		{
+			configManager.unsetConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY);
+		}
+		else if (saved != null)
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY, saved);
+		}
+	}
+
+	/** Once per install: an upgrade keeps what its old "Online and offline" switch did ({@link OnlineStatus#upgrading}). */
+	private void chooseOnlineStatus()
+	{
+		if (configManager.getConfiguration(GroupIronmanConfig.GROUP, ONLINE_STATUS_CHOSEN_KEY) != null)
+		{
+			return;
+		}
+		OnlineStatus kept = OnlineStatus.upgrading(config.discordOnline(), config.discordEnabled());
+		if (kept != null)
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, "discordOnlineStatus", kept);
+		}
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, ONLINE_STATUS_CHOSEN_KEY, "1");
 	}
 
 	// ---- Inputs from GroupService ----
@@ -697,6 +760,11 @@ class GroupEventEngine
 				presence.logout(System.currentTimeMillis());
 				savePresence();
 			}
+			StatusBoard.Self was = boardSelf;
+			if (was != null && was.online)
+			{
+				boardSelf = new StatusBoard.Self(was.name, false, was.world, System.currentTimeMillis());
+			}
 			// Another account may log in next: start every baseline over.
 			progress.reset();
 			watchers.reset();
@@ -722,6 +790,13 @@ class GroupEventEngine
 			login(now, me.getName());
 		}
 		checkBack(now);
+		StatusBoard.Self was = boardSelf;
+		if (was != null && was.online && was.world != client.getWorld())
+		{
+			// A hop: the board moves the world, and posts nothing.
+			boardSelf = new StatusBoard.Self(was.name, true, client.getWorld(), 0);
+		}
+		slayer(now, me.getName());
 		GroupEvent combat = progress.combat(me.getCombatLevel(), now, me.getName());
 		if (combat != null && wanted(combat.type))
 		{
@@ -730,6 +805,23 @@ class GroupEventEngine
 		readInterfaces(now);
 		dry.due(now).forEach(this::own);
 		watch(now, me);
+	}
+
+	/**
+	 * The NPC dialogue, where a Slayer master hands out a task (RuneLite's SlayerPlugin read the same widget,
+	 * {@code DIALOG_NPC_TEXT}, before 1f6ae893), and a finished task still waiting for its streak line.
+	 */
+	private void slayer(long now, String name)
+	{
+		if (!wanted(GroupEvent.Type.SLAYER))
+		{
+			return;
+		}
+		Widget text = client.getWidget(InterfaceID.ChatLeft.TEXT);
+		Widget npc = client.getWidget(InterfaceID.ChatLeft.NAME);
+		boolean open = text != null && !text.isHidden();
+		watchers.slayerDialog(open ? text.getText() : null, npc == null ? "" : npc.getText(), now, name);
+		watchers.slayerTick(now, name);
 	}
 
 	/** The quest, Barrows and clue interfaces, a tick or two after they loaded. */
@@ -892,6 +984,7 @@ class GroupEventEngine
 		{
 			varWait = VAR_WAIT_TICKS;
 		}
+		boardSelf = new StatusBoard.Self(name, true, client.getWorld(), 0);
 		List<GroupEvent> posts;
 		synchronized (presenceLock)
 		{
