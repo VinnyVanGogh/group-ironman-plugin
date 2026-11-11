@@ -193,19 +193,25 @@ final class EventSettings
 				overlay.add(t);
 			}
 		}
-		Set<GroupEvent.Category> digest = EnumSet.noneOf(GroupEvent.Category.class);
+		return new EventSettings(discord, overlay, values.value("eventDropMinValue"),
+			values.value("eventStorageMinValue"), values.intValue("eventLevelMin"),
+			values.intValue("eventBackAfterDays"), config.groupShareEvents(), values.value("eventClueMinValue"),
+			values.intValue("eventKcEvery"), values.intValue("eventGravestoneWarnMinutes"), digests(values, prefs),
+			values.intValue("discordDigestHour"), values.intValue("eventLevelEvery"), prefs.noPost, true);
+	}
+
+	/** The digest is this member's own events too: "Don't post my events" leaves it empty. */
+	private static Set<GroupEvent.Category> digests(GroupSettingsSchema.Resolved values, MemberPrefs prefs)
+	{
+		Set<GroupEvent.Category> out = EnumSet.noneOf(GroupEvent.Category.class);
 		for (GroupEvent.Category c : GroupEvent.Category.values())
 		{
 			if (!prefs.all && values.on(GroupSettingsSchema.digestKey(c)))
 			{
-				digest.add(c);
+				out.add(c);
 			}
 		}
-		return new EventSettings(discord, overlay, values.value("eventDropMinValue"),
-			values.value("eventStorageMinValue"), values.intValue("eventLevelMin"),
-			values.intValue("eventBackAfterDays"), config.groupShareEvents(), values.value("eventClueMinValue"),
-			values.intValue("eventKcEvery"), values.intValue("eventGravestoneWarnMinutes"), digest,
-			values.intValue("discordDigestHour"), values.intValue("eventLevelEvery"), prefs.noPost, true);
+		return out;
 	}
 
 	/** A copy with other level-up thresholds. */
