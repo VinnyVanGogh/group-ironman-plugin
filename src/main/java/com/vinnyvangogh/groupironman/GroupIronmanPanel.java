@@ -24,7 +24,10 @@ import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,9 +37,12 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JToggleButton;
 import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
@@ -118,6 +124,11 @@ class GroupIronmanPanel extends PluginPanel
 	private static final Color RUN = new Color(0xC8, 0xA0, 0x2A);
 	private static final Color SPEC = new Color(0x3A, 0x9A, 0x4A);
 	private static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR.darker();
+	/** Rows drawn at once; 2,000 labels in a side panel help nobody, the search and filters find the rest. */
+	private static final int MAX_LOG_ROWS = 200;
+	/** A row's text width, leaving room for its item or skill icon. */
+	private static final int LOG_TEXT_WIDTH = 140;
+	private static final String ALL_MEMBERS = "All members";
 
 	private final ItemManager itemManager;
 	private final SkillIconManager skillIcons;
@@ -132,6 +143,14 @@ class GroupIronmanPanel extends PluginPanel
 	private final IconTextField bankFilter = searchBar("Filter banks by item name");
 	private final IconTextField storageFilter = searchBar("Filter storage by item name");
 	private final IconTextField findQuery = searchBar("Item name, e.g. guam or ppot");
+	private final IconTextField logQuery = searchBar("Search the log: member, item, place or text");
+	/** Ticked category chips; none ticked shows every category. */
+	private final Set<GroupEvent.Category> logCategories = EnumSet.noneOf(GroupEvent.Category.class);
+	private final JComboBox<String> logMember = new JComboBox<>();
+	private final JComboBox<ActivityLog.Range> logRange = new JComboBox<>(ActivityLog.Range.values());
+	private List<String> logMembers = Collections.emptyList();
+	/** Set while the member picker is rebuilt, so its own events do not redraw mid-draw. */
+	private boolean updatingMembers;
 	/** Member cards the player collapsed, by name. */
 	private final Set<String> collapsed = new HashSet<>();
 	private String current = "Group";
@@ -161,7 +180,7 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Banks", bankFilter);
 		addTab("Storage", storageFilter);
 		addTab("Find", findQuery);
-		addTab("Log", null);
+		addTab("Log", logControls());
 		add(views, BorderLayout.CENTER);
 	}
 
@@ -802,59 +821,159 @@ class GroupIronmanPanel extends PluginPanel
 		}
 	}
 
-	// Log: drops and collection log slots.
+	// Log: every group event, yours and members' (Board 2026-11-10), with search and filters.
+
+	/** The search box, category chips, member and time pickers, held above the rows like a search bar. */
+	private JComponent logControls()
+	{
+		JPanel controls = new Column();
+		controls.add(logQuery);
+		JPanel chips = new JPanel(new GridLayout(0, 3, 2, 2));
+		chips.setBorder(new EmptyBorder(4, 0, 2, 0));
+		for (GroupEvent.Category c : GroupEvent.Category.values())
+		{
+			chips.add(chip(c));
+		}
+		controls.add(chips);
+		JPanel pickers = new JPanel(new GridLayout(1, 2, 2, 0));
+		logMember.addItem(ALL_MEMBERS);
+		logMember.setFont(FontManager.getRunescapeSmallFont());
+		logMember.setFocusable(false);
+		logMember.addActionListener(e ->
+		{
+			if (!updatingMembers)
+			{
+				redraw();
+			}
+		});
+		logRange.setFont(FontManager.getRunescapeSmallFont());
+		logRange.setFocusable(false);
+		logRange.addActionListener(e -> redraw());
+		pickers.add(logMember);
+		pickers.add(logRange);
+		controls.add(pickers);
+		return controls;
+	}
+
+	private JToggleButton chip(GroupEvent.Category category)
+	{
+		String label = ActivityLog.label(category);
+		JToggleButton b = new JToggleButton(label);
+		b.setFont(FontManager.getRunescapeSmallFont());
+		b.setFocusable(false);
+		b.setMargin(new java.awt.Insets(1, 0, 1, 0));
+		b.setToolTipText("Show " + label + ". With none ticked, the Log shows everything.");
+		b.addActionListener(e ->
+		{
+			if (b.isSelected())
+			{
+				logCategories.add(category);
+			}
+			else
+			{
+				logCategories.remove(category);
+			}
+			redraw();
+		});
+		return b;
+	}
+
+	/** The member picker lists who is in the log; rebuilt only when that changes, keeping the pick. */
+	private void refreshMembers(List<String> members)
+	{
+		if (members.equals(logMembers))
+		{
+			return;
+		}
+		logMembers = members;
+		Object picked = logMember.getSelectedItem();
+		updatingMembers = true;
+		try
+		{
+			logMember.removeAllItems();
+			logMember.addItem(ALL_MEMBERS);
+			members.forEach(logMember::addItem);
+			logMember.setSelectedItem(members.contains(picked) ? picked : ALL_MEMBERS);
+		}
+		finally
+		{
+			updatingMembers = false;
+		}
+	}
+
+	private ActivityLog.Filter logFilter()
+	{
+		Object member = logMember.getSelectedIndex() > 0 ? logMember.getSelectedItem() : null;
+		return new ActivityLog.Filter(logQuery.getText(), logCategories, member == null ? "" : member.toString(),
+			(ActivityLog.Range) logRange.getSelectedItem());
+	}
 
 	private void drawLog(JPanel tab, View v, long now)
 	{
-		// Storage changes by name, yours included (Board 2026-11-04: "the log should show that
-		// GroupShip took 15 trout"), above drops; "" as self names you too.
-		if (v.switches.storage)
+		List<GroupEvent> all = v.group.feed().entries();
+		refreshMembers(ActivityLog.members(all));
+		if (all.isEmpty())
 		{
-			List<StorageChange> changes = v.group.log().entries();
-			tab.add(heading("Group storage"));
-			if (changes.isEmpty())
-			{
-				tab.add(text("No deposits or withdrawals seen yet.", MUTED));
-			}
-			for (int i = 0; i < changes.size() && i < GroupService.MAX_EVENT_LINES; i++)
-			{
-				StorageChange c = changes.get(i);
-				tab.add(tip(text(PanelModel.change(c, v.items, "") + " (" + BoostText.ago(now, c.at()) + ")", Color.WHITE),
-					PanelModel.change(c, Amounts.EXACT.words(v.items), "")));
-			}
-		}
-		if (!v.switches.drops)
-		{
-			empty(tab, "Drops log is off.", "Turn on 'Share drops and collection log' in GIM Utilities' settings.");
+			empty(tab, "Nothing logged yet.", "Drops, deaths, levels, storage visits and the rest appear here, yours"
+				+ " and your group's, whether or not they go to Discord or the overlay.");
 			return;
 		}
-		List<GroupEvent> events;
-		if (v.since > 0)
+		ZoneId zone = ZoneId.systemDefault();
+		List<GroupEvent> shown = ActivityLog.filter(all, logFilter(), v.items, now, zone);
+		if (shown.isEmpty())
 		{
-			tab.add(heading("Since you last played (" + BoostText.ago(now, v.since) + ")"));
-			events = v.group.events().since(v.since, v.self);
-		}
-		else
-		{
-			tab.add(heading("Drops and collection log"));
-			events = v.group.events().entries();
-		}
-		if (events.isEmpty())
-		{
-			tab.add(text(v.since > 0 ? "Nothing new from the group." : "None seen yet. Valuable drops and new"
-				+ " collection log slots appear here.", MUTED));
+			empty(tab, "Nothing matches.", "Clear the search, untick a filter or pick a longer time.");
 			return;
 		}
-		List<String> lines = new ArrayList<>(DropLog.lines(events, v.items, now));
-		List<String> exact = DropLog.lines(events, Amounts.EXACT.words(v.items), now);
-		for (int i = 0; i < lines.size() && i < GroupService.MAX_EVENT_LINES; i++)
+		int left = MAX_LOG_ROWS;
+		for (ActivityLog.Section s : ActivityLog.sections(shown, v.since, v.self, now, zone))
 		{
-			tab.add(tip(text(lines.get(i), Color.WHITE), exact.get(i)));
+			if (left <= 0)
+			{
+				break;
+			}
+			tab.add(heading(s.title));
+			if (s.events.isEmpty())
+			{
+				tab.add(text("Nothing new from the group.", MUTED));
+			}
+			for (int i = 0; i < s.events.size() && left > 0; i++, left--)
+			{
+				tab.add(logRow(ActivityLog.row(s.events.get(i), v.items, now, zone)));
+			}
 		}
-		if (lines.size() > GroupService.MAX_EVENT_LINES)
+		if (shown.size() > MAX_LOG_ROWS)
 		{
-			tab.add(text("and " + (lines.size() - GroupService.MAX_EVENT_LINES) + " more.", MUTED));
+			tab.add(text("and " + (shown.size() - MAX_LOG_ROWS) + " more: search or filter to find them.", MUTED));
 		}
+	}
+
+	/** Icon, member, short line and time; the full line and value on hover; Copy on right-click. */
+	private JComponent logRow(ActivityLog.Row r)
+	{
+		JLabel row = new JLabel("<html><body style='width:" + LOG_TEXT_WIDTH + "px'><b>" + escape(r.event.member)
+			+ "</b> " + escape(r.text) + " <font color='#9a9a9a'>(" + escape(r.ago) + ")</font></body></html>");
+		row.setFont(FontManager.getRunescapeSmallFont());
+		row.setForeground(Color.WHITE);
+		row.setBorder(new EmptyBorder(2, 0, 2, 0));
+		row.setIconTextGap(4);
+		Skill skill = r.skill == null ? null : skill(r.skill);
+		if (r.itemId >= 0)
+		{
+			icon(r.itemId, r.quantity).addTo(row);
+		}
+		else if (skill != null)
+		{
+			row.setIcon(new javax.swing.ImageIcon(skillIcons.getSkillImage(skill, true)));
+		}
+		row.setToolTipText("<html>" + escape(r.full + "\nRight-click to copy.").replace("\n", "<br>") + "</html>");
+		JPopupMenu menu = new JPopupMenu();
+		JMenuItem copy = new JMenuItem("Copy");
+		copy.addActionListener(e ->
+			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(r.copy), null));
+		menu.add(copy);
+		row.setComponentPopupMenu(menu);
+		return row;
 	}
 
 	// Building blocks.
