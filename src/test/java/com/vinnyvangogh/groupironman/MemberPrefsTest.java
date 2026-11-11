@@ -35,6 +35,8 @@ public class MemberPrefsTest
 			}
 		}
 		values.put("eventLevelMin", 1L);
+		// The samples' clue is worth 80 gp; thresholds are not what these tests are about.
+		values.put("eventClueMinValue", 0L);
 		return new GroupSettingsSchema.Resolved(DEFAULTS,
 			GroupSettings.next(null, values, "Alex", GroupSigner.Identity.create(), EventFixtures.NOW));
 	}

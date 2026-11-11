@@ -186,6 +186,8 @@ class GroupService
 		throw new IOException("plugin data directory not set");
 	};
 	private GroupSync sync;
+	/** Roles and the group's shared settings; null when not running. */
+	private volatile GovernanceSync governance;
 	/** The group event engine, told about storage visits, minimums and members' events; null when not running. */
 	private volatile GroupEventEngine events;
 
@@ -270,6 +272,27 @@ class GroupService
 				partyService.changeParty(passphrase);
 			}
 		});
+		governance = new GovernanceSync(gson, new GovernanceSync.Store()
+		{
+			@Override
+			public String get(String key)
+			{
+				return configManager.getConfiguration(GroupIronmanConfig.GROUP, key);
+			}
+
+			@Override
+			public void set(String key, String value)
+			{
+				if (value == null)
+				{
+					configManager.unsetConfiguration(GroupIronmanConfig.GROUP, key);
+				}
+				else
+				{
+					configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value);
+				}
+			}
+		}, payload -> partyService.send(new VvgGroupIronmanMessage(payload)), () -> this.onChange.run());
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
@@ -293,6 +316,7 @@ class GroupService
 			sync.leaveOwn();
 		}
 		members = GroupMembers.UNKNOWN;
+		governance = null;
 		cacheLoaded = false;
 		session = false;
 		hiscoresOnLogin = true;
@@ -417,10 +441,79 @@ class GroupService
 		}
 	}
 
-	/** "Create group key" and "New key": a fresh random key, which the player then shares. */
+	/**
+	 * "Create group key" and "New key": a fresh random key, which the player
+	 * then shares. The member who creates the key leads a group that has no
+	 * leader yet (Board 2026-11-10); a group that has one keeps it.
+	 */
 	void newKey()
 	{
 		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_KEY, GroupKey.generate());
+		claimLeadership();
+	}
+
+	// ---- Group settings and roles (the panel's Settings tab) ----
+
+	/** Roles and the group's settings on this client, or null when not running. */
+	GroupGovernance governance()
+	{
+		GovernanceSync g = governance;
+		return g == null ? null : g.governance();
+	}
+
+	/** The value of each shared setting now: the group's, or this member's own config while it has none. */
+	GroupSettingsSchema.Resolved groupValues()
+	{
+		GroupGovernance g = governance();
+		return new GroupSettingsSchema.Resolved(config, g == null ? null : g.settings());
+	}
+
+	/** "Claim leadership", shown only while this client knows of no leader. False when refused. */
+	boolean claimLeadership()
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.claim(self, System.currentTimeMillis());
+	}
+
+	/** The leader's "Make editor" and "Remove editor". False when refused. */
+	boolean setEditor(String name, boolean editor)
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.setEditor(self, name, editor, System.currentTimeMillis());
+	}
+
+	/** The leader's or an editor's "Save to group". False when refused. */
+	boolean saveGroupSettings(Map<String, Long> values)
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.save(self, values, System.currentTimeMillis());
+	}
+
+	/** "Forget leader": this client only. */
+	void forgetLeader()
+	{
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.forgetLeader();
+		}
+	}
+
+	/** This member's own "don't post" (or overlay "don't show") for one kind. */
+	void optOut(GroupEvent.Type type, boolean overlay, boolean out)
+	{
+		String key = overlay ? GroupIronmanConfig.KEY_MUTE_TYPES : GroupIronmanConfig.KEY_OPT_OUT_TYPES;
+		Set<GroupEvent.Type> types = MemberPrefs.parse(overlay ? config.overlayMuteTypes() : config.eventOptOutTypes());
+		if (out ? types.add(type) : types.remove(type))
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, key, MemberPrefs.format(types));
+		}
+	}
+
+	/** "Don't post my events". */
+	void optOutAll(boolean out)
+	{
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_OPT_OUT_ALL, out);
 	}
 
 	/** What "Copy group key" puts on the clipboard, or null without a key. */
@@ -453,6 +546,11 @@ class GroupService
 			sync.leaveOwn();
 		}
 		lowStock = LowStock.parse(config.groupLowStock());
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.prefs(MemberPrefs.of(config));
+		}
 		GroupOutbox.Switches s = switches();
 		// Turning a live feature off drops what was collected for it.
 		if (!s.stats)
@@ -764,6 +862,11 @@ class GroupService
 		{
 			return;
 		}
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.flush(MemberPrefs.of(config));
+		}
 		GroupOutbox.Switches s = switches();
 
 		if (s.stats)
@@ -800,6 +903,11 @@ class GroupService
 		boolean first = !members.known() && now.known();
 		boolean changed = !now.names().equals(members.names()) || !now.group().equals(members.group());
 		members = now;
+		GovernanceSync g = governance;
+		if (g != null && now.known())
+		{
+			g.group(now.group());
+		}
 		if (first && syncing())
 		{
 			partyService.send(new UserSync());
@@ -1043,6 +1151,12 @@ class GroupService
 			statsDirty = true;
 			carriedDirty = true;
 			extrasDirty = true;
+			GovernanceSync g = governance;
+			if (g != null)
+			{
+				// Sent on the next tick: roles first, then the settings they authorise.
+				g.resendAll();
+			}
 			if (!syncing())
 			{
 				return;
@@ -1073,6 +1187,11 @@ class GroupService
 
 	void onPartyChanged()
 	{
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.resendAll();
+		}
 		assembler.clear();
 		roster.clearStrangers();
 		lastStatsSent = null;
@@ -1119,6 +1238,12 @@ class GroupService
 		String name = sender(message);
 		if (name == null)
 		{
+			return;
+		}
+		GovernanceSync g = governance;
+		if (g != null && GovernanceSync.isGovernance(message.getPayload()) && g.receive(name, message.getPayload()))
+		{
+			roster.heard(name, System.currentTimeMillis());
 			return;
 		}
 		GroupCodec.Decoded decoded = GroupCodec.decode(gson, message.getPayload());
