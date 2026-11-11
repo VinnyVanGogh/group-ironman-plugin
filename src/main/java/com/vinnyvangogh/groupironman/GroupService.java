@@ -862,11 +862,7 @@ class GroupService
 		{
 			return;
 		}
-		GovernanceSync g = governance;
-		if (g != null)
-		{
-			g.flush(MemberPrefs.of(config));
-		}
+		flushGovernance();
 		GroupOutbox.Switches s = switches();
 
 		if (s.stats)
@@ -1240,16 +1236,10 @@ class GroupService
 		{
 			return;
 		}
-		GovernanceSync g = governance;
-		if (g != null && GovernanceSync.isGovernance(message.getPayload()) && g.receive(name, message.getPayload()))
-		{
-			roster.heard(name, System.currentTimeMillis());
-			return;
-		}
 		GroupCodec.Decoded decoded = GroupCodec.decode(gson, message.getPayload());
 		if (decoded == null)
 		{
-			log.debug("ignored unreadable group payload from {}", message.getMemberId());
+			notData(name, message);
 			return;
 		}
 		GroupOutbox.Switches s = switches();
@@ -1331,6 +1321,29 @@ class GroupService
 		// Anything accepted from a member means their client is running and in the party.
 		roster.heard(name, now);
 		onChange.run();
+	}
+
+	/** A payload {@link GroupCodec} does not read: roles, group settings or an announce, or one from a newer build. */
+	private void notData(String name, VvgGroupIronmanMessage message)
+	{
+		GovernanceSync g = governance;
+		String payload = message.getPayload();
+		if (g != null && GovernanceSync.isGovernance(payload) && g.receive(name, payload))
+		{
+			roster.heard(name, System.currentTimeMillis());
+			return;
+		}
+		log.debug("ignored unreadable group payload from {}", message.getMemberId());
+	}
+
+	/** Game tick, connected: roles, settings and this member's announce, whichever changed. */
+	private void flushGovernance()
+	{
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.flush(MemberPrefs.of(config));
+		}
 	}
 
 	/**

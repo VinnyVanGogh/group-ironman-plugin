@@ -241,6 +241,21 @@ final class GroupSettingsTab
 		{
 			tab.add(text("Nothing saved yet: these are your own settings. Save to make them the group's.", MUTED));
 		}
+		drawInputs(tab, v);
+		if (v.canEdit())
+		{
+			JPanel buttons = new JPanel(new GridLayout(0, 2, 2, 2));
+			buttons.add(button("Save to group", "Send these to every member. They replace each member's own.", () ->
+				note = actions.save(new TreeMap<>(draft)) ? "Saved and sent to your group." : "Not saved: you are no"
+					+ " longer leader or editor."));
+			buttons.add(button("Discard changes", null, () -> draft = new TreeMap<>(v.current)));
+			tab.add(buttons);
+		}
+	}
+
+	/** One collapsible section per schema section; only "What counts" starts open. */
+	private void drawInputs(JPanel tab, View v)
+	{
 		String section = null;
 		JPanel body = null;
 		for (GroupSettingsSchema.Setting s : GroupSettingsSchema.ALL)
@@ -254,15 +269,6 @@ final class GroupSettingsTab
 			{
 				body.add(input(s, v.canEdit()));
 			}
-		}
-		if (v.canEdit())
-		{
-			JPanel buttons = new JPanel(new GridLayout(0, 2, 2, 2));
-			buttons.add(button("Save to group", "Send these to every member. They replace each member's own.", () ->
-				note = actions.save(new TreeMap<>(draft)) ? "Saved and sent to your group." : "Not saved: you are no"
-					+ " longer leader or editor."));
-			buttons.add(button("Discard changes", null, () -> draft = new TreeMap<>(v.current)));
-			tab.add(buttons);
 		}
 	}
 

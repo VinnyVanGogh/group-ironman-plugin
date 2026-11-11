@@ -228,10 +228,8 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		drawHeader(v);
 		JPanel tab = tabs.get(current);
-		if ("Settings".equals(current) && (v.settings == null || !settingsTab.changed(v.settings))
-			&& tab.getComponentCount() > 0)
+		if (settingsUnchanged(tab, v))
 		{
-			// Unchanged: rebuilding would throw away a half-typed number and the scroll position.
 			return;
 		}
 		tab.removeAll();
@@ -253,14 +251,7 @@ class GroupIronmanPanel extends PluginPanel
 					drawLog(tab, v, now);
 					break;
 				case "Settings":
-					if (v.settings == null)
-					{
-						empty(tab, "Group settings are starting.", "Open this tab again in a moment.");
-					}
-					else
-					{
-						settingsTab.draw(tab, v.settings, now);
-					}
+					drawSettings(tab, v, now);
 					break;
 				default:
 					drawGroup(tab, v, now);
@@ -277,6 +268,26 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		tab.revalidate();
 		tab.repaint();
+	}
+
+	/** The Settings tab is on screen and shows the same as before: rebuilding would lose a half-typed number. */
+	private boolean settingsUnchanged(JPanel tab, View v)
+	{
+		if (!"Settings".equals(current) || tab.getComponentCount() == 0)
+		{
+			return false;
+		}
+		return v.settings == null || !settingsTab.changed(v.settings);
+	}
+
+	private void drawSettings(JPanel tab, View v, long now)
+	{
+		if (v.settings == null)
+		{
+			empty(tab, "Group settings are starting.", "Open this tab again in a moment.");
+			return;
+		}
+		settingsTab.draw(tab, v.settings, now);
 	}
 
 	private JPanel tabBar(String... names)
