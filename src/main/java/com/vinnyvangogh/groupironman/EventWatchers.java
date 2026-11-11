@@ -346,6 +346,11 @@ final class EventWatchers
 		if (graveLeft > 0)
 		{
 			graveItems = lost;
+			// Nothing left the player (nothing to lose, or a safe death): the game spawns no grave to warn about.
+			if (lost.isEmpty())
+			{
+				graveLeft = 0;
+			}
 		}
 		emit(GroupEvent.of(GroupEvent.Type.DEATH_VALUE, now, me).items(lost).number(EventText.value(lost, lookup))
 			.location(deathWhere).world(deathWorld).detail("gravestone: 15 min").build());
@@ -353,7 +358,8 @@ final class EventWatchers
 
 	/**
 	 * Each tick while a grave may be out. {@code visible} is the game's grave varbit: once it has been seen on,
-	 * its going off means the grave was collected. If it is never seen on, the warning still fires.
+	 * its going off means the grave was collected. If it is never seen on, no grave spawned (a safe or instanced
+	 * death) and nothing is warned (Board 2026-11-10: only warn when a gravestone exists for that death).
 	 */
 	void graveTick(int visible, int warnMinutes, long now, String me)
 	{
@@ -374,6 +380,10 @@ final class EventWatchers
 		if (graveLeft == warnMinutes * TICKS_PER_MINUTE)
 		{
 			graveLeft = 0;
+			if (!graveSeen)
+			{
+				return;
+			}
 			emit(GroupEvent.of(GroupEvent.Type.GRAVESTONE_EXPIRING, now, me).number(warnMinutes).location(graveWhere)
 				.world(graveWorld).items(graveItems).build());
 		}

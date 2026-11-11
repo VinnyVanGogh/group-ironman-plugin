@@ -301,6 +301,38 @@ public class EventWatchersTest
 	}
 
 	@Test
+	public void aDeathWithNothingLostNeverWarns()
+	{
+		// Nothing to lose, or a safe death (minigame): everything is still carried once the death settles.
+		FakeItems items = new FakeItems();
+		watchers.died(EventFixtures.items(FakeItems.SHARK, 10), "Castle Wars", 302);
+		for (int i = 0; i < EventWatchers.DEATH_SETTLE_TICKS; i++)
+		{
+			watchers.deathTick(EventFixtures.items(FakeItems.SHARK, 10), items, NOW, "Alex");
+		}
+		assertFalse("no grave spawned", watchers.graveOut());
+		out.clear();
+		for (int i = 0; i < EventWatchers.GRAVE_TICKS; i++)
+		{
+			watchers.graveTick(1, 5, NOW, "Alex");
+		}
+		assertTrue(out.isEmpty());
+	}
+
+	@Test
+	public void aGraveNeverSeenNeverWarns()
+	{
+		// Items lost but the grave never showed (an instanced death, items to a reclaim NPC): no warning.
+		watchers.died(EventFixtures.items(FakeItems.WHIP, 1), "Zul-Andra", 302);
+		for (int i = 0; i < EventWatchers.GRAVE_TICKS; i++)
+		{
+			watchers.graveTick(0, 5, NOW, "Alex");
+		}
+		assertTrue(out.isEmpty());
+		assertFalse(watchers.graveOut());
+	}
+
+	@Test
 	public void theGravestoneIsSilentWhenOff()
 	{
 		on.remove(GroupEvent.Type.GRAVESTONE_EXPIRING);

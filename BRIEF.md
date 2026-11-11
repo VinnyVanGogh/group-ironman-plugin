@@ -239,7 +239,7 @@ assumed from its name.
 | 5 | Clue reward, counts by tier | "You have completed N tier Treasure Trails", reward container | As #20 | Unverified wording |
 | 7 | Dry streak | Kill count line, drop names | Adds no game information; display of past kills | Wiki rates read 2026-11-09, Vorkath and Zulrah only (`DryStreak`) |
 | 9 | Value lost on death, gravestone | `ActorDeath`, carried items before and after | Own items only | [Gravestone](https://oldschool.runescape.wiki/w/Gravestone): 15 min, paused logged out |
-| 10 | Gravestone expiring | Tick count, `GRAVESTONE_VISIBLE` | Own grave only. Idle pauses are not modelled, so it warns early, never late | Gameval name; meaning assumed |
+| 10 | Gravestone expiring | Tick count, `GRAVESTONE_VISIBLE` | Own grave only. Idle pauses are not modelled, so it warns early, never late. No warning unless the death lost something and the varbit was seen on (Board 2026-11-10: no grave, no warning) | Gameval name; meaning assumed, so the warning now depends on it: confirm in game |
 | 11 | Hardcore life lost | `GIM_HARDCORE_DEATHS`, `GIM_GROUPSIZE` | Own group's own varbits | Gameval names; [one life per player](https://oldschool.runescape.wiki/w/Group_Ironman_Mode) |
 | 12 | Wilderness, skulled | `INSIDE_WILDERNESS`, own skull icon | PvP Restrictions: this player's own state only, nothing about any opponent. Situational overlays are display only | Gameval name |
 | 30 | Diary tier | `*_DIARY_*_COMPLETE`, `ATJUN_*_DONE` | Own progress | Gameval names; `ATJUN_HARD_DONE` not confirmed |

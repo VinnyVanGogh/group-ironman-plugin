@@ -108,6 +108,26 @@ public class GraveShotTest
 	}
 
 	@Test
+	public void aDeathWithNothingLostPostsNoWarningAndFreesTheFrame()
+	{
+		// Board 2026-11-10: no gravestone, no "Gravestone expiring" post (Discord or overlay share this event).
+		dieWithFrame(DEATH_FRAME);
+		FakeItems items = new FakeItems();
+		for (int i = 0; i < EventWatchers.DEATH_SETTLE_TICKS; i++)
+		{
+			watchers.deathTick(EventFixtures.items(FakeItems.WHIP, 1), items, NOW, "Alex");
+		}
+		tick(1);
+		assertFalse("the death's frame is freed with no grave to hold it for", shot.holding());
+		for (int i = 0; i < EventWatchers.GRAVE_TICKS; i++)
+		{
+			tick(1);
+		}
+		assertTrue(posted.isEmpty());
+		assertTrue(out.stream().noneMatch(e -> e.type == GroupEvent.Type.GRAVESTONE_EXPIRING));
+	}
+
+	@Test
 	public void afterARestartTheWarningHasNoPicture()
 	{
 		// A restart is a new GraveShot with nothing in it; the grave itself was known (a fresh death).
