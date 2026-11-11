@@ -81,6 +81,7 @@ final class EventWatchers
 	private int graveWorld;
 	private String deathWhere = "";
 	private int deathWorld;
+	private final SlayerWatch slayer = new SlayerWatch(this::emit);
 
 	EventWatchers(Consumer<GroupEvent> out, Predicate<GroupEvent.Type> wanted)
 	{
@@ -120,6 +121,7 @@ final class EventWatchers
 		settle = 0;
 		graveLeft = 0;
 		graveSeen = false;
+		slayer.reset();
 	}
 
 	// ---- Chat ----
@@ -147,23 +149,19 @@ final class EventWatchers
 			emit(GroupEvent.of(GroupEvent.Type.COMBAT_TASK, now, me).text(task[1]).detail(task[0]).build());
 			return;
 		}
-		slayer(message, now, me);
+		slayer.chat(message, now, me);
 	}
 
-	private void slayer(String message, long now, String me)
+	/** Each tick: the NPC dialogue open now (null text when none), for a master handing out a Slayer task. */
+	void slayerDialog(String text, String npc, long now, String me)
 	{
-		long done = EventChat.slayerDone(message);
-		if (done >= 0)
-		{
-			emit(GroupEvent.of(GroupEvent.Type.SLAYER, now, me).text("task done").number(done).build());
-			return;
-		}
-		EventText.Count assigned = EventChat.slayerNew(message);
-		if (assigned != null)
-		{
-			emit(GroupEvent.of(GroupEvent.Type.SLAYER, now, me).text("new task: " + assigned.name)
-				.number(assigned.count).build());
-		}
+		slayer.dialog(text, npc, now, me);
+	}
+
+	/** Each tick, for a finished Slayer task whose streak line never came. */
+	void slayerTick(long now, String me)
+	{
+		slayer.tick(now, me);
 	}
 
 	private void raidLine(String message, long now, String me, Set<String> group, Collection<String> present)

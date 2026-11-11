@@ -571,12 +571,22 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = "discordOnline", name = "Online and offline", description = "Login and logout with the"
-		+ " world and how long you played. A world hop, or a relog within the offline grace, is not posted.",
-		section = discordEventsSection, position = 17)
+	/** Replaced by {@link #discordOnlineStatus}; still read once, so an older install keeps its choice. */
+	@ConfigItem(keyName = "discordOnline", name = "Online and offline", description = "Replaced by 'Online"
+		+ " status'.", hidden = true, section = discordEventsSection, position = 17)
 	default boolean discordOnline()
 	{
 		return false;
+	}
+
+	@ConfigItem(keyName = "discordOnlineStatus", name = "Online status", description = "Posts: a post for each"
+		+ " login and logout, with the world and how long you played (a hop, or a relog within the offline grace, is"
+		+ " not posted). Live board: one message in the Group channel listing each member online or offline,"
+		+ " edited as members log in, out or hop. Only members running this plugin are reported. Off: neither.",
+		section = discordEventsSection, position = 17)
+	default OnlineStatus discordOnlineStatus()
+	{
+		return OnlineStatus.LIVE_BOARD;
 	}
 
 	@Range(max = 10)
