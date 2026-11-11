@@ -30,6 +30,48 @@
 - A client closed during the grace posts the offline on the next start only
   when that is within 15 minutes; never a stale one hours later.
 
+### Daily digest is in addition to instant posts
+
+- Ticking a daily digest category no longer holds that category's posts.
+  Instant posts follow "Discord: which events" exactly as set; each ticked
+  digest category adds one summary a day at the digest hour, listing every
+  event of that category since the last digest, ticked for instant posts or
+  not. Untick a category's instant events to make it digest-only.
+- The digest switches are now "Include in daily digest: Drops" and so on.
+  Setting keys are unchanged.
+- A webhook field that is set but is not a Discord webhook link now gets one
+  game chat line naming the field (never the link), on login or a settings
+  change. Surrounding whitespace and quotes are stripped before checking, so
+  a link pasted with its quotes works.
+
+### Discord Easter eggs
+
+- New **Easter eggs** switch in the Discord section, off by default. When on,
+  some posts get one short funny line under the facts: a 0 gp death, a death
+  that lost only a spade (and clue items), a pet, a Bones-only "valuable"
+  drop, about ten well-known drops, and big group storage visits.
+- **Legend at (gp)** and **Freeloader at (gp)** (default 1M each, 0 turns it
+  off) set when a deposit or withdrawal gets its line.
+- A death that cost 0 gp no longer posts "lost about 0 gp". In a death's post
+  the line is left out; on its own it posts nothing with Easter eggs off, and
+  only the egg line with them on. The daily digest follows the same rule.
+- The lines are all in `EasterEggLines.java`; a new egg is one table row.
+
+### One Discord post per moment
+
+- A group storage visit is one Discord post. With a big deposit or withdrawal
+  it is titled "Big storage withdrawal", "Big storage deposit" or "Big storage
+  visit" (both), lists every item moved with the big stacks marked, and shows
+  the visit's total value. With nothing big it is the "Group storage visit"
+  summary, when that is switched on. "Storage minimum hit" and "Took the last
+  one" from the same visit are lines in that post, not posts of their own.
+- The same rule elsewhere: a kill's drop, untradeable unique, collection log
+  slot and pet; a tick's level up, 99, XP milestone, total level and combat
+  level; a death, its Hardcore group life and the value it cost. Each is one
+  post, titled after the biggest of them, with the rest as fields and one
+  screenshot taken when the moment began.
+- Discord only: banners, the group box and chat are unchanged.
+
 ### Windows launcher in CI
 
 - `Run-GimUtilities.cmd` takes an opt-in `GU_BUILD_ONLY=1` that builds

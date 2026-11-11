@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
@@ -46,6 +47,8 @@ import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
@@ -129,12 +132,19 @@ class GroupEventEngine
 	@Inject
 	private OverlayManager overlayManager;
 
+	@Inject
+	private ChatMessageManager chatMessageManager;
+
 	private final ToastQueue toasts = new ToastQueue();
+	private final WebhookWarnings webhookWarnings = new WebhookWarnings();
 	private final ProgressTracker progress = new ProgressTracker(Skill.values().length - 1);
 	/** Guards {@link #presence}: the client thread logs in and out, the executor polls. */
 	private final Object presenceLock = new Object();
 	private PresenceDebounce presence = new PresenceDebounce(ZoneId.systemDefault());
-	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()));
+	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()),
+		this::toDigest);
+	/** Client thread: Discord events waiting for the rest of their moment. */
+	private final DiscordBatch batch = new DiscordBatch();
 	private volatile EventSettings settings = EventSettings.OFF;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
 	private volatile Digest digest = new Digest();
@@ -201,6 +211,8 @@ class GroupEventEngine
 		{
 			sender.clear();
 		}
+		// Unsent posts are dropped at shutdown, as the sender's queue is.
+		batch.drain();
 		toasts.clear();
 		progress.reset();
 		settings = EventSettings.OFF;
@@ -216,6 +228,27 @@ class GroupEventEngine
 		if (toastOverlay != null)
 		{
 			toastOverlay.reposition();
+		}
+		warnBadWebhooks();
+	}
+
+	/**
+	 * A webhook field that is set but not a Discord webhook link gets one
+	 * chat line, on login or a config change, naming the field and never the
+	 * URL. Logged out, it waits for the login.
+	 */
+	private void warnBadWebhooks()
+	{
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+		for (String line : webhookWarnings.check(WebhookWarnings.fields(config)))
+		{
+			chatMessageManager.queue(QueuedMessage.builder()
+				.type(ChatMessageType.GAMEMESSAGE)
+				.runeLiteFormattedMessage(line)
+				.build());
 		}
 	}
 
@@ -261,6 +294,11 @@ class GroupEventEngine
 		for (GroupEvent e : EventDetect.storage(change, group.lookup))
 		{
 			router.route(e, own, settings, group.lookup);
+			if (own && e.type == GroupEvent.Type.STORAGE_SUMMARY)
+			{
+				// A big move's post lists the whole visit, whether or not the summary is switched on.
+				batch.attach(e);
+			}
 		}
 		if (own && wanted(GroupEvent.Type.WEEKLY_RECAP))
 		{
@@ -611,8 +649,15 @@ class GroupEventEngine
 		{
 			loginPending = true;
 		}
+		else if (state == GameState.HOPPING)
+		{
+			// No ticks until the new world loads: post the held moments now. A hop is never a logout.
+			batch.drain().forEach(this::flush);
+		}
 		else if (state == GameState.LOGIN_SCREEN)
 		{
+			// No more ticks until the next login: post what is held now.
+			batch.drain().forEach(this::flush);
 			// A world hop (HOPPING) is never a logout: it posts nothing, whatever the grace.
 			synchronized (presenceLock)
 			{
@@ -631,6 +676,7 @@ class GroupEventEngine
 	public void onGameTick(GameTick tick)
 	{
 		long now = System.currentTimeMillis();
+		batch.due(now).forEach(this::flush);
 		Player me = client.getLocalPlayer();
 		if (me == null || me.getName() == null)
 		{
@@ -776,15 +822,10 @@ class GroupEventEngine
 
 	private void flushDigest()
 	{
-		if (sender == null || !config.discordEnabled())
-		{
-			return;
-		}
-		Map<GroupEvent.Category, String> overrides = DiscordWebhook.overrides(config);
 		for (GroupEvent.Category category : settings.digest)
 		{
-			String url = DiscordWebhook.route(category, overrides, config.discordWebhookUrl());
-			// Draining first would lose held lines when the webhook has been cleared.
+			String url = webhook(category);
+			// Draining first would lose the day's lines when the webhook has been cleared.
 			if (url != null)
 			{
 				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category)), null);
@@ -799,6 +840,7 @@ class GroupEventEngine
 		week = Digest.Week.parse(profile(WEEK_KEY));
 		digest = Digest.parse(profile(DIGEST_KEY));
 		farm = FarmRuns.parse(profile(FARM_KEY), this::own, this::wanted);
+		warnBadWebhooks();
 		if (varWait < 0)
 		{
 			varWait = VAR_WAIT_TICKS;
@@ -936,35 +978,110 @@ class GroupEventEngine
 
 	// ---- Discord ----
 
-	/** Router output: one of this player's events for Discord, when posting is on and a webhook is set. */
-	private void toDiscord(GroupEvent event)
+	/** Where a category posts: null when Discord is off or no valid webhook is set. */
+	private String webhook(GroupEvent.Category category)
 	{
 		if (!config.discordEnabled() || sender == null)
 		{
+			return null;
+		}
+		return DiscordWebhook.route(category, DiscordWebhook.overrides(config), config.discordWebhookUrl());
+	}
+
+	/**
+	 * Router output: one of this player's events for its category's daily
+	 * digest. Separate from {@link #toDiscord}, which posts it now when its
+	 * kind is ticked: the digest is a summary on top, never a hold.
+	 */
+	private void toDigest(GroupEvent event)
+	{
+		if (webhook(event.type.category) == null)
+		{
 			return;
 		}
-		String url = DiscordWebhook.route(event.type.category, DiscordWebhook.overrides(config),
-			config.discordWebhookUrl());
+		// A Discord line: "450K (450,001)", as the webhook's own posts read. A 0 gp death has no value
+		// line, so without an egg there is nothing left to say ("lost about 0 gp" is never listed).
+		String words = DiscordWebhook.words(event, discordWords(), egg(Collections.singletonList(event)));
+		if (words == null)
+		{
+			return;
+		}
+		digest.add(event.type.category, event.member + ": " + words.replace('\n', ' '));
+		saveProfile(DIGEST_KEY, digest.save());
+	}
+
+	/**
+	 * Router output: one of this player's events posted now, when posting is on and a webhook is set. Kinds
+	 * that share a moment with others wait in {@link #batch} so the moment is one post.
+	 */
+	private void toDiscord(GroupEvent event)
+	{
+		String url = webhook(event.type.category);
 		if (url == null)
 		{
 			return;
 		}
-		if (settings.digest.contains(event.type.category) && event.type != GroupEvent.Type.WEEKLY_RECAP)
+		DiscordMerge.Family family = DiscordMerge.family(event.type);
+		if (family == null)
 		{
-			// A Discord line: "450K (450,001)", as the webhook's own posts read.
-			digest.add(event.type.category, EventText.sentence(event, Amounts.BOTH.words(group.lookup)));
-			saveProfile(DIGEST_KEY, digest.save());
+			// A logout settles at the login screen: nothing worth a picture.
+			post(url, DiscordMerge.single(event, discordWords()), Collections.singletonList(event),
+				event.type != GroupEvent.Type.ONLINE, null);
 			return;
 		}
+		List<DiscordBatch.Pending> done = new ArrayList<>();
+		DiscordBatch.Pending moment = batch.add(event, System.currentTimeMillis(),
+			DiscordMerge.window(family, settings), done);
+		if (moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot())
+		{
+			// The frame of the moment itself, not of whenever the post goes out (a death's respawn).
+			drawManager.requestNextFrameListener(image -> executor.execute(() -> moment.screenshot = png(image)));
+		}
+		done.forEach(this::flush);
+	}
+
+	/** Names and prices, amounts read the Discord way: "450K (450,001)" (Board 2026-11-10). */
+	private ItemLookup discordWords()
+	{
+		return Amounts.BOTH.words(group.lookup);
+	}
+
+	/** Client thread. One held moment as one post. */
+	private void flush(DiscordBatch.Pending moment)
+	{
+		DiscordMerge.Post post = DiscordMerge.merge(moment.events, settings, discordWords());
+		String url = post == null ? null : webhook(post.lead.type.category);
+		if (url != null)
+		{
+			post(url, post, moment.events, true, moment.screenshot);
+		}
+	}
+
+	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
+	private String egg(List<GroupEvent> events)
+	{
+		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(config));
+	}
+
+	/**
+	 * {@code shot}: a frame already taken; when a picture is wanted and none is ready, the next frame. Nothing is
+	 * posted when the post has nothing to say (a 0 gp death on its own, no egg).
+	 */
+	private void post(String url, DiscordMerge.Post post, List<GroupEvent> events, boolean picture, byte[] shot)
+	{
 		DiscordStyle style = config.discordStyle();
 		String mention = config.discordMention();
-		// A logout settles at the login screen: nothing worth a picture.
-		if (!config.discordScreenshot() || event.type == GroupEvent.Type.ONLINE)
+		boolean picked = picture && config.discordScreenshot();
+		String json = DiscordWebhook.payload(gson, post, discordWords(), style, mention, picked, egg(events));
+		if (json == null)
 		{
-			sender.post(url, DiscordWebhook.payload(gson, event, group.lookup, style, mention, false), null);
 			return;
 		}
-		String json = DiscordWebhook.payload(gson, event, group.lookup, style, mention, true);
+		if (!picked || shot != null)
+		{
+			sender.post(url, json, picked ? shot : null);
+			return;
+		}
 		// The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread.
 		drawManager.requestNextFrameListener(image -> executor.execute(() ->
 			sender.post(url, json, png(image))));
