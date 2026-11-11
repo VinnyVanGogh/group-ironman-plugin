@@ -146,6 +146,8 @@ class GroupEventEngine
 	/** Client thread: Discord events waiting for the rest of their moment. */
 	private final DiscordBatch batch = new DiscordBatch();
 	private volatile EventSettings settings = EventSettings.OFF;
+	/** The shared settings the event settings were built from: quiet hours, grace and Easter eggs read these. */
+	private volatile GroupSettingsSchema.Resolved values;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
 	private volatile Digest digest = new Digest();
 	private DryStreak dry = DryStreak.parse("");
@@ -218,12 +220,16 @@ class GroupEventEngine
 		settings = EventSettings.OFF;
 	}
 
+	/** A config change, or new group settings (they are kept in the config, so both arrive here). */
 	void reloadConfig()
 	{
-		settings = EventSettings.from(config);
+		GroupSettingsSchema.Resolved v = group == null ? new GroupSettingsSchema.Resolved(config, null)
+			: group.groupValues();
+		values = v;
+		settings = EventSettings.from(config, v, MemberPrefs.of(config));
 		if (sender != null)
 		{
-			sender.quietHours(config.discordQuietStart(), config.discordQuietEnd());
+			sender.quietHours(v.intValue("discordQuietStart"), v.intValue("discordQuietEnd"));
 		}
 		if (toastOverlay != null)
 		{
@@ -262,7 +268,7 @@ class GroupEventEngine
 			synchronized (presenceLock)
 			{
 				// The name is the one the login gave: after a logout localPlayer() is "You".
-				offline = presence.poll(System.currentTimeMillis(), config.discordOfflineGrace());
+				offline = presence.poll(System.currentTimeMillis(), values.intValue("discordOfflineGrace"));
 				savePresence();
 			}
 			if (offline != null)
@@ -848,7 +854,7 @@ class GroupEventEngine
 		List<GroupEvent> posts;
 		synchronized (presenceLock)
 		{
-			posts = presence.login(now, client.getWorld(), name, config.discordOfflineGrace());
+			posts = presence.login(now, client.getWorld(), name, values.intValue("discordOfflineGrace"));
 			savePresence();
 		}
 		for (GroupEvent e : posts)
@@ -1060,7 +1066,7 @@ class GroupEventEngine
 	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
 	private String egg(List<GroupEvent> events)
 	{
-		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(config));
+		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(values));
 	}
 
 	/**

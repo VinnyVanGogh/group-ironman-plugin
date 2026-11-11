@@ -1,0 +1,173 @@
+package com.vinnyvangogh.groupironman;
+
+import com.google.gson.Gson;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.Test;
+import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+/** Two simulated clients, each with its own config store, joined by a fake party. */
+public class GovernanceSyncTest
+{
+	private static final GroupIronmanConfig DEFAULTS = new GroupIronmanConfig()
+	{
+	};
+	private final Gson gson = new Gson();
+
+	/** One client: its config, what it sent, and its sync. */
+	private final class Client
+	{
+		final String name;
+		final Map<String, String> config = new HashMap<>();
+		final List<String> outbox = new ArrayList<>();
+		GovernanceSync sync;
+
+		Client(String name)
+		{
+			this.name = name;
+			start();
+		}
+
+		/** Starting the plugin: everything is read back from the config. */
+		void start()
+		{
+			sync = new GovernanceSync(gson, new GovernanceSync.Store()
+			{
+				@Override
+				public String get(String key)
+				{
+					return config.get(key);
+				}
+
+				@Override
+				public void set(String key, String value)
+				{
+					if (value == null)
+					{
+						config.remove(key);
+					}
+					else
+					{
+						config.put(key, value);
+					}
+				}
+			}, outbox::add, () ->
+			{
+			});
+			sync.group("GroupShip");
+		}
+
+		/** A game tick while connected: whatever is marked goes to {@code others}. */
+		void tick(Client... others)
+		{
+			sync.flush(MemberPrefs.NONE);
+			for (String payload : outbox)
+			{
+				assertTrue(GovernanceSync.isGovernance(payload));
+				for (Client o : others)
+				{
+					o.sync.receive(name, payload);
+				}
+			}
+			outbox.clear();
+		}
+	}
+
+	private static Map<String, Long> levelMin(long level)
+	{
+		Map<String, Long> v = GroupSettingsSchema.seed(DEFAULTS);
+		v.put("eventLevelMin", level);
+		return v;
+	}
+
+	@Test
+	public void aLeadersChangeReachesTheSecondMember()
+	{
+		Client alex = new Client("Alex");
+		Client sam = new Client("Sam");
+		alex.tick(sam);
+		sam.tick(alex);
+
+		assertTrue(alex.sync.claim("Alex", NOW));
+		assertTrue(alex.sync.save("Alex", levelMin(70), NOW + 1));
+		assertFalse("Sam is not an editor", sam.sync.save("Sam", levelMin(5), NOW + 1));
+		alex.tick(sam);
+
+		GroupSettings got = sam.sync.governance().settings();
+		assertNotNull(got);
+		assertEquals(70, new GroupSettingsSchema.Resolved(DEFAULTS, got).value("eventLevelMin"));
+		assertTrue("kept for Sam's next session", sam.config.containsKey(GovernanceSync.KEY_SETTINGS));
+	}
+
+	@Test
+	public void anOfflineMemberPicksUpTheLatestWhenTheyJoin()
+	{
+		Client alex = new Client("Alex");
+		Client sam = new Client("Sam");
+		alex.tick(sam);
+		sam.tick(alex);
+		alex.sync.claim("Alex", NOW);
+		alex.sync.save("Alex", levelMin(70), NOW + 1);
+		alex.tick();
+		alex.sync.save("Alex", levelMin(80), NOW + 2);
+		alex.tick();
+		assertNull("Sam was offline for both", sam.sync.governance().settings());
+
+		// Sam joins: his UserSync makes Alex resend everything.
+		alex.sync.resendAll();
+		alex.tick(sam);
+		assertEquals(2, sam.sync.governance().settings().version);
+	}
+
+	@Test
+	public void rolesSettingsAndKeyPairSurviveARestart()
+	{
+		Client alex = new Client("Alex");
+		alex.sync.claim("Alex", NOW);
+		alex.sync.save("Alex", levelMin(70), NOW + 1);
+		String key = alex.sync.governance().publicKey();
+		alex.start();
+		assertEquals(key, alex.sync.governance().publicKey());
+		assertEquals(GroupGovernance.Role.LEADER, alex.sync.governance().myRole("Alex"));
+		assertEquals(1, alex.sync.governance().settings().version);
+	}
+
+	@Test
+	public void nothingSentCarriesAWebhookOrThePrivateKey()
+	{
+		Client alex = new Client("Alex");
+		alex.sync.claim("Alex", NOW);
+		alex.sync.save("Alex", levelMin(70), NOW + 1);
+		alex.sync.flush(MemberPrefs.NONE);
+		String privateHalf = alex.config.get(GovernanceSync.KEY_IDENTITY).split("\\.")[1];
+		for (String payload : alex.outbox)
+		{
+			assertFalse(payload.contains(privateHalf));
+			assertFalse(payload.toLowerCase(java.util.Locale.ROOT).contains("webhook"));
+		}
+		assertEquals("announce, roles, settings", 3, alex.outbox.size());
+	}
+
+	@Test
+	public void anUnchangedAnnounceIsNotResent()
+	{
+		Client alex = new Client("Alex");
+		alex.sync.flush(MemberPrefs.NONE);
+		alex.outbox.clear();
+		alex.sync.prefs(MemberPrefs.NONE);
+		alex.sync.flush(MemberPrefs.NONE);
+		assertTrue(alex.outbox.isEmpty());
+		MemberPrefs out = new MemberPrefs(true, java.util.EnumSet.noneOf(GroupEvent.Type.class),
+			java.util.EnumSet.noneOf(GroupEvent.Type.class));
+		alex.sync.prefs(out);
+		alex.sync.flush(out);
+		assertEquals(1, alex.outbox.size());
+	}
+}
