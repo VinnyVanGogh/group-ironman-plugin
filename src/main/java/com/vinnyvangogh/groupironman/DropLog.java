@@ -100,6 +100,24 @@ final class DropLog
 		entries.clear();
 	}
 
+	/** Events after {@code since}, newest first, leaving out {@code self}'s own. */
+	List<GroupEvent> since(long since, String self)
+	{
+		List<GroupEvent> out = new ArrayList<>();
+		for (GroupEvent e : entries())
+		{
+			if (e.at <= since)
+			{
+				break;
+			}
+			if (self == null || !e.member.equalsIgnoreCase(self))
+			{
+				out.add(e);
+			}
+		}
+		return out;
+	}
+
 	/** {@code member}'s own events from the resend window, newest first, at most {@link #MAX_RESEND}. */
 	List<GroupEvent> recentBy(String member, long now)
 	{
@@ -114,6 +132,17 @@ final class DropLog
 			{
 				out.add(e);
 			}
+		}
+		return out;
+	}
+
+	/** "Alex: Vorkath dropped 1 x Draconic visage (2h ago)". */
+	static List<String> lines(List<GroupEvent> events, ItemLookup items, long now)
+	{
+		List<String> out = new ArrayList<>();
+		for (GroupEvent e : events)
+		{
+			out.add(e.member + ": " + e.describe(items) + " (" + BoostText.ago(now, e.at) + ")");
 		}
 		return out;
 	}

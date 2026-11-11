@@ -94,6 +94,8 @@ class GroupService
 	static final int MOVE_TILES = 8;
 	static final int CARRIED_INTERVAL_TICKS = 5;
 	static final int EXTRAS_INTERVAL_TICKS = 5;
+	/** How many drops and log slots the panel lists. */
+	static final int MAX_EVENT_LINES = 50;
 	/** How often the group roster is re-read from the game's clan data. */
 	static final int ROSTER_INTERVAL_TICKS = 10;
 	/** The chatFilterCheck script callback the base chat filter plugin uses to drop a line. */
