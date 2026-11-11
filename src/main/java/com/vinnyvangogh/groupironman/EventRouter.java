@@ -71,7 +71,7 @@ final class EventRouter
 			case CLUE:
 				return atLeast(event, settings.clueMin);
 			case LEVEL_UP:
-				return atLeast(event, settings.levelMin);
+				return everyN(atLeast(event, settings.levelMin), settings.levelEvery);
 			case STORAGE_DEPOSIT:
 			case STORAGE_WITHDRAWAL:
 				return atLeast(event, settings.storageMin);
@@ -83,6 +83,20 @@ final class EventRouter
 	private static GroupEvent atLeast(GroupEvent event, long min)
 	{
 		return event.number >= min ? event : null;
+	}
+
+	/**
+	 * "Post every N levels": only levels that are a multiple of {@code every}.
+	 * 99 always counts; 99s, max total, total level milestones and combat
+	 * levels are kinds of their own and never come through here.
+	 */
+	private static GroupEvent everyN(GroupEvent levelUp, int every)
+	{
+		if (levelUp == null || every <= 1 || levelUp.number >= ProgressTracker.MAX_LEVEL)
+		{
+			return levelUp;
+		}
+		return levelUp.number % every == 0 ? levelUp : null;
 	}
 
 	private static GroupEvent valuableStacks(GroupEvent event, long min, ItemLookup lookup)

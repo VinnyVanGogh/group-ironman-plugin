@@ -89,10 +89,11 @@ public class PluginIdentityTest
 		// presses Join. Part A of the group events adds 44 more, every one off: "Share group events", "Post to
 		// Discord", "Attach a screenshot", "Group box", and a Discord and an overlay switch per event kind.
 		// Part C adds 15 kinds (a Discord and an overlay switch each) and one digest switch per category.
-		// "Easter eggs" (Discord section) adds one more, off.
-		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1,
+		// "Easter eggs" (Discord section) adds one more, off. Group settings add "Don't post my events", off: a
+		// member's own opt-out, never something the group turns on for them.
+		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1,
 			switches);
-		assertEquals(91, switches);
+		assertEquals(92, switches);
 		assertEquals(Collections.singletonList("groupSync"), on);
 		assertEquals("", DEFAULTS.groupLowStock());
 		assertEquals("no key on a fresh install", "", DEFAULTS.groupKey());

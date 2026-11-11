@@ -100,6 +100,10 @@ final class EventSettings
 	 */
 	final Set<GroupEvent.Category> digest;
 	final int digestHour;
+	/** "Post every N levels": a level up counts only when its level is a multiple of this (99 always counts). */
+	final int levelEvery;
+	/** This member's own "don't post" kinds: kept out of the digest as well as the instant posts. */
+	final Set<GroupEvent.Type> noPost;
 
 	EventSettings(Set<GroupEvent.Type> discord, Set<GroupEvent.Type> overlay, long dropMin, long storageMin,
 		int levelMin, int backAfterDays, boolean share)
@@ -112,6 +116,16 @@ final class EventSettings
 		int levelMin, int backAfterDays, boolean share, long clueMin, int kcEvery, int graveWarnMinutes,
 		Set<GroupEvent.Category> digest, int digestHour)
 	{
+		this(discord, overlay, dropMin, storageMin, levelMin, backAfterDays, share, clueMin, kcEvery,
+			graveWarnMinutes, digest, digestHour, 1, EnumSet.noneOf(GroupEvent.Type.class));
+	}
+
+	private EventSettings(Set<GroupEvent.Type> discord, Set<GroupEvent.Type> overlay, long dropMin, long storageMin,
+		int levelMin, int backAfterDays, boolean share, long clueMin, int kcEvery, int graveWarnMinutes,
+		Set<GroupEvent.Category> digest, int digestHour, int levelEvery, Set<GroupEvent.Type> noPost)
+	{
+		this.levelEvery = Math.max(1, levelEvery);
+		this.noPost = Collections.unmodifiableSet(copy(noPost));
 		this.clueMin = Math.max(0, clueMin);
 		this.kcEvery = Math.max(0, kcEvery);
 		this.graveWarnMinutes = Math.max(1, Math.min(14, graveWarnMinutes));
@@ -139,39 +153,53 @@ final class EventSettings
 		return types.isEmpty() ? EnumSet.noneOf(GroupEvent.Type.class) : EnumSet.copyOf(types);
 	}
 
+	/** This member's own config only: no group settings, no opt-outs. */
 	static EventSettings from(GroupIronmanConfig config)
 	{
-		return new EventSettings(on(DISCORD, config), on(OVERLAY, config), config.eventDropMinValue(),
-			config.eventStorageMinValue(), config.eventLevelMin(), config.eventBackAfterDays(),
-			config.groupShareEvents(), config.eventClueMinValue(), config.eventKcEvery(),
-			config.eventGravestoneWarnMinutes(), digestOn(config), config.discordDigestHour());
+		return from(config, new GroupSettingsSchema.Resolved(config, null), MemberPrefs.NONE);
 	}
 
-	private static Set<GroupEvent.Category> digestOn(GroupIronmanConfig config)
+	/**
+	 * The group's settings where it has them ({@code values}), this member's
+	 * own config where it has none, then this member's own opt-outs on top:
+	 * a kind they opted out of is not posted, a muted kind not shown. "Share
+	 * group events" stays the member's own.
+	 */
+	static EventSettings from(GroupIronmanConfig config, GroupSettingsSchema.Resolved values, MemberPrefs prefs)
 	{
-		Set<GroupEvent.Category> out = EnumSet.noneOf(GroupEvent.Category.class);
-		for (Map.Entry<GroupEvent.Category, Predicate<GroupIronmanConfig>> e : DIGEST.entrySet())
+		Set<GroupEvent.Type> discord = EnumSet.noneOf(GroupEvent.Type.class);
+		Set<GroupEvent.Type> overlay = EnumSet.noneOf(GroupEvent.Type.class);
+		for (GroupEvent.Type t : GroupEvent.Type.values())
 		{
-			if (e.getValue().test(config))
+			if (values.on(GroupSettingsSchema.discordKey(t)) && prefs.posts(t))
 			{
-				out.add(e.getKey());
+				discord.add(t);
+			}
+			if (values.on(GroupSettingsSchema.overlayKey(t)) && !prefs.mute.contains(t))
+			{
+				overlay.add(t);
 			}
 		}
-		return out;
+		Set<GroupEvent.Category> digest = EnumSet.noneOf(GroupEvent.Category.class);
+		for (GroupEvent.Category c : GroupEvent.Category.values())
+		{
+			if (!prefs.all && values.on(GroupSettingsSchema.digestKey(c)))
+			{
+				digest.add(c);
+			}
+		}
+		return new EventSettings(discord, overlay, values.value("eventDropMinValue"),
+			values.value("eventStorageMinValue"), values.intValue("eventLevelMin"),
+			values.intValue("eventBackAfterDays"), config.groupShareEvents(), values.value("eventClueMinValue"),
+			values.intValue("eventKcEvery"), values.intValue("eventGravestoneWarnMinutes"), digest,
+			values.intValue("discordDigestHour"), values.intValue("eventLevelEvery"), prefs.noPost);
 	}
 
-	private static Set<GroupEvent.Type> on(Map<GroupEvent.Type, Predicate<GroupIronmanConfig>> switches,
-		GroupIronmanConfig config)
+	/** A copy with other level-up thresholds. */
+	EventSettings levels(int min, int every)
 	{
-		Set<GroupEvent.Type> out = EnumSet.noneOf(GroupEvent.Type.class);
-		for (Map.Entry<GroupEvent.Type, Predicate<GroupIronmanConfig>> e : switches.entrySet())
-		{
-			if (e.getValue().test(config))
-			{
-				out.add(e.getKey());
-			}
-		}
-		return out;
+		return new EventSettings(discord, overlay, dropMin, storageMin, min, backAfterDays, share, clueMin, kcEvery,
+			graveWarnMinutes, digest, digestHour, every, noPost);
 	}
 
 	/** Some output wants this kind; when none does, it is not even detected. */
@@ -183,6 +211,6 @@ final class EventSettings
 	/** This kind goes in its category's daily digest. The weekly recap is a post of its own. */
 	boolean digests(GroupEvent.Type type)
 	{
-		return type != GroupEvent.Type.WEEKLY_RECAP && digest.contains(type.category);
+		return type != GroupEvent.Type.WEEKLY_RECAP && digest.contains(type.category) && !noPost.contains(type);
 	}
 }

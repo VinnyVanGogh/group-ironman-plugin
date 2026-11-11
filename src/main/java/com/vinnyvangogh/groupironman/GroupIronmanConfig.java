@@ -45,6 +45,9 @@ public interface GroupIronmanConfig extends Config
 
 	/** Frozen. */
 	String KEY_GROUP_KEY = "groupKey";
+	String KEY_OPT_OUT_ALL = "eventOptOutAll";
+	String KEY_OPT_OUT_TYPES = "eventOptOutTypes";
+	String KEY_MUTE_TYPES = "overlayMuteTypes";
 
 	@ConfigItem(
 		keyName = "groupSync",
@@ -276,7 +279,9 @@ public interface GroupIronmanConfig extends Config
 	// ---- Group events: what counts. Both outputs read these. ----
 
 	@ConfigSection(name = "Group events", description = "When a drop, storage visit or level is big enough to"
-		+ " count as an event, for both the Discord webhook and the overlays.", position = 3, closedByDefault = true)
+		+ " count as an event, for both the Discord webhook and the overlays. Once your group's leader saves group"
+		+ " settings in the GIM Utilities panel (Settings tab), the group's values replace these and the"
+		+ " 'which events' switches below.", position = 3, closedByDefault = true)
 	String eventsSection = "events";
 
 	@ConfigItem(keyName = "eventDropMinValue", name = "Valuable drop at least (gp)", description = "A drop counts"
@@ -298,6 +303,15 @@ public interface GroupIronmanConfig extends Config
 		+ " level are not events.", section = eventsSection, position = 2)
 	@Range(min = 1, max = 99)
 	default int eventLevelMin()
+	{
+		return 1;
+	}
+
+	@ConfigItem(keyName = "eventLevelEvery", name = "Post every N levels", description = "From the 'Level ups from"
+		+ " level', only every Nth level counts (e.g. 5: 60, 65, 70). 1 is every level. 99s, max total, total level"
+		+ " milestones and combat levels always count.", section = eventsSection, position = 2)
+	@Range(min = 1, max = 98)
+	default int eventLevelEvery()
 	{
 		return 1;
 	}
@@ -331,6 +345,29 @@ public interface GroupIronmanConfig extends Config
 	default boolean discordEnabled()
 	{
 		return false;
+	}
+
+	@ConfigItem(keyName = "eventOptOutAll", name = "Don't post my events", description = "Yours alone, whatever"
+		+ " your group's settings say: none of your events go to Discord. Per-kind choices are in the panel's"
+		+ " Settings tab. Your group's leader and editors can see this choice.", section = discordSection,
+		position = 1)
+	default boolean eventOptOutAll()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "eventOptOutTypes", name = "Kinds not to post", description = "Set from the panel's"
+		+ " Settings tab.", hidden = true)
+	default String eventOptOutTypes()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "overlayMuteTypes", name = "Kinds not to show", description = "Set from the panel's"
+		+ " Settings tab.", hidden = true)
+	default String overlayMuteTypes()
+	{
+		return "";
 	}
 
 	@ConfigItem(keyName = "discordWebhookUrl", name = "Discord webhook URL", description = "From Discord: channel"
