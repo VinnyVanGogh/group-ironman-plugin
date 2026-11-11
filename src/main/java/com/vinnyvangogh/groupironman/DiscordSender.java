@@ -127,16 +127,31 @@ final class DiscordSender
 	/**
 	 * Where a post goes. A new post that wants its message id waits for it ({@code ?wait=true}); an edit goes to
 	 * {@code /messages/<id>} under the webhook (Discord "Edit Webhook Message",
-	 * {@code PATCH /webhooks/{id}/{token}/messages/{message.id}}).
+	 * {@code PATCH /webhooks/{id}/{token}/messages/{message.id}}). A query the webhook already has (a
+	 * {@code thread_id}) is kept, after the path, and {@code wait} joins it rather than starting a second one.
 	 */
 	static String target(DiscordQueue.Post post)
 	{
-		String base = post.url.endsWith("/") ? post.url.substring(0, post.url.length() - 1) : post.url;
+		if (post.edit == null && post.result == null)
+		{
+			return post.url;
+		}
+		int q = post.url.indexOf('?');
+		String path = q < 0 ? post.url : post.url.substring(0, q);
+		String query = q < 0 ? "" : post.url.substring(q + 1);
+		if (path.endsWith("/"))
+		{
+			path = path.substring(0, path.length() - 1);
+		}
 		if (post.edit != null)
 		{
-			return base + "/messages/" + post.edit;
+			path += "/messages/" + post.edit;
 		}
-		return post.result != null ? base + "?wait=true" : post.url;
+		else
+		{
+			query = query.isEmpty() ? "wait=true" : query + "&wait=true";
+		}
+		return query.isEmpty() ? path : path + "?" + query;
 	}
 
 	/** The message id in a {@code ?wait=true} reply's message object; null when there is none. */
@@ -212,7 +227,19 @@ final class DiscordSender
 				{
 					try
 					{
-						return r.isSuccessful() && r.body() != null ? messageId(gson, r.body().string()) : null;
+						if (!r.isSuccessful())
+						{
+							return null;
+						}
+						String id = r.body() == null ? null : messageId(gson, r.body().string());
+						if (id == null)
+						{
+							// No URL: the status and content type say enough. Without the id the streak cannot be
+							// edited, so the skill's next level posts anew.
+							log.debug("discord webhook reply has no message id: HTTP {} {}", r.code(),
+								r.header("Content-Type"));
+						}
+						return id;
 					}
 					catch (IOException e)
 					{
