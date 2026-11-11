@@ -171,11 +171,14 @@ final class EasterEggs
 		return null;
 	}
 
-	/** Took more than the 'Freeloader at' value, and more than was given back on the same visit. */
+	/**
+	 * Took at least the 'Freeloader at' value, and at least as much as was given back on the same visit. At, not
+	 * just over, like {@link #legend}: both settings read "at".
+	 */
 	private static boolean freeloader(GroupEvent e, ItemLookup lookup, Settings settings)
 	{
 		long took = EventText.value(taken(e), lookup);
-		return settings.freeloaderAt > 0 && took > settings.freeloaderAt
+		return settings.freeloaderAt > 0 && took >= settings.freeloaderAt
 			&& took >= EventText.value(deposited(e), lookup);
 	}
 

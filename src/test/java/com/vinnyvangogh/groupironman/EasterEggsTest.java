@@ -156,15 +156,27 @@ public class EasterEggsTest
 	@Test
 	public void aDepositAtTheLegendValueIsLegendary()
 	{
-		assertEquals(EasterEggLines.LEGEND[0], EasterEggs.line(deposit(1_000_000), lookup, ON));
+		assertLegend(EasterEggs.line(deposit(1_000_000), lookup, ON));
 		assertNull("just under", EasterEggs.line(deposit(999_999), lookup, ON));
 	}
 
 	@Test
-	public void aWithdrawalOverTheFreeloaderValueIsDetected()
+	public void aWithdrawalAtTheFreeloaderValueIsDetected()
 	{
-		assertEquals(EasterEggLines.FREELOADER[0], EasterEggs.line(withdrawal(1_000_001), lookup, ON));
-		assertNull("at, not over", EasterEggs.line(withdrawal(1_000_000), lookup, ON));
+		assertFreeloader(EasterEggs.line(withdrawal(1_000_001), lookup, ON));
+		assertFreeloader(EasterEggs.line(withdrawal(1_000_000), lookup, ON));
+		assertNull("just under", EasterEggs.line(withdrawal(999_999), lookup, ON));
+	}
+
+	/** The Board's live test: Legend and Freeloader both at 10,000, 10K coins in and then out. */
+	@Test
+	public void tenThousandInAndOutAtTenThousandGetsBothEggs()
+	{
+		EasterEggs.Settings tenK = new EasterEggs.Settings(true, 10_000, 10_000);
+		assertLegend(EasterEggs.line(deposit(10_000), lookup, tenK));
+		assertFreeloader(EasterEggs.line(withdrawal(10_000), lookup, tenK));
+		assertNull(EasterEggs.line(deposit(9_999), lookup, tenK));
+		assertNull(EasterEggs.line(withdrawal(9_999), lookup, tenK));
 	}
 
 	@Test
@@ -172,10 +184,13 @@ public class EasterEggsTest
 	{
 		GroupEvent took = GroupEvent.of(GroupEvent.Type.STORAGE_SUMMARY, NOW, "Alex").items(coins(10))
 			.taken(coins(2_000_000)).build();
-		assertEquals(EasterEggLines.FREELOADER[0], EasterEggs.line(took, lookup, ON));
+		assertFreeloader(EasterEggs.line(took, lookup, ON));
 		GroupEvent gave = GroupEvent.of(GroupEvent.Type.STORAGE_SUMMARY, NOW, "Alex").items(coins(3_000_000))
 			.taken(coins(2_000_000)).build();
-		assertEquals("gave more than took", EasterEggLines.LEGEND[0], EasterEggs.line(gave, lookup, ON));
+		assertLegend("gave more than took", EasterEggs.line(gave, lookup, ON));
+		GroupEvent atButGaveMore = GroupEvent.of(GroupEvent.Type.STORAGE_SUMMARY, NOW, "Alex")
+			.items(coins(1_500_000)).taken(coins(1_000_000)).build();
+		assertLegend("took exactly the value but gave more back", EasterEggs.line(atButGaveMore, lookup, ON));
 	}
 
 	@Test
@@ -205,6 +220,38 @@ public class EasterEggsTest
 			seen.add(EasterEggs.line(free, lookup, ON, seed));
 		}
 		assertEquals("every phrasing gets a turn", new HashSet<>(Arrays.asList(EasterEggLines.FREE_TRIP)), seen);
+	}
+
+	@Test
+	public void legendAndFreeloaderRotateStablyWithAFixedSeed()
+	{
+		assertRotates(deposit(1_000_000), EasterEggLines.LEGEND);
+		assertRotates(withdrawal(1_000_000), EasterEggLines.FREELOADER);
+		assertTrue("several phrasings each", EasterEggLines.LEGEND.length >= 4
+			&& EasterEggLines.FREELOADER.length >= 4);
+	}
+
+	@Test
+	public void anEmojiLineSurvivesTheEmbedAndPlainPayloads()
+	{
+		int checked = 0;
+		for (String egg : EasterEggLines.all())
+		{
+			if (egg.codePoints().noneMatch(Character::isSupplementaryCodePoint))
+			{
+				continue;
+			}
+			checked++;
+			GroupEvent in = deposit(1_000_000);
+			JsonObject embed = embed(DiscordWebhook.payload(gson, in, lookup, DiscordStyle.EMBED, "", false, egg));
+			assertTrue(embed.get("description").getAsString(), embed.get("description").getAsString().endsWith(egg));
+			String plain = new JsonParser().parse(DiscordWebhook.payload(gson, in, lookup, DiscordStyle.PLAIN, "",
+				false, egg)).getAsJsonObject().get("content").getAsString();
+			assertTrue(plain, plain.endsWith(egg));
+			assertTrue("an emoji is a whole surrogate pair", egg.codePoints()
+				.noneMatch(c -> Character.getType(c) == Character.SURROGATE));
+		}
+		assertTrue("the Legend and Freeloader emoji lines are checked", checked >= 2);
 	}
 
 	// ---- the post keeps its facts ----
@@ -239,6 +286,36 @@ public class EasterEggsTest
 	}
 
 	// ---- fixtures ----
+
+	private void assertRotates(GroupEvent e, String[] lines)
+	{
+		String first = EasterEggs.line(e, lookup, ON, 42L);
+		for (int i = 0; i < 5; i++)
+		{
+			assertEquals(first, EasterEggs.line(e, lookup, ON, 42L));
+		}
+		Set<String> seen = new HashSet<>();
+		for (long seed = 0; seed < 64; seed++)
+		{
+			seen.add(EasterEggs.line(e, lookup, ON, seed));
+		}
+		assertEquals("every phrasing gets a turn", new HashSet<>(Arrays.asList(lines)), seen);
+	}
+
+	private static void assertLegend(String egg)
+	{
+		assertLegend(null, egg);
+	}
+
+	private static void assertLegend(String why, String egg)
+	{
+		assertTrue(why + ": " + egg, Arrays.asList(EasterEggLines.LEGEND).contains(egg));
+	}
+
+	private static void assertFreeloader(String egg)
+	{
+		assertTrue(String.valueOf(egg), Arrays.asList(EasterEggLines.FREELOADER).contains(egg));
+	}
 
 	private static List<String> rowFor(int id)
 	{
