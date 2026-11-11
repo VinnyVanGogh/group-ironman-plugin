@@ -87,8 +87,17 @@ final class DiscordWebhook
 		return out;
 	}
 
-	/** One day's held lines for a category as a plain post; null when there are none. Mentions nobody. */
+	/** {@link #digest(Gson, GroupEvent.Category, List, String)} under today's name, "GIM Utilities". */
 	static String digest(Gson gson, GroupEvent.Category category, List<String> lines)
+	{
+		return digest(gson, category, lines, USERNAME);
+	}
+
+	/**
+	 * One day's held lines for a category as a plain post; null when there are none. Mentions nobody.
+	 * {@code username} null sends none, so the webhook's own name shows ({@link PosterNames}).
+	 */
+	static String digest(Gson gson, GroupEvent.Category category, List<String> lines, String username)
 	{
 		if (lines.isEmpty())
 		{
@@ -103,8 +112,7 @@ final class DiscordWebhook
 			}
 			text.append('\n').append(line);
 		}
-		JsonObject o = new JsonObject();
-		o.addProperty("username", USERNAME);
+		JsonObject o = poster(username);
 		o.addProperty("content", text.toString());
 		JsonObject allowed = new JsonObject();
 		allowed.add("parse", new JsonArray());
@@ -162,13 +170,23 @@ final class DiscordWebhook
 	static String payload(Gson gson, DiscordMerge.Post post, ItemLookup lookup, DiscordStyle style, String mention,
 		boolean screenshot, String egg)
 	{
+		return payload(gson, post, lookup, style, mention, screenshot, egg, USERNAME);
+	}
+
+	/**
+	 * {@link #payload(Gson, DiscordMerge.Post, ItemLookup, DiscordStyle, String, boolean, String)} under
+	 * {@code username}; null sends none, so Discord shows the webhook's own name and avatar ({@link PosterNames}).
+	 * The footer says "GIM Utilities" whatever the name.
+	 */
+	static String payload(Gson gson, DiscordMerge.Post post, ItemLookup lookup, DiscordStyle style, String mention,
+		boolean screenshot, String egg, String username)
+	{
 		String words = words(post, egg);
 		if (words == null)
 		{
 			return null;
 		}
-		JsonObject o = new JsonObject();
-		o.addProperty("username", USERNAME);
+		JsonObject o = poster(username);
 		String tag = post.big && mention != null && !mention.trim().isEmpty() ? mention.trim() : "";
 		// Only the configured mention may ping; a member or item name can never.
 		JsonObject allowed = new JsonObject();
@@ -195,13 +213,16 @@ final class DiscordWebhook
 		return gson.toJson(o);
 	}
 
-	/** A level streak's post ("Prayer 23 → 25 (+2) in 4 min"), as a new message: it never mentions anyone. */
+	/**
+	 * A level streak's post ("Prayer 23 → 25 (+2) in 4 min"), as a new message under {@code username} (null for
+	 * the webhook's own, {@link PosterNames}): it never mentions anyone.
+	 */
 	static String levels(Gson gson, GroupEvent latest, String text, ItemLookup lookup, DiscordStyle style,
-		boolean screenshot)
+		boolean screenshot, String username)
 	{
 		DiscordMerge.Post post = new DiscordMerge.Post(latest, EventText.title(latest), text,
 			Collections.emptyMap(), Collections.emptyList(), false);
-		return payload(gson, post, lookup, style, null, screenshot, null);
+		return payload(gson, post, lookup, style, null, screenshot, null, username);
 	}
 
 	/**
@@ -212,8 +233,7 @@ final class DiscordWebhook
 	static String levelsEdit(Gson gson, GroupEvent latest, String text, ItemLookup lookup, DiscordStyle style,
 		boolean screenshot)
 	{
-		JsonObject o = gson.fromJson(levels(gson, latest, text, lookup, style, screenshot), JsonObject.class);
-		o.remove("username");
+		JsonObject o = gson.fromJson(levels(gson, latest, text, lookup, style, screenshot, null), JsonObject.class);
 		if (screenshot)
 		{
 			JsonObject upload = new JsonObject();
@@ -224,6 +244,17 @@ final class DiscordWebhook
 			o.add("attachments", attachments);
 		}
 		return gson.toJson(o);
+	}
+
+	/** A post's body, with the {@code username} key only when there is a name to send. */
+	private static JsonObject poster(String username)
+	{
+		JsonObject o = new JsonObject();
+		if (username != null)
+		{
+			o.addProperty("username", username);
+		}
+		return o;
 	}
 
 	/** "Alex: died; lost about 1.5M gp on death": the lead's sentence, each merged fact, then the egg's line. */

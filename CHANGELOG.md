@@ -15,6 +15,26 @@
 - If the post was deleted or the webhook changed, the next update is posted as
   a new message, and that one is edited from then on. Message ids are kept in
   memory only.
+- One action that gains several levels (low Prayer from bones) reads from the
+  level before it: *Prayer 3 → 6 (+3)*, not *5 → 6*.
+- After three edits in a row lost to Discord or the network, or a post pushed
+  out of a full queue, the streak ends and the next level posts fresh.
+- Level-up posts use the Progress poster name.
+
+### The Log shows every group event
+
+- The sidebar Log lists every event the overlay and Discord know about,
+  yours and members', from the same events: an event is logged even when its
+  Discord and overlay switches are off. Every kind is detected while the
+  plugin runs, for the Log.
+- Search (member, item, place, text), category chips (Drops, Deaths,
+  Storage, Progress, Group, Activities), a member picker and a time range.
+- "Since you last played" stays on top; the rest is grouped by day. Each row
+  has the item or skill icon, member, short line and time; hover for the
+  full line and value (*1.5M (1,501,600) gp*); right-click to copy.
+- Kept in the group cache file under a new `feed` key: the newest 2,000
+  events, none older than 30 days. A cache from before starts the feed from
+  its drops and storage logs.
 
 ### Amounts read like the game
 
@@ -30,6 +50,33 @@
 - Item icons show the stack's own picture: a big coin pile for big stacks.
   The panel's Find rows now draw the stack too, and Discord thumbnails use
   the coin pile for the amount.
+
+### Online status: a live board
+
+- New setting **Online status**: *Posts*, *Live board* or *Off*. It replaces
+  the "Online and offline" switch; an install that had it ticked stays on
+  *Posts*, one that used Discord without it is *Off*, and a new install starts
+  on *Posts*: a member opts into *Live board*.
+- *Live board* keeps one message in the Group channel listing each member:
+  online (with the world) or offline (last seen, kept current by Discord). It
+  is edited on each login, logout and hop, at most once every 10 seconds and
+  never in quiet hours. If the message is deleted, the next change posts a new
+  one. Only members whose clients run the plugin are reported; the others show
+  *unknown*. The webhook and the message id stay on your client: neither is
+  sent to the group.
+- Each member with *Live board* and a Group webhook keeps their own board, so
+  only one member sharing a Group webhook should turn it on.
+- The board's posts and edits share the Discord queue with every other post
+  (at most 20 a minute) and use the Group poster name.
+
+### Slayer posts fixed
+
+- Checking the enchanted gem no longer posts *task done*: a task is done only
+  on the line that sends you back to a Slayer master (RuneLite's own rule).
+- A task from a master's dialogue now posts (it posted nothing), as does a
+  partner's: *New Slayer task: 19 x Icefiends (Turael)*. The gem's check never
+  posts the task you already have.
+- A finished task reads *Slayer task done: Icefiends (streak 1, 2 points)*.
 
 ### Online and offline posts
 

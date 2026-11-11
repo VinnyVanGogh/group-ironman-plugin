@@ -39,8 +39,13 @@ to share, and only sees other members' data for what they share themselves.
   ![Chatbox output from ::find command with colour-coded results](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/find-chatbox.png)
   *Chatbox `::find` command: instant, colour-coded item location lookup.*
 
-- **Log:** group storage changes by member, and members' drops and new
-  collection log slots since you last played.
+- **Log:** every group event, yours and your group's: drops, deaths, levels,
+  quests, slayer, diaries, storage visits, online and offline and the rest,
+  whether or not they go to Discord or the overlay. "Since you last played"
+  on top, then one section per day. Search by member, item, place or text;
+  filter by category, member and time (today, 7 days, all). Hover a row for
+  the full line and its value; right-click it to copy. The newest 2,000
+  events from the last 30 days are kept across restarts.
 
   ![Log tab showing group storage changes and activity since last played](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/storage-log.png)
   *Log tab: storage deposits/withdrawals and group activity since your last session.*

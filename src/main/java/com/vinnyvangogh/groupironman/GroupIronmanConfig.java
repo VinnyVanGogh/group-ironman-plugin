@@ -468,6 +468,70 @@ public interface GroupIronmanConfig extends Config
 		return 30;
 	}
 
+	@ConfigItem(keyName = "discordPosterName", name = "Poster name", description = "Whose name posts show. The"
+		+ " webhook's own: the name and avatar set on each webhook in Discord. Custom: the names below.",
+		section = discordSection, position = 17)
+	default DiscordPosterName discordPosterName()
+	{
+		return DiscordPosterName.WEBHOOK;
+	}
+
+	@ConfigItem(keyName = "discordNameMain", name = "Custom name: main", description = "With Poster name on Custom,"
+		+ " posts to the main webhook use this name, unless their category has its own below. Blank uses the"
+		+ " webhook's own. At most 80 characters, without 'discord', 'clyde', @, #, : or ```, and not 'everyone'"
+		+ " or 'here'.", section = discordSection, position = 18)
+	default String discordNameMain()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameDrops", name = "Custom name: Drops", description = "With Poster name on"
+		+ " Custom, drop posts use this name. Blank uses the webhook's own.", section = discordSection, position = 19)
+	default String discordNameDrops()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameDeaths", name = "Custom name: Deaths", description = "With Poster name on"
+		+ " Custom, death posts use this name. Blank uses the webhook's own.", section = discordSection,
+		position = 20)
+	default String discordNameDeaths()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameStorage", name = "Custom name: Storage", description = "With Poster name on"
+		+ " Custom, group storage posts use this name. Blank uses the webhook's own.", section = discordSection,
+		position = 21)
+	default String discordNameStorage()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameProgress", name = "Custom name: Progress", description = "With Poster name on"
+		+ " Custom, level, XP and quest posts use this name. Blank uses the webhook's own.", section = discordSection,
+		position = 22)
+	default String discordNameProgress()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameGroup", name = "Custom name: Group", description = "With Poster name on"
+		+ " Custom, online, offline and 'back after' posts use this name. Blank uses the webhook's own.",
+		section = discordSection, position = 23)
+	default String discordNameGroup()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "discordNameActivities", name = "Custom name: Activities", description = "With Poster name"
+		+ " on Custom, Barrows posts use this name. Blank uses the webhook's own.", section = discordSection,
+		position = 24)
+	default String discordNameActivities()
+	{
+		return "";
+	}
+
 	@ConfigSection(name = "Discord: which events", description = "Each event is its own switch, all off until you"
 		+ " tick it.", position = 5, closedByDefault = true)
 	String discordEventsSection = "discordEvents";
@@ -592,12 +656,23 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = "discordOnline", name = "Online and offline", description = "Login and logout with the"
-		+ " world and how long you played. A world hop, or a relog within the offline grace, is not posted.",
-		section = discordEventsSection, position = 17)
+	/** Replaced by {@link #discordOnlineStatus}; still read once, so an older install keeps its choice. */
+	@ConfigItem(keyName = "discordOnline", name = "Online and offline", description = "Replaced by 'Online"
+		+ " status'.", hidden = true, section = discordEventsSection, position = 17)
 	default boolean discordOnline()
 	{
 		return false;
+	}
+
+	@ConfigItem(keyName = "discordOnlineStatus", name = "Online status", description = "Posts: a post for each"
+		+ " login and logout, with the world and how long you played (a hop, or a relog within the offline grace, is"
+		+ " not posted). Live board: one message in the Group channel listing each member online or offline,"
+		+ " edited as members log in, out or hop. Only members running this plugin are reported; only one member"
+		+ " sharing a Group webhook should turn it on, or the channel gets one board each. Off: neither.",
+		section = discordEventsSection, position = 17)
+	default OnlineStatus discordOnlineStatus()
+	{
+		return OnlineStatus.POSTS;
 	}
 
 	@Range(max = 10)

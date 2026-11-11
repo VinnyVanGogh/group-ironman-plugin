@@ -651,6 +651,21 @@ class GroupService
 		}
 	}
 
+	/**
+	 * Any thread. One routed event, yours or a member's, into the Log tab's
+	 * feed. Kept on disk with the rest of the cache; duplicates (a resend) are
+	 * dropped by the feed.
+	 */
+	void logEvent(GroupEvent event)
+	{
+		if (!roster.feed().add(event))
+		{
+			return;
+		}
+		saveCache();
+		onChange.run();
+	}
+
 	/** Client thread. Logs one of this player's own events and tells the party. */
 	private void recordEvent(GroupEvent event)
 	{

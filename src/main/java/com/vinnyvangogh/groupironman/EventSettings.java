@@ -47,7 +47,7 @@ final class EventSettings
 		both(GroupEvent.Type.TOTAL_LEVEL, GroupIronmanConfig::discordTotalLevel, GroupIronmanConfig::overlayTotalLevel);
 		both(GroupEvent.Type.QUEST, GroupIronmanConfig::discordQuest, GroupIronmanConfig::overlayQuest);
 		both(GroupEvent.Type.QUEST_POINTS, GroupIronmanConfig::discordQuestPoints, GroupIronmanConfig::overlayQuestPoints);
-		both(GroupEvent.Type.ONLINE, GroupIronmanConfig::discordOnline, GroupIronmanConfig::overlayOnline);
+		both(GroupEvent.Type.ONLINE, EventSettings::postsOnline, GroupIronmanConfig::overlayOnline);
 		both(GroupEvent.Type.BACK, GroupIronmanConfig::discordBack, GroupIronmanConfig::overlayBack);
 		both(GroupEvent.Type.BARROWS, GroupIronmanConfig::discordBarrows, GroupIronmanConfig::overlayBarrows);
 		both(GroupEvent.Type.RAID_UNIQUE, GroupIronmanConfig::discordRaidUnique, GroupIronmanConfig::overlayRaidUnique);
@@ -79,7 +79,8 @@ final class EventSettings
 
 	/** Everything off: what a fresh install, and the plugin before startUp, sees. */
 	static final EventSettings OFF = new EventSettings(EnumSet.noneOf(GroupEvent.Type.class),
-		EnumSet.noneOf(GroupEvent.Type.class), Long.MAX_VALUE, Long.MAX_VALUE, 99, 365, false);
+		EnumSet.noneOf(GroupEvent.Type.class), Long.MAX_VALUE, Long.MAX_VALUE, 99, 365, false, 0, 100, 5,
+		EnumSet.noneOf(GroupEvent.Category.class), 20, false);
 
 	final Set<GroupEvent.Type> discord;
 	final Set<GroupEvent.Type> overlay;
@@ -100,6 +101,11 @@ final class EventSettings
 	 */
 	final Set<GroupEvent.Category> digest;
 	final int digestHour;
+	/**
+	 * The sidebar Log takes every kind (Board 2026-11-10), so every kind is
+	 * detected while the plugin runs. False only in {@link #OFF}.
+	 */
+	final boolean log;
 
 	EventSettings(Set<GroupEvent.Type> discord, Set<GroupEvent.Type> overlay, long dropMin, long storageMin,
 		int levelMin, int backAfterDays, boolean share)
@@ -112,6 +118,15 @@ final class EventSettings
 		int levelMin, int backAfterDays, boolean share, long clueMin, int kcEvery, int graveWarnMinutes,
 		Set<GroupEvent.Category> digest, int digestHour)
 	{
+		this(discord, overlay, dropMin, storageMin, levelMin, backAfterDays, share, clueMin, kcEvery, graveWarnMinutes,
+			digest, digestHour, true);
+	}
+
+	private EventSettings(Set<GroupEvent.Type> discord, Set<GroupEvent.Type> overlay, long dropMin, long storageMin,
+		int levelMin, int backAfterDays, boolean share, long clueMin, int kcEvery, int graveWarnMinutes,
+		Set<GroupEvent.Category> digest, int digestHour, boolean log)
+	{
+		this.log = log;
 		this.clueMin = Math.max(0, clueMin);
 		this.kcEvery = Math.max(0, kcEvery);
 		this.graveWarnMinutes = Math.max(1, Math.min(14, graveWarnMinutes));
@@ -132,6 +147,12 @@ final class EventSettings
 	{
 		DISCORD.put(type, discord);
 		OVERLAY.put(type, overlay);
+	}
+
+	/** Logins and logouts are posts only in that mode; the live board edits one message instead. */
+	private static boolean postsOnline(GroupIronmanConfig config)
+	{
+		return config.discordOnlineStatus() == OnlineStatus.POSTS;
 	}
 
 	private static Set<GroupEvent.Type> copy(Set<GroupEvent.Type> types)
@@ -174,10 +195,16 @@ final class EventSettings
 		return out;
 	}
 
-	/** Some output wants this kind; when none does, it is not even detected. */
+	/** Discord, the overlay or the digest wants this kind. */
 	boolean wants(GroupEvent.Type type)
 	{
 		return discord.contains(type) || overlay.contains(type) || digests(type);
+	}
+
+	/** Worth detecting: the Log takes every kind, so any settings but {@link #OFF} detect all of them. */
+	boolean detects(GroupEvent.Type type)
+	{
+		return log || wants(type);
 	}
 
 	/** This kind goes in its category's daily digest. The weekly recap is a post of its own. */

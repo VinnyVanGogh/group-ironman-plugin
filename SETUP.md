@@ -50,10 +50,24 @@ Five more sections, all closed and all off by default:
   webhooks per category (drops, deaths, storage, progress, group, activities),
   *Message style* (rich embed or plain text), *Attach a screenshot*, *Mention
   for big events* (e.g. `<@&role id>`, put in front of pets, 99s, maxing and a
-  Hardcore group death), and *Quiet hours from / until* (posts wait and go
-  when quiet hours end; the same hour twice means none).
+  Hardcore group death), *Quiet hours from / until* (posts wait and go
+  when quiet hours end; the same hour twice means none), and *Poster name*:
+  *Use the webhook's own name* (the default: the name and avatar you set on
+  each webhook in Discord), *GIM Utilities*, or *Custom*, which uses the
+  *Custom name* fields (main and one per category). A blank custom name uses
+  the webhook's own; names are cut to 80 characters, and a name Discord
+  refuses (containing "discord", "clyde", `@`, `#`, `:` or ` ``` `, or exactly
+  "everyone" or "here") gets a chat warning and is not used: those posts go
+  out under the webhook's own name, not the main custom name. Every embed's
+  footer still says GIM Utilities.
 - **Discord: which events** and **Overlays: which events**: one switch per
-  event, for each output.
+  event, for each output. *Online status* is *Posts* (the default: a post per
+  login and logout), *Live board* (one Group-channel message listing each
+  member, edited in place) or *Off*. Only one member sharing a Group webhook
+  should turn on *Live board*: each member who has it on keeps a board of
+  their own in that channel. Level-up posts use the Progress poster name and
+  the board the Group one; the board's edits count toward the same 20 posts
+  a minute.
 - **Overlays**: *Banner time*, *Banner position*, *Most banners at once*, the
   *Group box* (who is online and on which world, and the latest events) and
   how many events it lists.

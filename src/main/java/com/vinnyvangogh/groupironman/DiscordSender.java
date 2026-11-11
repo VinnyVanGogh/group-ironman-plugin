@@ -79,7 +79,7 @@ final class DiscordSender
 		{
 			return;
 		}
-		queue.offer(new DiscordQueue.Post(url, json, png));
+		offer(new DiscordQueue.Post(url, json, png));
 	}
 
 	/** Queues a new post whose final outcome, and the created message's id, go to {@code result}. */
@@ -87,7 +87,7 @@ final class DiscordSender
 	{
 		if (url != null && json != null)
 		{
-			queue.offer(new DiscordQueue.Post(url, json, png, null, result));
+			offer(new DiscordQueue.Post(url, json, png, null, result));
 		}
 	}
 
@@ -96,7 +96,16 @@ final class DiscordSender
 	{
 		if (url != null && json != null && messageId != null)
 		{
-			queue.offer(new DiscordQueue.Post(url, json, png, messageId, result));
+			offer(new DiscordQueue.Post(url, json, png, messageId, result));
+		}
+	}
+
+	/** A post a full queue pushed out is told so, outside the queue's lock: its owner may queue another. */
+	private void offer(DiscordQueue.Post post)
+	{
+		for (DiscordQueue.Post dropped : queue.offer(post))
+		{
+			dropped.result.done(DiscordQueue.DROPPED, null);
 		}
 	}
 

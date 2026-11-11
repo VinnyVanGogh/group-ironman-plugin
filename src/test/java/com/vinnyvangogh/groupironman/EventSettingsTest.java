@@ -27,12 +27,13 @@ public class EventSettingsTest
 	public void aFreshInstallWantsNothing()
 	{
 		EventSettings s = EventSettings.from(DEFAULTS);
-		assertTrue(s.discord.isEmpty());
+		// Online status defaults to Posts (Board 2026-11-10); nothing posts until Discord is turned on.
+		assertEquals(EnumSet.of(GroupEvent.Type.ONLINE), s.discord);
 		assertTrue(s.overlay.isEmpty());
 		assertFalse(s.share);
 		for (GroupEvent.Type t : GroupEvent.Type.values())
 		{
-			assertFalse(s.wants(t));
+			assertEquals(t == GroupEvent.Type.ONLINE, s.wants(t));
 		}
 		assertEquals(1_000_000, s.dropMin);
 		assertEquals(7, s.backAfterDays);

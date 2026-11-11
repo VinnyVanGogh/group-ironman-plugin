@@ -84,18 +84,6 @@ public class DropLogTest
 	}
 
 	@Test
-	public void sinceOnlyReturnsLaterEventsFromOtherMembers()
-	{
-		DropLog log = new DropLog();
-		log.add(GroupEvent.drop(NOW - 5 * HOUR, "Alex", "Vorkath", items(WHIP, 1)));
-		log.add(GroupEvent.drop(NOW - HOUR, "Alex", "Zulrah", items(RUNE_SCIM, 1)));
-		log.add(GroupEvent.clog(NOW - HOUR, "Me", "Abyssal whip"));
-		List<GroupEvent> since = log.since(NOW - 2 * HOUR, "me");
-		assertEquals(1, since.size());
-		assertEquals("Zulrah", since.get(0).text);
-	}
-
-	@Test
 	public void recentByIsOnlyThatMembersEventsInsideTheResendWindow()
 	{
 		DropLog log = new DropLog();
@@ -116,6 +104,18 @@ public class DropLogTest
 			log.add(GroupEvent.clog(NOW - i, "Me", "Item " + i));
 		}
 		assertEquals(DropLog.MAX_RESEND, log.recentBy("Me", NOW).size());
+	}
+
+	@Test
+	public void sinceOnlyReturnsLaterEventsFromOtherMembers()
+	{
+		DropLog log = new DropLog();
+		log.add(GroupEvent.drop(NOW - 5 * HOUR, "Alex", "Vorkath", items(WHIP, 1)));
+		log.add(GroupEvent.drop(NOW - HOUR, "Alex", "Zulrah", items(RUNE_SCIM, 1)));
+		log.add(GroupEvent.clog(NOW - HOUR, "Me", "Abyssal whip"));
+		List<GroupEvent> since = log.since(NOW - 2 * HOUR, "me");
+		assertEquals(1, since.size());
+		assertEquals("Zulrah", since.get(0).text);
 	}
 
 	@Test

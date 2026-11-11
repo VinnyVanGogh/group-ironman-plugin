@@ -44,6 +44,8 @@ final class GroupRoster
 	private final Set<String> strangers = ConcurrentHashMap.newKeySet();
 	private final StorageLog log = new StorageLog();
 	private final DropLog events = new DropLog();
+	/** Every event, for the Log tab: see {@link ActivityLog}. */
+	private final DropLog feed = ActivityLog.newFeed();
 	private volatile Storage storage;
 	/** When this player was last seen logged in, by this client; 0 when never. */
 	private volatile long lastPlayed;
@@ -92,6 +94,12 @@ final class GroupRoster
 	DropLog events()
 	{
 		return events;
+	}
+
+	/** Every group event, yours and members', newest first: the Log tab. */
+	DropLog feed()
+	{
+		return feed;
 	}
 
 	/** How many members other than {@code self} were heard from recently. */
@@ -210,6 +218,7 @@ final class GroupRoster
 		extras.clear();
 		heard.clear();
 		events.clear();
+		feed.clear();
 		lastPlayed = 0;
 	}
 
@@ -250,7 +259,7 @@ final class GroupRoster
 	boolean hasAnything()
 	{
 		return !banks.isEmpty() || !carried.isEmpty() || !stats.isEmpty() || storage != null || !extras.isEmpty()
-			|| !events.entries().isEmpty();
+			|| !events.entries().isEmpty() || !feed.entries().isEmpty();
 	}
 
 	/** Everything "who has it?" searches. */
@@ -301,6 +310,11 @@ final class GroupRoster
 		for (GroupEvent e : events.entries())
 		{
 			out.addAll(e.items.keySet());
+		}
+		for (GroupEvent e : feed.entries())
+		{
+			out.addAll(e.items.keySet());
+			out.addAll(e.taken.keySet());
 		}
 		return out;
 	}
