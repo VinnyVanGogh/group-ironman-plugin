@@ -1,5 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import java.io.IOException;
 import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
@@ -36,7 +40,13 @@ final class DiscordSender
 
 	interface Done
 	{
-		void done(int status, String retryAfter);
+		/** {@code messageId}: the created message's id, read only when the post asked for it; else null. */
+		void done(int status, String retryAfter, String messageId);
+
+		default void done(int status, String retryAfter)
+		{
+			done(status, retryAfter, null);
+		}
 	}
 
 	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
@@ -72,6 +82,24 @@ final class DiscordSender
 		queue.offer(new DiscordQueue.Post(url, json, png));
 	}
 
+	/** Queues a new post whose final outcome, and the created message's id, go to {@code result}. */
+	void post(String url, String json, byte[] png, DiscordQueue.Result result)
+	{
+		if (url != null && json != null)
+		{
+			queue.offer(new DiscordQueue.Post(url, json, png, null, result));
+		}
+	}
+
+	/** Queues an in-place edit of {@code messageId}, sent by {@code url}'s webhook; the outcome goes to {@code result}. */
+	void edit(String url, String messageId, String json, byte[] png, DiscordQueue.Result result)
+	{
+		if (url != null && json != null && messageId != null)
+		{
+			queue.offer(new DiscordQueue.Post(url, json, png, messageId, result));
+		}
+	}
+
 	/** Sends the next post if the queue allows one now. Any thread; called by the timer. */
 	void pump()
 	{
@@ -81,14 +109,53 @@ final class DiscordSender
 		{
 			return;
 		}
-		transport.send(post, (status, retryAfter) ->
+		transport.send(post, (status, retryAfter, messageId) ->
 		{
 			if (status < 200 || status >= 300)
 			{
-				log.debug("discord webhook post failed: {}", status == 0 ? "network error" : "HTTP " + status);
+				log.debug("discord webhook {} failed: {}", post.edit == null ? "post" : "edit",
+					status == 0 ? "network error" : "HTTP " + status);
 			}
-			queue.done(status, DiscordQueue.retryAfterMs(retryAfter), clock.getAsLong());
+			boolean again = queue.done(status, DiscordQueue.retryAfterMs(retryAfter), clock.getAsLong());
+			if (!again && post.result != null)
+			{
+				post.result.done(status, messageId);
+			}
 		});
+	}
+
+	/**
+	 * Where a post goes. A new post that wants its message id waits for it ({@code ?wait=true}); an edit goes to
+	 * {@code /messages/<id>} under the webhook (Discord "Edit Webhook Message",
+	 * {@code PATCH /webhooks/{id}/{token}/messages/{message.id}}).
+	 */
+	static String target(DiscordQueue.Post post)
+	{
+		String base = post.url.endsWith("/") ? post.url.substring(0, post.url.length() - 1) : post.url;
+		if (post.edit != null)
+		{
+			return base + "/messages/" + post.edit;
+		}
+		return post.result != null ? base + "?wait=true" : post.url;
+	}
+
+	/** The message id in a {@code ?wait=true} reply's message object; null when there is none. */
+	static String messageId(Gson gson, String body)
+	{
+		try
+		{
+			JsonElement reply = gson.fromJson(body, JsonElement.class);
+			if (reply == null || !reply.isJsonObject())
+			{
+				return null;
+			}
+			JsonObject o = reply.getAsJsonObject();
+			return o.has("id") && o.get("id").isJsonPrimitive() ? o.get("id").getAsString() : null;
+		}
+		catch (JsonParseException | IllegalStateException e)
+		{
+			return null;
+		}
 	}
 
 	int queued()
@@ -102,7 +169,7 @@ final class DiscordSender
 	}
 
 	/** The client's transport: RuneLite's own OkHttpClient, asynchronous. */
-	static Transport okHttp(OkHttpClient http)
+	static Transport okHttp(OkHttpClient http, Gson gson)
 	{
 		return (post, done) ->
 		{
@@ -118,7 +185,9 @@ final class DiscordSender
 					.addFormDataPart("files[0]", DiscordWebhook.SCREENSHOT, RequestBody.create(PNG, post.png))
 					.build();
 			}
-			Request request = new Request.Builder().url(post.url).post(body).build();
+			Request.Builder builder = new Request.Builder().url(target(post));
+			Request request = (post.edit == null ? builder.post(body) : builder.patch(body)).build();
+			boolean wantsId = post.edit == null && post.result != null;
 			http.newCall(request).enqueue(new Callback()
 			{
 				@Override
@@ -134,7 +203,21 @@ final class DiscordSender
 				{
 					try (Response r = response)
 					{
-						done.done(r.code(), r.header("Retry-After"));
+						done.done(r.code(), r.header("Retry-After"), wantsId ? id(r) : null);
+					}
+				}
+
+				/** The posted message's id; null when unreadable (the post still went, so it is not retried). */
+				private String id(Response r)
+				{
+					try
+					{
+						return r.isSuccessful() && r.body() != null ? messageId(gson, r.body().string()) : null;
+					}
+					catch (IOException e)
+					{
+						log.debug("discord webhook reply unreadable: {}", e.getClass().getSimpleName());
+						return null;
 					}
 				}
 			});

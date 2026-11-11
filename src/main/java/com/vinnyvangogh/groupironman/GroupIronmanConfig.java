@@ -6,6 +6,7 @@ import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Range;
+import net.runelite.client.config.Units;
 
 /**
  * Settings for GIM Utilities.
@@ -445,6 +446,17 @@ public interface GroupIronmanConfig extends Config
 	default int discordFreeloaderAt()
 	{
 		return 1_000_000;
+	}
+
+	@ConfigItem(keyName = "discordCombineLevels", name = "Combine level-ups within (minutes)", description = "More"
+		+ " levels in the same skill within this many minutes of its first post edit that post ('Prayer 23 → 25 (+2)')"
+		+ " instead of posting again. 99s, total and combat levels always post. 0 turns it off.",
+		section = discordSection, position = 16)
+	@Range(max = 240)
+	@Units(Units.MINUTES)
+	default int discordCombineLevels()
+	{
+		return 30;
 	}
 
 	@ConfigSection(name = "Discord: which events", description = "Each event is its own switch, all off until you"
