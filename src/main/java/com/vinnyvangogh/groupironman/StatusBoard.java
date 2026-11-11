@@ -173,12 +173,7 @@ final class StatusBoard
 		inFlight = null;
 		if (status >= 200 && status < 300)
 		{
-			sentLines = send.lines;
-			if (send.create() && newId != null)
-			{
-				messageId = newId;
-				idChanged = true;
-			}
+			sent(send, newId);
 		}
 		else if (status == 404 && !send.create())
 		{
@@ -194,6 +189,17 @@ final class StatusBoard
 		{
 			// A bad or deleted webhook: retrying cannot fix it, so wait for the lines to change.
 			sentLines = send.lines;
+		}
+	}
+
+	/** Holding the lock: Discord took {@code send}; a post's answer carries the board's id. */
+	private void sent(Send send, String newId)
+	{
+		sentLines = send.lines;
+		if (send.create() && newId != null)
+		{
+			messageId = newId;
+			idChanged = true;
 		}
 	}
 
