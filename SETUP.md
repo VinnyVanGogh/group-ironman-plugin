@@ -55,9 +55,11 @@ Five more sections, all closed and all off by default:
   *Use the webhook's own name* (the default: the name and avatar you set on
   each webhook in Discord), *GIM Utilities*, or *Custom*, which uses the
   *Custom name* fields (main and one per category). A blank custom name uses
-  the webhook's own; names are cut to 80 characters, and a name containing
-  "discord" or "clyde" (which Discord refuses) gets a chat warning and is not
-  used. Every embed's footer still says GIM Utilities.
+  the webhook's own; names are cut to 80 characters, and a name Discord
+  refuses (containing "discord", "clyde", `@`, `#`, `:` or ` ``` `, or exactly
+  "everyone" or "here") gets a chat warning and is not used: those posts go
+  out under the webhook's own name, not the main custom name. Every embed's
+  footer still says GIM Utilities.
 - **Discord: which events** and **Overlays: which events**: one switch per
   event, for each output.
 - **Overlays**: *Banner time*, *Banner position*, *Most banners at once*, the

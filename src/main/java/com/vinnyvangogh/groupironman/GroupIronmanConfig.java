@@ -478,8 +478,8 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigItem(keyName = "discordNameMain", name = "Custom name: main", description = "With Poster name on Custom,"
 		+ " posts to the main webhook use this name, unless their category has its own below. Blank uses the"
-		+ " webhook's own. At most 80 characters, without"
-		+ " 'discord' or 'clyde'.", section = discordSection, position = 18)
+		+ " webhook's own. At most 80 characters, without 'discord', 'clyde', @, #, : or ```, and not 'everyone'"
+		+ " or 'here'.", section = discordSection, position = 18)
 	default String discordNameMain()
 	{
 		return "";

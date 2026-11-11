@@ -1,6 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -12,16 +13,17 @@ import java.util.Map;
  * The {@code username} a Discord post is sent with, from the 'Poster name' setting. Null means no
  * {@code username} key, so Discord shows the name and avatar set on the webhook itself.
  *
- * <p>Discord's Execute Webhook takes a username of 1 to 80 characters and answers 400 to one containing
- * "discord" or "clyde" (any case), so a longer name is cut to 80 and a refused one is never sent: the post goes
- * out under the webhook's own name and the player gets one chat line naming the field, never the name. Pure, so
- * the rules and the once-only warning are tested.
+ * <p>Discord's Execute Webhook takes a username of 1 to 80 characters and answers 400 to the names in
+ * {@link #refused}, so a longer name is cut to 80 and a refused one is never sent: the post goes out under the
+ * webhook's own name (not the main custom name) and the player gets one chat line naming the field, never the
+ * name. Pure, so the rules and the once-only warning are tested.
  */
 final class PosterNames
 {
 	/** Discord's limit on a webhook username. */
 	static final int MAX = 80;
-	private static final String[] REFUSED = {"discord", "clyde"};
+	private static final String[] REFUSED = {"discord", "clyde", "@", "#", ":", "```"};
+	private static final List<String> EXACT = Arrays.asList("everyone", "here");
 
 	/** Field label to the refused name already warned about. In memory only, never shown or logged. */
 	private final Map<String, String> warned = new HashMap<>();
@@ -41,10 +43,11 @@ final class PosterNames
 		{
 			return null;
 		}
-		String own = usable(names.get(category));
-		if (own != null)
+		String own = clean(names.get(category));
+		if (!own.isEmpty())
 		{
-			return own;
+			// A refused own name is the webhook's own, as the warning says: never the main custom name.
+			return refused(own) ? null : own;
 		}
 		boolean onMain = !DiscordWebhook.valid(urls.get(category)) && DiscordWebhook.valid(mainUrl);
 		return onMain ? usable(mainName) : null;
@@ -69,13 +72,20 @@ final class PosterNames
 		return s;
 	}
 
-	/** Discord answers 400 to a webhook username containing either word, in any case. */
+	/**
+	 * Discord answers 400 to a webhook username containing "discord", "clyde", '@', '#', ':' or "```", or one
+	 * that is exactly "everyone" or "here" (any case, checked after {@link #clean}).
+	 */
 	static boolean refused(String name)
 	{
 		String lower = name.toLowerCase(Locale.ROOT);
-		for (String word : REFUSED)
+		if (EXACT.contains(lower))
 		{
-			if (lower.contains(word))
+			return true;
+		}
+		for (String part : REFUSED)
+		{
+			if (lower.contains(part))
 			{
 				return true;
 			}
@@ -108,8 +118,8 @@ final class PosterNames
 
 	static String message(String label)
 	{
-		return GroupIronmanPlugin.NAME + ": the " + label + " Discord custom name can't contain 'discord' or 'clyde';"
-			+ " posts use the webhook's own name instead";
+		return GroupIronmanPlugin.NAME + ": the " + label + " Discord custom name can't contain 'discord', 'clyde',"
+			+ " @, #, : or ```, or be 'everyone' or 'here'; posts use the webhook's own name instead";
 	}
 
 	/** Each category's custom name field. */

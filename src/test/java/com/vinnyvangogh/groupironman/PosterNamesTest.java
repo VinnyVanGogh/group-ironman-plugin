@@ -124,9 +124,33 @@ public class PosterNamesTest
 		assertTrue(PosterNames.refused("my CLYDE"));
 		assertTrue(PosterNames.refused("xdIsCoRdx"));
 		assertFalse(PosterNames.refused("Gringotts Bot"));
-		assertNull("refused names are not sent", name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS,
-			names(GroupEvent.Category.DEATHS, "Discord Deaths"), "Main Bot"));
+		assertNull("a refused category name is the webhook's own, never the main custom name",
+			name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS,
+				names(GroupEvent.Category.DEATHS, "Discord Deaths"), "Main Bot"));
 		assertNull(name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS, Collections.emptyMap(), "Clyde"));
+	}
+
+	@Test
+	public void namesWithMentionsOrMarkdownAreRefused()
+	{
+		for (String bad : new String[]{"Loot @ Home", "Bank#1", "Time: now", "a ```code``` bot", "everyone",
+			"Here", " EVERYONE "})
+		{
+			assertTrue(bad, PosterNames.refused(PosterNames.clean(bad)));
+			assertNull(bad, name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS,
+				names(GroupEvent.Category.DEATHS, bad), "Main Bot"));
+		}
+		assertFalse("only exactly everyone or here", PosterNames.refused("everyone's bot"));
+		assertFalse(PosterNames.refused("Over here"));
+		assertFalse("one or two backticks are fine", PosterNames.refused("a `b` c"));
+
+		PosterNames warnings = new PosterNames();
+		Map<String, String> fields = new java.util.LinkedHashMap<>();
+		fields.put("storage", "Bank#1");
+		List<String> lines = warnings.check(DiscordPosterName.CUSTOM, fields);
+		assertEquals(Collections.singletonList(PosterNames.message("storage")), lines);
+		assertFalse("never the name itself", lines.get(0).contains("Bank#1"));
+		assertTrue("once", warnings.check(DiscordPosterName.CUSTOM, fields).isEmpty());
 	}
 
 	@Test
@@ -139,7 +163,8 @@ public class PosterNamesTest
 		List<String> lines = warnings.check(DiscordPosterName.CUSTOM, fields);
 		assertEquals(1, lines.size());
 		assertEquals(PosterNames.message("main"), lines.get(0));
-		assertTrue(lines.get(0).contains("'discord' or 'clyde'"));
+		assertTrue(lines.get(0).contains("'discord'"));
+		assertTrue(lines.get(0).contains("'clyde'"));
 		assertFalse("never the name itself", lines.get(0).contains("Clyde"));
 		assertTrue("once", warnings.check(DiscordPosterName.CUSTOM, fields).isEmpty());
 		fields.put("main", "Main Bot");
