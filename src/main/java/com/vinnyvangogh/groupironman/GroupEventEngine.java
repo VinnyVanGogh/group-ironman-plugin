@@ -147,6 +147,8 @@ class GroupEventEngine
 	private final DiscordBatch batch = new DiscordBatch();
 	private volatile EventSettings settings = EventSettings.OFF;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
+	/** The death's frame for the gravestone warning; memory only, so a restart loses it. */
+	private final GraveShot graveShot = new GraveShot();
 	private volatile Digest digest = new Digest();
 	private DryStreak dry = DryStreak.parse("");
 	private Digest.Week week = Digest.Week.parse("");
@@ -564,18 +566,31 @@ class GroupEventEngine
 			group.resolveItems(items.keySet());
 			watchers.died(items, where == null ? "" : where, client.getWorld());
 		}
-		if (!wanted(GroupEvent.Type.DEATH))
+		int grave = graveShot.died();
+		if (wanted(GroupEvent.Type.DEATH))
 		{
-			return;
+			Actor killer = me.getInteracting();
+			boolean hardcore = client.getVarbitValue(VarbitID.IRONMAN) == EventDetect.HARDCORE_GROUP_IRONMAN;
+			own(GroupEvent.of(GroupEvent.Type.DEATH, System.currentTimeMillis(), group.localPlayer())
+				.text(killer == null ? null : killer.getName())
+				.location(where)
+				.world(client.getWorld())
+				.number(hardcore ? GroupEvent.LIFE_LOST : 0)
+				.build());
 		}
-		Actor killer = me.getInteracting();
-		boolean hardcore = client.getVarbitValue(VarbitID.IRONMAN) == EventDetect.HARDCORE_GROUP_IRONMAN;
-		own(GroupEvent.of(GroupEvent.Type.DEATH, System.currentTimeMillis(), group.localPlayer())
-			.text(killer == null ? null : killer.getName())
-			.location(where)
-			.world(client.getWorld())
-			.number(hardcore ? GroupEvent.LIFE_LOST : 0)
-			.build());
+		// No death post took the frame (death posts off, or joined an open moment): take it for the grave alone.
+		if (keepsDeathFrame() && graveShot.ask(grave))
+		{
+			drawManager.requestNextFrameListener(image -> executor.execute(() -> graveShot.keep(grave, png(image))));
+		}
+	}
+
+	/** The gravestone warning posts to Discord with "From the death" and screenshots on. */
+	private boolean keepsDeathFrame()
+	{
+		return config.discordScreenshot() && config.discordGravestoneScreenshot() == GraveScreenshot.DEATH
+			&& settings.discord.contains(GroupEvent.Type.GRAVESTONE_EXPIRING)
+			&& webhook(GroupEvent.Type.GRAVESTONE_EXPIRING.category) != null;
 	}
 
 	@Subscribe
@@ -667,6 +682,7 @@ class GroupEventEngine
 			// Another account may log in next: start every baseline over.
 			progress.reset();
 			watchers.reset();
+			graveShot.free();
 			backWait = -1;
 			varWait = -1;
 		}
@@ -734,13 +750,19 @@ class GroupEventEngine
 			watchers.poll(id -> id == EventWatchers.SKULL ? (me.getSkullIcon() != -1 ? 1 : 0) : client.getVarbitValue(id),
 				now, name);
 		}
-		if (wanted(GroupEvent.Type.DEATH_VALUE))
+		if (wanted(GroupEvent.Type.DEATH_VALUE) || wanted(GroupEvent.Type.GRAVESTONE_EXPIRING))
 		{
+			// Also for the gravestone alone: its warning lists what the death left in it.
 			watchers.deathTick(carried(), group.lookup, now, name);
 		}
 		if (wanted(GroupEvent.Type.GRAVESTONE_EXPIRING))
 		{
 			watchers.graveTick(client.getVarbitValue(VarbitID.GRAVESTONE_VISIBLE), settings.graveWarnMinutes, now, name);
+		}
+		if (!watchers.graveOut())
+		{
+			// Warned (already posted, the picture read), looted, or never wanted: the death's frame goes.
+			graveShot.free();
 		}
 		farmTick(now, me);
 		if (++scheduleTicks >= SCHEDULE_EVERY_TICKS)
@@ -1024,9 +1046,9 @@ class GroupEventEngine
 		DiscordMerge.Family family = DiscordMerge.family(event.type);
 		if (family == null)
 		{
-			// A logout settles at the login screen: nothing worth a picture.
-			post(url, DiscordMerge.single(event, discordWords()), Collections.singletonList(event),
-				event.type != GroupEvent.Type.ONLINE, null);
+			GraveShot.Choice shot = picture(event);
+			post(url, DiscordMerge.single(event, discordWords()), Collections.singletonList(event), shot.picture,
+				shot.png);
 			return;
 		}
 		List<DiscordBatch.Pending> done = new ArrayList<>();
@@ -1034,10 +1056,27 @@ class GroupEventEngine
 			DiscordMerge.window(family, settings), done);
 		if (moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot())
 		{
-			// The frame of the moment itself, not of whenever the post goes out (a death's respawn).
-			drawManager.requestNextFrameListener(image -> executor.execute(() -> moment.screenshot = png(image)));
+			// The frame of the moment itself, not of whenever the post goes out (a death's respawn). A death's
+			// frame is also the gravestone warning's, when that wants it: encoded once, held for that grave.
+			int live = graveShot.live();
+			int grave = family == DiscordMerge.Family.DEATH && keepsDeathFrame() && graveShot.ask(live) ? live : 0;
+			drawManager.requestNextFrameListener(image -> executor.execute(() ->
+			{
+				moment.screenshot = png(image);
+				graveShot.keep(grave, moment.screenshot);
+			}));
 		}
 		done.forEach(this::flush);
+	}
+
+	/** The picture for a post made at once: a logout settles at the login screen, a gravestone by its setting. */
+	private GraveShot.Choice picture(GroupEvent event)
+	{
+		if (event.type == GroupEvent.Type.GRAVESTONE_EXPIRING)
+		{
+			return graveShot.choose(config.discordGravestoneScreenshot(), config.discordScreenshot());
+		}
+		return event.type == GroupEvent.Type.ONLINE ? GraveShot.Choice.NOTHING : GraveShot.Choice.NEXT_FRAME;
 	}
 
 	/** Names and prices, amounts read the Discord way: "450K (450,001)" (Board 2026-11-10). */

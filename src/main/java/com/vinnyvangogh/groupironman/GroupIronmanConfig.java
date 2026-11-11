@@ -398,9 +398,18 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "discordGravestoneScreenshot", name = "Gravestone screenshot", description = "The picture"
+		+ " on 'Gravestone about to expire': where you died (kept in memory only; none after a client restart),"
+		+ " where you stand when it posts, or none. Needs 'Attach a screenshot'.", section = discordSection,
+		position = 10)
+	default GraveScreenshot discordGravestoneScreenshot()
+	{
+		return GraveScreenshot.DEATH;
+	}
+
 	@ConfigItem(keyName = "discordMention", name = "Mention for big events", description = "Put in front of pets,"
 		+ " 99s, maxing and a Hardcore group life lost, e.g. <@&role id> or <@user id>. Empty mentions nobody.",
-		section = discordSection, position = 10)
+		section = discordSection, position = 11)
 	default String discordMention()
 	{
 		return "";
@@ -408,7 +417,7 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigItem(keyName = "discordQuietStart", name = "Quiet hours from", description = "Hour (0-23) posts start"
 		+ " waiting; they are sent when quiet hours end. Same as 'until' means no quiet hours.",
-		section = discordSection, position = 11)
+		section = discordSection, position = 12)
 	@Range(max = 23)
 	default int discordQuietStart()
 	{
@@ -416,7 +425,7 @@ public interface GroupIronmanConfig extends Config
 	}
 
 	@ConfigItem(keyName = "discordQuietEnd", name = "Quiet hours until", description = "Hour (0-23) quiet hours"
-		+ " end.", section = discordSection, position = 12)
+		+ " end.", section = discordSection, position = 13)
 	@Range(max = 23)
 	default int discordQuietEnd()
 	{
@@ -425,7 +434,7 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigItem(keyName = "discordEasterEggs", name = "Easter eggs", description = "Add one short funny line under"
 		+ " some posts: a 0 gp death, a pet, a famous drop, a big storage visit. The facts stay as they are.",
-		section = discordSection, position = 13)
+		section = discordSection, position = 14)
 	default boolean discordEasterEggs()
 	{
 		return false;

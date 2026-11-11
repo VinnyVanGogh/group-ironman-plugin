@@ -1,6 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.regex.Matcher;
@@ -80,7 +83,7 @@ final class EventText
 		line(GroupEvent.Type.DEATH_VALUE, "Lost on death", EventText::deathValue);
 		line(GroupEvent.Type.GRAVESTONE_EXPIRING, "Gravestone expiring", (e, l) -> "gravestone"
 			+ (e.location.isEmpty() ? "" : " at " + e.location) + (e.world > 0 ? " on world " + e.world : "")
-			+ " has about " + e.number + " min left");
+			+ " has about " + e.number + " min left" + graveItems(e, l));
 		line(GroupEvent.Type.HC_LIFE_LOST, "Group life lost", (e, l) -> "lost a Hardcore group life, " + e.number
 			+ (e.number == 1 ? " life" : " lives") + " left");
 		line(GroupEvent.Type.WILDERNESS, "Wilderness", (e, l) -> e.text);
@@ -123,6 +126,30 @@ final class EventText
 	{
 		return "lost about " + lookup.amount(e.number) + " gp on death" + (e.location.isEmpty() ? "" : " at " + e.location)
 			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")");
+	}
+
+	/** Items shown on a gravestone warning: the most valuable few, as "Lost on death" counted them. */
+	static final int GRAVE_TOP = 3;
+
+	/** "; in it: 1 x Abyssal whip, 13.2K x Coins and 2 more (1.6M gp)": empty when the death was not counted. */
+	private static String graveItems(GroupEvent e, ItemLookup lookup)
+	{
+		if (e.items.isEmpty())
+		{
+			return "";
+		}
+		List<Map.Entry<Integer, Integer>> ranked = new ArrayList<>(e.items.entrySet());
+		ranked.sort(Comparator.comparingLong((Map.Entry<Integer, Integer> i) -> lookup.price(i.getKey()) * i.getValue())
+			.reversed().thenComparing(Map.Entry::getKey));
+		List<String> parts = new ArrayList<>();
+		for (Map.Entry<Integer, Integer> i : ranked.subList(0, Math.min(GRAVE_TOP, ranked.size())))
+		{
+			parts.add(Amounts.GAME.of(i.getValue()) + " x " + lookup.name(i.getKey()));
+		}
+		int more = ranked.size() - parts.size();
+		long value = value(e.items, lookup);
+		return "; in it: " + String.join(", ", parts) + (more > 0 ? " and " + more + " more" : "")
+			+ (value > 0 ? " (" + Amounts.GAME.of(value) + " gp)" : "");
 	}
 
 	private EventText()
