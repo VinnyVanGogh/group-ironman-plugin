@@ -4,6 +4,11 @@ import com.google.inject.Provides;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
@@ -149,6 +154,42 @@ public class GroupIronmanPlugin extends Plugin
 				}
 				return saved;
 			}
+
+			@Override
+			public boolean claim()
+			{
+				return group.claimLeadership();
+			}
+
+			@Override
+			public boolean setEditor(String name, boolean editor)
+			{
+				return group.setEditor(name, editor);
+			}
+
+			@Override
+			public boolean save(Map<String, Long> values)
+			{
+				return group.saveGroupSettings(values);
+			}
+
+			@Override
+			public void forgetLeader()
+			{
+				group.forgetLeader();
+			}
+
+			@Override
+			public void optOut(GroupEvent.Type type, boolean overlay, boolean out)
+			{
+				group.optOut(type, overlay, out);
+			}
+
+			@Override
+			public void optOutAll(boolean out)
+			{
+				group.optOutAll(out);
+			}
 		});
 		navButton = NavigationButton.builder()
 			.tooltip(NAME)
@@ -218,9 +259,37 @@ public class GroupIronmanPlugin extends Plugin
 			return;
 		}
 		GroupIronmanPanel.View view = new GroupIronmanPanel.View(group.syncState(), group.roster(), group.members(),
-			group.lookup, group.switches(), group.regions(), group.since(), group.self());
+			group.lookup, group.switches(), group.regions(), group.since(), group.self(), settingsView());
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
+	}
+
+	/** The Settings tab's view, or null before group settings have started. */
+	private GroupSettingsTab.View settingsView()
+	{
+		GroupGovernance g = group.governance();
+		if (g == null)
+		{
+			return null;
+		}
+		String self = group.self();
+		GroupSettingsSchema.Resolved values = group.groupValues();
+		Map<String, Long> current = new TreeMap<>();
+		for (GroupSettingsSchema.Setting s : GroupSettingsSchema.ALL)
+		{
+			current.put(s.key, values.value(s.key));
+		}
+		List<String> members = GroupSettingsTab.gridMembers(group.members().names(), self);
+		Set<String> heard = new HashSet<>();
+		for (String m : members)
+		{
+			if (g.knownKey(m) != null)
+			{
+				heard.add(m);
+			}
+		}
+		return new GroupSettingsTab.View(g.myRole(self), g.roles(), g.settings(), g.unclaimed(), group.syncing(),
+			members, self, current, MemberPrefs.of(config), g.prefs(), heard);
 	}
 
 	/** Markers only add points to the world map; they never open it (that stays the player's click). */
