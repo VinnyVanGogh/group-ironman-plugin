@@ -17,6 +17,31 @@
   The panel's Find rows now draw the stack too, and Discord thumbnails use
   the coin pile for the amount.
 
+### Online status: a live board
+
+- New setting **Online status**: *Posts*, *Live board* or *Off*. It replaces
+  the "Online and offline" switch; an install that had it ticked stays on
+  *Posts*, one that used Discord without it is *Off*, and a new install starts
+  on *Live board*.
+- *Live board* keeps one message in the Group channel listing each member:
+  online (with the world) or offline (last seen, kept current by Discord). It
+  is edited on each login, logout and hop, at most once every 10 seconds and
+  never in quiet hours. If the message is deleted, the next change posts a new
+  one. Only members whose clients run the plugin are reported; the others show
+  *unknown*. The webhook and the message id stay on your client: neither is
+  sent to the group.
+- Each member with *Live board* and a Group webhook keeps their own board, so
+  in a shared channel one member having it on is enough.
+
+### Slayer posts fixed
+
+- Checking the enchanted gem no longer posts *task done*: a task is done only
+  on the line that sends you back to a Slayer master (RuneLite's own rule).
+- A task from a master's dialogue now posts (it posted nothing), as does a
+  partner's: *New Slayer task: 19 x Icefiends (Turael)*. The gem's check never
+  posts the task you already have.
+- A finished task reads *Slayer task done: Icefiends (streak 1, 2 points)*.
+
 ### Online and offline posts
 
 - New setting **Offline grace (minutes)**, 0 to 10, default 2. A logout waits
