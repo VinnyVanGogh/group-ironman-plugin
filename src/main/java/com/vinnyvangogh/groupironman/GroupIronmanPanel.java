@@ -896,7 +896,7 @@ class GroupIronmanPanel extends PluginPanel
 		tab.add(text(next, MUTED));
 	}
 
-	private static JLabel heading(String text)
+	static JLabel heading(String text)
 	{
 		JLabel label = new JLabel(text);
 		label.setFont(FontManager.getRunescapeBoldFont());
@@ -905,7 +905,7 @@ class GroupIronmanPanel extends PluginPanel
 		return label;
 	}
 
-	private static JLabel text(String text, Color color)
+	static JLabel text(String text, Color color)
 	{
 		// The html wrapper makes long lines wrap at the panel width. Text from
 		// peers is escaped first: a display name or item name is data, not markup.

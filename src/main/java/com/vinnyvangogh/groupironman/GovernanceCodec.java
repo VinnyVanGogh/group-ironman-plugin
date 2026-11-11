@@ -142,28 +142,28 @@ final class GovernanceCodec
 		try
 		{
 			JsonElement root = gson.fromJson(json, JsonElement.class);
-			if (root == null || !root.isJsonObject())
-			{
-				return null;
-			}
-			JsonObject in = root.getAsJsonObject();
-			switch (string(in, "k"))
-			{
-				case ROLES:
-					return new Message(ROLES, roles(in), null, null, null);
-				case SETTINGS:
-					return new Message(SETTINGS, null, settings(in), null, null);
-				case MEMBER:
-					return new Message(MEMBER, null, null, string(in, "pk"), new MemberPrefs(bool(in, "all"),
-						MemberPrefs.parse(string(in, "np")), MemberPrefs.NONE.mute));
-				default:
-					return null;
-			}
+			return root != null && root.isJsonObject() ? decode(root.getAsJsonObject()) : null;
 		}
 		catch (RuntimeException e)
 		{
 			// Malformed JSON or a field of the wrong type: not a document anyone signed.
 			return null;
+		}
+	}
+
+	private static Message decode(JsonObject in)
+	{
+		switch (string(in, "k"))
+		{
+			case ROLES:
+				return new Message(ROLES, roles(in), null, null, null);
+			case SETTINGS:
+				return new Message(SETTINGS, null, settings(in), null, null);
+			case MEMBER:
+				return new Message(MEMBER, null, null, string(in, "pk"), new MemberPrefs(bool(in, "all"),
+					MemberPrefs.parse(string(in, "np")), MemberPrefs.NONE.mute));
+			default:
+				return null;
 		}
 	}
 

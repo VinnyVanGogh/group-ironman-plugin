@@ -20,7 +20,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
 import javax.swing.SpinnerNumberModel;
-import javax.swing.border.EmptyBorder;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 
@@ -467,21 +466,12 @@ final class GroupSettingsTab
 
 	private static JLabel heading(String text)
 	{
-		JLabel label = new JLabel(text);
-		label.setFont(FontManager.getRunescapeBoldFont());
-		label.setForeground(ColorScheme.BRAND_ORANGE);
-		label.setBorder(new EmptyBorder(6, 0, 2, 0));
-		return label;
+		return GroupIronmanPanel.heading(text);
 	}
 
 	private static JLabel text(String text, Color color)
 	{
-		JLabel label = new JLabel("<html><body style='width:150px'>" + GroupIronmanPanel.escape(text)
-			+ "</body></html>");
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(color);
-		label.setBorder(new EmptyBorder(1, 0, 1, 0));
-		return label;
+		return GroupIronmanPanel.text(text, color);
 	}
 
 	/** Names as the grid lists them: the roster, or this player alone before it is known. */

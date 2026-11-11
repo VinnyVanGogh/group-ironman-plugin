@@ -226,15 +226,23 @@ final class GroupGovernance
 		{
 			return Verdict.REFUSED;
 		}
-		if (roles == null)
+		return roles == null ? checkClaim(r) : checkUpdate(r);
+	}
+
+	/** No leader pinned yet: accepted only with the key the claimant announced themselves. */
+	private Verdict checkClaim(GroupRoles r)
+	{
+		String claimant = keys.get(GroupMembers.key(r.leader));
+		if (claimant == null)
 		{
-			String claimant = keys.get(GroupMembers.key(r.leader));
-			if (claimant == null)
-			{
-				return Verdict.PENDING;
-			}
-			return claimant.equals(r.leaderKey) ? Verdict.ACCEPTED : Verdict.REFUSED;
+			return Verdict.PENDING;
 		}
+		return claimant.equals(r.leaderKey) ? Verdict.ACCEPTED : Verdict.REFUSED;
+	}
+
+	/** A leader is pinned: same leader and key, and newer. */
+	private Verdict checkUpdate(GroupRoles r)
+	{
 		if (!r.leaderKey.equals(roles.leaderKey) || !r.isLeader(roles.leader))
 		{
 			return Verdict.REFUSED;
