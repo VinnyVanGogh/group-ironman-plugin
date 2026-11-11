@@ -145,27 +145,40 @@ final class GroupCache
 	{
 		if (feed == null || !feed.isJsonArray())
 		{
-			for (GroupEvent e : roster.events().entries())
-			{
-				roster.feed().add(e);
-			}
-			for (StorageChange c : roster.log().entries())
-			{
-				roster.feed().add(GroupEvent.of(GroupEvent.Type.STORAGE_SUMMARY, c.at(), c.member())
-					.items(c.deposited()).taken(c.took()).build());
-			}
+			seedFeed(roster);
 			return;
 		}
 		for (JsonElement item : feed.getAsJsonArray())
 		{
-			JsonElement by = item.isJsonObject() ? item.getAsJsonObject().get("by") : null;
-			GroupEvent event = by == null || !by.isJsonPrimitive() ? null
-				: GroupCodec.eventFrom(item.getAsJsonObject(), by.getAsString());
+			GroupEvent event = feedEvent(item);
 			if (event != null)
 			{
-				roster.feed().add(event.toBuilder()
-					.taken(ItemCounts.fromJson(item.getAsJsonObject().get("tk"), GroupCodec.MAX_STORAGE_ITEMS)).build());
+				roster.feed().add(event);
 			}
+		}
+	}
+
+	/** One feed entry; null when it has no member or is not an event this build reads. */
+	private static GroupEvent feedEvent(JsonElement item)
+	{
+		JsonElement by = item.isJsonObject() ? item.getAsJsonObject().get("by") : null;
+		GroupEvent event = by == null || !by.isJsonPrimitive() ? null
+			: GroupCodec.eventFrom(item.getAsJsonObject(), by.getAsString());
+		return event == null ? null : event.toBuilder()
+			.taken(ItemCounts.fromJson(item.getAsJsonObject().get("tk"), GroupCodec.MAX_STORAGE_ITEMS)).build();
+	}
+
+	/** A feed from an older file's drops log and storage log, already read into {@code roster}. */
+	private static void seedFeed(GroupRoster roster)
+	{
+		for (GroupEvent e : roster.events().entries())
+		{
+			roster.feed().add(e);
+		}
+		for (StorageChange c : roster.log().entries())
+		{
+			roster.feed().add(GroupEvent.of(GroupEvent.Type.STORAGE_SUMMARY, c.at(), c.member())
+				.items(c.deposited()).taken(c.took()).build());
 		}
 	}
 

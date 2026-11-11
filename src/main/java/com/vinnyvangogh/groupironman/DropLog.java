@@ -47,10 +47,27 @@ final class DropLog
 	/** Adds an event in time order. Invalid, too old and duplicate events are dropped. */
 	synchronized boolean add(GroupEvent event)
 	{
-		if (!event.isValid() || event.member.isEmpty() || tooOld(event, clock.getAsLong()))
+		long now = clock.getAsLong();
+		if (!event.isValid() || event.member.isEmpty() || tooOld(event, now))
 		{
 			return false;
 		}
+		int index = insertionIndex(event);
+		if (index < 0)
+		{
+			return false;
+		}
+		entries.add(index, event);
+		while (entries.size() > maxEntries || tooOld(entries.getLast(), now))
+		{
+			entries.removeLast();
+		}
+		return true;
+	}
+
+	/** Where {@code event} goes, newest first; -1 when it is already here. */
+	private int insertionIndex(GroupEvent event)
+	{
 		// Newest first, so every entry at the same time or later is passed, and checked, before the insertion point.
 		int index = 0;
 		for (GroupEvent e : entries)
@@ -61,17 +78,11 @@ final class DropLog
 			}
 			if (e.sameAs(event))
 			{
-				return false;
+				return -1;
 			}
 			index++;
 		}
-		entries.add(index, event);
-		long now = clock.getAsLong();
-		while (entries.size() > maxEntries || !entries.isEmpty() && tooOld(entries.getLast(), now))
-		{
-			entries.removeLast();
-		}
-		return true;
+		return index;
 	}
 
 	private boolean tooOld(GroupEvent event, long now)
