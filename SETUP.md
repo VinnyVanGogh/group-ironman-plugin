@@ -50,8 +50,14 @@ Five more sections, all closed and all off by default:
   webhooks per category (drops, deaths, storage, progress, group, activities),
   *Message style* (rich embed or plain text), *Attach a screenshot*, *Mention
   for big events* (e.g. `<@&role id>`, put in front of pets, 99s, maxing and a
-  Hardcore group death), and *Quiet hours from / until* (posts wait and go
-  when quiet hours end; the same hour twice means none).
+  Hardcore group death), *Quiet hours from / until* (posts wait and go
+  when quiet hours end; the same hour twice means none), and *Poster name*:
+  *Use the webhook's own name* (the default: the name and avatar you set on
+  each webhook in Discord), *GIM Utilities*, or *Custom*, which uses the
+  *Custom name* fields (main and one per category). A blank custom name uses
+  the webhook's own; names are cut to 80 characters, and a name containing
+  "discord" or "clyde" (which Discord refuses) gets a chat warning and is not
+  used. Every embed's footer still says GIM Utilities.
 - **Discord: which events** and **Overlays: which events**: one switch per
   event, for each output.
 - **Overlays**: *Banner time*, *Banner position*, *Most banners at once*, the

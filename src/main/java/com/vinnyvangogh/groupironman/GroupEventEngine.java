@@ -137,6 +137,7 @@ class GroupEventEngine
 
 	private final ToastQueue toasts = new ToastQueue();
 	private final WebhookWarnings webhookWarnings = new WebhookWarnings();
+	private final PosterNames posterNames = new PosterNames();
 	private final ProgressTracker progress = new ProgressTracker(Skill.values().length - 1);
 	/** Guards {@link #presence}: the client thread logs in and out, the executor polls. */
 	private final Object presenceLock = new Object();
@@ -243,7 +244,9 @@ class GroupEventEngine
 		{
 			return;
 		}
-		for (String line : webhookWarnings.check(WebhookWarnings.fields(config)))
+		List<String> lines = new ArrayList<>(webhookWarnings.check(WebhookWarnings.fields(config)));
+		lines.addAll(posterNames.check(config.discordPosterName(), PosterNames.fields(config)));
+		for (String line : lines)
 		{
 			chatMessageManager.queue(QueuedMessage.builder()
 				.type(ChatMessageType.GAMEMESSAGE)
@@ -828,7 +831,8 @@ class GroupEventEngine
 			// Draining first would lose the day's lines when the webhook has been cleared.
 			if (url != null)
 			{
-				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category)), null);
+				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category),
+					PosterNames.name(config, category)), null);
 			}
 		}
 		saveProfile(DIGEST_KEY, digest.save());
@@ -1072,7 +1076,8 @@ class GroupEventEngine
 		DiscordStyle style = config.discordStyle();
 		String mention = config.discordMention();
 		boolean picked = picture && config.discordScreenshot();
-		String json = DiscordWebhook.payload(gson, post, discordWords(), style, mention, picked, egg(events));
+		String json = DiscordWebhook.payload(gson, post, discordWords(), style, mention, picked, egg(events),
+			PosterNames.name(config, post.lead.type.category));
 		if (json == null)
 		{
 			return;
