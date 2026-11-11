@@ -569,20 +569,25 @@ class GroupEventEngine
 		int grave = graveShot.died();
 		if (wanted(GroupEvent.Type.DEATH))
 		{
-			Actor killer = me.getInteracting();
-			boolean hardcore = client.getVarbitValue(VarbitID.IRONMAN) == EventDetect.HARDCORE_GROUP_IRONMAN;
-			own(GroupEvent.of(GroupEvent.Type.DEATH, System.currentTimeMillis(), group.localPlayer())
-				.text(killer == null ? null : killer.getName())
-				.location(where)
-				.world(client.getWorld())
-				.number(hardcore ? GroupEvent.LIFE_LOST : 0)
-				.build());
+			deathPost(me, where);
 		}
 		// No death post took the frame (death posts off, or joined an open moment): take it for the grave alone.
 		if (keepsDeathFrame() && graveShot.ask(grave))
 		{
 			drawManager.requestNextFrameListener(image -> executor.execute(() -> graveShot.keep(grave, png(image))));
 		}
+	}
+
+	private void deathPost(Player me, String where)
+	{
+		Actor killer = me.getInteracting();
+		boolean hardcore = client.getVarbitValue(VarbitID.IRONMAN) == EventDetect.HARDCORE_GROUP_IRONMAN;
+		own(GroupEvent.of(GroupEvent.Type.DEATH, System.currentTimeMillis(), group.localPlayer())
+			.text(killer == null ? null : killer.getName())
+			.location(where)
+			.world(client.getWorld())
+			.number(hardcore ? GroupEvent.LIFE_LOST : 0)
+			.build());
 	}
 
 	/** The gravestone warning posts to Discord with "From the death" and screenshots on. */
@@ -750,6 +755,18 @@ class GroupEventEngine
 			watchers.poll(id -> id == EventWatchers.SKULL ? (me.getSkullIcon() != -1 ? 1 : 0) : client.getVarbitValue(id),
 				now, name);
 		}
+		deathTick(now, name);
+		farmTick(now, me);
+		if (++scheduleTicks >= SCHEDULE_EVERY_TICKS)
+		{
+			scheduleTicks = 0;
+			schedule(now, name);
+		}
+	}
+
+	/** After a death: its value once settled, then the gravestone's timer and the death frame it holds. */
+	private void deathTick(long now, String name)
+	{
 		if (wanted(GroupEvent.Type.DEATH_VALUE) || wanted(GroupEvent.Type.GRAVESTONE_EXPIRING))
 		{
 			// Also for the gravestone alone: its warning lists what the death left in it.
@@ -763,12 +780,6 @@ class GroupEventEngine
 		{
 			// Warned (already posted, the picture read), looted, or never wanted: the death's frame goes.
 			graveShot.free();
-		}
-		farmTick(now, me);
-		if (++scheduleTicks >= SCHEDULE_EVERY_TICKS)
-		{
-			scheduleTicks = 0;
-			schedule(now, name);
 		}
 	}
 
