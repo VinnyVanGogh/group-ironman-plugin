@@ -69,7 +69,11 @@ to share, and only sees other members' data for what they share themselves.
   ![In-game chat showing group event broadcasts](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/group-events.png)
   *Group events: in-game broadcasts for member level ups and achievements.*
 
-- **Settings:** granular opt-in toggles for every feature and sharing category.
+- **Settings:** granular opt-in toggles for every feature and sharing
+  category, in eight sections: *Group*, *Discord: connection*, *Discord: what
+  to post*, *Discord: how to post*, *Discord: daily digest*, *In-game*,
+  *Thresholds* and *Advanced* (the last two start closed). See
+  [SETUP.md](SETUP.md#settings).
 
   ![Settings panel showing configuration toggles for GIM Utilities](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings.png)
   *Settings: opt-in toggles for group sync, sharing categories, minimums, and commands.*
