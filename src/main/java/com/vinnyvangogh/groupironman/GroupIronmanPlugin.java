@@ -4,10 +4,19 @@ import com.google.inject.Provides;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.util.List;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ChatMessageType;
+import net.runelite.api.Client;
+import net.runelite.api.GameState;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.chat.ChatColorType;
+import net.runelite.client.chat.ChatMessageBuilder;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
@@ -93,6 +102,18 @@ public class GroupIronmanPlugin extends Plugin
 	@Inject
 	private SpriteManager spriteManager;
 
+	@Inject
+	private Client client;
+
+	@Inject
+	private ConfigManager configManager;
+
+	@Inject
+	private ChatMessageManager chatMessageManager;
+
+	/** Whether this start found the player logged in: with no stored version, a fresh install (UpdateNotes). */
+	private boolean startedLoggedIn;
+
 	private GroupIronmanPanel panel;
 	private NavigationButton navButton;
 
@@ -164,6 +185,50 @@ public class GroupIronmanPlugin extends Plugin
 		events.startUp(group);
 		eventBus.register(events);
 		updateNavButton();
+
+		// Installed or turned on mid-session: no LOGGED_IN is coming, so say it now.
+		startedLoggedIn = client.getGameState() == GameState.LOGGED_IN;
+		if (startedLoggedIn)
+		{
+			clientThread.invoke(this::postUpdateNotes);
+		}
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		if (event.getGameState() == GameState.LOGGED_IN)
+		{
+			postUpdateNotes();
+		}
+	}
+
+	/**
+	 * Posts the welcome or "what's new" lines once per version (UpdateNotes), and
+	 * stores the version as seen even with the setting off, so turning it on later
+	 * does not bring back notes for an update long past. Client thread.
+	 */
+	private void postUpdateNotes()
+	{
+		final String lastSeen = config.lastSeenVersion();
+		if (!UpdateNotes.needsRecord(lastSeen))
+		{
+			return;
+		}
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_LAST_SEEN_VERSION,
+			UpdateNotes.VERSION);
+		final List<String> lines = UpdateNotes.toShow(lastSeen, config.showUpdateNotes(), startedLoggedIn);
+		for (int i = 0; i < lines.size(); i++)
+		{
+			final String message = new ChatMessageBuilder()
+				.append(i == 0 ? ChatColorType.HIGHLIGHT : ChatColorType.NORMAL)
+				.append(lines.get(i))
+				.build();
+			chatMessageManager.queue(QueuedMessage.builder()
+				.type(ChatMessageType.CONSOLE)
+				.runeLiteFormattedMessage(message)
+				.build());
+		}
 	}
 
 	@Override
@@ -184,7 +249,9 @@ public class GroupIronmanPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (!GroupIronmanConfig.GROUP.equals(event.getGroup()))
+		// The plugin's own once-per-version bookkeeping changes nothing the features read.
+		if (!GroupIronmanConfig.GROUP.equals(event.getGroup())
+			|| GroupIronmanConfig.KEY_LAST_SEEN_VERSION.equals(event.getKey()))
 		{
 			return;
 		}

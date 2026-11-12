@@ -38,7 +38,9 @@ closed, so a first install shows every section's name at once.
    Hover a setting for its full meaning ("at least this much").
 8. **Advanced** (closed): the `::find` colours: *Search colour*, *Colour item
    names*, *Your bank colour*, *Member bank colour*, *Storage colour*,
-   *Carried colour* and *Item name colour*.
+   *Carried colour* and *Item name colour*. Also *Show update notes* (on by
+   default): a welcome in the game chat on a fresh install, and what is new
+   once after each update.
 
 Moving or renaming a setting never resets it: each is saved under the same
 key it always was. The gp boxes show plain digits (`1000000`): RuneLite's

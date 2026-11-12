@@ -69,6 +69,12 @@ public class ConfigFitTest
 	}
 
 	@Test
+	public void showUpdateNotesFitsBesideItsTick()
+	{
+		assertTrue(w("Show update notes") <= w(FITS_BESIDE_TICK));
+	}
+
+	@Test
 	public void everyNameFitsBesideItsControl()
 	{
 		List<String> tooLong = new ArrayList<>();
