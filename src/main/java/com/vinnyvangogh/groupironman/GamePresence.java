@@ -1,9 +1,12 @@
 package com.vinnyvangogh.groupironman;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -112,6 +115,20 @@ final class GamePresence
 			return State.ONLINE;
 		}
 		return covered.containsKey(key) ? State.OFFLINE : State.UNKNOWN;
+	}
+
+	/** Those of {@code names} that {@code after} has online and {@code before} did not: just came online. */
+	static List<String> cameOnline(Collection<String> names, GamePresence before, GamePresence after)
+	{
+		List<String> out = new ArrayList<>();
+		for (String name : names)
+		{
+			if (after.state(name) == State.ONLINE && before.state(name) != State.ONLINE)
+			{
+				out.add(name);
+			}
+		}
+		return out;
 	}
 
 	/** The world they are on, 0 when not online or not known. */

@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -15,7 +16,8 @@ import java.util.Map;
  * played, as one JSON document. Each member's last stats (world, place, HP,
  * prayer, run, levels) and carried items are kept too, so an offline member's
  * card shows where they were and what they had the last time you were both
- * online.
+ * online. Hiscore levels for members who do not share stats ({@link HiscoreBook}) are kept with when they were
+ * read, so they show across restarts too.
  *
  * <p>Pure, {@code String} in and out. The plugin reads and writes the file
  * ({@code .runelite/gim-utilities/group-cache.json}) off the client thread. A
@@ -118,7 +120,63 @@ final class GroupCache
 			carried.addProperty(e.getKey(), GroupCodec.encodeCarried(gson, e.getValue().inventory, e.getValue().worn));
 		}
 		out.add("carried", carried);
+		out.add("hiscores", hiscoresJson(roster.hiscores()));
 		return gson.toJson(out);
+	}
+
+	/** Each member's last hiscore lookup: {@code {"name": {"ts": 1700000000000, "l": {"Attack": 99}}}}. */
+	private static JsonObject hiscoresJson(HiscoreBook book)
+	{
+		JsonObject out = new JsonObject();
+		for (Map.Entry<String, HiscoreBook.Entry> e : book.all().entrySet())
+		{
+			JsonObject entry = new JsonObject();
+			entry.addProperty("ts", e.getValue().at);
+			JsonObject levels = new JsonObject();
+			e.getValue().levels.forEach(levels::addProperty);
+			entry.add("l", levels);
+			out.add(e.getKey(), entry);
+		}
+		return out;
+	}
+
+	/** A file from before hiscores has no key and loads as before. */
+	private static void readHiscores(JsonElement in, HiscoreBook book)
+	{
+		if (in == null || !in.isJsonObject())
+		{
+			return;
+		}
+		int n = 0;
+		for (Map.Entry<String, JsonElement> e : in.getAsJsonObject().entrySet())
+		{
+			if (n++ >= MAX_MEMBERS || !e.getValue().isJsonObject())
+			{
+				continue;
+			}
+			JsonObject entry = e.getValue().getAsJsonObject();
+			Long ts = ItemCounts.longValue(entry.get("ts"));
+			JsonElement l = entry.get("l");
+			if (ts != null && l != null && l.isJsonObject())
+			{
+				book.restore(e.getKey(), ts, levelsFrom(l.getAsJsonObject()));
+			}
+		}
+	}
+
+	/** The numbers in {@code l}; {@link HiscoreBook#restore} drops the ones out of range. */
+	private static Map<String, Integer> levelsFrom(JsonObject l)
+	{
+		Map<String, Integer> levels = new LinkedHashMap<>();
+		for (Map.Entry<String, JsonElement> s : l.entrySet())
+		{
+			Long level = ItemCounts.longValue(s.getValue());
+			if (level != null)
+			{
+				levels.put(s.getKey(), (int) Math.max(0, Math.min(level, Integer.MAX_VALUE)));
+			}
+		}
+		return levels;
 	}
 
 	/**
@@ -413,6 +471,7 @@ final class GroupCache
 		}
 		readPayloads(gson, in.get("stats"), roster);
 		readPayloads(gson, in.get("carried"), roster);
+		readHiscores(in.get("hiscores"), roster.hiscores());
 		return true;
 	}
 }
