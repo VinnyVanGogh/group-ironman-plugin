@@ -166,22 +166,35 @@ final class GroupCache
 		int n = 0;
 		for (Map.Entry<String, JsonElement> e : in.getAsJsonObject().entrySet())
 		{
-			if (n++ >= MAX_MEMBERS || !e.getValue().isJsonObject())
+			LastSeen s = n++ < MAX_MEMBERS ? lastSeen(e.getValue()) : null;
+			if (s != null)
 			{
-				continue;
+				roster.seen(e.getKey(), s);
 			}
-			JsonObject s = e.getValue().getAsJsonObject();
-			Long at = ItemCounts.longValue(s.get("ts"));
-			if (at == null || at <= 0)
-			{
-				continue;
-			}
-			Long world = ItemCounts.longValue(s.get("w"));
-			int w = world == null || world < 0 || world > MAX_WORLD ? 0 : world.intValue();
-			JsonElement p = s.get("p");
-			boolean plugin = p != null && p.isJsonPrimitive() && p.getAsJsonPrimitive().isBoolean() && p.getAsBoolean();
-			roster.seen(e.getKey(), new LastSeen(at, w, plugin));
 		}
+	}
+
+	/** One {@code seen} entry; null without a time. */
+	private static LastSeen lastSeen(JsonElement item)
+	{
+		if (!item.isJsonObject())
+		{
+			return null;
+		}
+		JsonObject s = item.getAsJsonObject();
+		Long at = ItemCounts.longValue(s.get("ts"));
+		if (at == null || at <= 0)
+		{
+			return null;
+		}
+		Long world = ItemCounts.longValue(s.get("w"));
+		int w = world == null || world < 0 || world > MAX_WORLD ? 0 : world.intValue();
+		return new LastSeen(at, w, isTrue(s.get("p")));
+	}
+
+	private static boolean isTrue(JsonElement p)
+	{
+		return p != null && p.isJsonPrimitive() && p.getAsJsonPrimitive().isBoolean() && p.getAsBoolean();
 	}
 
 	/**
