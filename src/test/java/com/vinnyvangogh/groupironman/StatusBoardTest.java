@@ -170,8 +170,8 @@ public class StatusBoardTest
 		StatusBoard.Self me = new StatusBoard.Self("Alex", false, 301, NOW - 120_000);
 		String lines = StatusBoard.lines(roster, heard, stats, me, NOW);
 		assertEquals(String.join("\n",
-			StatusBoard.OFFLINE + " **Alex** offline (last seen <t:" + (NOW - 120_000) / 1000 + ":R>)",
-			StatusBoard.OFFLINE + " **Jo** offline (last seen <t:" + (NOW - Presence.ONLINE_MS - 60_000) / 1000 + ":R>)",
+			StatusBoard.OFFLINE + " **Alex** last seen <t:" + (NOW - 120_000) / 1000 + ":R> on world 301",
+			StatusBoard.OFFLINE + " **Jo** last seen <t:" + (NOW - Presence.ONLINE_MS - 60_000) / 1000 + ":R> on world 330",
 			StatusBoard.UNKNOWN + " **Kim** unknown",
 			StatusBoard.ONLINE + " **Sam** online (world 302)"), lines);
 
@@ -194,7 +194,7 @@ public class StatusBoardTest
 		String lines = StatusBoard.lines(GamePresenceTest.ROSTER, heard, stats, me, GamePresenceTest.twoOfFive(), NOW);
 		assertEquals(String.join("\n",
 			// Heard 30 seconds ago, but the game says logged out: the game wins.
-			StatusBoard.OFFLINE + " **GroupArk** offline (last seen <t:" + (NOW - 30_000) / 1000 + ":R>)",
+			StatusBoard.OFFLINE + " **GroupArk** last seen <t:" + (NOW - 30_000) / 1000 + ":R> on world 330",
 			StatusBoard.ONLINE + " **GroupOtt** online (world 615)" + StatusBoard.NO_PLUGIN,
 			StatusBoard.OFFLINE + " **GroupPNK** offline" + StatusBoard.NO_PLUGIN,
 			StatusBoard.ONLINE + " **GroupShip** online (world 303)",
@@ -202,6 +202,133 @@ public class StatusBoardTest
 		assertEquals(2, lines.split(StatusBoard.ONLINE, -1).length - 1);
 		assertEquals(3, lines.split(StatusBoard.OFFLINE, -1).length - 1);
 		assertFalse(lines.contains("unknown"));
+	}
+
+	private static String t(long at)
+	{
+		return "<t:" + at / 1000 + ":R>";
+	}
+
+	/** Board 2026-11-11: offline reads "last seen", on the world known; a no-plugin member's comes from the channel. */
+	@Test
+	public void offlineMembersReadLastSeenWithTheirWorld()
+	{
+		Map<String, Long> heard = new HashMap<>();
+		heard.put("GroupArk", NOW - 7_200_000);
+		Map<String, MemberStats> stats = new HashMap<>();
+		stats.put("GroupArk", new MemberStats(Collections.emptyMap(), 100, 100, 330, 0));
+		Map<String, LastSeen> seen = new HashMap<>();
+		seen.put("GroupPNK", new LastSeen(NOW - 3_600_000, 420, false));
+		// Seen on the channel after their client was last heard: the newer world wins.
+		seen.put("GroupArk", new LastSeen(NOW - 60_000, 331, false));
+		StatusBoard.Self me = new StatusBoard.Self("GroupShip", true, 303, 0);
+		String lines = StatusBoard.lines(GamePresenceTest.ROSTER, heard, seen, stats, me,
+			GamePresenceTest.twoOfFive(), NOW);
+		assertEquals(String.join("\n",
+			StatusBoard.OFFLINE + " **GroupArk** last seen " + t(NOW - 60_000) + " on world 331",
+			StatusBoard.ONLINE + " **GroupOtt** online (world 615)" + StatusBoard.NO_PLUGIN,
+			StatusBoard.OFFLINE + " **GroupPNK** last seen " + t(NOW - 3_600_000) + " on world 420"
+				+ StatusBoard.NO_PLUGIN,
+			StatusBoard.ONLINE + " **GroupShip** online (world 303)",
+			StatusBoard.OFFLINE + " **GroupTrashy** offline" + StatusBoard.NO_PLUGIN), lines);
+		assertFalse("a plugin user is online", lines.contains(StatusBoard.STALE));
+	}
+
+	/**
+	 * Board 2026-11-11: the last plugin user logs out. Its final edit keeps every last seen, shows the members no one
+	 * can see now as unknown, and says the board may be out of date as of the logout.
+	 */
+	@Test
+	public void theLastPluginUserLoggingOutMarksTheBoardStale()
+	{
+		long logout = NOW - 5_000;
+		Map<String, Long> heard = new HashMap<>();
+		heard.put("GroupArk", NOW - 7_200_000);
+		Map<String, MemberStats> stats = new HashMap<>();
+		stats.put("GroupArk", new MemberStats(Collections.emptyMap(), 100, 100, 330, 0));
+		Map<String, LastSeen> seen = new HashMap<>();
+		seen.put("GroupOtt", new LastSeen(logout - 600, 615, false));
+		seen.put("GroupShip", new LastSeen(logout - 600, 303, true));
+		StatusBoard.Self me = new StatusBoard.Self("GroupShip", false, 303, logout);
+		String lines = StatusBoard.lines(GamePresenceTest.ROSTER, heard, seen, stats, me, GamePresence.UNKNOWN,
+			NOW);
+		assertEquals(String.join("\n",
+			StatusBoard.OFFLINE + " **GroupArk** last seen " + t(NOW - 7_200_000) + " on world 330",
+			StatusBoard.UNKNOWN + " **GroupOtt** last seen " + t(logout - 600) + " on world 615"
+				+ StatusBoard.NO_PLUGIN,
+			StatusBoard.UNKNOWN + " **GroupPNK** unknown",
+			StatusBoard.OFFLINE + " **GroupShip** last seen " + t(logout) + " on world 303",
+			StatusBoard.UNKNOWN + " **GroupTrashy** unknown",
+			"*" + StatusBoard.STALE + " (as of " + t(logout) + ")*"), lines);
+
+		// The edit goes out, and an unchanged board is not edited again as time passes.
+		posted("before", NOW - GAP);
+		board.show(lines, NOW);
+		StatusBoard.Send edit = board.next(NOW, false);
+		assertFalse(edit.create());
+		assertTrue(StatusBoard.payload(GSON, edit, DiscordStyle.PLAIN, null).contains(StatusBoard.STALE));
+		board.done(edit, 200, null, -1, NOW);
+		assertEquals(lines, StatusBoard.lines(GamePresenceTest.ROSTER, heard, seen, stats, me, GamePresence.UNKNOWN,
+			NOW + 3_600_000));
+		board.show(lines, NOW + 3_600_000);
+		assertNull(board.next(NOW + 3_600_000, false));
+	}
+
+	@Test
+	public void anotherPluginUserOnlineKeepsTheBoardCurrent()
+	{
+		Map<String, Long> heard = Collections.singletonMap("GroupArk", NOW - 1_000);
+		StatusBoard.Self me = new StatusBoard.Self("GroupShip", false, 303, NOW - 5_000);
+		String lines = StatusBoard.lines(GamePresenceTest.ROSTER, heard, Collections.emptyMap(),
+			Collections.emptyMap(), me, GamePresence.UNKNOWN, NOW);
+		assertFalse(lines, lines.contains(StatusBoard.STALE));
+		assertTrue(lines.contains(StatusBoard.ONLINE + " **GroupArk** online"));
+	}
+
+	/** Board 2026-11-11: last seen is in the group cache, so a restarted client, logged out, still shows it. */
+	@Test
+	public void aRestartKeepsLastSeen()
+	{
+		GroupRoster before = new GroupRoster();
+		before.seen("GroupOtt", new LastSeen(NOW - 3_600_000, 615, false));
+		before.seen("GroupShip", new LastSeen(NOW - 60_000, 303, true));
+		before.seen("GroupShip", new LastSeen(NOW - 120_000, 0, false));
+		GroupRoster after = new GroupRoster();
+		assertTrue(GroupCache.read(GSON, GroupCache.write(GSON, before), after));
+		LastSeen ship = after.lastSeen().get("GroupShip");
+		assertEquals(NOW - 60_000, ship.at);
+		assertEquals(303, ship.world);
+		assertTrue(ship.plugin);
+
+		String lines = StatusBoard.lines(GroupMembers.UNKNOWN, after.lastHeard(), after.lastSeen(),
+			after.allStats(), null, GamePresence.UNKNOWN, NOW);
+		assertEquals(String.join("\n",
+			StatusBoard.UNKNOWN + " **GroupOtt** last seen " + t(NOW - 3_600_000) + " on world 615"
+				+ StatusBoard.NO_PLUGIN,
+			StatusBoard.OFFLINE + " **GroupShip** last seen " + t(NOW - 60_000) + " on world 303",
+			"*" + StatusBoard.STALE + " (as of " + t(NOW - 60_000) + ")*"), lines);
+	}
+
+	@Test
+	public void anOlderCacheWithoutLastSeenStillLoads()
+	{
+		GroupRoster before = new GroupRoster();
+		before.heard("Sam", NOW);
+		JsonObject old = GSON.fromJson(GroupCache.write(GSON, before), JsonObject.class);
+		old.remove("seen");
+		GroupRoster after = new GroupRoster();
+		assertTrue(GroupCache.read(GSON, GSON.toJson(old), after));
+		assertTrue(after.lastSeen().isEmpty());
+		assertEquals(Long.valueOf(NOW), after.lastHeard().get("Sam"));
+	}
+
+	@Test
+	public void lastSeenOnlyMovesForward()
+	{
+		LastSeen merged = LastSeen.merge(new LastSeen(200, 0, true), new LastSeen(100, 301, false));
+		assertEquals(200, merged.at);
+		assertEquals("the older world when the newer has none", 301, merged.world);
+		assertTrue(merged.plugin);
 	}
 
 	@Test

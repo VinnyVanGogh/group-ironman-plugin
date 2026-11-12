@@ -758,6 +758,7 @@ class GroupService
 		{
 			roster.markPlayed(now);
 		}
+		recordSeen(now);
 		refreshRoster();
 		if (!syncing())
 		{
@@ -897,6 +898,19 @@ class GroupService
 		{
 			refreshPresence();
 		}
+	}
+
+	/**
+	 * Client thread, each tick logged in: this player, and every member the game shows online (the Group channel,
+	 * plugin or not), were seen now on their world. The live board's "last seen"; saved with the group cache.
+	 */
+	private void recordSeen(long now)
+	{
+		if (!self.isEmpty())
+		{
+			roster.seen(self, new LastSeen(now, client.getWorld(), true));
+		}
+		presence.online().forEach((name, world) -> roster.seen(name, new LastSeen(now, world, false)));
 	}
 
 	/** Who in the group is online and where, as the game shows it; {@link GamePresence#UNKNOWN} logged out. */

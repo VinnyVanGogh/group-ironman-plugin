@@ -15,6 +15,17 @@
 - Shared plugin data always wins. Inventory and worn items are never made
   up: a member who never shared them shows none.
 
+### Live board: last seen for everyone
+
+- Offline members read *last seen 2 hours ago on world 302* (Discord's own
+  relative time, so it stays current without edits) instead of just
+  *offline*. Members without the plugin get theirs from when a plugin user
+  last saw them online in the Group channel.
+- When the last plugin user logs out, the board's final edit keeps every
+  member's last seen and ends with *Nobody with GIM Utilities is online, so
+  these may be out of date (as of ...)*.
+- Last seen is kept in the group cache, so it survives a restart.
+
 ### Online status for members without the plugin
 
 - Who is online, and on which world, now comes from the game's own Ironman

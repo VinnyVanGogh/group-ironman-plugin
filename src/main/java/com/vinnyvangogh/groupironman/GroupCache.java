@@ -11,7 +11,8 @@ import java.util.Map;
 /**
  * What survives a restart: members' last banks, the storage log, the last
  * group storage contents, members' rune pouch, quiver and seed vault, the
- * drops log, the Log tab's feed of every event ({@code feed}), when each member was last heard from and when this player last
+ * drops log, the Log tab's feed of every event ({@code feed}), when each member was last heard from and last seen
+ * online ({@code seen}, for the live board) and when this player last
  * played, as one JSON document. Each member's last stats (world, place, HP,
  * prayer, run, levels) and carried items are kept too, so an offline member's
  * card shows where they were and what they had the last time you were both
@@ -27,6 +28,8 @@ final class GroupCache
 {
 	static final int VERSION = 1;
 	static final int MAX_MEMBERS = 50;
+	/** A world number past this in the file is not a world: read as unknown. */
+	private static final int MAX_WORLD = 65535;
 
 	private GroupCache()
 	{
@@ -100,6 +103,7 @@ final class GroupCache
 			heard.addProperty(e.getKey(), e.getValue());
 		}
 		out.add("heard", heard);
+		out.add("seen", seenJson(roster));
 		out.addProperty("played", roster.lastPlayed());
 
 		// Round 2: the last stats and carried items per member, for offline cards. Stored as
@@ -193,6 +197,62 @@ final class GroupCache
 			feed.add(entry);
 		}
 		return feed;
+	}
+
+	/** When each member was last seen online ({@link LastSeen}): {@code ts}, {@code w} the world, {@code p} plugin. */
+	private static JsonObject seenJson(GroupRoster roster)
+	{
+		JsonObject seen = new JsonObject();
+		for (Map.Entry<String, LastSeen> e : roster.lastSeen().entrySet())
+		{
+			JsonObject s = new JsonObject();
+			s.addProperty("ts", e.getValue().at);
+			s.addProperty("w", e.getValue().world);
+			s.addProperty("p", e.getValue().plugin);
+			seen.add(e.getKey(), s);
+		}
+		return seen;
+	}
+
+	/** A file from before last-seen was kept has none, and loads as before. */
+	private static void readSeen(JsonElement in, GroupRoster roster)
+	{
+		if (in == null || !in.isJsonObject())
+		{
+			return;
+		}
+		int n = 0;
+		for (Map.Entry<String, JsonElement> e : in.getAsJsonObject().entrySet())
+		{
+			LastSeen s = n++ < MAX_MEMBERS ? lastSeen(e.getValue()) : null;
+			if (s != null)
+			{
+				roster.seen(e.getKey(), s);
+			}
+		}
+	}
+
+	/** One {@code seen} entry; null without a time. */
+	private static LastSeen lastSeen(JsonElement item)
+	{
+		if (!item.isJsonObject())
+		{
+			return null;
+		}
+		JsonObject s = item.getAsJsonObject();
+		Long at = ItemCounts.longValue(s.get("ts"));
+		if (at == null || at <= 0)
+		{
+			return null;
+		}
+		Long world = ItemCounts.longValue(s.get("w"));
+		int w = world == null || world < 0 || world > MAX_WORLD ? 0 : world.intValue();
+		return new LastSeen(at, w, isTrue(s.get("p")));
+	}
+
+	private static boolean isTrue(JsonElement p)
+	{
+		return p != null && p.isJsonPrimitive() && p.getAsJsonPrimitive().isBoolean() && p.getAsBoolean();
 	}
 
 	/**
@@ -401,6 +461,8 @@ final class GroupCache
 				}
 			}
 		}
+
+		readSeen(in.get("seen"), roster);
 
 		Long played = ItemCounts.longValue(in.get("played"));
 		if (played != null && played > 0)
