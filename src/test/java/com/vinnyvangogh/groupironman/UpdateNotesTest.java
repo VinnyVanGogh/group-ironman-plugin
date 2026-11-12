@@ -13,8 +13,8 @@ import org.junit.Test;
 
 /**
  * The welcome and "what's new" chat lines: once per version, never with the
- * setting off, the welcome only for a fresh install, and nothing for an update
- * whose notes are empty.
+ * setting off, the welcome for any fresh install (however the plugin was turned
+ * on), and nothing for an update whose notes are empty.
  */
 public class UpdateNotesTest
 {
@@ -34,9 +34,9 @@ public class UpdateNotesTest
 	@Test
 	public void aFreshInstallGetsTheWelcomeLines()
 	{
-		// Installed from the Plugin Hub panel while logged in: no stored version.
-		assertEquals(UpdateNotes.WELCOME, UpdateNotes.toShow(NEVER_SEEN, true, true));
-		assertEquals(UpdateNotes.WELCOME, UpdateNotes.toShow(null, true, true));
+		// No stored version is a fresh install, whether it was turned on mid-session or before logging in.
+		assertEquals(UpdateNotes.WELCOME, UpdateNotes.toShow(NEVER_SEEN, true));
+		assertEquals(UpdateNotes.WELCOME, UpdateNotes.toShow(null, true));
 		assertEquals(4, UpdateNotes.WELCOME.size());
 		assertTrue(UpdateNotes.WELCOME.get(0).startsWith(GroupIronmanPlugin.NAME + " is on."));
 	}
@@ -48,7 +48,7 @@ public class UpdateNotesTest
 		String stored = NEVER_SEEN;
 		for (int login = 0; login < 4; login++)
 		{
-			posted.addAll(UpdateNotes.toShow(stored, true, true));
+			posted.addAll(UpdateNotes.toShow(stored, true));
 			if (UpdateNotes.needsRecord(stored))
 			{
 				stored = UpdateNotes.VERSION;
@@ -61,8 +61,7 @@ public class UpdateNotesTest
 	@Test
 	public void theSeenVersionShowsNothing()
 	{
-		assertTrue(UpdateNotes.toShow(UpdateNotes.VERSION, true, false).isEmpty());
-		assertTrue(UpdateNotes.toShow(UpdateNotes.VERSION, true, true).isEmpty());
+		assertTrue(UpdateNotes.toShow(UpdateNotes.VERSION, true).isEmpty());
 		assertFalse(UpdateNotes.needsRecord(UpdateNotes.VERSION));
 	}
 
@@ -70,9 +69,8 @@ public class UpdateNotesTest
 	public void theSettingOffShowsNothingButStillRecordsTheVersion()
 	{
 		// Turned off now, back on later: the old lines must not appear then.
-		assertTrue(UpdateNotes.toShow(NEVER_SEEN, false, true).isEmpty());
-		assertTrue(UpdateNotes.toShow(NEVER_SEEN, false, false).isEmpty());
-		assertTrue(UpdateNotes.toShow("0.9.0", false, false).isEmpty());
+		assertTrue(UpdateNotes.toShow(NEVER_SEEN, false).isEmpty());
+		assertTrue(UpdateNotes.toShow("0.9.0", false).isEmpty());
 		assertTrue(UpdateNotes.needsRecord(NEVER_SEEN));
 		assertTrue(UpdateNotes.needsRecord("0.9.0"));
 	}
@@ -80,11 +78,9 @@ public class UpdateNotesTest
 	@Test
 	public void anUpdateWithNoNotesShowsNothing()
 	{
-		// This first release has no notes: an update (login screen start, or an older stored version) says nothing.
+		// This first release has no notes: an update from an older stored version says nothing.
 		assertTrue(UpdateNotes.NOTES.isEmpty());
-		assertTrue(UpdateNotes.toShow(NEVER_SEEN, true, false).isEmpty());
-		assertTrue(UpdateNotes.toShow("0.9.0", true, false).isEmpty());
-		assertTrue(UpdateNotes.toShow("0.9.0", true, true).isEmpty());
+		assertTrue(UpdateNotes.toShow("0.9.0", true).isEmpty());
 		assertTrue(UpdateNotes.needsRecord("0.9.0"));
 	}
 

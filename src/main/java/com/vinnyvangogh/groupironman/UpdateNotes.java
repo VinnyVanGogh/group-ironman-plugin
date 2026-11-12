@@ -9,12 +9,10 @@ import java.util.List;
  * The game-chat lines posted once per version: a welcome on a fresh install,
  * and a "what's new" list on the first login after an update.
  *
- * <p>Nothing stored means a version before this one, or a brand-new install.
- * The Plugin Hub updates plugins while the client starts, so an update starts
- * the plugin on the login screen; an install from the Plugin Hub panel starts
- * it in a running, usually logged-in client. Nothing stored and started logged
- * in is therefore read as a fresh install and gets the welcome lines instead.
- * (The same rule as Combat Vitals.)
+ * <p>Every published version stores itself as seen, so nothing stored always
+ * means a fresh install, however the plugin was turned on: installed mid-session
+ * or switched on before logging in (Board 2026-11-11). Combat Vitals needed a
+ * logged-in check only because its 1.0.0 never stored a version.
  */
 final class UpdateNotes
 {
@@ -47,17 +45,16 @@ final class UpdateNotes
 	/**
 	 * What to post on this login, first line first; empty when nothing.
 	 *
-	 * @param lastSeen        the stored last-seen version, "" when none
-	 * @param enabled         the "Show update notes" setting
-	 * @param startedLoggedIn whether the plugin started while already logged in
+	 * @param lastSeen the stored last-seen version, "" when none
+	 * @param enabled  the "Show update notes" setting
 	 */
-	static List<String> toShow(String lastSeen, boolean enabled, boolean startedLoggedIn)
+	static List<String> toShow(String lastSeen, boolean enabled)
 	{
 		if (!enabled || !needsRecord(lastSeen))
 		{
 			return Collections.emptyList();
 		}
-		if (isNullOrEmpty(lastSeen) && startedLoggedIn)
+		if (isNullOrEmpty(lastSeen))
 		{
 			return WELCOME;
 		}

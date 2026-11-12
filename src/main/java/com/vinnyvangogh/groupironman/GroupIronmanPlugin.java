@@ -111,9 +111,6 @@ public class GroupIronmanPlugin extends Plugin
 	@Inject
 	private ChatMessageManager chatMessageManager;
 
-	/** Whether this start found the player logged in: with no stored version, a fresh install (UpdateNotes). */
-	private boolean startedLoggedIn;
-
 	private GroupIronmanPanel panel;
 	private NavigationButton navButton;
 
@@ -187,8 +184,7 @@ public class GroupIronmanPlugin extends Plugin
 		updateNavButton();
 
 		// Installed or turned on mid-session: no LOGGED_IN is coming, so say it now.
-		startedLoggedIn = client.getGameState() == GameState.LOGGED_IN;
-		if (startedLoggedIn)
+		if (client.getGameState() == GameState.LOGGED_IN)
 		{
 			clientThread.invoke(this::postUpdateNotes);
 		}
@@ -217,7 +213,7 @@ public class GroupIronmanPlugin extends Plugin
 		}
 		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_LAST_SEEN_VERSION,
 			UpdateNotes.VERSION);
-		final List<String> lines = UpdateNotes.toShow(lastSeen, config.showUpdateNotes(), startedLoggedIn);
+		final List<String> lines = UpdateNotes.toShow(lastSeen, config.showUpdateNotes());
 		for (int i = 0; i < lines.size(); i++)
 		{
 			final String message = new ChatMessageBuilder()
