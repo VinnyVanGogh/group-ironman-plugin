@@ -458,25 +458,7 @@ class GroupIronmanPanel extends PluginPanel
 		card.add(name);
 		card.add(text(c.status, c.online ? ColorScheme.PROGRESS_COMPLETE_COLOR : MUTED));
 
-		if (!c.bars.isEmpty())
-		{
-			JPanel bars = new JPanel(new GridLayout(1, c.bars.size(), 2, 0));
-			bars.setOpaque(false);
-			for (PanelModel.Bar b : c.bars)
-			{
-				// An assumed number (run and spec for a member without the plugin) is drawn dimmed.
-				bars.add(new Orb(b, barColor(b.label), (c.online || c.you) && !b.assumed, orbIcons.get(b.label)));
-			}
-			body.add(bars);
-		}
-		if (c.source != null)
-		{
-			body.add(text(c.source, MUTED));
-		}
-		if (!c.skills.isEmpty())
-		{
-			body.add(skillGrid(c.skills, c.online || c.you));
-		}
+		addStats(body, c);
 		// Worn then inventory, small and side by side, in the game's own layouts.
 		PanelModel.ItemGroup worn = null;
 		PanelModel.ItemGroup inventory = null;
@@ -514,6 +496,31 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		card.add(body);
 		return card;
+	}
+
+	/** The orbs, where the numbers came from when not shared, and the skill grid. */
+	private void addStats(JPanel body, PanelModel.MemberCard c)
+	{
+		boolean live = c.online || c.you;
+		if (!c.bars.isEmpty())
+		{
+			JPanel bars = new JPanel(new GridLayout(1, c.bars.size(), 2, 0));
+			bars.setOpaque(false);
+			for (PanelModel.Bar b : c.bars)
+			{
+				// An assumed number (run and spec for a member without the plugin) is drawn dimmed.
+				bars.add(new Orb(b, barColor(b.label), live && !b.assumed, orbIcons.get(b.label)));
+			}
+			body.add(bars);
+		}
+		if (c.source != null)
+		{
+			body.add(text(c.source, MUTED));
+		}
+		if (!c.skills.isEmpty())
+		{
+			body.add(skillGrid(c.skills, live));
+		}
 	}
 
 	private void loadOrbIcon(SpriteManager sprites, String label, int spriteId)

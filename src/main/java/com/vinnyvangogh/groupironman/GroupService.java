@@ -808,7 +808,12 @@ class GroupService
 			onChange.run();
 		}
 		refreshPresence();
-		// Once per login, every roster member, seen online or not; otherwise only failed lookups' retries.
+		hiscoresAfterRoster();
+	}
+
+	/** Client thread. Once per login, every roster member, seen online or not; otherwise only failed lookups' retries. */
+	private void hiscoresAfterRoster()
+	{
 		boolean login = hiscoresOnLogin && cacheLoaded && members.known();
 		if (login)
 		{

@@ -153,21 +153,26 @@ final class GroupCache
 			JsonObject entry = e.getValue().getAsJsonObject();
 			Long ts = ItemCounts.longValue(entry.get("ts"));
 			JsonElement l = entry.get("l");
-			if (ts == null || l == null || !l.isJsonObject())
+			if (ts != null && l != null && l.isJsonObject())
 			{
-				continue;
+				book.restore(e.getKey(), ts, levelsFrom(l.getAsJsonObject()));
 			}
-			Map<String, Integer> levels = new LinkedHashMap<>();
-			for (Map.Entry<String, JsonElement> s : l.getAsJsonObject().entrySet())
-			{
-				Long level = ItemCounts.longValue(s.getValue());
-				if (level != null && level > 0 && level <= HiscoreBook.MAX_LEVEL)
-				{
-					levels.put(s.getKey(), level.intValue());
-				}
-			}
-			book.restore(e.getKey(), ts, levels);
 		}
+	}
+
+	/** The numbers in {@code l}; {@link HiscoreBook#restore} drops the ones out of range. */
+	private static Map<String, Integer> levelsFrom(JsonObject l)
+	{
+		Map<String, Integer> levels = new LinkedHashMap<>();
+		for (Map.Entry<String, JsonElement> s : l.entrySet())
+		{
+			Long level = ItemCounts.longValue(s.getValue());
+			if (level != null)
+			{
+				levels.put(s.getKey(), (int) Math.max(0, Math.min(level, Integer.MAX_VALUE)));
+			}
+		}
+		return levels;
 	}
 
 	/**
