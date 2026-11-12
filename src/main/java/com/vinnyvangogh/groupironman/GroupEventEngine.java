@@ -322,8 +322,9 @@ class GroupEventEngine
 		board.target(url, () -> configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY));
 		if (url != null)
 		{
-			String lines = StatusBoard.lines(group.members(), group.roster().lastHeard(), group.roster().allStats(),
-				boardSelf, group.presence(), now);
+			// Logged out too: the last plugin user's client marks the board as no longer kept current.
+			String lines = StatusBoard.lines(group.members(), group.roster().lastHeard(), group.roster().lastSeen(),
+				group.roster().allStats(), boardSelf, group.presence(), now);
 			if (!lines.isEmpty())
 			{
 				board.show(lines, now);

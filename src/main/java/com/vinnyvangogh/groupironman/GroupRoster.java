@@ -41,6 +41,7 @@ final class GroupRoster
 	private final Map<String, MemberStats> stats = new ConcurrentHashMap<>();
 	private final Map<String, MemberExtras> extras = new ConcurrentHashMap<>();
 	private final Map<String, Long> heard = new ConcurrentHashMap<>();
+	private final Map<String, LastSeen> seen = new ConcurrentHashMap<>();
 	private final Set<String> strangers = ConcurrentHashMap.newKeySet();
 	private final StorageLog log = new StorageLog();
 	private final DropLog events = new DropLog();
@@ -59,6 +60,18 @@ final class GroupRoster
 	Map<String, Long> lastHeard()
 	{
 		return new TreeMap<>(heard);
+	}
+
+	/** {@code member} was seen online ({@link LastSeen#merge}: only ever moves forward). */
+	void seen(String member, LastSeen sighting)
+	{
+		seen.merge(member, sighting, LastSeen::merge);
+	}
+
+	/** When each member was last seen online, by this client or from the cache. */
+	Map<String, LastSeen> lastSeen()
+	{
+		return new TreeMap<>(seen);
 	}
 
 	void markPlayed(long at)
@@ -217,6 +230,7 @@ final class GroupRoster
 		storage = null;
 		extras.clear();
 		heard.clear();
+		seen.clear();
 		events.clear();
 		feed.clear();
 		lastPlayed = 0;
