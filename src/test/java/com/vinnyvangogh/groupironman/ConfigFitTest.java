@@ -158,14 +158,6 @@ public class ConfigFitTest
 
 	private static List<Method> items()
 	{
-		List<Method> out = new ArrayList<>();
-		for (Method m : GroupIronmanConfig.class.getMethods())
-		{
-			if (m.isAnnotationPresent(ConfigItem.class))
-			{
-				out.add(m);
-			}
-		}
-		return out;
+		return ConfigLayoutTest.items();
 	}
 }
