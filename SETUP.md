@@ -25,20 +25,24 @@ closed.
    storage, progress, group, activities.
 4. **Discord: how to post**: *Online status* (Posts / Live board / Off),
    *Offline grace*, *Combine level-ups*, message style, screenshots
-   (including the gravestone picture), the mention for big events, quiet
-   hours, and the Easter eggs.
+   (including *Grave picture*: *Where I died*, *Current view* or *None*), the
+   mention for big events, quiet hours, and the Easter eggs.
 5. **Discord: daily digest**: the digest hour and which categories it covers.
 6. **In-game**: banner time, position and how many at once, the group box,
    world map markers, the `::find` command, then one *Banner:* switch per
    event.
 7. **Thresholds** (closed): what is big enough to count, for Discord and
-   banners alike: gp values, *Share drops worth at least*, *Level ups from
-   level*, kill count milestones, *Back after (days)*, the gravestone warning
-   and *Untradeables to ignore*.
-8. **Advanced** (closed): the `::find` colours.
+   banners alike: *Valuable drop (gp)*, *Big storage (gp)*, *Clue reward
+   (gp)*, *Shared drops (gp)*, *Level ups from level*, *KC milestone every*,
+   *Back after (days)*, *Gravestone warning* and *Untradeables to ignore*.
+   Hover a setting for its full meaning ("at least this much").
+8. **Advanced** (closed): the `::find` colours: *Search colour*, *Colour item
+   names*, *Your bank colour*, *Member bank colour*, *Storage colour*,
+   *Carried colour* and *Item name colour*.
 
-Moving a setting between sections never resets it: each is saved under the
-same name it always was.
+Moving or renaming a setting never resets it: each is saved under the same
+key it always was. The gp boxes show plain digits (`1000000`): RuneLite's
+number box is too narrow for `1,000,000` with commas.
 
 **Sharing** (in *Group*), all off by default, including `::find` (in
 *In-game*). Each one works on its own, and each only shows you other members'
@@ -52,8 +56,8 @@ sends nothing, collects nothing, and its side panel button is hidden.
 | Share stats | Every skill's real and boosted level (shown as `90 (+8)` or `70 (-3)`), HP, prayer, run energy, special attack, your world and where you are (resent every 8 tiles you walk, and once a minute so members see you as online). |
 | Share inventory and equipment | What you are carrying and wearing, with counts, for the panel's "Items" list and the search. |
 | Storage minimums | Not sent anywhere. One per line, `Shark: 100`. A desktop notification when a group storage close leaves an item below its minimum; once per item until it is restocked. Your own closes always count; other members' count when *Share group storage changes* is on. |
-| Share rune pouch, quiver, seed vault | What is in your rune pouch and Dizana's quiver, and your seed vault as of the last time you opened it. |
-| Share drops and collection log | Your NPC drops (items worth at least *Drops worth at least*, 10,000 gp by default; 0 sends everything) and each new collection log slot. Kept on disk for everyone, and resent for 7 days whenever someone joins the party. |
+| Share pouch, quiver, vault | What is in your rune pouch and Dizana's quiver, and your seed vault as of the last time you opened it. |
+| Share drops and collection log | Your NPC drops (items worth at least *Shared drops (gp)*, 10,000 gp by default; 0 sends everything) and each new collection log slot. Kept on disk for everyone, and resent for 7 days whenever someone joins the party. |
 | Show members on world map | Not sent anywhere. Marks online members on the world map. Needs *Share stats* on, for you and for them. |
 | ::find chat command | Not sent anywhere. Lets you type `::find dragon hunter wand` in the chatbox (see below). |
 | Share group events | Your pets, deaths, levels, quests, logins and Barrows chests, so members see them as banners. Drops and collection log slots go with *Share drops and collection log*; storage events are worked out by each member from the storage changes already shared. |
@@ -67,8 +71,8 @@ Utilities' own is the optional Discord webhook below.
 
 Every event switch is off by default:
 
-- **Thresholds**: when something counts. *Valuable drop at least* (1M gp,
-  per item stack), *Big storage move at least* (1M gp), *Level ups from level*
+- **Thresholds**: when something counts. *Valuable drop (gp)* (1M gp,
+  per item stack), *Big storage (gp)* (1M gp), *Level ups from level*
   (1), *Back after (days)* (7), and *Untradeables to ignore* (clue scrolls,
   keys, totems and the like, by name).
 - **Discord: connection** and **Discord: how to post**: *Post to Discord* (shows RuneLite's third-party
@@ -79,7 +83,7 @@ Every event switch is off by default:
   for big events* (e.g. `<@&role id>`, put in front of pets, 99s, maxing and a
   Hardcore group death), *Quiet hours from / until* (posts wait and go
   when quiet hours end; the same hour twice means none), and *Poster name*:
-  *Use the webhook's own name* (the default: the name and avatar you set on
+  *Webhook's own* (the default: the name and avatar you set on
   each webhook in Discord), *GIM Utilities*, or *Custom*, which uses the
   *Custom name* fields (main and one per category). A blank custom name uses
   the webhook's own; names are cut to 80 characters, and a name Discord

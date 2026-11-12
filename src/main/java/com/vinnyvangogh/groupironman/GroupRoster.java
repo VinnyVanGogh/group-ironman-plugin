@@ -41,11 +41,14 @@ final class GroupRoster
 	private final Map<String, MemberStats> stats = new ConcurrentHashMap<>();
 	private final Map<String, MemberExtras> extras = new ConcurrentHashMap<>();
 	private final Map<String, Long> heard = new ConcurrentHashMap<>();
+	private final Map<String, LastSeen> seen = new ConcurrentHashMap<>();
 	private final Set<String> strangers = ConcurrentHashMap.newKeySet();
 	private final StorageLog log = new StorageLog();
 	private final DropLog events = new DropLog();
 	/** Every event, for the Log tab: see {@link ActivityLog}. */
 	private final DropLog feed = ActivityLog.newFeed();
+	/** Hiscore levels for members who do not share stats. */
+	private final HiscoreBook hiscores = new HiscoreBook();
 	private volatile Storage storage;
 	/** When this player was last seen logged in, by this client; 0 when never. */
 	private volatile long lastPlayed;
@@ -59,6 +62,18 @@ final class GroupRoster
 	Map<String, Long> lastHeard()
 	{
 		return new TreeMap<>(heard);
+	}
+
+	/** {@code member} was seen online ({@link LastSeen#merge}: only ever moves forward). */
+	void seen(String member, LastSeen sighting)
+	{
+		seen.merge(member, sighting, LastSeen::merge);
+	}
+
+	/** When each member was last seen online, by this client or from the cache. */
+	Map<String, LastSeen> lastSeen()
+	{
+		return new TreeMap<>(seen);
 	}
 
 	void markPlayed(long at)
@@ -94,6 +109,11 @@ final class GroupRoster
 	DropLog events()
 	{
 		return events;
+	}
+
+	HiscoreBook hiscores()
+	{
+		return hiscores;
 	}
 
 	/** Every group event, yours and members', newest first: the Log tab. */
@@ -217,8 +237,10 @@ final class GroupRoster
 		storage = null;
 		extras.clear();
 		heard.clear();
+		seen.clear();
 		events.clear();
 		feed.clear();
+		hiscores.clear();
 		lastPlayed = 0;
 	}
 

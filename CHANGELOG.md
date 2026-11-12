@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+### Settings names that fit
+
+- Long setting names no longer get cut off with "..." in the settings panel.
+  Shorter names: *Combine level-ups*, *Grave picture*, *Valuable drop (gp)*,
+  *Big storage (gp)*, *Clue reward (gp)*, *Shared drops (gp)*, *KC milestone
+  every*, *Gravestone warning*, *Share pouch, quiver, vault*, *Banner:
+  Gravestone expiring*, and the `::find` colours (*Search colour*, *Your bank
+  colour* and so on). The full meaning is in each setting's tooltip.
+- *Poster name*'s first choice is now *Webhook's own*, and *Grave picture*'s
+  is *Where I died*: a long choice made the dropdown squeeze the name to
+  "P...".
+- gp boxes show plain digits, so 1,000,000 shows as `1000000` instead of
+  being cut to `1,000,00`. *Gravestone warning* shows `5 mins`.
+- Nothing resets: every setting keeps its saved value.
+
+### Hiscore levels for members without the plugin
+
+- Group tab cards for members who never ran GIM Utilities, online or never
+  seen, now show their skill levels from the OSRS hiscores, read with
+  RuneLite's own hiscore lookup, marked *From hiscores, 2h ago*.
+- Online, such a member also shows HP and Prayer at their hiscore level, and
+  Run and Spec at 100%, dimmed, with the tooltip *assumed, not shared*.
+- Looked up when you log in and when a member comes online, at most once
+  every 6 hours per member, and kept across restarts. A failed lookup shows
+  *Hiscores unavailable* and retries later, backing off up to 6 hours.
+- Shared plugin data always wins. Inventory and worn items are never made
+  up: a member who never shared them shows none.
+
+### Live board: last seen for everyone
+
+- Offline members read *last seen 2 hours ago on world 302* (Discord's own
+  relative time, so it stays current without edits) instead of just
+  *offline*. Members without the plugin get theirs from when a plugin user
+  last saw them online in the Group channel.
+- When the last plugin user logs out, the board's final edit keeps every
+  member's last seen and ends with *Nobody with GIM Utilities is online, so
+  these may be out of date (as of ...)*.
+- Last seen is kept in the group cache, so it survives a restart.
+
 ### Online status for members without the plugin
 
 - Who is online, and on which world, now comes from the game's own Ironman

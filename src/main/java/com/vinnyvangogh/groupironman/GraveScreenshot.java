@@ -9,8 +9,11 @@ package com.vinnyvangogh.groupironman;
  */
 public enum GraveScreenshot
 {
-	/** The frame taken for the death post, kept in memory only until the grave is gone. */
-	DEATH("From the death"),
+	/**
+	 * The frame taken for the death post, kept in memory only until the grave is gone. Labels stay short: the
+	 * dropdown is as wide as its longest one and squeezes the setting's name beside it.
+	 */
+	DEATH("Where I died"),
 	/** The frame drawn when the warning goes out. */
 	CURRENT("Current view"),
 	NONE("None");

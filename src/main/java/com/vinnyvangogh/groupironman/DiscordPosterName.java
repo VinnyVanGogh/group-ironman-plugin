@@ -6,8 +6,12 @@ package com.vinnyvangogh.groupironman;
  */
 public enum DiscordPosterName
 {
-	/** No {@code username} is sent, so Discord shows the name and avatar set on the webhook. */
-	WEBHOOK("Use the webhook's own name"),
+	/**
+	 * No {@code username} is sent, so Discord shows the name and avatar set on the webhook. The label is short
+	 * because the dropdown is as wide as its longest label, and a long one squeezed "Poster name" to "P...".
+	 * Only the label: the setting is saved under the constant's name, so changing it never resets anyone.
+	 */
+	WEBHOOK("Webhook's own"),
 	GIM_UTILITIES("GIM Utilities"),
 	CUSTOM("Custom");
 

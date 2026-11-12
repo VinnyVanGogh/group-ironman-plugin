@@ -151,6 +151,115 @@ public class EasterEggsTest
 		assertTrue(Arrays.asList(EasterEggLines.BONES_ONLY).contains(EasterEggs.line(bones, lookup, ON)));
 	}
 
+	// ---- community memes ----
+
+	@Test
+	public void eachMemeFiresOnItsEvent()
+	{
+		for (Map.Entry<GroupEvent, String[]> meme : memes().entrySet())
+		{
+			String egg = EasterEggs.line(meme.getKey(), lookup, ON);
+			assertTrue(meme.getKey().type + ": " + egg, Arrays.asList(meme.getValue()).contains(egg));
+		}
+	}
+
+	@Test
+	public void noMemeFiresWithEasterEggsOff()
+	{
+		for (GroupEvent e : memes().keySet())
+		{
+			assertNull(e.type.toString(), EasterEggs.line(e, lookup, OFF));
+		}
+	}
+
+	@Test
+	public void aNearMissGetsNoMeme()
+	{
+		assertNull("72 is not 73", EasterEggs.line(level(72), lookup, ON));
+		assertNull("91 is not 92", EasterEggs.line(level(91), lookup, ON));
+		assertNull(EasterEggs.line(GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, NOW, "Alex").number(125).build(),
+			lookup, ON));
+		assertNull(EasterEggs.line(GroupEvent.of(GroupEvent.Type.TOTAL_LEVEL, NOW, "Alex").number(1900).build(),
+			lookup, ON));
+		assertNull(EasterEggs.line(GroupEvent.of(GroupEvent.Type.XP_MILESTONE, NOW, "Alex").text("Attack")
+			.number(10_000_000).build(), lookup, ON));
+		assertNull("the sequel is not the original", EasterEggs.line(quest("Dragon Slayer II"), lookup, ON));
+		assertNull(EasterEggs.line(GroupEvent.of(GroupEvent.Type.DEATH, NOW, "Alex").text("Goblin").build(),
+			lookup, ON));
+		assertNull("a death with no killer", EasterEggs.line(GroupEvent.of(GroupEvent.Type.DEATH, NOW, "Alex")
+			.build(), lookup, ON));
+		assertNull("a gold ring taken out is not bought", EasterEggs.line(GroupEvent.of(
+			GroupEvent.Type.STORAGE_WITHDRAWAL, NOW, "Alex").items(items(EasterEggLines.GOLD_RING, 1)).build(),
+			lookup, ON));
+	}
+
+	@Test
+	public void aLevel73InAnySkillIsTheB0atyMeme()
+	{
+		for (String skill : Arrays.asList("Attack", "Agility", "Runecraft"))
+		{
+			GroupEvent e = GroupEvent.of(GroupEvent.Type.LEVEL_UP, NOW, "Alex").text(skill).number(73).build();
+			assertTrue(skill, Arrays.asList(EasterEggLines.LEVEL_73).contains(EasterEggs.line(e, lookup, ON)));
+		}
+	}
+
+	@Test
+	public void aMergedNinetyNineTakesTheSkillCapeLine()
+	{
+		GroupEvent up = GroupEvent.of(GroupEvent.Type.LEVEL_UP, NOW, "Alex").text("Fishing").number(99).build();
+		GroupEvent maxed = GroupEvent.of(GroupEvent.Type.MAXED, NOW, "Alex").text("Fishing").number(99).build();
+		String egg = EasterEggs.line(Arrays.asList(up, maxed), lookup, ON);
+		assertTrue(egg, Arrays.asList(EasterEggLines.SKILL_99).contains(egg));
+	}
+
+	@Test
+	public void aBigDepositWithAGoldRingStaysLegendary()
+	{
+		GroupEvent both = GroupEvent.of(GroupEvent.Type.STORAGE_DEPOSIT, NOW, "Alex")
+			.items(items(ItemID.COINS, 2_000_000, EasterEggLines.GOLD_RING, 1)).build();
+		assertLegend(EasterEggs.line(both, lookup, ON));
+	}
+
+	/** One event per meme trigger, with the lines it must pick from. */
+	private static Map<GroupEvent, String[]> memes()
+	{
+		Map<GroupEvent, String[]> m = new java.util.LinkedHashMap<>();
+		m.put(level(73), EasterEggLines.LEVEL_73);
+		m.put(level(92), EasterEggLines.LEVEL_92);
+		m.put(GroupEvent.of(GroupEvent.Type.MAXED, NOW, "Alex").text("Cooking").number(99).build(),
+			EasterEggLines.SKILL_99);
+		m.put(GroupEvent.of(GroupEvent.Type.MAXED, NOW, "Alex").text("total").number(2277).build(),
+			EasterEggLines.MAXED_TOTAL);
+		m.put(GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, NOW, "Alex").number(126).build(),
+			EasterEggLines.COMBAT_126);
+		m.put(GroupEvent.of(GroupEvent.Type.TOTAL_LEVEL, NOW, "Alex").number(2000).build(),
+			EasterEggLines.TOTAL_2000);
+		m.put(GroupEvent.of(GroupEvent.Type.XP_MILESTONE, NOW, "Alex").text("Attack").number(200_000_000L).build(),
+			EasterEggLines.XP_200M);
+		m.put(quest("Cook's Assistant"), EasterEggLines.COOKS_ASSISTANT);
+		m.put(quest("Dragon Slayer I"), EasterEggLines.DRAGON_SLAYER);
+		m.put(quest("Recipe for Disaster"), EasterEggLines.RECIPE_FOR_DISASTER);
+		m.put(GroupEvent.of(GroupEvent.Type.DEATH, NOW, "Alex").text("TzTok-Jad").location("Mor Ul Rek").build(),
+			EasterEggLines.JAD);
+		m.put(GroupEvent.of(GroupEvent.Type.DRY_STREAK, NOW, "Alex").text("Vorkath").number(1500).build(),
+			EasterEggLines.SIT);
+		m.put(GroupEvent.of(GroupEvent.Type.STORAGE_DEPOSIT, NOW, "Alex").items(items(EasterEggLines.GOLD_RING, 1))
+			.build(), EasterEggLines.BUYING_GF);
+		m.put(pet(), EasterEggLines.PET);
+		m.put(deathValue(items(), 0), EasterEggLines.FREE_TRIP);
+		return m;
+	}
+
+	private static GroupEvent level(int level)
+	{
+		return GroupEvent.of(GroupEvent.Type.LEVEL_UP, NOW, "Alex").text("Attack").number(level).build();
+	}
+
+	private static GroupEvent quest(String name)
+	{
+		return GroupEvent.of(GroupEvent.Type.QUEST, NOW, "Alex").text(name).number(1).build();
+	}
+
 	// ---- group storage ----
 
 	@Test
