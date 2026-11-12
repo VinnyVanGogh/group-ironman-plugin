@@ -146,6 +146,8 @@ class GroupEventEngine
 	/** Guards {@link #presence}: the client thread logs in and out, the executor polls. */
 	private final Object presenceLock = new Object();
 	private PresenceDebounce presence = new PresenceDebounce(ZoneId.systemDefault());
+	/** Members without the plugin, as the Group channel sees them; guarded by {@link #presenceLock} too. */
+	private final ChannelPosts channelPosts = new ChannelPosts(ZoneId.systemDefault());
 	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()),
 		this::toDigest, this::toLog);
 	/** Client thread: Discord events waiting for the rest of their moment. */
@@ -283,17 +285,20 @@ class GroupEventEngine
 			levels.tick();
 			sender.pump();
 			GroupEvent offline;
+			List<GroupEvent> others;
 			synchronized (presenceLock)
 			{
 				// The name is the one the login gave: after a logout localPlayer() is "You".
 				offline = presence.poll(System.currentTimeMillis(), config.discordOfflineGrace());
 				savePresence();
+				others = channelPosts.poll(System.currentTimeMillis(), config.discordOfflineGrace());
 			}
 			if (offline != null)
 			{
 				// Not own(): that is client thread only. The router is fine here, as before.
 				router.route(offline, true, settings, group.lookup);
 			}
+			routeChannelPosts(others);
 			boardTick(System.currentTimeMillis());
 		}
 		catch (RuntimeException e)
@@ -314,7 +319,7 @@ class GroupEventEngine
 		if (url != null)
 		{
 			String lines = StatusBoard.lines(group.members(), group.roster().lastHeard(), group.roster().allStats(),
-				boardSelf, now);
+				boardSelf, group.presence(), now);
 			if (!lines.isEmpty())
 			{
 				board.show(lines, now);
@@ -355,6 +360,61 @@ class GroupEventEngine
 	}
 
 	// ---- Inputs from GroupService ----
+
+	/**
+	 * Client thread: the game's Group channel changed. Logins and logouts of members without the plugin become
+	 * Online posts ({@link ChannelPosts}); members with it post their own.
+	 */
+	void gamePresence(GamePresence game)
+	{
+		Player me = client.getLocalPlayer();
+		String self = me == null || me.getName() == null ? "" : GroupMembers.key(me.getName());
+		Set<String> plugin = new HashSet<>();
+		group.roster().lastHeard().keySet().forEach(n -> plugin.add(GroupMembers.key(n)));
+		group.roster().allStats().keySet().forEach(n -> plugin.add(GroupMembers.key(n)));
+		List<GroupEvent> posts;
+		synchronized (presenceLock)
+		{
+			posts = channelPosts.update(game, n -> plugin.contains(GroupMembers.key(n)) || GroupMembers.key(n)
+				.equals(self), System.currentTimeMillis(), config.discordOfflineGrace());
+		}
+		routeChannelPosts(posts);
+	}
+
+	/**
+	 * Any thread: posts for members without the plugin. Every client shows them in its Log and overlay; only the
+	 * one plugin user that {@link ChannelPosts#leads} sends them to Discord, so each is posted once.
+	 */
+	private void routeChannelPosts(List<GroupEvent> posts)
+	{
+		if (posts.isEmpty())
+		{
+			return;
+		}
+		boolean leads = leadsChannelPosts(System.currentTimeMillis());
+		for (GroupEvent e : posts)
+		{
+			router.route(e, leads, settings, group.lookup);
+		}
+	}
+
+	/** The plugin users the others hear and the game does not say left, without this player; then who leads. */
+	private boolean leadsChannelPosts(long now)
+	{
+		StatusBoard.Self self = boardSelf;
+		String name = self == null ? "" : self.name;
+		GamePresence game = group.presence();
+		List<String> others = new ArrayList<>();
+		group.roster().lastHeard().forEach((member, at) ->
+		{
+			if (Presence.online(at, now) && game.state(member) != GamePresence.State.OFFLINE
+				&& !GroupMembers.key(member).equals(GroupMembers.key(name)))
+			{
+				others.add(member);
+			}
+		});
+		return ChannelPosts.leads(name, group.syncing(), others);
+	}
 
 	/** A member's event from the party, already filed under their name. */
 	void member(GroupEvent event)
@@ -759,6 +819,8 @@ class GroupEventEngine
 			{
 				presence.logout(System.currentTimeMillis());
 				savePresence();
+				// The channel goes with this player: the next login's channel is a new baseline.
+				channelPosts.reset();
 			}
 			StatusBoard.Self was = boardSelf;
 			if (was != null && was.online)

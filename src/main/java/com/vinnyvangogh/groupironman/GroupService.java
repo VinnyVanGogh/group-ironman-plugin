@@ -9,6 +9,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,6 +26,8 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.EnumComposition;
 import net.runelite.api.EnumID;
+import net.runelite.api.Friend;
+import net.runelite.api.FriendContainer;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
@@ -38,6 +41,9 @@ import net.runelite.api.clan.ClanMember;
 import net.runelite.api.clan.ClanSettings;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.ClanChannelChanged;
+import net.runelite.api.events.ClanMemberJoined;
+import net.runelite.api.events.ClanMemberLeft;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -176,6 +182,7 @@ class GroupService
 
 	private volatile LowStock lowStock = LowStock.parse("");
 	private volatile GroupMembers members = GroupMembers.UNKNOWN;
+	private volatile GamePresence presence = GamePresence.UNKNOWN;
 
 	// Client thread only.
 	private final StorageSession storage = new StorageSession();
@@ -523,6 +530,10 @@ class GroupService
 			roster.markPlayed(System.currentTimeMillis());
 			saveCache();
 		}
+		if (event.getGameState() == GameState.LOGIN_SCREEN)
+		{
+			refreshPresence();
+		}
 	}
 
 	@Subscribe
@@ -783,6 +794,100 @@ class GroupService
 		{
 			onChange.run();
 		}
+		refreshPresence();
+	}
+
+	/**
+	 * Client thread: the Group channel changed, a member joined it or left it. RuneLite posts
+	 * {@code ClanChannelChanged} (with {@code getClanId()}) when a channel loads or goes, and
+	 * {@code ClanMemberJoined} / {@code ClanMemberLeft} (with {@code getClanChannel()}) as members log in and out.
+	 */
+	@Subscribe
+	public void onClanChannelChanged(ClanChannelChanged event)
+	{
+		if (event.getClanId() == ClanID.GROUP_IRONMAN)
+		{
+			refreshPresence();
+		}
+	}
+
+	@Subscribe
+	public void onClanMemberJoined(ClanMemberJoined event)
+	{
+		groupChannelEvent(event.getClanChannel());
+	}
+
+	@Subscribe
+	public void onClanMemberLeft(ClanMemberLeft event)
+	{
+		groupChannelEvent(event.getClanChannel());
+	}
+
+	private void groupChannelEvent(ClanChannel channel)
+	{
+		if (channel != null && channel == client.getClanChannel(ClanID.GROUP_IRONMAN))
+		{
+			refreshPresence();
+		}
+	}
+
+	/** Who in the group is online and where, as the game shows it; {@link GamePresence#UNKNOWN} logged out. */
+	GamePresence presence()
+	{
+		return presence;
+	}
+
+	/** Client thread. Re-reads {@link #presence} and, when it changed, tells the panel and the event engine. */
+	private void refreshPresence()
+	{
+		GamePresence now = client.getGameState() == GameState.LOGGED_IN
+			? GamePresence.read(members, readChannel(), readFriends()) : GamePresence.UNKNOWN;
+		if (now.equals(presence))
+		{
+			return;
+		}
+		presence = now;
+		GroupEventEngine e = events;
+		if (e != null)
+		{
+			e.gamePresence(now);
+		}
+		onChange.run();
+	}
+
+	/** Client thread. The Group channel's members and worlds, null before it loads. */
+	private Map<String, Integer> readChannel()
+	{
+		ClanChannel channel = client.getClanChannel(ClanID.GROUP_IRONMAN);
+		if (channel == null || channel.getMembers() == null)
+		{
+			return null;
+		}
+		Map<String, Integer> out = new HashMap<>();
+		for (ClanChannelMember m : channel.getMembers())
+		{
+			out.put(m.getName(), m.getWorld());
+		}
+		return out;
+	}
+
+	/** Client thread. The Friends list's names and worlds (0 offline), null before it loads. */
+	private Map<String, Integer> readFriends()
+	{
+		FriendContainer friends = client.getFriendContainer();
+		if (friends == null || friends.getMembers() == null)
+		{
+			return null;
+		}
+		Map<String, Integer> out = new HashMap<>();
+		for (Friend f : friends.getMembers())
+		{
+			if (f != null && f.getName() != null)
+			{
+				out.put(f.getName(), f.getWorld());
+			}
+		}
+		return out;
 	}
 
 	/** Client thread. {@code ClanSettings} lists every member; the channel only those online, so it is the fallback. */
@@ -798,15 +903,10 @@ class GroupService
 			}
 			return GroupMembers.of(settings.getName(), names);
 		}
-		ClanChannel channel = client.getClanChannel(ClanID.GROUP_IRONMAN);
-		if (channel != null && channel.getMembers() != null)
+		Map<String, Integer> online = readChannel();
+		if (online != null)
 		{
-			List<String> names = new ArrayList<>();
-			for (ClanChannelMember m : channel.getMembers())
-			{
-				names.add(m.getName());
-			}
-			return GroupMembers.of(channel.getName(), names);
+			return GroupMembers.of(client.getClanChannel(ClanID.GROUP_IRONMAN).getName(), online.keySet());
 		}
 		return GroupMembers.UNKNOWN;
 	}
