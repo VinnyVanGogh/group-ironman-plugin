@@ -590,6 +590,12 @@ class GroupEventEngine
 			return;
 		}
 		watchChat(message, now);
+		gameMessage(message, now);
+	}
+
+	/** A game message that is not a count: a level-up line (for its picture), a pet or a collection log slot. */
+	private void gameMessage(String message, long now)
+	{
 		if (levelShot.chat(message, now))
 		{
 			shootLevels(now);
@@ -1256,9 +1262,7 @@ class GroupEventEngine
 		List<DiscordBatch.Pending> done = new ArrayList<>();
 		DiscordBatch.Pending moment = batch.add(event, System.currentTimeMillis(),
 			DiscordMerge.window(family, settings), done);
-		// A level-up's frame waits for its chat line (LevelShot), taken when the moment is posted.
-		if (moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot()
-			&& event.type != GroupEvent.Type.LEVEL_UP)
+		if (framesAtStart(event, moment, done))
 		{
 			// The frame of the moment itself, not of whenever the post goes out (a death's respawn). A death's
 			// frame is also the gravestone warning's, when that wants it: encoded once, held for that grave.
@@ -1271,6 +1275,16 @@ class GroupEventEngine
 			}));
 		}
 		done.forEach(this::flush);
+	}
+
+	/**
+	 * A moment just opened, still to be posted, wants the frame of its start. Not a level-up's: that frame waits
+	 * for its chat line ({@link LevelShot}) and is taken when the moment is posted.
+	 */
+	private boolean framesAtStart(GroupEvent event, DiscordBatch.Pending moment, List<DiscordBatch.Pending> done)
+	{
+		return moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot()
+			&& event.type != GroupEvent.Type.LEVEL_UP;
 	}
 
 	/** The picture for a post made at once: a logout settles at the login screen, a gravestone by its setting. */
