@@ -7,6 +7,7 @@ import com.google.gson.JsonParseException;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +60,8 @@ final class DiscordSender
 	 * never holds back the Deaths one, and each keeps its own order and per-minute cap.
 	 */
 	private final Map<String, DiscordQueue> queues = new ConcurrentHashMap<>();
+	/** Replies whose outcome is being handed to the post's owner right now ({@link #queued}). */
+	private final AtomicInteger settling = new AtomicInteger();
 	private final Transport transport;
 	private final LongSupplier clock;
 	private final IntSupplier hour;
@@ -140,10 +143,20 @@ final class DiscordSender
 				log.debug("discord webhook {} failed: {}", post.edit == null ? "post" : "edit",
 					status == 0 ? "network error" : "HTTP " + status);
 			}
-			boolean again = queue.done(status, DiscordQueue.retryAfterMs(retryAfter), clock.getAsLong());
-			if (!again && post.result != null)
+			// Counted in queued() from leaving the queue until its owner has heard the outcome, so nobody sees an
+			// empty sender while a reply's message id is still on its way to its owner.
+			settling.incrementAndGet();
+			try
 			{
-				post.result.done(status, messageId);
+				boolean again = queue.done(status, DiscordQueue.retryAfterMs(retryAfter), clock.getAsLong());
+				if (!again && post.result != null)
+				{
+					post.result.done(status, messageId);
+				}
+			}
+			finally
+			{
+				settling.decrementAndGet();
 			}
 		});
 	}
@@ -199,7 +212,7 @@ final class DiscordSender
 
 	int queued()
 	{
-		return queues.values().stream().mapToInt(DiscordQueue::size).sum();
+		return queues.values().stream().mapToInt(DiscordQueue::size).sum() + settling.get();
 	}
 
 	void clear()
