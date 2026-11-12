@@ -83,6 +83,11 @@ to share, and only sees other members' data for what they share themselves.
   ![Group settings: sync, group key and what you share](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-group.png)
 
   </details>
+  <details><summary>Discord: connection</summary>
+
+  ![Discord: connection, the webhooks and the poster name choices](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-connection.png)
+
+  </details>
   <details><summary>Discord: what to post</summary>
 
   ![Discord: what to post, one switch per event](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-what-to-post.png)
@@ -101,6 +106,11 @@ to share, and only sees other members' data for what they share themselves.
   <details><summary>In-game</summary>
 
   ![In-game settings: banners, group box, world map, ::find and one banner switch per event](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-in-game.png)
+
+  </details>
+  <details><summary>Thresholds and Advanced</summary>
+
+  ![Thresholds: gp values, level and kill count limits, untradeables to ignore; Advanced: the ::find colours](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-thresholds-advanced.png)
 
   </details>
 
