@@ -193,7 +193,8 @@ public class PosterNamesTest
 		};
 		assertEquals(DiscordPosterName.WEBHOOK, defaults.discordPosterName());
 		assertEquals("", defaults.discordNameMain());
-		assertEquals("Use the webhook's own name", DiscordPosterName.WEBHOOK.toString());
+		assertEquals("Webhook's own", DiscordPosterName.WEBHOOK.toString());
+		assertEquals("saved under the constant's name, not the label", "WEBHOOK", DiscordPosterName.WEBHOOK.name());
 	}
 
 	private static String repeat(char c, int n)

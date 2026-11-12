@@ -740,7 +740,7 @@ class GroupEventEngine
 			.build());
 	}
 
-	/** The gravestone warning posts to Discord with "From the death" and screenshots on. */
+	/** The gravestone warning posts to Discord with "Where I died" ({@link GraveScreenshot#DEATH}) and screenshots on. */
 	private boolean keepsDeathFrame()
 	{
 		return config.discordScreenshot() && config.discordGravestoneScreenshot() == GraveScreenshot.DEATH
