@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Settings open on a short list
+
+- Every settings section but *Group* starts closed, so a first install shows
+  all eight section names at once.
+- *Offline grace (minutes)* is now *Offline grace*, with *mins* in the box,
+  so its name is no longer cut off. Same key, same value.
+
 ### Settings names that fit
 
 - Long setting names no longer get cut off with "..." in the settings panel.

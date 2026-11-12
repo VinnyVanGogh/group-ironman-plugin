@@ -59,7 +59,9 @@ public class ConfigLayoutTest
 	private static final List<String> SECTION_ORDER = Arrays.asList("Group", "Discord: connection",
 		"Discord: what to post", "Discord: how to post", "Discord: daily digest", "In-game", "Thresholds", "Advanced");
 
-	private static final Set<String> CLOSED = new HashSet<>(Arrays.asList("Thresholds", "Advanced"));
+	/** Every section but Group starts closed, so a first install shows all eight names at once. */
+	private static final Set<String> CLOSED = new HashSet<>(Arrays.asList("Discord: connection",
+		"Discord: what to post", "Discord: how to post", "Discord: daily digest", "In-game", "Thresholds", "Advanced"));
 
 	@Test
 	public void theConfigGroupIsUnchanged()
@@ -82,7 +84,7 @@ public class ConfigLayoutTest
 	}
 
 	@Test
-	public void exactlyEightSectionsInOrderWithOnlyThresholdsAndAdvancedClosed() throws Exception
+	public void exactlyEightSectionsInOrderWithOnlyGroupOpen() throws Exception
 	{
 		List<ConfigSection> sections = new ArrayList<>(sections().values());
 		sections.sort(Comparator.comparingInt(ConfigSection::position));

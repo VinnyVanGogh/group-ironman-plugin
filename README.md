@@ -72,7 +72,7 @@ to share, and only sees other members' data for what they share themselves.
 - **Settings:** granular opt-in toggles for every feature and sharing
   category, in eight sections: *Group*, *Discord: connection*, *Discord: what
   to post*, *Discord: how to post*, *Discord: daily digest*, *In-game*,
-  *Thresholds* and *Advanced* (the last two start closed). See
+  *Thresholds* and *Advanced* (all but *Group* start closed). See
   [SETUP.md](SETUP.md#settings).
 
   ![Settings panel with its eight sections closed](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-overview.png)
