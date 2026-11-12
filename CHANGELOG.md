@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Welcome and update notes in the game chat
+
+- A fresh install says hello in the game chat once: four short lines on
+  joining your group, connecting Discord, and what you get.
+- After a later update, the first login lists what is new, once per version.
+- New setting *Show update notes* (in *Advanced*, on by default) turns both
+  off. The version is still marked as seen with it off, so turning it back on
+  never brings back old notes.
+
 ### Settings open on a short list
 
 - Every settings section but *Group* starts closed, so a first install shows

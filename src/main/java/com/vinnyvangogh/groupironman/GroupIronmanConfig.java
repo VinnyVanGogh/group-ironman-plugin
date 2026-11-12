@@ -36,6 +36,9 @@ public interface GroupIronmanConfig extends Config
 	/** Frozen. */
 	String KEY_GROUP_KEY = "groupKey";
 
+	/** Frozen. Written by the plugin once per version (UpdateNotes). */
+	String KEY_LAST_SEEN_VERSION = "lastSeenVersion";
+
 	/**
 	 * The {@code @Units} on every gp number box: no suffix at all. RuneLite's number box is a fixed 6 columns
 	 * wide whatever the label, and its plain formatter writes thousands commas, so 1,000,000 showed as
@@ -1212,5 +1215,22 @@ public interface GroupIronmanConfig extends Config
 	default Color findItemColour()
 	{
 		return new Color(0x1E, 0x5A, 0xA8);
+	}
+
+	@ConfigItem(keyName = "showUpdateNotes", name = "Show update notes", description = "Say hello in the game chat"
+		+ " on a fresh install, and what is new once after each update, on your next login.",
+		section = advancedSection, position = 7)
+	default boolean showUpdateNotes()
+	{
+		return true;
+	}
+
+	/** The last version whose update notes were handled; written by the plugin, never shown. */
+	@ConfigItem(keyName = KEY_LAST_SEEN_VERSION, name = "Last seen version", description = "The last version whose"
+		+ " update notes were handled. Written by the plugin.", hidden = true, section = advancedSection,
+		position = 8)
+	default String lastSeenVersion()
+	{
+		return "";
 	}
 }

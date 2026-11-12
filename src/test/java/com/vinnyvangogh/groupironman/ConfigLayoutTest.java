@@ -54,7 +54,7 @@ public class ConfigLayoutTest
 		"overlayDeathValue", "overlayGravestone", "overlayHardcoreLife", "overlayWilderness", "overlayDiary",
 		"overlayCombatTask", "overlayKcMilestone", "overlayPersonalBest", "overlayWeeklyRecap", "overlaySlayer",
 		"overlayFarming", "overlayBirdhouse", "discordDigestHour", "digestDrops", "digestDeaths", "digestStorage",
-		"digestProgress", "digestGroup", "digestActivities"));
+		"digestProgress", "digestGroup", "digestActivities", "showUpdateNotes", "lastSeenVersion"));
 
 	private static final List<String> SECTION_ORDER = Arrays.asList("Group", "Discord: connection",
 		"Discord: what to post", "Discord: how to post", "Discord: daily digest", "In-game", "Thresholds", "Advanced");
@@ -134,6 +134,22 @@ public class ConfigLayoutTest
 	}
 
 	@Test
+	public void updateNotesSitLastInAdvancedAndTheSeenVersionIsHidden()
+	{
+		assertEquals(GroupIronmanConfig.advancedSection, sectionOf("showUpdateNotes"));
+		assertEquals(7, item("showUpdateNotes").position());
+		assertFalse(item("showUpdateNotes").hidden());
+		assertEquals(GroupIronmanConfig.KEY_LAST_SEEN_VERSION, item("lastSeenVersion").keyName());
+		assertTrue(item("lastSeenVersion").hidden());
+	}
+
+	private static ConfigItem item(String method)
+	{
+		return items().stream().filter(m -> m.getName().equals(method)).findFirst()
+			.orElseThrow(AssertionError::new).getAnnotation(ConfigItem.class);
+	}
+
+	@Test
 	public void everySettingHasAPlainNameAndDescription()
 	{
 		for (Method m : items())
@@ -146,8 +162,7 @@ public class ConfigLayoutTest
 
 	private static String sectionOf(String method)
 	{
-		return items().stream().filter(m -> m.getName().equals(method)).findFirst()
-			.orElseThrow(AssertionError::new).getAnnotation(ConfigItem.class).section();
+		return item(method).section();
 	}
 
 	/** Section key (the field's value) to its annotation. */
