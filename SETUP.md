@@ -13,10 +13,37 @@ plugin is, see the [README](README.md).
 
 ## Settings
 
-**Group banks, storage and stats**, all off by default, including `::find`.
-Each one works on its own, and each only shows you other members' data while
-you share the same thing yourself. With every switch off the plugin sends
-nothing, collects nothing, and its side panel button is hidden.
+The settings panel has eight sections, in this order. The last two start
+closed.
+
+1. **Group**: *Sync with my group*, the *Group key*, what you share (bank,
+   group storage changes, stats, inventory and equipment, rune pouch / quiver /
+   seed vault, drops and collection log, group events) and *Storage minimums*.
+2. **Discord: connection**: *Post to Discord*, the main webhook and the
+   optional one per category, *Poster name* and the custom names.
+3. **Discord: what to post**: one switch per event, grouped drops, deaths,
+   storage, progress, group, activities.
+4. **Discord: how to post**: *Online status* (Posts / Live board / Off),
+   *Offline grace*, *Combine level-ups*, message style, screenshots
+   (including the gravestone picture), the mention for big events, quiet
+   hours, and the Easter eggs.
+5. **Discord: daily digest**: the digest hour and which categories it covers.
+6. **In-game**: banner time, position and how many at once, the group box,
+   world map markers, the `::find` command, then one *Banner:* switch per
+   event.
+7. **Thresholds** (closed): what is big enough to count, for Discord and
+   banners alike: gp values, *Share drops worth at least*, *Level ups from
+   level*, kill count milestones, *Back after (days)*, the gravestone warning
+   and *Untradeables to ignore*.
+8. **Advanced** (closed): the `::find` colours.
+
+Moving a setting between sections never resets it: each is saved under the
+same name it always was.
+
+**Sharing** (in *Group*), all off by default, including `::find` (in
+*In-game*). Each one works on its own, and each only shows you other members'
+data while you share the same thing yourself. With every switch off the plugin
+sends nothing, collects nothing, and its side panel button is hidden.
 
 | Setting | What it sends to your party |
 | --- | --- |
@@ -38,13 +65,13 @@ Utilities' own is the optional Discord webhook below.
 
 ### Group events: Discord and banners
 
-Five more sections, all closed and all off by default:
+Every event switch is off by default:
 
-- **Group events**: when something counts. *Valuable drop at least* (1M gp,
+- **Thresholds**: when something counts. *Valuable drop at least* (1M gp,
   per item stack), *Big storage move at least* (1M gp), *Level ups from level*
   (1), *Back after (days)* (7), and *Untradeables to ignore* (clue scrolls,
   keys, totems and the like, by name).
-- **Discord webhook**: *Post to Discord* (shows RuneLite's third-party
+- **Discord: connection** and **Discord: how to post**: *Post to Discord* (shows RuneLite's third-party
   warning), the *Discord webhook URL* (must be
   `https://discord.com/api/webhooks/...`; a password field), optional
   webhooks per category (drops, deaths, storage, progress, group, activities),
@@ -60,15 +87,16 @@ Five more sections, all closed and all off by default:
   "everyone" or "here") gets a chat warning and is not used: those posts go
   out under the webhook's own name, not the main custom name. Every embed's
   footer still says GIM Utilities.
-- **Discord: which events** and **Overlays: which events**: one switch per
-  event, for each output. *Online status* is *Posts* (the default: a post per
+- **Discord: what to post** and the *Banner:* switches in **In-game**: one
+  switch per event, for each output. *Online status* (under *Discord: how to
+  post*) is *Posts* (the default: a post per
   login and logout), *Live board* (one Group-channel message listing each
   member, edited in place) or *Off*. Only one member sharing a Group webhook
   should turn on *Live board*: each member who has it on keeps a board of
   their own in that channel. Level-up posts use the Progress poster name and
   the board the Group one; the board's edits count toward the same 20 posts
   a minute.
-- **Overlays**: *Banner time*, *Banner position*, *Most banners at once*, the
+- **In-game**: *Banner time*, *Banner position*, *Most banners at once*, the
   *Group box* (who is online and on which world, and the latest events) and
   how many events it lists.
 
