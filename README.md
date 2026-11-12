@@ -59,10 +59,11 @@ to share, and only sees other members' data for what they share themselves.
   level ups, 99s and max total, XP milestones, combat and total level, quests
   and quest points, online / offline, "back after a break", and Barrows
   chests. Each can go to:
-  - **Discord**, through a webhook you set (one per category if you like),
-    as rich embeds or plain text, with an optional screenshot, a mention for
-    big events, and quiet hours. Each member's client posts only that
-    member's own events, so nothing is posted twice.
+  - **Discord**, through a webhook you set (one per category if you like,
+    see [Discord webhooks](#discord-webhooks)), as rich embeds or plain text,
+    with an optional screenshot, a mention for big events, and quiet hours.
+    Each member's client posts only that member's own events, so nothing is
+    posted twice.
   - **In-game banners**, yours and your group's, plus an optional group box
     with who is online and the latest events.
 
@@ -119,6 +120,28 @@ and only names on your in-game group roster are shown. **Only the optional
 Discord webhook you set** is a network call of the plugin's own: it is off
 until you turn on *Post to Discord* and paste a webhook URL, and it sends your
 own events and your IP address to Discord.
+
+## Discord webhooks
+
+*Discord: connection* has seven webhooks. Only **Main** is needed: leave any
+other one empty and its posts go to Main's webhook. Each webhook also has its
+own poster name, kept even when its posts go to Main's: *Webhook's own* (the
+name and avatar set on the webhook in Discord), *Default name* (below), or
+*Custom* (the box under it, which starts filled with the default name; left
+empty, the default name is used).
+
+| Webhook | What it posts | Default name |
+| --- | --- | --- |
+| Main | Anything not listed below: clue rewards, kill count milestones, personal bests, slayer tasks, farming and birdhouse runs, diaries, combat tasks, Wilderness, "back after a break", the weekly recap. Also every category left empty. | Town Crier |
+| Online status | The live board, or the online and offline posts. Changing this webhook starts a new board. | World Hopper |
+| Drops & loot | Valuable drops, pets, collection log slots, untradeable uniques, Barrows and raids chests, "took the last one". | Party Pete |
+| Progress | Level-ups, 99s and maxing, XP milestones, combat level, total level, quests and quest points. | Skillcape Seller |
+| Deaths & danger | Deaths and what they cost, a Hardcore group life lost, a gravestone about to expire. | Death's Office |
+| Group storage | Big deposits and withdrawals, storage visit summaries, storage minimums. | Gielinor Banker |
+| Daily digest | The once-a-day summaries ticked under *Discord: daily digest*. | Varrock Herald |
+
+Each webhook has its own queue and rate limit, so a busy Drops channel never
+holds up a death post.
 
 ## Quick start
 

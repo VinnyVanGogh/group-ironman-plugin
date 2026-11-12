@@ -2,9 +2,7 @@ package com.vinnyvangogh.groupironman;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -44,17 +42,5 @@ final class WebhookWarnings
 	static String message(String label)
 	{
 		return GroupIronmanPlugin.NAME + ": the " + label + " Discord webhook isn't a valid Discord webhook link";
-	}
-
-	/** Every webhook field, by the label the warning uses: "main", then each category's. */
-	static Map<String, String> fields(GroupIronmanConfig config)
-	{
-		Map<String, String> out = new LinkedHashMap<>();
-		out.put("main", config.discordWebhookUrl());
-		for (Map.Entry<GroupEvent.Category, String> e : DiscordWebhook.overrides(config).entrySet())
-		{
-			out.put(e.getKey().name().toLowerCase(Locale.ROOT), e.getValue());
-		}
-		return out;
 	}
 }

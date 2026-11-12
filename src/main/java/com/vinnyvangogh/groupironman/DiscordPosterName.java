@@ -12,7 +12,12 @@ public enum DiscordPosterName
 	 * Only the label: the setting is saved under the constant's name, so changing it never resets anyone.
 	 */
 	WEBHOOK("Webhook's own"),
-	GIM_UTILITIES("GIM Utilities"),
+	/**
+	 * The webhook's RuneScape-flavoured default name ({@link Webhook#defaultName}). The constant keeps its first
+	 * name, GIM_UTILITIES, because that is what a saved choice is stored under.
+	 */
+	GIM_UTILITIES("Default name"),
+	/** The webhook's Custom box; a blank or refused box uses the default name. */
 	CUSTOM("Custom");
 
 	private final String label;

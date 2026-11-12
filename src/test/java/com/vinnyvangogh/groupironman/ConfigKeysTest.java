@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -15,6 +16,7 @@ import java.util.stream.Stream;
 import net.runelite.client.config.ConfigItem;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -27,6 +29,9 @@ import static org.junit.Assert.assertTrue;
 public class ConfigKeysTest
 {
 	private static final Path SOURCES = Paths.get("src/main/java/com/vinnyvangogh/groupironman");
+	/** Keys kept only so they are never reused: hidden and unread (the Activities webhook, 2026-11-12). */
+	private static final Set<String> RETIRED = new HashSet<>(Arrays.asList("discordActivitiesUrl",
+		"discordNameActivities"));
 
 	@Test
 	public void everySettingCanBeReadThroughAConfigProxy() throws Exception
@@ -68,6 +73,12 @@ public class ConfigKeysTest
 		}
 		for (Method m : items())
 		{
+			if (RETIRED.contains(m.getName()))
+			{
+				assertTrue(m.getName() + " is retired, so hidden", m.getAnnotation(ConfigItem.class).hidden());
+				assertFalse(m.getName() + " is retired, so never read", code.contains("config." + m.getName() + "()"));
+				continue;
+			}
 			// EventSettings reads the per-event switches as method references.
 			assertTrue(m.getName() + " is never read", code.contains("config." + m.getName() + "()")
 				|| code.contains("GroupIronmanConfig::" + m.getName() + ",")
