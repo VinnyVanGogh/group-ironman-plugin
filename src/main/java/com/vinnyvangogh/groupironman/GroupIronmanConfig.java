@@ -45,6 +45,7 @@ public interface GroupIronmanConfig extends Config
 	String GP_PLAIN = "";
 
 	// ---- The eight sections ----
+	// Every section but Group starts closed, so a first install shows all eight names at a glance (Board 2026-11-11).
 
 	@ConfigSection(name = "Group", description = "Join your group and choose what you share with them. Nothing is"
 		+ " shared until you turn it on, and you only see members' data for what you share yourself.",
@@ -53,25 +54,25 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigSection(name = "Discord: connection", description = "Where your Discord posts go: the webhooks, and the"
 		+ " name each post shows. Each member's client posts only that member's own events, so nothing is posted"
-		+ " twice.", position = 1)
+		+ " twice.", position = 1, closedByDefault = true)
 	String discordConnectionSection = "sectionDiscordConnection";
 
 	@ConfigSection(name = "Discord: what to post", description = "One switch per event. Each is off until you tick"
-		+ " it.", position = 2)
+		+ " it.", position = 2, closedByDefault = true)
 	String discordEventsSection = "sectionDiscordWhat";
 
 	@ConfigSection(name = "Discord: how to post", description = "How posts look and when they go: online status,"
-		+ " combining level-ups, screenshots, mentions and quiet hours.", position = 3)
+		+ " combining level-ups, screenshots, mentions and quiet hours.", position = 3, closedByDefault = true)
 	String discordHowSection = "sectionDiscordHow";
 
 	@ConfigSection(name = "Discord: daily digest", description = "Tick a category to add a once-a-day summary of it,"
 		+ " sent while you are logged in. Instant posts still go out as set above; the digest never delays"
-		+ " them.", position = 4)
+		+ " them.", position = 4, closedByDefault = true)
 	String digestSection = "sectionDigest";
 
 	@ConfigSection(name = "In-game", description = "Event banners, the group box, world map markers and the ::find"
 		+ " command, and which events show as a banner in game. Members' events need 'Share group events' (or"
-		+ " drops) on, here and on their side.", position = 5)
+		+ " drops) on, here and on their side.", position = 5, closedByDefault = true)
 	String inGameSection = "sectionInGame";
 
 	@ConfigSection(name = "Thresholds", description = "What is big enough to count as an event, for both Discord"
@@ -603,9 +604,10 @@ public interface GroupIronmanConfig extends Config
 	}
 
 	@Range(max = 10)
-	@ConfigItem(keyName = "discordOfflineGrace", name = "Offline grace (minutes)", description = "How long a"
-		+ " logout waits before it is posted. Logging back in within it posts nothing. At most one online and"
-		+ " offline per 10 minutes.", section = discordHowSection, position = 1)
+	@Units(Units.MINUTES)
+	@ConfigItem(keyName = "discordOfflineGrace", name = "Offline grace", description = "Minutes a logout waits"
+		+ " before it is posted. Logging back in within it posts nothing. At most one online and offline per 10"
+		+ " minutes.", section = discordHowSection, position = 1)
 	default int discordOfflineGrace()
 	{
 		return 2;

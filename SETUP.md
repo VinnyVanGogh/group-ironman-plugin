@@ -13,8 +13,8 @@ plugin is, see the [README](README.md).
 
 ## Settings
 
-The settings panel has eight sections, in this order. The last two start
-closed.
+The settings panel has eight sections, in this order. All but Group start
+closed, so a first install shows every section's name at once.
 
 1. **Group**: *Sync with my group*, the *Group key*, what you share (bank,
    group storage changes, stats, inventory and equipment, rune pouch / quiver /
