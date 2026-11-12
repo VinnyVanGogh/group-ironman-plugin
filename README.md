@@ -75,8 +75,34 @@ to share, and only sees other members' data for what they share themselves.
   *Thresholds* and *Advanced* (the last two start closed). See
   [SETUP.md](SETUP.md#settings).
 
-  ![Settings panel showing configuration toggles for GIM Utilities](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings.png)
-  *Settings: opt-in toggles for group sync, sharing categories, minimums, and commands.*
+  ![Settings panel with its eight sections closed](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-overview.png)
+  *Settings: eight sections, every switch off until you turn it on.*
+
+  <details><summary>Group</summary>
+
+  ![Group settings: sync, group key and what you share](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-group.png)
+
+  </details>
+  <details><summary>Discord: what to post</summary>
+
+  ![Discord: what to post, one switch per event](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-what-to-post.png)
+
+  </details>
+  <details><summary>Discord: how to post</summary>
+
+  ![Discord: how to post, online status, combining level-ups, screenshots and quiet hours](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-how-to-post.png)
+
+  </details>
+  <details><summary>Discord: daily digest</summary>
+
+  ![Discord: daily digest, the hour and which categories it covers](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-daily-digest.png)
+
+  </details>
+  <details><summary>In-game</summary>
+
+  ![In-game settings: banners, group box, world map, ::find and one banner switch per event](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-in-game.png)
+
+  </details>
 
 No server of its own. Party data goes only through RuneLite's Party service,
 and only names on your in-game group roster are shown. **Only the optional

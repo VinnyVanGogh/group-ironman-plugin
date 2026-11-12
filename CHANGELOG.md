@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Settings names that fit
+
+- Long setting names no longer get cut off with "..." in the settings panel.
+  Shorter names: *Combine level-ups*, *Grave picture*, *Valuable drop (gp)*,
+  *Big storage (gp)*, *Clue reward (gp)*, *Shared drops (gp)*, *KC milestone
+  every*, *Gravestone warning*, *Share pouch, quiver, vault*, *Banner:
+  Gravestone expiring*, and the `::find` colours (*Search colour*, *Your bank
+  colour* and so on). The full meaning is in each setting's tooltip.
+- *Poster name*'s first choice is now *Webhook's own*, and *Grave picture*'s
+  is *Where I died*: a long choice made the dropdown squeeze the name to
+  "P...".
+- gp boxes show plain digits, so 1,000,000 shows as `1000000` instead of
+  being cut to `1,000,00`. *Gravestone warning* shows `5 mins`.
+- Nothing resets: every setting keeps its saved value.
+
 ### Hiscore levels for members without the plugin
 
 - Group tab cards for members who never ran GIM Utilities, online or never

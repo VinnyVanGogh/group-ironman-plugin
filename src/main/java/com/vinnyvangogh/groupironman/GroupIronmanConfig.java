@@ -36,6 +36,14 @@ public interface GroupIronmanConfig extends Config
 	/** Frozen. */
 	String KEY_GROUP_KEY = "groupKey";
 
+	/**
+	 * The {@code @Units} on every gp number box: no suffix at all. RuneLite's number box is a fixed 6 columns
+	 * wide whatever the label, and its plain formatter writes thousands commas, so 1,000,000 showed as
+	 * "1,000,00". A {@code @Units} formatter writes {@code value + units} with no commas instead, so 1000000
+	 * fits. Display only: the saved value and its key are untouched. ConfigFitTest holds every row to fit.
+	 */
+	String GP_PLAIN = "";
+
 	// ---- The eight sections ----
 
 	@ConfigSection(name = "Group", description = "Join your group and choose what you share with them. Nothing is"
@@ -169,7 +177,7 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigItem(
 		keyName = "groupShareExtras",
-		name = "Share rune pouch, quiver, seed vault",
+		name = "Share pouch, quiver, vault",
 		description = "Send what is in your rune pouch and Dizana's quiver, and your seed vault as of the last time"
 			+ " you opened it, and show every member's.",
 		section = groupSection,
@@ -269,8 +277,9 @@ public interface GroupIronmanConfig extends Config
 		return "";
 	}
 
-	@ConfigItem(keyName = "discordPosterName", name = "Poster name", description = "Whose name posts show. The"
-		+ " webhook's own: the name and avatar set on each webhook in Discord. Custom: the names below.",
+	@ConfigItem(keyName = "discordPosterName", name = "Poster name", description = "Whose name posts show. Webhook's"
+		+ " own: the name and avatar set on each webhook in Discord. GIM Utilities: that name. Custom: the names"
+		+ " below.",
 		section = discordConnectionSection, position = 8)
 	default DiscordPosterName discordPosterName()
 	{
@@ -425,14 +434,14 @@ public interface GroupIronmanConfig extends Config
 	}
 
 	@ConfigItem(keyName = "discordStorageDeposit", name = "Big storage deposit", description = "A deposit worth at"
-		+ " least the 'Big storage move' value under Thresholds.", section = discordEventsSection, position = 12)
+		+ " least the 'Big storage' value under Thresholds.", section = discordEventsSection, position = 12)
 	default boolean discordStorageDeposit()
 	{
 		return false;
 	}
 
 	@ConfigItem(keyName = "discordStorageWithdrawal", name = "Big storage withdrawal", description = "A withdrawal"
-		+ " worth at least the 'Big storage move' value under Thresholds.", section = discordEventsSection,
+		+ " worth at least the 'Big storage' value under Thresholds.", section = discordEventsSection,
 		position = 13)
 	default boolean discordStorageWithdrawal()
 	{
@@ -523,7 +532,7 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = "discordKcMilestone", name = "Kill count milestone", description = "Every 'Kill count"
+	@ConfigItem(keyName = "discordKcMilestone", name = "Kill count milestone", description = "Every 'KC"
 		+ " milestone every' kills of a boss (under Thresholds).", section = discordEventsSection, position = 26)
 	default boolean discordKcMilestone()
 	{
@@ -602,9 +611,10 @@ public interface GroupIronmanConfig extends Config
 		return 2;
 	}
 
-	@ConfigItem(keyName = "discordCombineLevels", name = "Combine level-ups within (minutes)", description = "More"
-		+ " levels in the same skill within this many minutes of its first post edit that post ('Prayer 23 → 25 (+2)')"
-		+ " instead of posting again. 99s, total and combat levels always post. 0 turns it off.",
+	@ConfigItem(keyName = "discordCombineLevels", name = "Combine level-ups", description = "Minutes to"
+		+ " combine level-ups for. More levels in the same skill within this many minutes of its first post edit"
+		+ " that post ('Prayer 23 → 25 (+2)') instead of posting again. 99s, total and combat levels always post."
+		+ " 0 turns it off.",
 		section = discordHowSection, position = 2)
 	@Range(max = 240)
 	@Units(Units.MINUTES)
@@ -627,7 +637,7 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = "discordGravestoneScreenshot", name = "Gravestone screenshot", description = "The picture"
+	@ConfigItem(keyName = "discordGravestoneScreenshot", name = "Grave picture", description = "The screenshot"
 		+ " on 'Gravestone about to expire': where you died (kept in memory only; none after a client restart),"
 		+ " where you stand when it posts, or none. Needs 'Attach a screenshot'.", section = discordHowSection,
 		position = 5)
@@ -670,16 +680,18 @@ public interface GroupIronmanConfig extends Config
 	}
 
 	@ConfigItem(keyName = "discordLegendAt", name = "Legend at (gp)", description = "With Easter eggs on, a group"
-		+ " storage deposit worth at least this much gets a line. 0 turns it off.", section = discordHowSection,
+		+ " storage deposit worth at least this much gp gets a line. 0 turns it off.", section = discordHowSection,
 		position = 10)
+	@Units(GP_PLAIN)
 	default int discordLegendAt()
 	{
 		return 1_000_000;
 	}
 
 	@ConfigItem(keyName = "discordFreeloaderAt", name = "Freeloader at (gp)", description = "With Easter eggs on, a"
-		+ " group storage withdrawal worth at least this much gets a line. 0 turns it off.",
+		+ " group storage withdrawal worth at least this much gp gets a line. 0 turns it off.",
 		section = discordHowSection, position = 11)
+	@Units(GP_PLAIN)
 	default int discordFreeloaderAt()
 	{
 		return 1_000_000;
@@ -879,7 +891,7 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = "overlayGravestone", name = "Banner: Gravestone about to expire", description = "A"
+	@ConfigItem(keyName = "overlayGravestone", name = "Banner: Gravestone expiring", description = "A"
 		+ " gravestone is about to expire.", section = inGameSection, position = 16)
 	default boolean overlayGravestone()
 	{
@@ -1063,24 +1075,27 @@ public interface GroupIronmanConfig extends Config
 
 	// ---- 7. Thresholds: what counts. Both Discord and the banners read these. ----
 
-	@ConfigItem(keyName = "eventDropMinValue", name = "Valuable drop at least (gp)", description = "A drop counts"
-		+ " as valuable when an item stack in it is worth at least this much.", section = thresholdsSection,
-		position = 0)
+	@ConfigItem(keyName = "eventDropMinValue", name = "Valuable drop (gp)", description = "Valuable drop at least"
+		+ " (gp): a drop counts as valuable when an item stack in it is worth at least this much.",
+		section = thresholdsSection, position = 0)
+	@Units(GP_PLAIN)
 	default int eventDropMinValue()
 	{
 		return 1_000_000;
 	}
 
-	@ConfigItem(keyName = "eventStorageMinValue", name = "Big storage move at least (gp)", description = "A group"
-		+ " storage deposit or withdrawal counts as big when it is worth at least this much.",
+	@ConfigItem(keyName = "eventStorageMinValue", name = "Big storage (gp)", description = "Big storage move"
+		+ " at least (gp): a group storage deposit or withdrawal counts as big when it is worth at least this much.",
 		section = thresholdsSection, position = 1)
+	@Units(GP_PLAIN)
 	default int eventStorageMinValue()
 	{
 		return 1_000_000;
 	}
 
-	@ConfigItem(keyName = "eventClueMinValue", name = "Clue reward at least (gp)", description = "A clue reward counts"
-		+ " when it is worth at least this much.", section = thresholdsSection, position = 2)
+	@ConfigItem(keyName = "eventClueMinValue", name = "Clue reward (gp)", description = "Clue reward at least (gp): a"
+		+ " clue reward counts when it is worth at least this much.", section = thresholdsSection, position = 2)
+	@Units(GP_PLAIN)
 	default int eventClueMinValue()
 	{
 		return 1_000_000;
@@ -1088,12 +1103,13 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigItem(
 		keyName = "groupDropMinValue",
-		name = "Share drops worth at least (gp)",
-		description = "With 'Share drops and collection log' on, only items whose stack is worth at least this much"
-			+ " are sent to your group's panels. 0 shares every item.",
+		name = "Shared drops (gp)",
+		description = "Share drops worth at least (gp): with 'Share drops and collection log' on, only items whose"
+			+ " stack is worth at least this much are sent to your group's panels. 0 shares every item.",
 		section = thresholdsSection,
 		position = 3
 	)
+	@Units(GP_PLAIN)
 	default int groupDropMinValue()
 	{
 		return 10_000;
@@ -1108,8 +1124,9 @@ public interface GroupIronmanConfig extends Config
 		return 1;
 	}
 
-	@ConfigItem(keyName = "eventKcEvery", name = "Kill count milestone every", description = "A boss kill count"
-		+ " milestone every this many kills. 0 turns them off.", section = thresholdsSection, position = 5)
+	@ConfigItem(keyName = "eventKcEvery", name = "KC milestone every", description = "Kill count milestone every:"
+		+ " a boss kill count milestone every this many kills. 0 turns them off.", section = thresholdsSection,
+		position = 5)
 	default int eventKcEvery()
 	{
 		return 100;
@@ -1123,9 +1140,10 @@ public interface GroupIronmanConfig extends Config
 		return 7;
 	}
 
-	@ConfigItem(keyName = "eventGravestoneWarnMinutes", name = "Gravestone warning (minutes left)", description = "How"
+	@ConfigItem(keyName = "eventGravestoneWarnMinutes", name = "Gravestone warning", description = "Minutes left: how"
 		+ " long before a gravestone's 15 minutes run out to warn.", section = thresholdsSection, position = 7)
 	@Range(min = 1, max = 14)
+	@Units(Units.MINUTES)
 	default int eventGravestoneWarnMinutes()
 	{
 		return 5;
@@ -1141,14 +1159,14 @@ public interface GroupIronmanConfig extends Config
 
 	// ---- 8. Advanced: ::find colours ----
 
-	@ConfigItem(keyName = "findQueryColour", name = "::find colour: your search", description = "The colour of the"
-		+ " words you searched for in the ::find answer.", section = advancedSection, position = 0)
+	@ConfigItem(keyName = "findQueryColour", name = "Search colour", description = "::find colour: the words you"
+		+ " searched for in the ::find answer.", section = advancedSection, position = 0)
 	default Color findQueryColour()
 	{
 		return new Color(0xD0, 0x5A, 0x00);
 	}
 
-	@ConfigItem(keyName = "findColourItemNames", name = "::find: colour item names",
+	@ConfigItem(keyName = "findColourItemNames", name = "Colour item names",
 		description = "Also colour each item's name in the ::find answer. Off keeps the answer calmer: only your"
 			+ " search and the places are coloured.", section = advancedSection, position = 1)
 	default boolean findColourItemNames()
@@ -1156,38 +1174,39 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = "findYourBankColour", name = "::find colour: your bank", description = "What is in your"
-		+ " own bank.", section = advancedSection, position = 2)
+	@ConfigItem(keyName = "findYourBankColour", name = "Your bank colour", description = "::find colour: what is in"
+		+ " your own bank.", section = advancedSection, position = 2)
 	default Color findYourBankColour()
 	{
 		return new Color(0x1E, 0x8C, 0x1E);
 	}
 
-	@ConfigItem(keyName = "findMemberBankColour", name = "::find colour: members' banks",
-		description = "What is in another member's bank.", section = advancedSection, position = 3)
+	@ConfigItem(keyName = "findMemberBankColour", name = "Member bank colour",
+		description = "::find colour: what is in another member's bank.", section = advancedSection, position = 3)
 	default Color findMemberBankColour()
 	{
 		return new Color(0x8A, 0x2B, 0xE2);
 	}
 
-	@ConfigItem(keyName = "findStorageColour", name = "::find colour: group storage",
-		description = "What is in group storage, and who took or deposited it.", section = advancedSection,
-		position = 4)
+	@ConfigItem(keyName = "findStorageColour", name = "Storage colour",
+		description = "::find colour: what is in group storage, and who took or deposited it.",
+		section = advancedSection, position = 4)
 	default Color findStorageColour()
 	{
 		return new Color(0xB8, 0x86, 0x0B);
 	}
 
-	@ConfigItem(keyName = "findCarriedColour", name = "::find colour: carried and worn",
-		description = "What someone has in their inventory, equipped, or in a pouch, quiver or seed vault.",
+	@ConfigItem(keyName = "findCarriedColour", name = "Carried colour",
+		description = "::find colour: what someone has in their inventory, equipped, or in a pouch, quiver or"
+			+ " seed vault.",
 		section = advancedSection, position = 5)
 	default Color findCarriedColour()
 	{
 		return new Color(0x00, 0x8B, 0x8B);
 	}
 
-	@ConfigItem(keyName = "findItemColour", name = "::find colour: item names", description = "Each matching item's"
-		+ " name, when '::find: colour item names' is on.", section = advancedSection, position = 6)
+	@ConfigItem(keyName = "findItemColour", name = "Item name colour", description = "::find colour: each matching"
+		+ " item's name, when 'Colour item names' is on.", section = advancedSection, position = 6)
 	default Color findItemColour()
 	{
 		return new Color(0x1E, 0x5A, 0xA8);

@@ -163,7 +163,8 @@ public class ConfigLayoutTest
 		return out;
 	}
 
-	private static List<Method> items()
+	/** Every setting method, also used by ConfigFitTest. */
+	static List<Method> items()
 	{
 		List<Method> out = new ArrayList<>();
 		for (Method m : GroupIronmanConfig.class.getMethods())
