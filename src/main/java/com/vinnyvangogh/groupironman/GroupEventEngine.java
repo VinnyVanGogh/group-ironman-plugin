@@ -17,6 +17,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -158,6 +159,8 @@ class GroupEventEngine
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
 	/** The death's frame for the gravestone warning; memory only, so a restart loses it. */
 	private final GraveShot graveShot = new GraveShot();
+	/** Level-up pictures, taken once the chat shows the level. Client thread. */
+	private final LevelShot levelShot = new LevelShot();
 	private volatile Digest digest = new Digest();
 	private DryStreak dry = DryStreak.parse("");
 	private Digest.Week week = Digest.Week.parse("");
@@ -232,6 +235,7 @@ class GroupEventEngine
 		board.target(null, () -> null);
 		// Unsent posts are dropped at shutdown, as the sender's queue is.
 		batch.drain();
+		levelShot.clear();
 		if (levels != null)
 		{
 			levels.clear();
@@ -586,6 +590,11 @@ class GroupEventEngine
 			return;
 		}
 		watchChat(message, now);
+		if (levelShot.chat(message, now))
+		{
+			shootLevels(now);
+			return;
+		}
 		if (EventText.isPet(message) && wanted(GroupEvent.Type.PET))
 		{
 			own(GroupEvent.of(GroupEvent.Type.PET, now, group.localPlayer()).build());
@@ -807,11 +816,13 @@ class GroupEventEngine
 		{
 			// No ticks until the new world loads: post the held moments now. A hop is never a logout.
 			batch.drain().forEach(this::flush);
+			levelShot.drain().forEach(this::shoot);
 		}
 		else if (state == GameState.LOGIN_SCREEN)
 		{
 			// No more ticks until the next login: post what is held now.
 			batch.drain().forEach(this::flush);
+			levelShot.drain().forEach(this::shoot);
 			// A logout ends every level streak; an edit already owed still goes.
 			levels.close();
 			// A world hop (HOPPING) is never a logout: it posts nothing, whatever the grace.
@@ -841,6 +852,7 @@ class GroupEventEngine
 	{
 		long now = System.currentTimeMillis();
 		batch.due(now).forEach(this::flush);
+		shootLevels(now);
 		Player me = client.getLocalPlayer();
 		if (me == null || me.getName() == null)
 		{
@@ -1244,7 +1256,9 @@ class GroupEventEngine
 		List<DiscordBatch.Pending> done = new ArrayList<>();
 		DiscordBatch.Pending moment = batch.add(event, System.currentTimeMillis(),
 			DiscordMerge.window(family, settings), done);
-		if (moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot())
+		// A level-up's frame waits for its chat line (LevelShot), taken when the moment is posted.
+		if (moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot()
+			&& event.type != GroupEvent.Type.LEVEL_UP)
 		{
 			// The frame of the moment itself, not of whenever the post goes out (a death's respawn). A death's
 			// frame is also the gravestone warning's, when that wants it: encoded once, held for that grave.
@@ -1275,39 +1289,72 @@ class GroupEventEngine
 		return Amounts.BOTH.words(group.lookup);
 	}
 
-	/** Client thread. One held moment as one post. */
+	/** Client thread. One held moment as one post; a level-up's waits for its picture ({@link LevelShot}). */
 	private void flush(DiscordBatch.Pending moment)
 	{
 		DiscordMerge.Post post = DiscordMerge.merge(moment.events, settings, discordWords());
 		String url = post == null ? null : webhook(post.lead.type.category);
-		if (url != null && !combineLevels(url, moment))
+		if (url == null)
 		{
-			post(url, post, moment.events, true, moment.screenshot);
+			return;
 		}
+		Consumer<byte[]> send = combineLevels(url, moment);
+		if (send == null)
+		{
+			send = poster(url, post, moment.events, true);
+		}
+		if (send == null)
+		{
+			return;
+		}
+		GroupEvent level = firstLevelUp(moment.events);
+		if (!config.discordScreenshot() || moment.screenshot != null)
+		{
+			send.accept(moment.screenshot);
+		}
+		else if (level != null)
+		{
+			levelShot.hold(level.text, level.number, level.at, send);
+			shootLevels(System.currentTimeMillis());
+		}
+		else
+		{
+			nextFrame(send);
+		}
+	}
+
+	private static GroupEvent firstLevelUp(List<GroupEvent> events)
+	{
+		return events.stream().filter(e -> e.type == GroupEvent.Type.LEVEL_UP).findFirst().orElse(null);
+	}
+
+	/** Client thread. The level-up pictures due now: one frame each, for every post waiting on it. */
+	private void shootLevels(long now)
+	{
+		levelShot.due(now).forEach(this::shoot);
+	}
+
+	private void shoot(LevelShot.Held shot)
+	{
+		nextFrame(png -> shot.sends.forEach(send -> send.accept(png)));
 	}
 
 	/**
 	 * A moment that is one skill's level-up joins that skill's post when the combine window is on: the first
-	 * posts and is kept, later ones edit it ({@link LevelThreads}). False when the moment posts as usual.
+	 * posts and is kept, later ones edit it ({@link LevelThreads}). Returns what sends it, given the picture; null
+	 * when the moment posts as usual.
 	 */
-	private boolean combineLevels(String url, DiscordBatch.Pending moment)
+	private Consumer<byte[]> combineLevels(String url, DiscordBatch.Pending moment)
 	{
 		long window = TimeUnit.MINUTES.toMillis(config.discordCombineLevels());
 		GroupEvent level = window > 0 ? LevelThreads.combinable(moment.events) : null;
 		if (level == null)
 		{
-			return false;
+			return null;
 		}
 		// The egg reads the item cache: on the client thread, as every other post's does.
 		String egg = egg(moment.events);
-		if (!config.discordScreenshot() || moment.screenshot != null)
-		{
-			levelUp(url, level, window, moment.screenshot, egg);
-			return true;
-		}
-		drawManager.requestNextFrameListener(image -> executor.execute(() ->
-			levelUp(url, level, window, png(image), egg)));
-		return true;
+		return png -> levelUp(url, level, window, png, egg);
 	}
 
 	/** Any thread. A level-up into its streak, with the usual level-up post should it start a new one. */
@@ -1331,23 +1378,36 @@ class GroupEventEngine
 	 */
 	private void post(String url, DiscordMerge.Post post, List<GroupEvent> events, boolean picture, byte[] shot)
 	{
-		DiscordStyle style = config.discordStyle();
-		String mention = config.discordMention();
+		Consumer<byte[]> send = poster(url, post, events, picture);
+		if (send == null)
+		{
+			return;
+		}
+		if (!picture || !config.discordScreenshot() || shot != null)
+		{
+			send.accept(shot);
+			return;
+		}
+		nextFrame(send);
+	}
+
+	/** Client thread. What sends a post, given its picture (dropped when none is wanted); null for nothing to say. */
+	private Consumer<byte[]> poster(String url, DiscordMerge.Post post, List<GroupEvent> events, boolean picture)
+	{
 		boolean picked = picture && config.discordScreenshot();
-		String json = DiscordWebhook.payload(gson, post, discordWords(), style, mention, picked, egg(events),
-			PosterNames.name(config, post.lead.type.category));
+		String json = DiscordWebhook.payload(gson, post, discordWords(), config.discordStyle(),
+			config.discordMention(), picked, egg(events), PosterNames.name(config, post.lead.type.category));
 		if (json == null)
 		{
-			return;
+			return null;
 		}
-		if (!picked || shot != null)
-		{
-			sender.post(url, json, picked ? shot : null);
-			return;
-		}
-		// The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread.
-		drawManager.requestNextFrameListener(image -> executor.execute(() ->
-			sender.post(url, json, png(image))));
+		return png -> sender.post(url, json, picked ? png : null);
+	}
+
+	/** The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread. */
+	private void nextFrame(Consumer<byte[]> send)
+	{
+		drawManager.requestNextFrameListener(image -> executor.execute(() -> send.accept(png(image))));
 	}
 
 	private static byte[] png(Image image)
