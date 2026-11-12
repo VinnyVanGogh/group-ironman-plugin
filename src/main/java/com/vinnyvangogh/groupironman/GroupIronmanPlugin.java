@@ -222,7 +222,8 @@ public class GroupIronmanPlugin extends Plugin
 			return;
 		}
 		GroupIronmanPanel.View view = new GroupIronmanPanel.View(group.syncState(), group.roster(), group.members(),
-			group.lookup, group.switches(), group.regions(), group.since(), group.self());
+			group.lookup, group.switches(), group.regions(), group.since(), group.self(),
+			group.presence());
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
 	}

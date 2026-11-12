@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Online status for members without the plugin
+
+- Who is online, and on which world, now comes from the game's own Ironman
+  Group channel (the in-game Group tab), so members who don't run the plugin
+  show too. The Friends list is the fallback before the channel loads.
+- Live board: *online (world 615)* or *offline* for every member, with a
+  subtle *(no plugin)* tag for members whose client never reported. *unknown*
+  only before the game has said.
+- The Group overlay no longer says *Nobody else online* while the game shows
+  others online. Sidebar cards show *Online - W615 (no plugin)* or *Offline*.
+- Online posts: logins and logouts of members without the plugin are posted
+  too, with the same offline grace, by one plugin user only (the first by name
+  of those online in the group's party).
+
 ### One Discord post per skill's level streak
 
 - New setting **Combine level-ups within (minutes)**, default 30, 0 turns it

@@ -101,10 +101,13 @@ class GroupIronmanPanel extends PluginPanel
 		/** When this player last played before this session, 0 when not known. */
 		final long since;
 		final String self;
+		/** Who is online, plugin or not, as the game's Group channel shows it. */
+		final GamePresence presence;
 
 		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
-			GroupOutbox.Switches switches, RegionNames regions, long since, String self)
+			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GamePresence presence)
 		{
+			this.presence = presence;
 			this.sync = sync;
 			this.group = group;
 			this.members = members;
@@ -408,7 +411,7 @@ class GroupIronmanPanel extends PluginPanel
 	private void drawGroup(JPanel tab, View v, long now)
 	{
 		List<PanelModel.MemberCard> cardsList = PanelModel.members(v.group, v.members.names(), v.regions, v.items,
-			v.self, now);
+			v.self, v.presence, now);
 		if (cardsList.isEmpty())
 		{
 			empty(tab, "No members yet.", "Turn on 'Share stats' and 'Share inventory and equipment' in GIM Utilities'"

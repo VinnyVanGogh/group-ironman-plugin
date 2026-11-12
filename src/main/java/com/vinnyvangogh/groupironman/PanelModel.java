@@ -224,6 +224,16 @@ final class PanelModel
 	static List<MemberCard> members(GroupRoster group, Collection<String> roster, RegionNames regions, ItemLookup items,
 		String self, long now)
 	{
+		return members(group, roster, regions, items, self, GamePresence.UNKNOWN, now);
+	}
+
+	/**
+	 * As above, with online and world from the game's Group channel ({@link GamePresence}) where it knows them,
+	 * so members without the plugin show too; party data still fills everything else.
+	 */
+	static List<MemberCard> members(GroupRoster group, Collection<String> roster, RegionNames regions, ItemLookup items,
+		String self, GamePresence game, long now)
+	{
 		Map<String, MemberStats> stats = group.allStats();
 		Map<String, GroupCodec.Carried> carried = group.allCarried();
 		Map<String, MemberExtras> extras = group.extras();
@@ -240,13 +250,34 @@ final class PanelModel
 		{
 			boolean you = name.equalsIgnoreCase(self);
 			long at = heard.getOrDefault(name, 0L);
-			boolean online = Presence.online(at, now);
+			GamePresence.State g = game.state(name);
+			boolean online = g == GamePresence.State.ONLINE || g == GamePresence.State.UNKNOWN && Presence.online(at, now);
 			MemberStats s = stats.get(name);
-			out.add(new MemberCard(name, you, online, status(s, at, online, regions, now), bars(s), skills(s),
+			out.add(new MemberCard(name, you, online, status(s, at, g, game.world(name), regions, now), bars(s), skills(s),
 				itemGroups(carried.get(name), extras.get(name), items), seedVault(extras.get(name), now)));
 		}
 		out.sort(Comparator.comparing((MemberCard c) -> !c.you));
 		return out;
+	}
+
+	/**
+	 * The card's line with the game's word on it: online on the game's world when only the game says so, offline
+	 * when the game says so, and " (no plugin)" for a member whose client never reported.
+	 */
+	private static String status(MemberStats s, long heardAt, GamePresence.State game, int gameWorld,
+		RegionNames regions, long now)
+	{
+		String tag = heardAt > 0 || s != null ? "" : " (no plugin)";
+		boolean heard = Presence.online(heardAt, now);
+		if (game == GamePresence.State.ONLINE && !heard)
+		{
+			return (gameWorld > 0 ? "Online - W" + gameWorld : "Online") + tag;
+		}
+		if (game == GamePresence.State.OFFLINE)
+		{
+			return heardAt > 0 ? status(s, heardAt, false, regions, now) : "Offline" + tag;
+		}
+		return status(s, heardAt, heard, regions, now);
 	}
 
 	static String status(MemberStats s, long heardAt, boolean online, RegionNames regions, long now)

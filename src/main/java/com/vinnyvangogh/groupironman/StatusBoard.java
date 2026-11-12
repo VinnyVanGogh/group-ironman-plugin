@@ -44,6 +44,8 @@ final class StatusBoard
 	static final String ONLINE = "🟢";
 	static final String OFFLINE = "🔴";
 	static final String UNKNOWN = "⚪";
+	/** After a member the game shows but whose client never reported: they do not run the plugin. */
+	static final String NO_PLUGIN = " *(no plugin)*";
 	private static final String SEP = "\t";
 
 	/** This client's own player, which it knows better than the party does. */
@@ -202,20 +204,29 @@ final class StatusBoard
 
 	// ---- What it says ----
 
-	/**
-	 * One line per member: the game's roster when known, else everyone heard from. A member is online while
-	 * their client is heard from ({@link Presence}), offline with when it last was, and unknown when it never
-	 * was: only members whose clients run the plugin report. Empty when there is no one to list.
-	 */
+	/** {@link #lines(GroupMembers, Map, Map, Self, GamePresence, long)} without the game's Group channel. */
 	static String lines(GroupMembers roster, Map<String, Long> heard, Map<String, MemberStats> stats, Self self,
 		long now)
+	{
+		return lines(roster, heard, stats, self, GamePresence.UNKNOWN, now);
+	}
+
+	/**
+	 * One line per member: the game's roster when known, else everyone heard from or in the channel. When the
+	 * game says ({@link GamePresence}, the in-game Group channel) a member is online or offline, that is the line,
+	 * with " (no plugin)" for a member whose client was never heard from. Otherwise a member is online while their
+	 * client is heard from ({@link Presence}), offline with when it last was, and unknown when it never was.
+	 * Empty when there is no one to list.
+	 */
+	static String lines(GroupMembers roster, Map<String, Long> heard, Map<String, MemberStats> stats, Self self,
+		GamePresence game, long now)
 	{
 		Map<String, Long> heardBy = new HashMap<>();
 		heard.forEach((name, at) -> heardBy.put(GroupMembers.key(name), at));
 		Map<String, Integer> worldBy = new HashMap<>();
 		stats.forEach((name, s) -> worldBy.put(GroupMembers.key(name), s.world()));
 		List<String> out = new ArrayList<>();
-		for (String name : names(roster, heard, self))
+		for (String name : names(roster, heard, self, game))
 		{
 			String key = GroupMembers.key(name);
 			if (self != null && key.equals(GroupMembers.key(self.name)))
@@ -223,20 +234,34 @@ final class StatusBoard
 				out.add(self.online ? online(name, self.world) : offline(name, self.seenAt));
 				continue;
 			}
-			long at = heardBy.getOrDefault(key, 0L);
-			if (Presence.online(at, now))
-			{
-				out.add(online(name, worldBy.getOrDefault(key, 0)));
-			}
-			else
-			{
-				out.add(at > 0 || worldBy.containsKey(key) ? offline(name, at) : UNKNOWN + " " + bold(name) + " unknown");
-			}
+			out.add(member(name, heardBy.getOrDefault(key, 0L), worldBy.get(key), game, now));
 		}
 		return String.join("\n", out);
 	}
 
-	private static Set<String> names(GroupMembers roster, Map<String, Long> heard, Self self)
+	/** Another member's line: the game first, then their client, else unknown. */
+	private static String member(String name, long heardAt, Integer statsWorld, GamePresence game, long now)
+	{
+		boolean plugin = heardAt > 0 || statsWorld != null;
+		int lastWorld = statsWorld == null ? 0 : statsWorld;
+		String tag = plugin ? "" : NO_PLUGIN;
+		switch (game.state(name))
+		{
+			case ONLINE:
+				return online(name, game.world(name) > 0 ? game.world(name) : lastWorld) + tag;
+			case OFFLINE:
+				return offline(name, heardAt) + tag;
+			default:
+				break;
+		}
+		if (Presence.online(heardAt, now))
+		{
+			return online(name, lastWorld);
+		}
+		return plugin ? offline(name, heardAt) : UNKNOWN + " " + bold(name) + " unknown";
+	}
+
+	private static Set<String> names(GroupMembers roster, Map<String, Long> heard, Self self, GamePresence game)
 	{
 		if (roster.known())
 		{
@@ -244,6 +269,7 @@ final class StatusBoard
 		}
 		Set<String> names = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 		names.addAll(heard.keySet());
+		names.addAll(game.names());
 		if (self != null && !self.name.isEmpty())
 		{
 			names.add(self.name);

@@ -667,7 +667,8 @@ public interface GroupIronmanConfig extends Config
 	@ConfigItem(keyName = "discordOnlineStatus", name = "Online status", description = "Posts: a post for each"
 		+ " login and logout, with the world and how long you played (a hop, or a relog within the offline grace, is"
 		+ " not posted). Live board: one message in the Group channel listing each member online or offline,"
-		+ " edited as members log in, out or hop. Only members running this plugin are reported; only one member"
+		+ " edited as members log in, out or hop. Members without this plugin are read from the game's Group"
+		+ " channel and marked '(no plugin)'; their logins are posted by one plugin user only. Only one member"
 		+ " sharing a Group webhook should turn it on, or the channel gets one board each. Off: neither.",
 		section = discordEventsSection, position = 17)
 	default OnlineStatus discordOnlineStatus()

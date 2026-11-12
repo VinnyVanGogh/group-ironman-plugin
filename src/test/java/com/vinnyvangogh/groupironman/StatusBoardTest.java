@@ -180,6 +180,51 @@ public class StatusBoardTest
 			.startsWith(StatusBoard.ONLINE + " **Alex** online (world 444)"));
 	}
 
+	/** Board 2026-11-11: the game's Group channel fills in members without the plugin; 2 of 5 online. */
+	@Test
+	public void theGroupChannelShowsMembersWithoutThePlugin()
+	{
+		Map<String, Long> heard = new HashMap<>();
+		heard.put("GroupShip", NOW - 5_000);
+		heard.put("GroupArk", NOW - 30_000);
+		Map<String, MemberStats> stats = new HashMap<>();
+		stats.put("GroupShip", new MemberStats(Collections.emptyMap(), 100, 100, 303, 0));
+		stats.put("GroupArk", new MemberStats(Collections.emptyMap(), 100, 100, 330, 0));
+		StatusBoard.Self me = new StatusBoard.Self("GroupShip", true, 303, 0);
+		String lines = StatusBoard.lines(GamePresenceTest.ROSTER, heard, stats, me, GamePresenceTest.twoOfFive(), NOW);
+		assertEquals(String.join("\n",
+			// Heard 30 seconds ago, but the game says logged out: the game wins.
+			StatusBoard.OFFLINE + " **GroupArk** offline (last seen <t:" + (NOW - 30_000) / 1000 + ":R>)",
+			StatusBoard.ONLINE + " **GroupOtt** online (world 615)" + StatusBoard.NO_PLUGIN,
+			StatusBoard.OFFLINE + " **GroupPNK** offline" + StatusBoard.NO_PLUGIN,
+			StatusBoard.ONLINE + " **GroupShip** online (world 303)",
+			StatusBoard.OFFLINE + " **GroupTrashy** offline" + StatusBoard.NO_PLUGIN), lines);
+		assertEquals(2, lines.split(StatusBoard.ONLINE, -1).length - 1);
+		assertEquals(3, lines.split(StatusBoard.OFFLINE, -1).length - 1);
+		assertFalse(lines.contains("unknown"));
+	}
+
+	@Test
+	public void beforeTheChannelLoadsMembersWithoutThePluginAreUnknown()
+	{
+		StatusBoard.Self me = new StatusBoard.Self("GroupShip", true, 303, 0);
+		String lines = StatusBoard.lines(GamePresenceTest.ROSTER, Collections.emptyMap(), Collections.emptyMap(), me,
+			GamePresence.UNKNOWN, NOW);
+		assertTrue(lines, lines.contains(StatusBoard.UNKNOWN + " **GroupOtt** unknown"));
+		assertFalse(lines.contains(StatusBoard.NO_PLUGIN));
+	}
+
+	@Test
+	public void withoutTheRosterTheChannelStillListsWhoIsOn()
+	{
+		StatusBoard.Self me = new StatusBoard.Self("GroupShip", true, 303, 0);
+		GamePresence game = GamePresence.read(GroupMembers.UNKNOWN,
+			GamePresenceTest.worlds("GroupOtt", 615, "GroupShip", 303), null);
+		assertEquals(StatusBoard.ONLINE + " **GroupOtt** online (world 615)" + StatusBoard.NO_PLUGIN + "\n"
+			+ StatusBoard.ONLINE + " **GroupShip** online (world 303)",
+			StatusBoard.lines(GroupMembers.UNKNOWN, Collections.emptyMap(), Collections.emptyMap(), me, game, NOW));
+	}
+
 	@Test
 	public void withoutTheRosterOnlyMembersHeardFromAreListed()
 	{
