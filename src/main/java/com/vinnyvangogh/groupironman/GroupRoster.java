@@ -46,6 +46,8 @@ final class GroupRoster
 	private final DropLog events = new DropLog();
 	/** Every event, for the Log tab: see {@link ActivityLog}. */
 	private final DropLog feed = ActivityLog.newFeed();
+	/** Hiscore levels for members who do not share stats. */
+	private final HiscoreBook hiscores = new HiscoreBook();
 	private volatile Storage storage;
 	/** When this player was last seen logged in, by this client; 0 when never. */
 	private volatile long lastPlayed;
@@ -94,6 +96,11 @@ final class GroupRoster
 	DropLog events()
 	{
 		return events;
+	}
+
+	HiscoreBook hiscores()
+	{
+		return hiscores;
 	}
 
 	/** Every group event, yours and members', newest first: the Log tab. */
@@ -219,6 +226,7 @@ final class GroupRoster
 		heard.clear();
 		events.clear();
 		feed.clear();
+		hiscores.clear();
 		lastPlayed = 0;
 	}
 

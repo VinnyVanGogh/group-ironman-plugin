@@ -306,6 +306,57 @@ client (HTTP interactions on the Worker) and never posts game data. Its
 commands are limited to Manage Server by default and re-checked on the
 server. Same reasoning as #23.
 
+### Phase 0 addendum — hiscore levels for members without the plugin (2026-11-11)
+
+Board in-game test, 2026-11-11: the Group tab should show something for a
+roster member who never ran GIM Utilities, and for one never seen online.
+
+**26. Hiscore lookup of your own group's members — allowed, with
+precedent.** *The feature, as what the player now knows:* the public hiscore
+skill levels of the people on their own in-game Group Ironman roster. *Nearest
+rules:* Data & Privacy, "no crowdsourcing data about other players" and "no
+exposing player information over HTTP". Neither applies: the levels are
+already public on Jagex's own hiscores, the lookup is a read from Jagex
+(`secure.runescape.com`) by RuneLite's own `HiscoreClient`, nothing about any
+player is sent anywhere, and the result never leaves this client: it is not
+relayed over Party (#8–#17) or posted to Discord (#18). Only names on the
+in-game roster (`GroupMembers`) are looked up, never a typed or arbitrary
+name, so this is not a lookup tool. Not PvP scouting: group members cannot be
+attacked by each other, and hiscore levels say nothing about a fight.
+*Precedent:* the base client's **Hiscore** plugin
+(`net.runelite.client.plugins.hiscore`) looks up any player's levels with the
+same `HiscoreClient` (runelite-client 1.13.5, `HiscoreClient.lookupAsync`,
+read with `javap` 2026-11-11); its right-click *Lookup* runs on players the
+user meets. Group Ironmen Tracker (#8, #22) shows each member's skills on its
+site; whether it reads them from the hiscores was not checked in this run.
+
+*Conditions this build keeps* (`HiscoreBook`, `GroupService.lookUpHiscores`):
+- RuneLite's injected `HiscoreClient` only, no HTTP client of our own; its
+  `lookupAsync` runs on OkHttp's threads, never the client thread.
+- Only members who share no stats, never this player. Shared plugin data
+  always wins over hiscores in the panel (`PanelModel.members`).
+- At most one lookup per member every 6 hours (Board), started only on this
+  player's login or the member coming online in the Group channel. A failed
+  lookup retries on its own after 15 min, doubling to at most 6 h: no storm.
+  Failure shows "Hiscores unavailable".
+- Results are kept in the group cache with their time ("From hiscores, 2h
+  ago"). Run and special attack are never on the hiscores: for an online
+  member they show 100%, dimmed, "assumed, not shared" (Board). Items are
+  never invented: a member who never shared them shows none.
+- Endpoint: `HiscoreEndpoint.NORMAL`. RuneLite 1.13.5 has no Group Ironman
+  endpoint (`IRONMAN`, `HARDCORE_IRONMAN`, `ULTIMATE_IRONMAN` only), and the
+  main hiscores rank every account type. *Unverified:* that every group
+  member is on the main hiscores; a skill below the ranking threshold shows as
+  missing, not as level 1.
+- No new switch: the lookup sends nothing about anyone and goes to Jagex, not
+  a third party, so the third-party warning does not apply. It runs only
+  while some GIM Utilities feature is on (`anyOn`). If the Board wants it
+  switchable, that is a new key, off by default, frozen at first release.
+
+This amends the roster line in round 2 ("no hiscores or Wise Old Man
+calls"): the roster still comes only from the game; hiscores add levels, not
+members.
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection**, and therefore any integration that reads another plugin's
@@ -315,7 +366,9 @@ server. Same reasoning as #23.
   player sets (#18), and any server, **on `main`**. Group Ironmen Tracker
   needs a website; this plugin's point is that it does not. *Amended
   2026-11-11 (Board):* the opt-in server sync in #22–#25 is the one exception,
-  on the `server-sync` branch only, until the Board merges it.
+  on the `server-sync` branch only, until the Board merges it. *Amended
+  2026-11-11 (Board):* reading roster members' public levels through
+  RuneLite's own `HiscoreClient` (#26) is allowed on `main`; it sends nothing.
 - **Automating anything**: moving items, withdrawing, walking. Input
   Restrictions.
 - **Joining a party without a click**, on login or on a timer, and **putting

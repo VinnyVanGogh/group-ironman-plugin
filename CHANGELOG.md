@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Hiscore levels for members without the plugin
+
+- Group tab cards for members who never ran GIM Utilities, online or never
+  seen, now show their skill levels from the OSRS hiscores, read with
+  RuneLite's own hiscore lookup, marked *From hiscores, 2h ago*.
+- Online, such a member also shows HP and Prayer at their hiscore level, and
+  Run and Spec at 100%, dimmed, with the tooltip *assumed, not shared*.
+- Looked up when you log in and when a member comes online, at most once
+  every 6 hours per member, and kept across restarts. A failed lookup shows
+  *Hiscores unavailable* and retries later, backing off up to 6 hours.
+- Shared plugin data always wins. Inventory and worn items are never made
+  up: a member who never shared them shows none.
+
 ### Online status for members without the plugin
 
 - Who is online, and on which world, now comes from the game's own Ironman

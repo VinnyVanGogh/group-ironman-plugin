@@ -69,6 +69,9 @@ import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStats;
 import net.runelite.client.game.ItemStack;
+import net.runelite.client.hiscore.HiscoreClient;
+import net.runelite.client.hiscore.HiscoreEndpoint;
+import net.runelite.client.hiscore.HiscoreResult;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.events.UserPart;
@@ -88,7 +91,10 @@ import net.runelite.client.party.messages.UserSync;
  *
  * <p>Data only ever comes from this player's own client: their bank and
  * group storage as the game shows them, their own stats. Nothing is read
- * from another player and nothing goes anywhere but RuneLite Party.
+ * from another player and nothing goes anywhere but RuneLite Party. The one
+ * exception is read, not sent: roster members who share no stats are looked up
+ * on the public OSRS hiscores with RuneLite's own {@link HiscoreClient}
+ * ({@link HiscoreBook}), and the result stays on this client.
  */
 @Slf4j
 class GroupService
@@ -165,6 +171,9 @@ class GroupService
 	@Inject
 	private ConfigManager configManager;
 
+	@Inject
+	private HiscoreClient hiscoreClient;
+
 	private final GroupRoster roster = new GroupRoster();
 	private final BankAssembler assembler = new BankAssembler();
 	private final Map<Integer, String> names = new ConcurrentHashMap<>();
@@ -207,6 +216,8 @@ class GroupService
 	private Map<Integer, Integer> seedVault = new TreeMap<>();
 	private long seedVaultAt = -1;
 	private boolean session;
+	/** This login has not asked the hiscores about the roster yet. */
+	private boolean hiscoresOnLogin = true;
 
 	private volatile RegionNames regions = RegionNames.parse("");
 	/** Nothing is written to disk until the file has been read, or a save would replace it with less. */
@@ -284,6 +295,7 @@ class GroupService
 		members = GroupMembers.UNKNOWN;
 		cacheLoaded = false;
 		session = false;
+		hiscoresOnLogin = true;
 		seedVault = new TreeMap<>();
 		seedVaultAt = -1;
 		lastExtrasSent = null;
@@ -532,6 +544,7 @@ class GroupService
 		}
 		if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
+			hiscoresOnLogin = true;
 			refreshPresence();
 		}
 	}
@@ -795,6 +808,56 @@ class GroupService
 			onChange.run();
 		}
 		refreshPresence();
+		// Once per login, every roster member, seen online or not; otherwise only failed lookups' retries.
+		boolean login = hiscoresOnLogin && cacheLoaded && members.known();
+		if (login)
+		{
+			hiscoresOnLogin = false;
+		}
+		lookUpHiscores(members.names(), login);
+	}
+
+	/**
+	 * Client thread. Starts a hiscore lookup, on OkHttp's threads, for each of {@code names} that is not this
+	 * player, shares no stats (shared data always wins) and is due ({@link HiscoreBook#begin}). {@code asked}:
+	 * this player just logged in or these members just came online.
+	 */
+	private void lookUpHiscores(Collection<String> names, boolean asked)
+	{
+		if (!cacheLoaded || !anyOn() || names.isEmpty())
+		{
+			return;
+		}
+		Set<String> shared = new HashSet<>();
+		roster.allStats().keySet().forEach(n -> shared.add(GroupMembers.key(n)));
+		shared.add(GroupMembers.key(self));
+		long now = System.currentTimeMillis();
+		for (String name : names)
+		{
+			if (!shared.contains(GroupMembers.key(name)) && roster.hiscores().begin(name, now, asked))
+			{
+				hiscoreClient.lookupAsync(name, HiscoreEndpoint.NORMAL)
+					.whenComplete((result, error) -> hiscoreDone(name, result, error));
+			}
+		}
+	}
+
+	/** OkHttp thread. A null result is a name not on the hiscores; it shows as unavailable, like an error. */
+	private void hiscoreDone(String name, HiscoreResult result, Throwable error)
+	{
+		long now = System.currentTimeMillis();
+		Map<String, Integer> levels = error == null ? HiscoreBook.levels(result) : Collections.emptyMap();
+		if (levels.isEmpty())
+		{
+			log.debug("hiscore lookup for a group member failed", error);
+			roster.hiscores().failed(name, now);
+		}
+		else
+		{
+			roster.hiscores().succeeded(name, levels, now);
+			saveCache();
+		}
+		onChange.run();
 	}
 
 	/**
@@ -846,7 +909,9 @@ class GroupService
 		{
 			return;
 		}
+		GamePresence before = presence;
 		presence = now;
+		lookUpHiscores(GamePresence.cameOnline(members.names(), before, now), true);
 		GroupEventEngine e = events;
 		if (e != null)
 		{

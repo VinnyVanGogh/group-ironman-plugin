@@ -464,9 +464,14 @@ class GroupIronmanPanel extends PluginPanel
 			bars.setOpaque(false);
 			for (PanelModel.Bar b : c.bars)
 			{
-				bars.add(new Orb(b, barColor(b.label), c.online || c.you, orbIcons.get(b.label)));
+				// An assumed number (run and spec for a member without the plugin) is drawn dimmed.
+				bars.add(new Orb(b, barColor(b.label), (c.online || c.you) && !b.assumed, orbIcons.get(b.label)));
 			}
 			body.add(bars);
+		}
+		if (c.source != null)
+		{
+			body.add(text(c.source, MUTED));
 		}
 		if (!c.skills.isEmpty())
 		{
@@ -1072,7 +1077,7 @@ class GroupIronmanPanel extends PluginPanel
 			this.live = live;
 			this.icon = icon;
 			setPreferredSize(new Dimension(44, SIZE + 2));
-			setToolTipText(bar.label + " " + bar.text());
+			setToolTipText(bar.tooltip());
 		}
 
 		@Override
