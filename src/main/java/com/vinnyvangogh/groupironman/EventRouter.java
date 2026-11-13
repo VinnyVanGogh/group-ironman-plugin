@@ -104,7 +104,13 @@ final class EventRouter
 	/**
 	 * "Post every N levels": only levels that are a multiple of {@code every}.
 	 * 99 always counts; 99s, max total, total level milestones and combat
-	 * levels are kinds of their own and never come through here.
+	 * levels are kinds of their own and never come through here. One action
+	 * that gains several levels (low Prayer, 3 → 7 with N = 5) counts when it
+	 * passes a multiple, so a jump never skips the level it crossed.
+	 *
+	 * <p>This filter runs before "Combine level-ups": a skill's streak post is
+	 * made of the levels that pass it, so with N = 5 one post reads 59 → 65
+	 * and is edited when 70 comes, not at every level in between.
 	 */
 	private static GroupEvent everyN(GroupEvent levelUp, int every)
 	{
@@ -112,7 +118,10 @@ final class EventRouter
 		{
 			return levelUp;
 		}
-		return levelUp.number % every == 0 ? levelUp : null;
+		long before = levelUp.previous > 0 && levelUp.previous < levelUp.number ? levelUp.previous
+			: levelUp.number - 1;
+		// The highest multiple of N at or below the new level is above the old one.
+		return levelUp.number / every * every > before ? levelUp : null;
 	}
 
 	private static GroupEvent valuableStacks(GroupEvent event, long min, ItemLookup lookup)

@@ -71,7 +71,10 @@ public class GroupSettingsSchemaTest
 	{
 		for (GroupEvent.Type t : GroupEvent.Type.values())
 		{
-			assertNotNull(GroupSettingsSchema.get(GroupSettingsSchema.discordKey(t)));
+			if (t != GroupSettingsSchema.OWN_DISCORD)
+			{
+				assertNotNull(GroupSettingsSchema.get(GroupSettingsSchema.discordKey(t)));
+			}
 			assertNotNull(GroupSettingsSchema.get(GroupSettingsSchema.overlayKey(t)));
 		}
 		for (GroupEvent.Category c : GroupEvent.Category.values())

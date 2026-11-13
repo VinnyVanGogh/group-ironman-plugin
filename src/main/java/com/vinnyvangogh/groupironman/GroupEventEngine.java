@@ -265,6 +265,19 @@ class GroupEventEngine
 		warnBadWebhooks();
 	}
 
+	/** The shared values now; this member's own config until the first {@link #reloadConfig}. */
+	private GroupSettingsSchema.Resolved resolved()
+	{
+		GroupSettingsSchema.Resolved v = values;
+		return v != null ? v : new GroupSettingsSchema.Resolved(config, null);
+	}
+
+	/** The group's offline grace when it has settings, else this member's own. */
+	private int offlineGrace()
+	{
+		return resolved().intValue("discordOfflineGrace");
+	}
+
 	/**
 	 * A webhook field that is set but not a Discord webhook link gets one
 	 * chat line, on login or a config change, naming the field and never the
@@ -299,9 +312,9 @@ class GroupEventEngine
 			synchronized (presenceLock)
 			{
 				// The name is the one the login gave: after a logout localPlayer() is "You".
-				offline = presence.poll(System.currentTimeMillis(), values.intValue("discordOfflineGrace"));
+				offline = presence.poll(System.currentTimeMillis(), offlineGrace());
 				savePresence();
-				others = channelPosts.poll(System.currentTimeMillis(), config.discordOfflineGrace());
+				others = channelPosts.poll(System.currentTimeMillis(), offlineGrace());
 			}
 			if (offline != null)
 			{
@@ -335,8 +348,9 @@ class GroupEventEngine
 			{
 				board.show(lines, now);
 			}
-			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), config.discordQuietStart(),
-				config.discordQuietEnd());
+			GroupSettingsSchema.Resolved v = resolved();
+			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), v.intValue("discordQuietStart"),
+				v.intValue("discordQuietEnd"));
 			StatusBoard.Send send = board.next(now, quiet);
 			if (send != null)
 			{
@@ -387,7 +401,7 @@ class GroupEventEngine
 		synchronized (presenceLock)
 		{
 			posts = channelPosts.update(game, n -> plugin.contains(GroupMembers.key(n)) || GroupMembers.key(n)
-				.equals(self), System.currentTimeMillis(), config.discordOfflineGrace());
+				.equals(self), System.currentTimeMillis(), offlineGrace());
 		}
 		routeChannelPosts(posts);
 	}
@@ -1075,7 +1089,7 @@ class GroupEventEngine
 		List<GroupEvent> posts;
 		synchronized (presenceLock)
 		{
-			posts = presence.login(now, client.getWorld(), name, values.intValue("discordOfflineGrace"));
+			posts = presence.login(now, client.getWorld(), name, offlineGrace());
 			savePresence();
 		}
 		for (GroupEvent e : posts)
@@ -1390,7 +1404,7 @@ class GroupEventEngine
 	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
 	private String egg(List<GroupEvent> events)
 	{
-		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(values));
+		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(resolved()));
 	}
 
 	/**

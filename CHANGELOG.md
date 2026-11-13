@@ -123,11 +123,17 @@
 - Yours alone, whatever the group says: **Don't post my events**, and per
   event kind *Post* and *Show*. The leader and editors see a read-only grid
   of who posts what.
-- Webhook URLs, the mention, *Post to Discord* and every *Share* switch stay
-  each member's own and are never sent to the group.
-- New group setting **Post every N levels** (default 1): from *Level ups from
-  level*, only every Nth level posts or shows (5: 60, 65, 70). 99s, max
-  total, total level milestones and combat levels always do.
+- Webhook URLs, the mention, *Post to Discord*, *Online status* and every
+  *Share* switch stay each member's own and are never sent to the group. So
+  the group can never turn login posts on beside a member's live board.
+- New group setting **Post every N levels** (default 1, under *Thresholds*):
+  from *Level ups from level*, only every Nth level posts or shows (5: 60,
+  65, 70). 99s, max total, total level milestones and combat levels always
+  do. One action that jumps past a multiple (Prayer 3 → 7 with 5) still
+  counts.
+- With *Combine level-ups* on, every N applies first: one post for 60, edited
+  in place to "59 → 65" when 65 comes, not at each level in between.
+- *Don't post my events* is the last setting under *Discord: connection*.
 
 ### Amounts read like the game
 

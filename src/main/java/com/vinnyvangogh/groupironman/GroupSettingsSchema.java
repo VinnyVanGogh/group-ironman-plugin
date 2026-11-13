@@ -19,7 +19,7 @@ import java.util.function.ToLongFunction;
  * uses while their group has none).
  *
  * <p><b>What is not here, on purpose.</b> Webhook URLs, the mention, "Post to
- * Discord" itself and every "Share ..." switch stay each member's own: they
+ * Discord" itself, "Online status" and every "Share ..." switch stay each member's own: they
  * are where a member's posts go and what of theirs leaves their client, and a
  * webhook is a secret. {@code GroupSettingsSchemaTest} checks no key here
  * names one.
@@ -62,6 +62,13 @@ final class GroupSettingsSchema
 		}
 	}
 
+	/**
+	 * Logins and logouts post to Discord by this member's own "Online status"
+	 * (posts or the live board), never by a group switch: one member per Group
+	 * webhook keeps the board, and a group switch would post beside it.
+	 */
+	static final GroupEvent.Type OWN_DISCORD = GroupEvent.Type.ONLINE;
+
 	private static final long GP_MAX = Integer.MAX_VALUE;
 	private static final Map<String, Setting> BY_KEY = new LinkedHashMap<>();
 	/** In the order the panel lists them. */
@@ -82,7 +89,10 @@ final class GroupSettingsSchema
 
 		for (GroupEvent.Type t : GroupEvent.Type.values())
 		{
-			flag(discordKey(t), EventText.title(t), DISCORD, EventSettings.DISCORD.get(t));
+			if (t != OWN_DISCORD)
+			{
+				flag(discordKey(t), EventText.title(t), DISCORD, EventSettings.DISCORD.get(t));
+			}
 		}
 		for (GroupEvent.Type t : GroupEvent.Type.values())
 		{

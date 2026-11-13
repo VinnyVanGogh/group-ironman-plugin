@@ -9,6 +9,8 @@ import java.util.TreeMap;
 import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.sample;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /** Per-member opt-outs: personal, applied on top of the group's settings, and shown read-only in the grid. */
@@ -71,6 +73,25 @@ public class MemberPrefsTest
 		assertEquals(GroupEvent.Type.PET, discord.get(0).type);
 		assertEquals("the death stays out of the digest too", 1, digest.size());
 		assertEquals("both still show in this member's overlay", 2, overlay.size());
+	}
+
+	/** The group cannot turn login posts on beside a member's live board: Online status stays theirs. */
+	@Test
+	public void onlineStatusStaysTheMembersOwn()
+	{
+		assertNull(GroupSettingsSchema.get(GroupSettingsSchema.discordKey(GroupEvent.Type.ONLINE)));
+		GroupIronmanConfig board = new GroupIronmanConfig()
+		{
+			@Override
+			public OnlineStatus discordOnlineStatus()
+			{
+				return OnlineStatus.LIVE_BOARD;
+			}
+		};
+		MemberPrefs none = new MemberPrefs(false, EnumSet.noneOf(GroupEvent.Type.class),
+			EnumSet.noneOf(GroupEvent.Type.class));
+		assertFalse(EventSettings.from(board, groupAllOn(), none).discord.contains(GroupEvent.Type.ONLINE));
+		assertTrue(EventSettings.from(DEFAULTS, groupAllOn(), none).discord.contains(GroupEvent.Type.ONLINE));
 	}
 
 	@Test

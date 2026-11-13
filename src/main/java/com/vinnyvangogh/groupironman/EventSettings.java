@@ -184,7 +184,9 @@ final class EventSettings
 		Set<GroupEvent.Type> overlay = EnumSet.noneOf(GroupEvent.Type.class);
 		for (GroupEvent.Type t : GroupEvent.Type.values())
 		{
-			if (values.on(GroupSettingsSchema.discordKey(t)) && prefs.posts(t))
+			boolean post = t == GroupSettingsSchema.OWN_DISCORD ? postsOnline(config)
+				: values.on(GroupSettingsSchema.discordKey(t));
+			if (post && prefs.posts(t))
 			{
 				discord.add(t);
 			}
