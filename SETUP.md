@@ -252,7 +252,7 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
      Temurin Java 11 (about 200 MB) and checks its SHA-256 fingerprint
      against the one written in the launcher before unpacking it. If the
      fingerprint does not match, it stops.
-   - `[2/3]` downloads the GIM Utilities source at tag `gim-test-2` from
+   - `[2/3]` downloads the GIM Utilities source at tag `gim-test-3` from
      GitHub. Run from inside a checkout (`tools\windows\`), it uses that
      checkout instead.
    - `[3/3]` builds and starts RuneLite. The first run takes a few minutes
@@ -275,7 +275,7 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
    PowerShell downloads carries no "from the internet" mark:
 
    ```
-   $f="$env:LOCALAPPDATA\Run-GimUtilities.cmd"; iwr -UseBasicParsing https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/gim-test-2/tools/windows/Run-GimUtilities.cmd -OutFile $f; cmd /c $f
+   $f="$env:LOCALAPPDATA\Run-GimUtilities.cmd"; iwr -UseBasicParsing https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/gim-test-3/tools/windows/Run-GimUtilities.cmd -OutFile $f; cmd /c $f
    ```
 
    Next time, start it with `cmd /c "$env:LOCALAPPDATA\Run-GimUtilities.cmd"`.
@@ -283,8 +283,8 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
    stop, close the RuneLite window.
 
 For whoever cuts the test release: the launcher downloads
-`github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-2.zip`
-with no login, so the repo has to be public and the `gim-test-2` tag pushed
+`github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-3.zip`
+with no login, so the repo has to be public and the `gim-test-3` tag pushed
 before friends run it. To test a different tag, change `$SourceRef` at the
 top of the launcher. The checksum step has its own tests:
 `pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1`.
@@ -292,7 +292,7 @@ top of the launcher. The checksum step has its own tests:
 The `windows-launcher` GitHub Actions workflow runs the launcher end to end
 on a clean Windows runner with `GU_BUILD_ONLY=1` set, which makes `[3/3]` run
 `gradlew build` instead of opening RuneLite. It runs both the `.cmd` in the
-commit and the `.cmd` attached to the `gim-test-2` release, byte for byte.
+commit and the `.cmd` attached to the `gim-test-3` release, byte for byte.
 **Whenever `tools/windows/Run-GimUtilities.cmd` changes, re-upload it to the
 release** (as committed, with CRLF line endings), or the `release-asset` leg
 fails and players keep downloading the old one.
