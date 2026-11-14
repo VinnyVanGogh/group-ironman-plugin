@@ -4,7 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.util.Collections;
-import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
@@ -12,35 +12,13 @@ import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
 import static com.vinnyvangogh.groupironman.EventFixtures.items;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+/** The rules a Custom poster name must meet, and how a name lands in a post. Which name is used: WebhooksTest. */
 public class PosterNamesTest
 {
-	private static final String MAIN = DiscordWebhookTest.URL;
-	private static final String STORAGE = "https://discord.com/api/webhooks/2/storage-token";
 	private final Gson gson = new Gson();
 	private final FakeItems items = new FakeItems();
-
-	private static Map<GroupEvent.Category, String> urls()
-	{
-		Map<GroupEvent.Category, String> out = new EnumMap<>(GroupEvent.Category.class);
-		out.put(GroupEvent.Category.STORAGE, STORAGE);
-		return out;
-	}
-
-	private static Map<GroupEvent.Category, String> names(GroupEvent.Category category, String name)
-	{
-		Map<GroupEvent.Category, String> out = new EnumMap<>(GroupEvent.Category.class);
-		out.put(category, name);
-		return out;
-	}
-
-	private String name(DiscordPosterName mode, GroupEvent.Category category, Map<GroupEvent.Category, String> names,
-		String main)
-	{
-		return PosterNames.name(mode, category, urls(), MAIN, names, main);
-	}
 
 	private JsonObject post(String username)
 	{
@@ -57,53 +35,14 @@ public class PosterNamesTest
 	}
 
 	@Test
-	public void theWebhooksOwnNameSendsNoUsernameKey()
+	public void noNameSendsNoUsernameKey()
 	{
-		assertNull(name(DiscordPosterName.WEBHOOK, GroupEvent.Category.STORAGE,
-			names(GroupEvent.Category.STORAGE, "Gringotts Bot"), "Main Bot"));
 		JsonObject o = post(null);
 		assertFalse("Discord shows the webhook's own name", o.has("username"));
 		assertFalse("and its own avatar", o.has("avatar_url"));
 		assertEquals("the footer still says where it came from", "GIM Utilities",
 			o.getAsJsonArray("embeds").get(0).getAsJsonObject().getAsJsonObject("footer").get("text").getAsString());
-	}
-
-	@Test
-	public void gimUtilitiesIsTodaysName()
-	{
-		assertEquals("GIM Utilities", name(DiscordPosterName.GIM_UTILITIES, GroupEvent.Category.DROPS,
-			Collections.emptyMap(), ""));
-		assertEquals("GIM Utilities", post("GIM Utilities").get("username").getAsString());
-	}
-
-	@Test
-	public void customWithABlankFieldSendsNoUsername()
-	{
-		assertNull(name(DiscordPosterName.CUSTOM, GroupEvent.Category.STORAGE,
-			names(GroupEvent.Category.STORAGE, "   "), "Main Bot"));
-		assertNull("unset", name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS, Collections.emptyMap(), ""));
-		assertNull(name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS, Collections.emptyMap(), null));
-	}
-
-	@Test
-	public void customWithANameSendsThatNamePerCategory()
-	{
-		Map<GroupEvent.Category, String> set = new EnumMap<>(GroupEvent.Category.class);
-		set.put(GroupEvent.Category.STORAGE, "  Gringotts Bot ");
-		set.put(GroupEvent.Category.DROPS, "Loot Goblin");
-		assertEquals("Gringotts Bot", name(DiscordPosterName.CUSTOM, GroupEvent.Category.STORAGE, set, "Main Bot"));
-		assertEquals("a category's own name, even on the main webhook", "Loot Goblin",
-			name(DiscordPosterName.CUSTOM, GroupEvent.Category.DROPS, set, "Main Bot"));
-		assertEquals("no category name, on the main webhook: the main name", "Main Bot",
-			name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS, set, "Main Bot"));
-		assertEquals("Gringotts Bot", post("Gringotts Bot").get("username").getAsString());
-	}
-
-	@Test
-	public void aBlankCategoryNameOnItsOwnWebhookIsTheWebhooksName()
-	{
-		assertNull("the storage webhook's own name, not the main custom name",
-			name(DiscordPosterName.CUSTOM, GroupEvent.Category.STORAGE, Collections.emptyMap(), "Main Bot"));
+		assertEquals("Party Pete", post("Party Pete").get("username").getAsString());
 	}
 
 	@Test
@@ -111,8 +50,6 @@ public class PosterNamesTest
 	{
 		String longName = "  " + repeat('a', 100) + "  ";
 		assertEquals(repeat('a', 80), PosterNames.clean(longName));
-		assertEquals(repeat('b', 80), name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS,
-			Collections.emptyMap(), repeat('b', 81)));
 		assertEquals("never half a surrogate pair", 79, PosterNames.clean(repeat('c', 79) + "😀").length());
 		assertEquals("cut, then trimmed", repeat('d', 70), PosterNames.clean(repeat('d', 70) + repeat(' ', 20) + "x"));
 	}
@@ -124,10 +61,7 @@ public class PosterNamesTest
 		assertTrue(PosterNames.refused("my CLYDE"));
 		assertTrue(PosterNames.refused("xdIsCoRdx"));
 		assertFalse(PosterNames.refused("Gringotts Bot"));
-		assertNull("a refused category name is the webhook's own, never the main custom name",
-			name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS,
-				names(GroupEvent.Category.DEATHS, "Discord Deaths"), "Main Bot"));
-		assertNull(name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS, Collections.emptyMap(), "Clyde"));
+		assertFalse("blank is not refused: it means the default name", PosterNames.refused(""));
 	}
 
 	@Test
@@ -137,42 +71,44 @@ public class PosterNamesTest
 			"Here", " EVERYONE "})
 		{
 			assertTrue(bad, PosterNames.refused(PosterNames.clean(bad)));
-			assertNull(bad, name(DiscordPosterName.CUSTOM, GroupEvent.Category.DEATHS,
-				names(GroupEvent.Category.DEATHS, bad), "Main Bot"));
 		}
 		assertFalse("only exactly everyone or here", PosterNames.refused("everyone's bot"));
 		assertFalse(PosterNames.refused("Over here"));
 		assertFalse("one or two backticks are fine", PosterNames.refused("a `b` c"));
+		assertFalse("an apostrophe is fine", PosterNames.refused("Death's Office"));
 
 		PosterNames warnings = new PosterNames();
-		Map<String, String> fields = new java.util.LinkedHashMap<>();
-		fields.put("storage", "Bank#1");
-		List<String> lines = warnings.check(DiscordPosterName.CUSTOM, fields);
-		assertEquals(Collections.singletonList(PosterNames.message("storage")), lines);
+		Map<String, String> fields = new LinkedHashMap<>();
+		fields.put("group storage", "Bank#1");
+		List<String> lines = warnings.check(fields);
+		assertEquals(Collections.singletonList(PosterNames.message("group storage")), lines);
 		assertFalse("never the name itself", lines.get(0).contains("Bank#1"));
-		assertTrue("once", warnings.check(DiscordPosterName.CUSTOM, fields).isEmpty());
+		assertTrue("once", warnings.check(fields).isEmpty());
 	}
 
 	@Test
 	public void aRefusedNameGetsOneChatWarningNamingTheField()
 	{
 		PosterNames warnings = new PosterNames();
-		Map<String, String> fields = new java.util.LinkedHashMap<>();
+		Map<String, String> fields = new LinkedHashMap<>();
 		fields.put("main", "Clyde");
-		fields.put("deaths", "Death Bot");
-		List<String> lines = warnings.check(DiscordPosterName.CUSTOM, fields);
+		fields.put("deaths & danger", "Death Bot");
+		List<String> lines = warnings.check(fields);
 		assertEquals(1, lines.size());
 		assertEquals(PosterNames.message("main"), lines.get(0));
 		assertTrue(lines.get(0).contains("'discord'"));
 		assertTrue(lines.get(0).contains("'clyde'"));
+		assertTrue(lines.get(0).contains("default name"));
 		assertFalse("never the name itself", lines.get(0).contains("Clyde"));
-		assertTrue("once", warnings.check(DiscordPosterName.CUSTOM, fields).isEmpty());
+		assertTrue("once", warnings.check(fields).isEmpty());
 		fields.put("main", "Main Bot");
-		assertTrue(warnings.check(DiscordPosterName.CUSTOM, fields).isEmpty());
+		assertTrue(warnings.check(fields).isEmpty());
 		fields.put("main", "Discord");
-		assertEquals("broken again, warned again", 1, warnings.check(DiscordPosterName.CUSTOM, fields).size());
-		assertTrue("names are unused unless Custom is picked",
-			new PosterNames().check(DiscordPosterName.WEBHOOK, fields).isEmpty());
+		assertEquals("broken again, warned again", 1, warnings.check(fields).size());
+		fields.put("main", "");
+		assertTrue("off Custom (blank), forgotten", warnings.check(fields).isEmpty());
+		fields.put("main", "Discord");
+		assertEquals("back on Custom, warned again", 1, warnings.check(fields).size());
 	}
 
 	@Test
@@ -181,18 +117,17 @@ public class PosterNamesTest
 		List<String> lines = Collections.singletonList("Alex: took 1 x Abyssal whip");
 		JsonObject own = parse(DiscordWebhook.digest(gson, GroupEvent.Category.STORAGE, lines, null));
 		assertFalse(own.has("username"));
-		JsonObject custom = parse(DiscordWebhook.digest(gson, GroupEvent.Category.STORAGE, lines, "Gringotts Bot"));
-		assertEquals("Gringotts Bot", custom.get("username").getAsString());
+		JsonObject named = parse(DiscordWebhook.digest(gson, GroupEvent.Category.STORAGE, lines, "Varrock Herald"));
+		assertEquals("Varrock Herald", named.get("username").getAsString());
 	}
 
 	@Test
-	public void theWebhooksOwnNameIsTheDefault()
+	public void theWebhooksOwnNameIsTheDefaultChoice()
 	{
 		GroupIronmanConfig defaults = new GroupIronmanConfig()
 		{
 		};
 		assertEquals(DiscordPosterName.WEBHOOK, defaults.discordPosterName());
-		assertEquals("", defaults.discordNameMain());
 		assertEquals("Webhook's own", DiscordPosterName.WEBHOOK.toString());
 		assertEquals("saved under the constant's name, not the label", "WEBHOOK", DiscordPosterName.WEBHOOK.name());
 	}

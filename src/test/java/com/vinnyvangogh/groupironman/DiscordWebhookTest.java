@@ -3,21 +3,17 @@ package com.vinnyvangogh.groupironman;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import java.util.EnumMap;
-import java.util.Map;
 import net.runelite.client.config.ConfigItem;
 import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
 import static com.vinnyvangogh.groupironman.EventFixtures.items;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class DiscordWebhookTest
 {
 	static final String URL = "https://discord.com/api/webhooks/123456789012345678/AbC-def_GHI123";
-	private static final String DROPS = "https://discord.com/api/webhooks/1/drops-token";
 	private final Gson gson = new Gson();
 	private final FakeItems items = new FakeItems();
 
@@ -33,18 +29,6 @@ public class DiscordWebhookTest
 		assertFalse("another host", DiscordWebhook.valid("https://discord.com.evil.example/api/webhooks/1/x"));
 		assertFalse("not a webhook", DiscordWebhook.valid("https://discord.com/channels/1/2"));
 		assertFalse("no token", DiscordWebhook.valid("https://discord.com/api/webhooks/1/"));
-	}
-
-	@Test
-	public void aCategoryOverrideWinsAndAnInvalidOneFallsBack()
-	{
-		Map<GroupEvent.Category, String> overrides = new EnumMap<>(GroupEvent.Category.class);
-		overrides.put(GroupEvent.Category.DROPS, DROPS);
-		overrides.put(GroupEvent.Category.DEATHS, "not a url");
-		assertEquals(DROPS, DiscordWebhook.route(GroupEvent.Category.DROPS, overrides, URL));
-		assertEquals(URL, DiscordWebhook.route(GroupEvent.Category.DEATHS, overrides, URL));
-		assertEquals(URL, DiscordWebhook.route(GroupEvent.Category.STORAGE, overrides, URL));
-		assertNull("no webhook, no post", DiscordWebhook.route(GroupEvent.Category.STORAGE, overrides, ""));
 	}
 
 	@Test

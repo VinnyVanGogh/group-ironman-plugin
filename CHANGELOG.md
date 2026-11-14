@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Seven Discord webhooks, each with its own poster name
+
+- *Discord: connection* now lists seven webhooks in order: Main, Online
+  status, Drops & loot, Progress, Deaths & danger, Group storage and Daily
+  digest. Leave any but Main empty and its posts go to Main's webhook. See
+  the table in the README for what each one carries.
+- Each webhook has its own *name* choice: *Webhook's own*, *Default name* or
+  *Custom*. The default names: Town Crier, World Hopper, Party Pete,
+  Skillcape Seller, Death's Office, Gielinor Banker, Varrock Herald. A
+  category posting to Main's webhook keeps its own name.
+- Each *Custom name* box starts filled with that webhook's default name, and
+  an empty or refused box uses the default name (it used to use the
+  webhook's own).
+- The daily digest now goes to the *Daily digest* webhook (or Main), not to
+  each category's webhook.
+- The *Activities* webhook is retired: clue, kill count, personal best,
+  slayer, farming and birdhouse posts go to Main, Barrows chests to Drops &
+  loot. *Back after a break* moves from the Group webhook to Main.
+- Each webhook has its own send queue and rate limit, so one busy or
+  rate-limited webhook never holds up another.
+- Kept: the main webhook, its poster name and its custom name use the same
+  keys, so they carry over. The old Drops, Deaths, Storage, Progress and
+  Group webhook fields and their custom names carry over too (Group is now
+  *Online status*). The one *Poster name* choice now applies to Main only;
+  the other webhooks start on *Webhook's own*.
+
 ### Welcome and update notes in the game chat
 
 - A fresh install says hello in the game chat once: four short lines on
