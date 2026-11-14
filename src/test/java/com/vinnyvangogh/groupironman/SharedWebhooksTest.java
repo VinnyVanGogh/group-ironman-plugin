@@ -84,6 +84,16 @@ public class SharedWebhooksTest
 		return new Client[]{alex, sam, kim};
 	}
 
+	/** {@link #group}, with Alex sharing {@link #leaderHooks} and everyone having heard it. */
+	private Client[] sharing()
+	{
+		Client[] c = group();
+		assertTrue(c[0].sync.shareWebhooks("Alex", true, leaderHooks(), NOW + 2));
+		c[0].tick(c[1], c[2]);
+		assertNotNull(c[2].shared());
+		return c;
+	}
+
 	private static boolean anyWebhooksDocument(List<String> payloads)
 	{
 		for (String p : payloads)
@@ -185,12 +195,7 @@ public class SharedWebhooksTest
 	@Test
 	public void aMembersOwnWebhookWinsForItsCategory()
 	{
-		Client[] c = group();
-		Client alex = c[0];
-		Client kim = c[2];
-		alex.sync.shareWebhooks("Alex", true, leaderHooks(), NOW + 2);
-		alex.tick(kim);
-
+		Client kim = sharing()[2];
 		Webhooks merged = own(Webhook.DROPS, OWN_DROPS).withGroup(kim.shared());
 
 		assertEquals("own wins", OWN_DROPS, merged.url(Webhook.DROPS));
@@ -207,13 +212,9 @@ public class SharedWebhooksTest
 	@Test
 	public void turningSharingOffClearsMembersCopiesOnTheNextSync()
 	{
-		Client[] c = group();
+		Client[] c = sharing();
 		Client alex = c[0];
 		Client kim = c[2];
-		alex.sync.shareWebhooks("Alex", true, leaderHooks(), NOW + 2);
-		alex.tick(kim);
-		assertNotNull(kim.shared());
-
 		assertTrue(alex.sync.shareWebhooks("Alex", false, leaderHooks(), NOW + 3));
 		alex.tick(kim);
 		assertNull(kim.shared());
@@ -226,11 +227,9 @@ public class SharedWebhooksTest
 	@Test
 	public void theLeadersEditWhileSharingIsANewerVersionAndNoEditSendsNothing()
 	{
-		Client[] c = group();
+		Client[] c = sharing();
 		Client alex = c[0];
 		Client kim = c[2];
-		alex.sync.shareWebhooks("Alex", true, leaderHooks(), NOW + 2);
-		alex.tick(kim);
 		GroupWebhooks first = alex.sync.governance().webhooks();
 
 		assertTrue(alex.sync.shareWebhooks("Alex", true, leaderHooks(), NOW + 3));
@@ -250,11 +249,7 @@ public class SharedWebhooksTest
 	@Test
 	public void theLiveBoardOnTheSharedWebhookIsPostedByTheLeaderOnly()
 	{
-		Client[] c = group();
-		Client alex = c[0];
-		alex.sync.shareWebhooks("Alex", true, leaderHooks(), NOW + 2);
-		alex.tick(c[1], c[2]);
-
+		Client[] c = sharing();
 		int keepers = 0;
 		for (Client client : c)
 		{
@@ -278,12 +273,7 @@ public class SharedWebhooksTest
 	@Test
 	public void aNewLeaderDropsTheOldLeadersWebhooks()
 	{
-		Client[] c = group();
-		Client alex = c[0];
-		Client kim = c[2];
-		alex.sync.shareWebhooks("Alex", true, leaderHooks(), NOW + 2);
-		alex.tick(kim);
-		assertNotNull(kim.shared());
+		Client kim = sharing()[2];
 		kim.sync.forgetLeader();
 		assertNull("no leader, no shared webhooks", kim.shared());
 	}
