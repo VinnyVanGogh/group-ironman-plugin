@@ -2,8 +2,10 @@ package com.vinnyvangogh.groupironman;
 
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The one place a post's webhook URL and poster name are decided. Every sender asks this, never a webhook setting
@@ -36,11 +38,51 @@ final class Webhooks
 	private static final Setting UNSET = new Setting("", DiscordPosterName.WEBHOOK, "");
 
 	private final Map<Webhook, Setting> settings;
+	/** The webhooks whose setting came from the leader's shared ones ({@link #withGroup}), not this member's. */
+	private final Set<Webhook> fromGroup;
 
 	Webhooks(Map<Webhook, Setting> settings)
 	{
+		this(settings, EnumSet.noneOf(Webhook.class));
+	}
+
+	private Webhooks(Map<Webhook, Setting> settings, Set<Webhook> fromGroup)
+	{
 		this.settings = new EnumMap<>(Webhook.class);
 		this.settings.putAll(settings);
+		this.fromGroup = fromGroup.isEmpty() ? EnumSet.noneOf(Webhook.class) : EnumSet.copyOf(fromGroup);
+	}
+
+	/**
+	 * These (a member's own) with the leader's shared webhooks filling in: per webhook, the member's own setting
+	 * (URL and poster name) when its URL field is not empty, else the group's. Unchanged when the group shares
+	 * none. Main's fallback then runs over the result, so an empty category still lands on Main (the member's own
+	 * Main when set, else the group's).
+	 */
+	Webhooks withGroup(GroupWebhooks group)
+	{
+		if (group == null || !group.shared)
+		{
+			return this;
+		}
+		Map<Webhook, Setting> merged = new EnumMap<>(settings);
+		Set<Webhook> borrowed = EnumSet.noneOf(Webhook.class);
+		for (Map.Entry<Webhook, Setting> e : group.settings.entrySet())
+		{
+			if (DiscordWebhook.clean(setting(e.getKey()).url).isEmpty())
+			{
+				merged.put(e.getKey(), e.getValue());
+				borrowed.add(e.getKey());
+			}
+		}
+		return new Webhooks(merged, borrowed);
+	}
+
+	/** True when {@link #url}{@code (webhook)} is the leader's shared URL, not one this member typed. */
+	boolean fromGroup(Webhook webhook)
+	{
+		Webhook used = DiscordWebhook.valid(setting(webhook).url) ? webhook : Webhook.MAIN;
+		return fromGroup.contains(used) && url(webhook) != null;
 	}
 
 	private Setting setting(Webhook webhook)

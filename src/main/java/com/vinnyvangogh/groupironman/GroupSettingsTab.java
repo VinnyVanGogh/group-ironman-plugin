@@ -44,6 +44,9 @@ final class GroupSettingsTab
 
 		GovernanceSync.SaveResult save(Map<String, Long> values);
 
+		/** The leader's "Share webhooks with the group"; false when refused. */
+		boolean shareWebhooks(boolean share);
+
 		void forgetLeader();
 
 		void optOut(GroupEvent.Type type, boolean overlay, boolean out);
@@ -67,11 +70,14 @@ final class GroupSettingsTab
 		final Map<String, MemberPrefs> prefs;
 		/** Members whose key this client has heard: only they can be made editor. */
 		final Set<String> heard;
+		/** Who shares the group's webhooks (the leader), or null when nobody does. Never a URL. */
+		final String webhooksBy;
 
 		View(GroupGovernance.Role role, GroupRoles roles, GroupSettings settings, boolean unclaimed, boolean syncing,
 			List<String> members, String self, Map<String, Long> current, MemberPrefs mine,
-			Map<String, MemberPrefs> prefs, Set<String> heard)
+			Map<String, MemberPrefs> prefs, Set<String> heard, String webhooksBy)
 		{
+			this.webhooksBy = webhooksBy;
 			this.role = role;
 			this.roles = roles;
 			this.settings = settings;
@@ -100,7 +106,7 @@ final class GroupSettingsTab
 				settings == null ? "" : settings.signature, String.valueOf(unclaimed), String.valueOf(syncing),
 				String.valueOf(members), self, String.valueOf(mine.all), String.valueOf(mine.noPost),
 				String.valueOf(mine.mute), String.valueOf(prefsText()), String.valueOf(heard),
-				settings == null ? String.valueOf(current) : "");
+				settings == null ? String.valueOf(current) : "", String.valueOf(webhooksBy));
 		}
 
 		private String prefsText()
@@ -148,6 +154,7 @@ final class GroupSettingsTab
 		drawn = v.signature();
 		drawHeader(tab, v, now);
 		drawEditors(tab, v);
+		drawWebhooks(tab, v);
 		drawSettings(tab, v);
 		drawHistory(tab, v, now);
 		drawMine(tab, v);
@@ -228,6 +235,37 @@ final class GroupSettingsTab
 			row.add(b, BorderLayout.EAST);
 			tab.add(row);
 		}
+	}
+
+	// ---- Shared webhooks (the switch is the leader's only) ----
+
+	private void drawWebhooks(JPanel tab, View v)
+	{
+		for (String line : SettingsModel.webhookLines(v.role, v.webhooksBy))
+		{
+			tab.add(text(line, MUTED));
+		}
+		if (v.role != GroupGovernance.Role.LEADER)
+		{
+			return;
+		}
+		JCheckBox box = new JCheckBox("Share webhooks with the group", v.webhooksBy != null);
+		small(box);
+		box.setToolTipText("Send your seven webhooks and poster names to every member, so they only tick 'Post to"
+			+ " Discord'. Anyone with the group key can read them. Off, or a new group key, stops sending them.");
+		box.addActionListener(e ->
+		{
+			boolean on = box.isSelected();
+			if (on && !confirm("Send your Discord webhooks to every member? Anyone with the group key can read"
+				+ " them. A member's own webhook still wins for that category."))
+			{
+				box.setSelected(false);
+				return;
+			}
+			note = actions.shareWebhooks(on) ? null : "Could not change sharing: you are no longer the leader.";
+			refresh.run();
+		});
+		tab.add(box);
 	}
 
 	// ---- The shared settings ----
