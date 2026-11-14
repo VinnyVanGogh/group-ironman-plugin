@@ -7,6 +7,6 @@
   ],
   "expect": [
     {"probe": "discord", "count": 1},
-    {"probe": "overlay", "contains": "GroupShip: died, killed by Vorkath"}
+    {"probe": "overlay", "contains": "GroupShip: died at Ungael, killed by Vorkath (world 302)"}
   ]
 }

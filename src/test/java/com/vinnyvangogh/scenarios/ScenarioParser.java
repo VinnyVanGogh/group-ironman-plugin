@@ -74,26 +74,27 @@ public final class ScenarioParser
 		{
 			throw new ScenarioException("a scenario needs a 'name'");
 		}
-		JsonArray stepArray = root.has("steps") && root.get("steps").isJsonArray()
-			? root.getAsJsonArray("steps") : new JsonArray();
-		if (stepArray.size() == 0)
-		{
-			throw new ScenarioException("'" + name + "' has no steps");
-		}
 		List<Step> steps = new ArrayList<>();
-		for (JsonElement e : stepArray)
+		for (JsonElement e : array(root, "steps"))
 		{
 			steps.add(step(e, steps.size() + 1, kinds));
 		}
-		List<Scenario.Expect> expect = new ArrayList<>();
-		if (root.has("expect") && root.get("expect").isJsonArray())
+		if (steps.isEmpty())
 		{
-			for (JsonElement e : root.getAsJsonArray("expect"))
-			{
-				expect.add(expectation(e, expect.size() + 1));
-			}
+			throw new ScenarioException("'" + name + "' has no steps");
+		}
+		List<Scenario.Expect> expect = new ArrayList<>();
+		for (JsonElement e : array(root, "expect"))
+		{
+			expect.add(expectation(e, expect.size() + 1));
 		}
 		return new Scenario(source, name, text(root, "description"), steps, expect);
+	}
+
+	/** The array at {@code key}; empty when absent or not an array. */
+	private static JsonArray array(JsonObject o, String key)
+	{
+		return o.has(key) && o.get(key).isJsonArray() ? o.getAsJsonArray(key) : new JsonArray();
 	}
 
 	private static Step step(JsonElement e, int number, EventKinds kinds)
