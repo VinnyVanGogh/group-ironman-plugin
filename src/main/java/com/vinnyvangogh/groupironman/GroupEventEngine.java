@@ -198,8 +198,8 @@ class GroupEventEngine
 		chooseOnlineStatus();
 		reloadConfig();
 		restorePresence();
-		toastOverlay = new EventToastOverlay(toasts, config, group.lookup);
-		boxOverlay = new GroupBoxOverlay(toasts, config, group);
+		toastOverlay = new EventToastOverlay(toasts, config, group.lookup, this::eggSettings);
+		boxOverlay = new GroupBoxOverlay(toasts, config, group, this::eggSettings);
 		overlayManager.add(toastOverlay);
 		overlayManager.add(boxOverlay);
 		pump = executor.scheduleWithFixedDelay(this::tick, 1, 1, TimeUnit.SECONDS);
@@ -1429,7 +1429,13 @@ class GroupEventEngine
 	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
 	private String egg(List<GroupEvent> events)
 	{
-		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(resolved()));
+		return EasterEggs.line(events, group.lookup, eggSettings());
+	}
+
+	/** The Easter egg settings now: the group's when it has them. Also read by the overlays for the 67/69 tag. */
+	private EasterEggs.Settings eggSettings()
+	{
+		return EasterEggs.Settings.of(resolved());
 	}
 
 	/**
