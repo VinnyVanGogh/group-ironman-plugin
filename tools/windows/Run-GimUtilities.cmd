@@ -34,7 +34,7 @@ $JdkUrl    = 'https://github.com/adoptium/temurin11-binaries/releases/download/j
 $JdkSha256 = 'd5008f02174c1ad21c10407cbf104815cb390ec4c263d53946e8d0507d7a77f9'
 # The tagged commit of this repo the launcher builds when it is run on its own.
 # GitHub's tag archive needs no login only while the repo is public.
-$SourceRef = 'gim-test-2'
+$SourceRef = 'gim-test-3'
 $SourceUrl = "https://github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/$SourceRef.zip"
 
 $GuHome = Join-Path $env:LOCALAPPDATA 'GimUtilities'

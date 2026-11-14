@@ -41,6 +41,21 @@ import java.util.function.Supplier;
 final class StatusBoard
 {
 	static final long MIN_GAP_MS = TimeUnit.SECONDS.toMillis(10);
+
+	/**
+	 * Whether this client keeps the live board: 'Online status' is the board and the Online status webhook (or
+	 * Main) is set. On a webhook the leader shares, only the leader's client does, so a group whose members all
+	 * pick the board on the shared webhook still gets one board (each member's own pasted webhook is theirs, as
+	 * before: the setting's description asks that only one member sharing a webhook turn the board on).
+	 */
+	static boolean keeps(OnlineStatus status, Webhooks webhooks, boolean leader)
+	{
+		if (status != OnlineStatus.LIVE_BOARD || webhooks.url(Webhook.ONLINE) == null)
+		{
+			return false;
+		}
+		return leader || !webhooks.fromGroup(Webhook.ONLINE);
+	}
 	static final String TITLE = "Group status";
 	static final String ONLINE = "🟢";
 	static final String OFFLINE = "🔴";

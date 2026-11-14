@@ -7,10 +7,10 @@ name: windows-launcher
 #
 # Two launchers are run:
 #   this-commit   - the .cmd in this commit (what a re-upload would ship)
-#   release-asset - the .cmd attached to the gim-test-2 release, byte for byte
+#   release-asset - the .cmd attached to the gim-test-3 release, byte for byte
 #                   (what a player downloads today)
 # A release-asset failure that says "re-upload" means the Board has to attach
-# tools/windows/Run-GimUtilities.cmd from this commit to the gim-test-2 release.
+# tools/windows/Run-GimUtilities.cmd from this commit to the gim-test-3 release.
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 env:
-  RELEASE_ASSET_URL: https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/gim-test-2/Run-GimUtilities.cmd
+  RELEASE_ASSET_URL: https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/gim-test-3/Run-GimUtilities.cmd
 
 jobs:
   launcher-tests:
@@ -72,11 +72,11 @@ jobs:
             Write-Host "::warning::${{ matrix.launcher }} launcher has $lines lines but $crs CRLF endings; .gitattributes wants CRLF because cmd.exe mis-parses some LF-only batch files."
           }
           if ($sha -ne $oursSha) {
-            Write-Host "::warning::${{ matrix.launcher }} launcher differs from tools/windows/Run-GimUtilities.cmd in this commit. Re-upload it to the gim-test-2 release."
+            Write-Host "::warning::${{ matrix.launcher }} launcher differs from tools/windows/Run-GimUtilities.cmd in this commit. Re-upload it to the gim-test-3 release."
           }
           # An old launcher ignores GU_BUILD_ONLY and would open RuneLite and never exit.
           if (-not ([IO.File]::ReadAllText($cmd)).Contains('GU_BUILD_ONLY')) {
-            Write-Host "::error::${{ matrix.launcher }} launcher predates GU_BUILD_ONLY, so it cannot be run headless. Re-upload tools/windows/Run-GimUtilities.cmd to the gim-test-2 release."
+            Write-Host "::error::${{ matrix.launcher }} launcher predates GU_BUILD_ONLY, so it cannot be run headless. Re-upload tools/windows/Run-GimUtilities.cmd to the gim-test-3 release."
             exit 1
           }
           "GU_LAUNCHER=$cmd" >> $env:GITHUB_ENV
@@ -127,7 +127,7 @@ jobs:
             'Downloading Java 11 (Eclipse Temurin',
             'Checksum verified. Unpacking Java',
             '[2/3] Getting the plugin source',
-            'Downloading GIM Utilities source (gim-test-2) from GitHub',
+            'Downloading GIM Utilities source (gim-test-3) from GitHub',
             '[3/3] Building GIM Utilities only (GU_BUILD_ONLY=1)',
             'BUILD SUCCESSFUL'
           )
@@ -135,8 +135,8 @@ jobs:
           if ($missing.Count -gt 0) { Fail "launcher output is missing: $($missing -join ' | ')" }
           if ($text.Contains('ERROR:')) { Fail 'launcher printed ERROR:' }
 
-          $jars = Get-ChildItem -Path (Join-Path $managed 'src\gim-test-2\build\libs') -Filter *.jar -ErrorAction SilentlyContinue
-          if (-not $jars) { Fail 'no jar under src\gim-test-2\build\libs' }
+          $jars = Get-ChildItem -Path (Join-Path $managed 'src\gim-test-3\build\libs') -Filter *.jar -ErrorAction SilentlyContinue
+          if (-not $jars) { Fail 'no jar under src\gim-test-3\build\libs' }
           $jars | ForEach-Object { Write-Host "built $($_.FullName) ($($_.Length) bytes)" }
 
       - name: Keep the launcher log

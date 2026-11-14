@@ -163,18 +163,20 @@ final class GroupSettings
 	/** The total order every client uses to pick one document: version, then save time, then signature. */
 	boolean newerThan(GroupSettings other)
 	{
-		if (other == null)
+		return other == null || newer(version, at, signature, other.version, other.at, other.signature);
+	}
+
+	/** The order of two signed documents: version, then save time, then signature. Shared with {@link GroupWebhooks}. */
+	static boolean newer(long version, long at, String signature, long otherVersion, long otherAt, String otherSignature)
+	{
+		if (version != otherVersion)
 		{
-			return true;
+			return version > otherVersion;
 		}
-		if (version != other.version)
+		if (at != otherAt)
 		{
-			return version > other.version;
+			return at > otherAt;
 		}
-		if (at != other.at)
-		{
-			return at > other.at;
-		}
-		return signature.compareTo(other.signature) > 0;
+		return signature.compareTo(otherSignature) > 0;
 	}
 }

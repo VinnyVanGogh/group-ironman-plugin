@@ -289,6 +289,7 @@ class GroupEventEngine
 		{
 			return;
 		}
+		// This member's own fields only: a leader's shared webhook is not theirs to fix, and its URL is never named.
 		Webhooks webhooks = Webhooks.of(config);
 		List<String> lines = new ArrayList<>(webhookWarnings.check(webhooks.urlFields()));
 		lines.addAll(posterNames.check(webhooks.customNames()));
@@ -334,11 +335,16 @@ class GroupEventEngine
 
 	/**
 	 * Timer: the live board, when 'Online status' is the board and the Online status webhook (or Main) is set.
-	 * Members are read from the roster the party fills; the webhook and the message id stay in this client.
+	 * Members are read from the roster the party fills; the webhook and the message id stay in this client. On
+	 * the leader's shared webhook only the leader's client keeps it ({@link StatusBoard#keeps}).
 	 */
 	private void boardTick(long now)
 	{
-		String url = config.discordOnlineStatus() == OnlineStatus.LIVE_BOARD ? webhookFor(Webhook.ONLINE) : null;
+		String url = webhookFor(Webhook.ONLINE);
+		if (!StatusBoard.keeps(config.discordOnlineStatus(), webhooks(), group.isLeader()))
+		{
+			url = null;
+		}
 		board.target(url, () -> configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY));
 		if (url != null)
 		{
@@ -1231,13 +1237,20 @@ class GroupEventEngine
 		{
 			return null;
 		}
-		return Webhooks.of(config).url(webhook);
+		return webhooks().url(webhook);
 	}
 
 	/** The name {@code webhook}'s posts go out under, by its own choice ({@link Webhooks#name}). */
 	private String posterName(Webhook webhook)
 	{
-		return Webhooks.of(config).name(webhook);
+		return webhooks().name(webhook);
+	}
+
+	/** This member's own webhooks, with the leader's shared ones filling any left empty ({@link GroupService#webhooks}). */
+	private Webhooks webhooks()
+	{
+		GroupService g = group;
+		return g == null ? Webhooks.of(config) : g.webhooks();
 	}
 
 	/**

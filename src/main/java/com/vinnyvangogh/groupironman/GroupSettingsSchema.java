@@ -22,7 +22,9 @@ import java.util.function.ToLongFunction;
  * Discord" itself, "Online status" and every "Share ..." switch stay each member's own: they
  * are where a member's posts go and what of theirs leaves their client, and a
  * webhook is a secret. {@code GroupSettingsSchemaTest} checks no key here
- * names one.
+ * names one. The one way a webhook reaches members is the leader's own
+ * opt-in, "Share webhooks with the group": a separate document signed by the
+ * leader only ({@link GroupWebhooks}), never these settings, which editors sign too.
  */
 final class GroupSettingsSchema
 {

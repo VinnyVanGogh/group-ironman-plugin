@@ -36,8 +36,12 @@ public class GroupSettingsSchemaTest
 			});
 	}
 
+	/**
+	 * The shared settings never carry a webhook, whoever saves them: a webhook travels only in the leader's
+	 * separate "Share webhooks with the group" document ({@link GroupWebhooks}, SharedWebhooksTest).
+	 */
 	@Test
-	public void aWebhookNeverTravelsInTheSyncedPayload()
+	public void aWebhookNeverTravelsInTheSettingsPayloadUnlessTheLeaderShares()
 	{
 		for (GroupSettingsSchema.Setting s : GroupSettingsSchema.ALL)
 		{
@@ -49,6 +53,13 @@ public class GroupSettingsSchemaTest
 		String payload = GovernanceCodec.encode(new Gson(), doc);
 		assertFalse(payload, payload.contains("SECRETTOKEN"));
 		assertFalse(payload, payload.contains("discord.com"));
+
+		GroupWebhooks off = GroupWebhooks.next(null, "groupship", false, Webhooks.of(everythingSet()), "Alex", leader,
+			NOW);
+		assertFalse("sharing off carries none", GovernanceCodec.encode(new Gson(), off).contains("SECRETTOKEN"));
+		GroupWebhooks on = GroupWebhooks.next(off, "groupship", true, Webhooks.of(everythingSet()), "Alex", leader,
+			NOW + 1);
+		assertTrue("the leader shares", GovernanceCodec.encode(new Gson(), on).contains("SECRETTOKEN"));
 	}
 
 	@Test

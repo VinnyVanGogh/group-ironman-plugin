@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Dev builds follow the newest RuneLite
+
+- `./gradlew build`, `test` and `run` now use the newest RuneLite client
+  release, checked on every run, and print which one they resolved. Pin a run
+  with `-PruneLiteVersion=1.13.6` to compare. Plugin Hub builds are unaffected.
+
+### Built against RuneLite 1.13.6
+
+- Was 1.13.5. The test client now loads the Plugin Hub index for the Hub's
+  current RuneLite, so other Hub plugins run at their newest versions
+  (e.g. Combat Vitals) alongside this one.
+
+### The leader can share the Discord webhooks with the group
+
+- New in the panel's *Settings* tab, for the group leader only: *Share
+  webhooks with the group*. On, the leader's seven webhooks and their poster
+  names reach every member, so a member only ticks *Post to Discord*.
+- A webhook a member pastes themselves still wins for that category.
+- Members see "Using the group's webhooks (set by ...)" and never the links.
+  They are kept with the group's cache file, not in RuneLite's settings.
+- Anyone with the group key can read shared webhooks. Turning sharing off
+  clears members' copies; a leaked webhook is replaced by deleting it in
+  Discord and pasting a new one, which members pick up.
+- On a shared *Online status* webhook only the leader's client keeps the live
+  board, so the channel gets one board.
+
 ### One click to share after joining
 
 - After a group key is saved, the panel shows a *Share with your group?*

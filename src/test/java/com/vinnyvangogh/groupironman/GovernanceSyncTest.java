@@ -1,9 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
@@ -19,70 +16,13 @@ public class GovernanceSyncTest
 	private static final GroupIronmanConfig DEFAULTS = new GroupIronmanConfig()
 	{
 	};
-	private final Gson gson = new Gson();
 
-	/** One client: its config, what it sent, and its sync. */
-	private final class Client
+	/** One client: its config, what it sent, and its sync ({@link GovernanceClient}). */
+	private final class Client extends GovernanceClient
 	{
-		final String name;
-		final Map<String, String> config = new HashMap<>();
-		final List<String> outbox = new ArrayList<>();
-		GovernanceSync sync;
-
 		Client(String name)
 		{
-			this.name = name;
-			start();
-		}
-
-		/** Starting the plugin: everything is read back from the config. */
-		void start()
-		{
-			sync = new GovernanceSync(gson, new GovernanceSync.Store()
-			{
-				@Override
-				public String get(String key)
-				{
-					return config.get(key);
-				}
-
-				@Override
-				public void set(String key, String value)
-				{
-					if (value == null)
-					{
-						config.remove(key);
-					}
-					else
-					{
-						config.put(key, value);
-					}
-				}
-			}, outbox::add, () ->
-			{
-			});
-			sync.group("GroupShip");
-		}
-
-		/** A game tick while connected: whatever is marked goes to {@code others}. */
-		void tick(Client... others)
-		{
-			tick(MemberPrefs.NONE, others);
-		}
-
-		/** As {@link #tick(Client...)}, with this member's own opt-outs as they are now. */
-		void tick(MemberPrefs prefs, Client... others)
-		{
-			sync.flush(prefs);
-			for (String payload : outbox)
-			{
-				assertTrue(GovernanceSync.isGovernance(payload));
-				for (Client o : others)
-				{
-					o.sync.receive(name, payload);
-				}
-			}
-			outbox.clear();
+			super(name, new Gson());
 		}
 	}
 
@@ -147,7 +87,7 @@ public class GovernanceSyncTest
 	}
 
 	@Test
-	public void nothingSentCarriesAWebhookOrThePrivateKey()
+	public void nothingSentCarriesAWebhookUnlessTheLeaderSharesNorEverThePrivateKey()
 	{
 		Client alex = new Client("Alex");
 		alex.sync.claim("Alex", NOW);
@@ -160,6 +100,23 @@ public class GovernanceSyncTest
 			assertFalse(payload.toLowerCase(java.util.Locale.ROOT).contains("webhook"));
 		}
 		assertEquals("announce, roles, settings", 3, alex.outbox.size());
+		alex.outbox.clear();
+
+		// Turning sharing off without ever having shared sends nothing either.
+		assertTrue(alex.sync.shareWebhooks("Alex", false, Webhooks.of(DEFAULTS), NOW + 2));
+		alex.sync.flush(MemberPrefs.NONE);
+		assertTrue(alex.outbox.isEmpty());
+
+		// The leader's "Share webhooks with the group": now, and only now, one document carries them.
+		java.util.Map<Webhook, Webhooks.Setting> hooks = new java.util.EnumMap<>(Webhook.class);
+		hooks.put(Webhook.MAIN, new Webhooks.Setting("https://discord.com/api/webhooks/1/SHAREDTOKEN",
+			DiscordPosterName.WEBHOOK, ""));
+		assertTrue(alex.sync.shareWebhooks("Alex", true, new Webhooks(hooks), NOW + 3));
+		alex.sync.flush(MemberPrefs.NONE);
+		assertEquals(1, alex.outbox.size());
+		assertTrue(alex.outbox.get(0).contains("SHAREDTOKEN"));
+		assertFalse(alex.outbox.get(0).contains(privateHalf));
+		assertFalse("never in the leader's config either", alex.config.values().toString().contains("SHAREDTOKEN"));
 	}
 
 	private static Map<String, Long> current(Client c)
