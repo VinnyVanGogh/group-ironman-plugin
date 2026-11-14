@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### The live board comes back to the bottom of the channel once a day
+
+- New setting under *Discord: how to post*: **Repost board daily**, on by
+  default. With *Online status* on *Live board*, the first board update after
+  your midnight posts the board again at the bottom of the channel and then
+  deletes yesterday's, so the channel still holds one board. The rest of the
+  day it is edited in place, as before.
+- The new board goes first; yesterday's is deleted only once the new one is
+  saved, so a failed post never leaves the channel without a board. Quiet
+  hours hold the repost until the first update they allow.
+- Only the client that keeps the board reposts it (the leader's, on a shared
+  webhook). Off: the board is only ever edited.
 ### Group storage only logs what the game saved
 
 - Closing group storage without pressing Save no longer logs or posts

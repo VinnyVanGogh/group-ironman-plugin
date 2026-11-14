@@ -93,11 +93,12 @@ public class PluginIdentityTest
 		// "Easter eggs" (Discord section) adds one more, off. "Show update notes" (Advanced) is the second switch
 		// on by default (Board 2026-11-11): it only writes the welcome or what's new in the game chat, once per
 		// version, and sends nothing anywhere. Group settings add "Don't post my events", off: a member's own
-		// opt-out, never something the group turns on for them.
-		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1,
-			switches);
-		assertEquals(93, switches);
-		List<String> expectedOn = Arrays.asList("groupSync", "showUpdateNotes");
+		// opt-out, never something the group turns on for them. "Repost board daily" (Discord) is the third
+		// switch on by default (Board 2026-11-14): it only acts when the live board is already on.
+		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1
+			+ 1, switches);
+		assertEquals(94, switches);
+		List<String> expectedOn = Arrays.asList("discordRepostBoard", "groupSync", "showUpdateNotes");
 		Collections.sort(on);
 		assertEquals(expectedOn, on);
 		assertEquals("", DEFAULTS.groupLowStock());

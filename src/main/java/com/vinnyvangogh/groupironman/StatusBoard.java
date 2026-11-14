@@ -3,6 +3,7 @@ package com.vinnyvangogh.groupironman;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,6 +28,9 @@ import java.util.function.Supplier;
  * <ul>
  * <li>The first send for a webhook posts the board and keeps its id ({@link #takeSaved}, this client's config
  * only, never the party). Every later send edits it; an edit Discord answers 404 (deleted) posts a new one.</li>
+ * <li>Once a day (Board 2026-11-14, 'Repost board daily'), the first send after the keeper's midnight posts a
+ * new board, then deletes the old one (Delete Webhook Message, {@code DELETE .../messages/{message.id}}) once
+ * the new id is saved, so the board is back at the bottom of the channel and the channel still holds one.</li>
  * <li>At most one send per {@link #MIN_GAP_MS}, and none in quiet hours. Only the newest lines are ever sent,
  * and only when they changed.</li>
  * <li>"Last seen" is Discord's own relative timestamp ({@code <t:...:R>}), so the board stays right as time
@@ -84,21 +88,36 @@ final class StatusBoard
 		}
 	}
 
-	/** One request: the board posted, or the one already posted edited. */
+	/** One request: the board posted, the one already posted edited, or yesterday's deleted. */
 	static final class Send
 	{
 		final String url;
-		/** Null to post a new board. */
+		/** Null to post a new board; the board to delete for a delete. */
 		final String messageId;
+		/** Null for a delete. */
 		final String lines;
 		final long changedAt;
+		/** A daily repost: the board it replaces, deleted once the new one's id is saved; else null. */
+		final String replaces;
+		/** The keeper's day ({@link LocalDate#toEpochDay}) the request was made on. */
+		final long day;
+		final boolean delete;
 
 		Send(String url, String messageId, String lines, long changedAt)
+		{
+			this(url, messageId, lines, changedAt, null, UNKNOWN_DAY, false);
+		}
+
+		private Send(String url, String messageId, String lines, long changedAt, String replaces, long day,
+			boolean delete)
 		{
 			this.url = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
 			this.messageId = messageId;
 			this.lines = lines;
 			this.changedAt = changedAt;
+			this.replaces = replaces;
+			this.day = day;
+			this.delete = delete;
 		}
 
 		boolean create()
@@ -107,8 +126,15 @@ final class StatusBoard
 		}
 	}
 
+	/** The day of a board saved before daily reposts, or posted without them: the next repost brings it down. */
+	private static final long UNKNOWN_DAY = Long.MIN_VALUE;
+
 	private String url;
 	private String messageId;
+	/** The keeper's day the board was posted on. */
+	private long postedDay = UNKNOWN_DAY;
+	/** Yesterday's board, to delete now that the new one's id is saved; null when none. */
+	private String oldId;
 	private boolean idChanged;
 	private String lines;
 	private long changedAt;
@@ -128,7 +154,10 @@ final class StatusBoard
 			return;
 		}
 		this.url = url;
-		messageId = url == null ? null : savedId(url, saved.get());
+		String[] f = url == null ? null : savedLine(url, saved.get());
+		messageId = f == null ? null : f[1];
+		postedDay = f == null || f.length < 3 ? UNKNOWN_DAY : Long.parseLong(f[2]);
+		oldId = f == null || f.length < 4 ? null : f[3];
 		sentLines = null;
 		inFlight = null;
 	}
@@ -143,17 +172,62 @@ final class StatusBoard
 		}
 	}
 
-	/** The request to make now, or null: nothing new, one in flight, quiet hours, the gap or a Retry-After. */
+	/** {@link #next(long, boolean, long, boolean)} without daily reposts. */
 	synchronized Send next(long now, boolean quiet)
 	{
-		if (url == null || lines == null || lines.equals(sentLines) || inFlight != null || quiet || now < notBefore
-			|| now - lastTry < MIN_GAP_MS)
+		return next(now, quiet, UNKNOWN_DAY, false);
+	}
+
+	/**
+	 * The request to make now, or null: nothing new, one in flight, quiet hours, the gap or a Retry-After.
+	 * {@code day} is the keeper's local day ({@link LocalDate#toEpochDay}); with {@code repost} on, the first send
+	 * on a later day than the board was posted posts a new board instead of editing (Board 2026-11-14: Discord
+	 * cannot move a message, so the board comes back to the bottom of the channel as a new one). Yesterday's is
+	 * deleted after, once the new id is saved ({@link #takeSaved}): a failed post never leaves no board.
+	 */
+	synchronized Send next(long now, boolean quiet, long day, boolean repost)
+	{
+		if (held(now))
 		{
 			return null;
 		}
+		if (oldId != null && !idChanged)
+		{
+			// Deleting makes no noise in the channel, so neither quiet hours nor the gap hold it.
+			return send(now, new Send(url, oldId, null, 0, null, day, true));
+		}
+		String replaces = repost ? reposting(day) : null;
+		if (!due(replaces) || quiet || now - lastTry < MIN_GAP_MS)
+		{
+			return null;
+		}
+		return send(now, new Send(url, replaces == null ? messageId : null, lines, changedAt, replaces, day, false));
+	}
+
+	/** Holding the lock: no webhook, a request already out, or a Retry-After still running. */
+	private boolean held(long now)
+	{
+		return url == null || inFlight != null || now < notBefore;
+	}
+
+	/** Holding the lock: the board a post on {@code day} replaces, when one was posted on an earlier day. */
+	private String reposting(long day)
+	{
+		return day > postedDay ? messageId : null;
+	}
+
+	/** Holding the lock: there are lines to send, and they changed or the day's repost is due. */
+	private boolean due(String replaces)
+	{
+		return lines != null && (replaces != null || !lines.equals(sentLines));
+	}
+
+	/** Holding the lock: {@code send} goes out now. */
+	private Send send(long now, Send send)
+	{
 		lastTry = now;
-		inFlight = new Send(url, messageId, lines, changedAt);
-		return inFlight;
+		inFlight = send;
+		return send;
 	}
 
 	/** How {@code send} went: an HTTP status (0 for none), the new message's id for a post, a 429's wait. */
@@ -165,11 +239,24 @@ final class StatusBoard
 			return;
 		}
 		inFlight = null;
-		if (status >= 200 && status < 300)
+		if (send.delete)
+		{
+			deleted(status, retryAfterMs, now);
+		}
+		else if (status >= 200 && status < 300)
 		{
 			sent(send, newId);
 		}
-		else if (status == 404 && !send.create())
+		else
+		{
+			failed(send, status, retryAfterMs, now);
+		}
+	}
+
+	/** Holding the lock: Discord refused {@code send}, a post or an edit, or it never got there. */
+	private void failed(Send send, int status, long retryAfterMs, long now)
+	{
+		if (status == 404 && !send.create())
 		{
 			// Deleted in Discord: the next send posts a new board.
 			messageId = null;
@@ -177,27 +264,64 @@ final class StatusBoard
 		}
 		else if (status == 429)
 		{
-			notBefore = now + (retryAfterMs >= 0 ? retryAfterMs : MIN_GAP_MS);
+			waitRetryAfter(retryAfterMs, now);
 		}
 		else if (status >= 400)
 		{
-			// A bad or deleted webhook: retrying cannot fix it, so wait for the lines to change.
+			// A bad or deleted webhook: retrying cannot fix it, so wait for the lines to change. A failed repost
+			// keeps yesterday's board, edited, until tomorrow's.
 			sentLines = send.lines;
+			postedDay = send.replaces == null ? postedDay : send.day;
 		}
 	}
 
-	/** Holding the lock: Discord took {@code send}; a post's answer carries the board's id. */
+	/**
+	 * Holding the lock: Discord took {@code send}; a post's answer carries the board's id. A repost whose id is
+	 * unreadable keeps editing the old board, which is then not deleted.
+	 */
 	private void sent(Send send, String newId)
 	{
 		sentLines = send.lines;
-		if (send.create() && newId != null)
+		if (!send.create())
 		{
+			return;
+		}
+		postedDay = send.day;
+		if (newId != null)
+		{
+			oldId = send.replaces;
 			messageId = newId;
 			idChanged = true;
 		}
 	}
 
-	/** The line to save when the board's id changed since the last call, "" to forget it, else null. */
+	/**
+	 * Holding the lock: how deleting yesterday's board went. A 429 or a dropped request tries again; anything
+	 * else, a 404 (already gone) too, is the end of it: a board that cannot be deleted is left.
+	 */
+	private void deleted(int status, long retryAfterMs, long now)
+	{
+		if (status == 429)
+		{
+			waitRetryAfter(retryAfterMs, now);
+		}
+		else if (status != DiscordQueue.DROPPED)
+		{
+			oldId = null;
+			idChanged = true;
+		}
+	}
+
+	/** Holding the lock: a 429 holds every request for its Retry-After, or the gap when it gave none. */
+	private void waitRetryAfter(long retryAfterMs, long now)
+	{
+		notBefore = now + (retryAfterMs >= 0 ? retryAfterMs : MIN_GAP_MS);
+	}
+
+	/**
+	 * The line to save when the board changed since the last call, "" to forget it, else null: the webhook's tag
+	 * and the id, then the day it was posted and the board still to delete, when there are.
+	 */
 	synchronized String takeSaved()
 	{
 		if (!idChanged)
@@ -205,7 +329,16 @@ final class StatusBoard
 			return null;
 		}
 		idChanged = false;
-		return messageId == null || url == null ? "" : tag(url) + SEP + messageId;
+		if (messageId == null || url == null)
+		{
+			return "";
+		}
+		String line = tag(url) + SEP + messageId;
+		if (postedDay != UNKNOWN_DAY)
+		{
+			line += SEP + postedDay + (oldId == null ? "" : SEP + oldId);
+		}
+		return line;
 	}
 
 	/** The webhook is kept only as a hash, so the saved line can tell a changed webhook without holding it. */
@@ -214,10 +347,22 @@ final class StatusBoard
 		return Integer.toHexString(url.hashCode());
 	}
 
-	private static String savedId(String url, String saved)
+	/** The saved line's fields when it is this webhook's: tag, id, and maybe the day and the board to delete. */
+	private static String[] savedLine(String url, String saved)
 	{
 		String[] f = saved == null ? new String[0] : saved.split(SEP, -1);
-		return f.length == 2 && f[0].equals(tag(url)) && f[1].matches("\\d+") ? f[1] : null;
+		if (f.length < 2 || f.length > 4 || !f[0].equals(tag(url)))
+		{
+			return null;
+		}
+		for (int i = 1; i < f.length; i++)
+		{
+			if (!f[i].matches("\\d{1,18}"))
+			{
+				return null;
+			}
+		}
+		return f;
 	}
 
 	// ---- What it says ----
@@ -406,6 +551,10 @@ final class StatusBoard
 	 */
 	static String payload(Gson gson, Send send, DiscordStyle style, String username)
 	{
+		if (send.delete)
+		{
+			return null;
+		}
 		String text = send.lines + "\nUpdated " + when(send.changedAt);
 		JsonObject o = new JsonObject();
 		if (send.create() && username != null)
@@ -444,11 +593,18 @@ final class StatusBoard
 		return gson.toJson(o);
 	}
 
-	/** Queues {@code send} with the sender: a post that waits for its id, or an edit; the outcome to {@link #done}. */
+	/**
+	 * Queues {@code send} with the sender: a post that waits for its id, an edit, or a delete (no {@code json});
+	 * the outcome to {@link #done}.
+	 */
 	void send(DiscordSender sender, Send send, String json, LongSupplier clock)
 	{
 		DiscordQueue.Result result = (status, id) -> done(send, status, id, -1, clock.getAsLong());
-		if (send.create())
+		if (send.delete)
+		{
+			sender.delete(send.url, send.messageId, result);
+		}
+		else if (send.create())
 		{
 			sender.post(send.url, json, null, result);
 		}
