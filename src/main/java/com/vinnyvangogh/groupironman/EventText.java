@@ -1,6 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.regex.Matcher;
@@ -26,6 +29,8 @@ final class EventText
 	/** "Your Vorkath kill count is: 120." and "Your Barrows chest count is: 41." */
 	private static final Pattern KILL_COUNT = Pattern.compile(
 		"^Your (.+?) (?:kill|chest|success|completion|completed) count is: ?([0-9,]+)\\.?$");
+	/** "Your completed Chambers of Xeric count is: 12." The word order is unverified: see {@link EventChat}. */
+	private static final Pattern RAID_COUNT = Pattern.compile("^Your completed (.+?) count is: ?([0-9,]+)\\.?$");
 	/** "You have completed Cook's Assistant!" and "You have completed the Restless Ghost Quest!" */
 	private static final Pattern QUEST = Pattern.compile(
 		"^You (?:have|'ve) (?:completed|been|rebuilt|achieved|helped|defeated|restored|freed|found|learned|solved)"
@@ -51,24 +56,114 @@ final class EventText
 			+ items(e, l) + " from group storage");
 		line(GroupEvent.Type.STORAGE_SUMMARY, "Group storage visit", EventText::summary);
 		line(GroupEvent.Type.STORAGE_MINIMUM, "Storage minimum hit", (e, l) -> "group storage is low on " + e.text
-			+ ": " + e.number + " left" + (e.detail.isEmpty() ? "" : ", " + e.detail));
+			+ ": " + l.amount(e.number) + " left" + (e.detail.isEmpty() ? "" : ", " + e.detail));
 		line(GroupEvent.Type.STORAGE_LAST, "Took the last one", (e, l) -> "took the last of "
 			+ StorageLog.describe(e.items, l) + " from group storage");
 		line(GroupEvent.Type.LEVEL_UP, "Level up", (e, l) -> e.text + " level " + e.number);
 		line(GroupEvent.Type.MAXED, "99!", (e, l) -> "total".equalsIgnoreCase(e.text)
 			? "maxed, total level " + e.number : "99 " + e.text + "!");
-		line(GroupEvent.Type.XP_MILESTONE, "XP milestone", (e, l) -> BoostText.gp(e.number) + " " + e.text + " XP");
+		line(GroupEvent.Type.XP_MILESTONE, "XP milestone", (e, l) -> l.amount(e.number) + " " + e.text + " XP");
 		line(GroupEvent.Type.COMBAT_LEVEL, "Combat level", (e, l) -> "combat level " + e.number);
 		line(GroupEvent.Type.TOTAL_LEVEL, "Total level", (e, l) -> "total level " + e.number);
 		line(GroupEvent.Type.QUEST, "Quest complete", (e, l) -> "completed " + e.text
 			+ (e.number > 0 ? " (" + e.number + " QP)" : ""));
 		line(GroupEvent.Type.QUEST_POINTS, "Quest points", (e, l) -> e.text.isEmpty()
 			? e.number + " quest points" : e.text + ", " + e.number + " quest points");
-		line(GroupEvent.Type.ONLINE, "Online", (e, l) -> "is " + e.text
-			+ (e.world > 0 ? " on world " + e.world : ""));
+		line(GroupEvent.Type.ONLINE, "Online", (e, l) -> isOffline(e) ? offline(e) : "is " + e.text
+			+ onWorld(e));
 		line(GroupEvent.Type.BACK, "Back", (e, l) -> "is back after " + e.number + (e.number == 1 ? " day" : " days"));
 		line(GroupEvent.Type.BARROWS, "Barrows chest", (e, l) -> "Barrows chest" + (e.number > 0 ? " " + e.number : "")
 			+ ": " + items(e, l) + (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
+		line(GroupEvent.Type.RAID_UNIQUE, "Raid unique", (e, l) -> "purple! " + e.text
+			+ (e.number > 0 ? ", raid count " + e.number : "") + (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
+		line(GroupEvent.Type.CLUE, "Clue reward", (e, l) -> e.text + " clue reward: " + items(e, l)
+			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
+		line(GroupEvent.Type.DRY_STREAK, "Dry streak", (e, l) -> e.number + " " + e.text + " kills without a unique"
+			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
+		line(GroupEvent.Type.DEATH_VALUE, "Lost on death", EventText::deathValue);
+		line(GroupEvent.Type.GRAVESTONE_EXPIRING, "Gravestone expiring", (e, l) -> "gravestone"
+			+ (e.location.isEmpty() ? "" : " at " + e.location) + (e.world > 0 ? " on world " + e.world : "")
+			+ " has about " + e.number + " min left" + graveItems(e, l));
+		line(GroupEvent.Type.HC_LIFE_LOST, "Group life lost", (e, l) -> "lost a Hardcore group life, " + e.number
+			+ (e.number == 1 ? " life" : " lives") + " left");
+		line(GroupEvent.Type.WILDERNESS, "Wilderness", (e, l) -> e.text);
+		line(GroupEvent.Type.DIARY, "Achievement diary", (e, l) -> "completed the " + e.text + " diary");
+		line(GroupEvent.Type.COMBAT_TASK, "Combat achievement", (e, l) -> "combat task: " + e.text
+			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")"));
+		line(GroupEvent.Type.KC_MILESTONE, "Kill count milestone", (e, l) -> e.number + " " + e.text + " kills");
+		line(GroupEvent.Type.PERSONAL_BEST, "New personal best", (e, l) -> "new personal best: " + e.text);
+		line(GroupEvent.Type.WEEKLY_RECAP, "Weekly recap", (e, l) -> "this week: +" + l.amount(e.number) + " XP, "
+			+ e.text);
+		line(GroupEvent.Type.SLAYER, "Slayer", (e, l) -> slayer(e));
+		line(GroupEvent.Type.FARMING, "Farming run", (e, l) -> ready(e));
+		line(GroupEvent.Type.BIRDHOUSE, "Bird houses and Hespori", (e, l) -> ready(e));
+	}
+
+	private static boolean isOffline(GroupEvent e)
+	{
+		return e.type == GroupEvent.Type.ONLINE && "offline".equals(e.text);
+	}
+
+	private static String onWorld(GroupEvent e)
+	{
+		return e.world > 0 ? " on world " + e.world : "";
+	}
+
+	/** "offline, played 1h 12m on world 303, logged off at 1:35 PM": the clock is the logout, not the post. */
+	private static String offline(GroupEvent e)
+	{
+		// 0 is also an older client's offline, from the party: no session known, so none said.
+		return "offline" + (e.number > 0 ? ", played " + PresenceDebounce.played(e.number) : "") + onWorld(e)
+			+ (e.detail.isEmpty() ? "" : ", logged off at " + e.detail);
+	}
+
+	/**
+	 * "New Slayer task: 19 x Icefiends (Turael)" or "Slayer task done: Icefiends (streak 1, 2 points)"
+	 * ({@link SlayerWatch}). An older member's client sends "task done" and "new task: X", worded as it was.
+	 */
+	private static String slayer(GroupEvent e)
+	{
+		if ("task done".equals(e.text) || e.text.startsWith("new task: "))
+		{
+			return "slayer " + e.text + (e.number > 0 ? " (" + e.number + ")" : "");
+		}
+		String extra = e.detail.isEmpty() ? "" : " (" + e.detail + ")";
+		return e.number > 0 ? "New Slayer task: " + e.number + " x " + e.text + extra : "Slayer task done: " + e.text + extra;
+	}
+
+	private static String ready(GroupEvent e)
+	{
+		return e.text + " ready" + (e.detail.isEmpty() ? "" : ": " + e.detail);
+	}
+
+	private static String deathValue(GroupEvent e, ItemLookup lookup)
+	{
+		return "lost about " + lookup.amount(e.number) + " gp on death" + (e.location.isEmpty() ? "" : " at " + e.location)
+			+ (e.detail.isEmpty() ? "" : " (" + e.detail + ")");
+	}
+
+	/** Items shown on a gravestone warning: the most valuable few, as "Lost on death" counted them. */
+	static final int GRAVE_TOP = 3;
+
+	/** "; in it: 1 x Abyssal whip, 13.2K x Coins and 2 more (1.6M gp)": empty when the death was not counted. */
+	private static String graveItems(GroupEvent e, ItemLookup lookup)
+	{
+		if (e.items.isEmpty())
+		{
+			return "";
+		}
+		List<Map.Entry<Integer, Integer>> ranked = new ArrayList<>(e.items.entrySet());
+		ranked.sort(Comparator.comparingLong((Map.Entry<Integer, Integer> i) -> lookup.price(i.getKey()) * i.getValue())
+			.reversed().thenComparing(Map.Entry::getKey));
+		List<String> parts = new ArrayList<>();
+		for (Map.Entry<Integer, Integer> i : ranked.subList(0, Math.min(GRAVE_TOP, ranked.size())))
+		{
+			parts.add(Amounts.GAME.of(i.getValue()) + " x " + lookup.name(i.getKey()));
+		}
+		int more = ranked.size() - parts.size();
+		long value = value(e.items, lookup);
+		return "; in it: " + String.join(", ", parts) + (more > 0 ? " and " + more + " more" : "")
+			+ (value > 0 ? " (" + Amounts.GAME.of(value) + " gp)" : "");
 	}
 
 	private EventText()
@@ -99,17 +194,27 @@ final class EventText
 		return TITLES.get(type);
 	}
 
+	/** The heading for this event: "Offline" for a logout, where the type alone would say "Online". */
+	static String title(GroupEvent e)
+	{
+		return isOffline(e) ? "Offline" : title(e.type);
+	}
+
 	/** Every type has words; a new type without them fails EventTextTest, not a player's client. */
 	static boolean covers(GroupEvent.Type type)
 	{
 		return LINES.containsKey(type) && TITLES.containsKey(type);
 	}
 
-	/** "1 x Draconic visage (1.2M gp)": the items and their total value when any is known. */
+	/**
+	 * "1 x Draconic visage (1.2M gp)": the items and their total value when any is known. The total is
+	 * always the game's short form: Discord's exact total is its own Value field, and a short total keeps
+	 * "40K (40,000) x Coins (40K gp)" from nesting parentheses.
+	 */
 	static String items(GroupEvent e, ItemLookup lookup)
 	{
 		long value = value(e.items, lookup);
-		return StorageLog.describe(e.items, lookup) + (value > 0 ? " (" + BoostText.gp(value) + " gp)" : "");
+		return StorageLog.describe(e.items, lookup) + (value > 0 ? " (" + Amounts.GAME.of(value) + " gp)" : "");
 	}
 
 	/** Total value at the lookup's prices. */
@@ -186,10 +291,15 @@ final class EventText
 	/** A kill or chest count line: the name ("Vorkath", "Barrows") and the count; null when not one. */
 	static Count killCount(String message)
 	{
-		Matcher m = KILL_COUNT.matcher(plain(message));
+		String text = plain(message);
+		Matcher m = KILL_COUNT.matcher(text);
 		if (!m.matches())
 		{
-			return null;
+			m = RAID_COUNT.matcher(text);
+			if (!m.matches())
+			{
+				return null;
+			}
 		}
 		try
 		{

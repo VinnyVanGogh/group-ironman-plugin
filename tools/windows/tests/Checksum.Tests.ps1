@@ -67,6 +67,31 @@ try {
         if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "$path does not exist" }
     }
 
+    # GU_BUILD_ONLY=1 lets CI run the launcher end to end without opening RuneLite.
+    $taskBlock = [regex]::Match((Get-Content -Raw $launcher), '(?s)# BEGIN Get-GradleTask.*?# END Get-GradleTask').Value
+    if ($taskBlock) { Invoke-Expression $taskBlock }
+    Check 'Get-GradleTask is marked in the .cmd' { if (-not $taskBlock) { throw 'BEGIN/END Get-GradleTask markers missing' } }
+    Check 'no GU_BUILD_ONLY starts the client' { if ((Get-GradleTask '') -ne 'run') { throw "got $(Get-GradleTask '')" } }
+    Check 'GU_BUILD_ONLY=1 only builds' { if ((Get-GradleTask '1') -ne 'build') { throw "got $(Get-GradleTask '1')" } }
+    Check 'any other GU_BUILD_ONLY value starts the client' {
+        foreach ($v in @('0', 'true', ' 1', 'yes')) { if ((Get-GradleTask $v) -ne 'run') { throw "'$v' gave $(Get-GradleTask $v)" } }
+    }
+    Check 'the .cmd passes the chosen task to Gradle' {
+        $cmd = Get-Content -Raw $launcher
+        if ($cmd -notmatch 'Get-GradleTask \$env:GU_BUILD_ONLY') { throw 'the task is not read from GU_BUILD_ONLY' }
+        if ($cmd -notmatch "gradlew\.bat'\) --console=plain \`$gradleTask") { throw 'gradlew.bat is not given $gradleTask' }
+    }
+
+    # Started from a PowerShell 7 window, powershell.exe inherits pwsh's
+    # PSModulePath and cannot load Get-FileHash (seen on windows-latest).
+    Check 'the .cmd clears PSModulePath before starting powershell' {
+        $lines = (Get-Content -Raw $launcher) -split "`r?`n"
+        $clear = [array]::IndexOf($lines, 'set "PSModulePath="')
+        $start = @(0..($lines.Count - 1) | Where-Object { $lines[$_] -like 'powershell *' })
+        if ($clear -lt 0) { throw 'no set "PSModulePath=" line' }
+        if ($start.Count -ne 1 -or $clear -gt $start[0]) { throw 'PSModulePath is not cleared before the powershell line' }
+    }
+
     Check 'the .cmd parses as PowerShell' {
         $errors = $null
         $text = Get-Content -Raw $launcher

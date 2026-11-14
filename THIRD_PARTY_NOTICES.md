@@ -35,6 +35,26 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+## RuneLite: Time Tracking
+
+`FarmRuns.java` follows RuneLite's Time Tracking plugin (`runelite-client`,
+master, read 2026-11-09,
+`net/runelite/client/plugins/timetracking/`): the growth values and cycles for
+herbs, trees and Hespori from `farming/PatchImplementation.java` and
+`farming/Produce.java`, the regions and variables from
+`farming/FarmingWorld.java`, the ready time from
+`farming/FarmingTracker.java`, and the bird house rules from
+`hunter/BirdHouseTracker.java` and `hunter/BirdHouseState.java`. RuneLite is
+under the BSD 2-Clause license, with the terms above:
+
+```
+Copyright (c) 2018 Abex
+Copyright (c) 2019 Abex
+Copyright (c) 2018, Daniel Teo <https://github.com/takuyakanbr>
+Copyright (c) 2018, NotFoxtrot <https://github.com/NotFoxtrot>
+All rights reserved.
+```
+
 ## Group Ironmen Tracker
 
 The group features match features of Group Ironmen Tracker

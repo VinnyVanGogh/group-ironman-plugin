@@ -4,7 +4,9 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.time.Instant;
-import java.util.EnumMap;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -17,7 +19,8 @@ import java.util.regex.Pattern;
  * a file goes in a multipart form beside {@code payload_json}). Item icons are
  * RuneLite's static item cache, the URL Dink uses
  * ({@code https://static.runelite.net/cache/item/icon/<id>.png},
- * pajlads/DinkPlugin {@code ItemUtils.ITEM_CACHE_BASE_URL}).
+ * pajlads/DinkPlugin {@code ItemUtils.ITEM_CACHE_BASE_URL}), at the stack's own
+ * pile ({@link StackIcons}). Amounts read "450K (450,001)" ({@link Amounts#BOTH}).
  */
 final class DiscordWebhook
 {
@@ -26,10 +29,15 @@ final class DiscordWebhook
 		+ " verified by RuneLite developers";
 	static final String USERNAME = "GIM Utilities";
 	static final String SCREENSHOT = "screenshot.png";
+	/** Discord refuses {@code content} over 2,000 characters; lines past this wait out the day and are dropped. */
+	static final int MAX_DIGEST = 1_900;
 	private static final String ICON = "https://static.runelite.net/cache/item/icon/%d.png";
 	/** discord.com (and the old discordapp.com, and the ptb/canary clients' hosts), /api/webhooks/id/token. */
 	private static final Pattern URL = Pattern.compile(
 		"^https://(?:(?:ptb|canary)\\.)?discord(?:app)?\\.com/api/webhooks/\\d+/[A-Za-z0-9_-]+/?$");
+
+	/** Quotes a pasted link may come wrapped in: straight, backtick and curly. */
+	private static final String QUOTES = "\"'`“”‘’";
 
 	private DiscordWebhook()
 	{
@@ -37,39 +45,125 @@ final class DiscordWebhook
 
 	static boolean valid(String url)
 	{
-		return url != null && URL.matcher(url.trim()).matches();
+		return URL.matcher(clean(url)).matches();
 	}
 
-	/** The category's own webhook when it is set and valid, else the main one, else null: nothing is posted. */
-	static String route(GroupEvent.Category category, Map<GroupEvent.Category, String> overrides, String main)
+	/**
+	 * The field as typed, without surrounding whitespace or quotes: a link
+	 * pasted with its quotes, straight or curly, is the common mistake. Empty
+	 * for null.
+	 */
+	static String clean(String url)
 	{
-		String own = overrides.get(category);
-		if (valid(own))
+		String s = url == null ? "" : url.trim();
+		while (s.length() >= 2 && QUOTES.indexOf(s.charAt(0)) >= 0 && QUOTES.indexOf(s.charAt(s.length() - 1)) >= 0)
 		{
-			return own.trim();
+			s = s.substring(1, s.length() - 1).trim();
 		}
-		return valid(main) ? main.trim() : null;
+		return s;
 	}
 
-	static Map<GroupEvent.Category, String> overrides(GroupIronmanConfig config)
+	/** {@link #digest(Gson, GroupEvent.Category, List, String)} under today's name, "GIM Utilities". */
+	static String digest(Gson gson, GroupEvent.Category category, List<String> lines)
 	{
-		Map<GroupEvent.Category, String> out = new EnumMap<>(GroupEvent.Category.class);
-		out.put(GroupEvent.Category.DROPS, config.discordDropsUrl());
-		out.put(GroupEvent.Category.DEATHS, config.discordDeathsUrl());
-		out.put(GroupEvent.Category.STORAGE, config.discordStorageUrl());
-		out.put(GroupEvent.Category.PROGRESS, config.discordProgressUrl());
-		out.put(GroupEvent.Category.GROUP, config.discordGroupUrl());
-		out.put(GroupEvent.Category.ACTIVITIES, config.discordActivitiesUrl());
-		return out;
+		return digest(gson, category, lines, USERNAME);
 	}
 
-	/** The JSON body ({@code payload_json} when a screenshot is attached). */
-	static String payload(Gson gson, GroupEvent e, ItemLookup lookup, DiscordStyle style, String mention,
+	/**
+	 * One day's held lines for a category as a plain post; null when there are none. Mentions nobody.
+	 * {@code username} null sends none, so the webhook's own name shows ({@link PosterNames}).
+	 */
+	static String digest(Gson gson, GroupEvent.Category category, List<String> lines, String username)
+	{
+		if (lines.isEmpty())
+		{
+			return null;
+		}
+		StringBuilder text = new StringBuilder("Daily digest, ").append(category.name().toLowerCase(Locale.ROOT));
+		for (String line : lines)
+		{
+			if (text.length() + line.length() + 1 > MAX_DIGEST)
+			{
+				break;
+			}
+			text.append('\n').append(line);
+		}
+		JsonObject o = poster(username);
+		o.addProperty("content", text.toString());
+		JsonObject allowed = new JsonObject();
+		allowed.add("parse", new JsonArray());
+		o.add("allowed_mentions", allowed);
+		return gson.toJson(o);
+	}
+
+	/** One event's post text; see {@link #words(DiscordMerge.Post, String)}. */
+	static String words(GroupEvent e, ItemLookup lookup, String egg)
+	{
+		return words(DiscordMerge.single(e, lookup), egg);
+	}
+
+	/**
+	 * What the post's description says: the lead's line, then the Easter egg under it. A death that cost 0 gp has
+	 * no value line, so it says only the egg, or is null (nothing to post) when there is no egg.
+	 */
+	static String words(DiscordMerge.Post post, String egg)
+	{
+		String extra = egg == null || egg.trim().isEmpty() ? null : egg.trim();
+		if (EasterEggs.nothingLost(post.lead))
+		{
+			return extra;
+		}
+		return extra == null ? post.description : post.description + "\n" + extra;
+	}
+
+	/** The JSON body ({@code payload_json} when a screenshot is attached), without an Easter egg. */
+	static String payload(Gson gson, GroupEvent e, ItemLookup items, DiscordStyle style, String mention,
 		boolean screenshot)
 	{
-		JsonObject o = new JsonObject();
-		o.addProperty("username", USERNAME);
-		String tag = e.isBig() && mention != null && !mention.trim().isEmpty() ? mention.trim() : "";
+		return payload(gson, e, items, style, mention, screenshot, null);
+	}
+
+	/** One event's post; null when there is nothing to post. */
+	static String payload(Gson gson, GroupEvent e, ItemLookup items, DiscordStyle style, String mention,
+		boolean screenshot, String egg)
+	{
+		// "450K (450,001)": the game's words, and nothing lost (Board 2026-11-10).
+		ItemLookup lookup = Amounts.BOTH.words(items);
+		return payload(gson, DiscordMerge.single(e, lookup), lookup, style, mention, screenshot, egg);
+	}
+
+	static String payload(Gson gson, DiscordMerge.Post post, ItemLookup lookup, DiscordStyle style, String mention,
+		boolean screenshot)
+	{
+		return payload(gson, post, lookup, style, mention, screenshot, null);
+	}
+
+	/**
+	 * One moment's post: its lead event's title and line, the other events' lines as fields, and the Easter egg
+	 * under the line. {@code lookup} already words amounts the Discord way ({@link Amounts#BOTH}), as the post's
+	 * text was built with it. Null when there is nothing to post.
+	 */
+	static String payload(Gson gson, DiscordMerge.Post post, ItemLookup lookup, DiscordStyle style, String mention,
+		boolean screenshot, String egg)
+	{
+		return payload(gson, post, lookup, style, mention, screenshot, egg, USERNAME);
+	}
+
+	/**
+	 * {@link #payload(Gson, DiscordMerge.Post, ItemLookup, DiscordStyle, String, boolean, String)} under
+	 * {@code username}; null sends none, so Discord shows the webhook's own name and avatar ({@link PosterNames}).
+	 * The footer says "GIM Utilities" whatever the name.
+	 */
+	static String payload(Gson gson, DiscordMerge.Post post, ItemLookup lookup, DiscordStyle style, String mention,
+		boolean screenshot, String egg, String username)
+	{
+		String words = words(post, egg);
+		if (words == null)
+		{
+			return null;
+		}
+		JsonObject o = poster(username);
+		String tag = post.big && mention != null && !mention.trim().isEmpty() ? mention.trim() : "";
 		// Only the configured mention may ping; a member or item name can never.
 		JsonObject allowed = new JsonObject();
 		JsonArray parse = new JsonArray();
@@ -82,7 +176,7 @@ final class DiscordWebhook
 		o.add("allowed_mentions", allowed);
 		if (style == DiscordStyle.PLAIN)
 		{
-			o.addProperty("content", (tag.isEmpty() ? "" : tag + " ") + EventText.sentence(e, lookup));
+			o.addProperty("content", (tag.isEmpty() ? "" : tag + " ") + plain(post, words));
 			return gson.toJson(o);
 		}
 		if (!tag.isEmpty())
@@ -90,41 +184,86 @@ final class DiscordWebhook
 			o.addProperty("content", tag);
 		}
 		JsonArray embeds = new JsonArray();
-		embeds.add(embed(e, lookup, screenshot));
+		embeds.add(embed(post, words, lookup, screenshot));
 		o.add("embeds", embeds);
 		return gson.toJson(o);
 	}
 
-	private static JsonObject embed(GroupEvent e, ItemLookup lookup, boolean screenshot)
+	/**
+	 * A level streak's post ("Prayer 23 → 25 (+2) in 4 min"), as a new message under {@code username} (null for
+	 * the webhook's own, {@link PosterNames}): it never mentions anyone.
+	 */
+	static String levels(Gson gson, GroupEvent latest, String text, ItemLookup lookup, DiscordStyle style,
+		boolean screenshot, String username)
 	{
+		DiscordMerge.Post post = new DiscordMerge.Post(latest, EventText.title(latest), text,
+			Collections.emptyMap(), Collections.emptyList(), false);
+		return payload(gson, post, lookup, style, null, screenshot, null, username);
+	}
+
+	/**
+	 * The same, as an edit of the streak's message (Discord "Edit Webhook Message"): no {@code username}, which
+	 * that endpoint does not take. A new screenshot replaces the old one: files sent with an edit are appended
+	 * unless {@code attachments} lists every file the message keeps, here only the new upload.
+	 */
+	static String levelsEdit(Gson gson, GroupEvent latest, String text, ItemLookup lookup, DiscordStyle style,
+		boolean screenshot)
+	{
+		JsonObject o = gson.fromJson(levels(gson, latest, text, lookup, style, screenshot, null), JsonObject.class);
+		if (screenshot)
+		{
+			JsonObject upload = new JsonObject();
+			upload.addProperty("id", 0);
+			upload.addProperty("filename", SCREENSHOT);
+			JsonArray attachments = new JsonArray();
+			attachments.add(upload);
+			o.add("attachments", attachments);
+		}
+		return gson.toJson(o);
+	}
+
+	/** A post's body, with the {@code username} key only when there is a name to send. */
+	private static JsonObject poster(String username)
+	{
+		JsonObject o = new JsonObject();
+		if (username != null)
+		{
+			o.addProperty("username", username);
+		}
+		return o;
+	}
+
+	/** "Alex: died; lost about 1.5M gp on death": the lead's sentence, each merged fact, then the egg's line. */
+	private static String plain(DiscordMerge.Post post, String words)
+	{
+		int egg = words.indexOf('\n');
+		StringBuilder text = new StringBuilder(post.lead.member).append(": ")
+			.append(egg < 0 ? words : words.substring(0, egg));
+		for (String[] extra : post.extras)
+		{
+			text.append("; ").append(extra[1]);
+		}
+		return egg < 0 ? text.toString() : text.append(words.substring(egg)).toString();
+	}
+
+	private static JsonObject embed(DiscordMerge.Post post, String words, ItemLookup lookup, boolean screenshot)
+	{
+		GroupEvent e = post.lead;
 		JsonObject embed = new JsonObject();
-		embed.addProperty("title", e.member + ": " + EventText.title(e.type));
-		embed.addProperty("description", EventText.describe(e, lookup));
+		embed.addProperty("title", e.member + ": " + post.title);
+		embed.addProperty("description", words);
 		embed.addProperty("color", e.type.category.colour);
 		embed.addProperty("timestamp", Instant.ofEpochMilli(e.at).toString());
-		JsonArray fields = new JsonArray();
-		long value = EventText.value(e.items, lookup);
-		if (value > 0)
-		{
-			fields.add(field("Value", BoostText.gp(value) + " gp"));
-		}
-		if (e.world > 0)
-		{
-			fields.add(field("World", Integer.toString(e.world)));
-		}
-		if (!e.location.isEmpty())
-		{
-			fields.add(field("Where", e.location));
-		}
+		JsonArray fields = fields(post, lookup);
 		if (fields.size() > 0)
 		{
 			embed.add("fields", fields);
 		}
-		Integer icon = e.items.isEmpty() ? null : mostValuable(e.items, lookup);
+		Integer icon = post.items.isEmpty() ? null : mostValuable(post.items, lookup);
 		if (icon != null)
 		{
 			JsonObject thumb = new JsonObject();
-			thumb.addProperty("url", String.format(ICON, icon));
+			thumb.addProperty("url", String.format(ICON, StackIcons.variant(icon, post.items.get(icon))));
 			embed.add("thumbnail", thumb);
 		}
 		if (screenshot)
@@ -139,12 +278,37 @@ final class DiscordWebhook
 		return embed;
 	}
 
-	private static JsonObject field(String name, String value)
+	/** Value, World and Where (inline), then one full-width field per merged fact. */
+	private static JsonArray fields(DiscordMerge.Post post, ItemLookup lookup)
+	{
+		GroupEvent e = post.lead;
+		JsonArray fields = new JsonArray();
+		long value = EventText.value(post.items, lookup);
+		if (value > 0)
+		{
+			fields.add(field("Value", lookup.amount(value) + " gp", true));
+		}
+		if (e.world > 0)
+		{
+			fields.add(field("World", Integer.toString(e.world), true));
+		}
+		if (!e.location.isEmpty())
+		{
+			fields.add(field("Where", e.location, true));
+		}
+		for (String[] extra : post.extras)
+		{
+			fields.add(field(extra[0], extra[1], false));
+		}
+		return fields;
+	}
+
+	private static JsonObject field(String name, String value, boolean inline)
 	{
 		JsonObject f = new JsonObject();
 		f.addProperty("name", name);
 		f.addProperty("value", value);
-		f.addProperty("inline", true);
+		f.addProperty("inline", inline);
 		return f;
 	}
 

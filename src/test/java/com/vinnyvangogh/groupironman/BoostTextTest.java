@@ -45,13 +45,4 @@ public class BoostTextTest
 	{
 		assertEquals("just now", BoostText.ago(1000, 50_000));
 	}
-
-	@Test
-	public void gpIsShortened()
-	{
-		assertEquals("999", BoostText.gp(999));
-		assertEquals("45.6K", BoostText.gp(45_600));
-		assertEquals("12.3M", BoostText.gp(12_300_000));
-		assertEquals("2.1B", BoostText.gp(2_147_483_647L));
-	}
 }

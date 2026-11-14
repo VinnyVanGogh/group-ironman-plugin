@@ -107,6 +107,35 @@ public class PanelModelTest
 		assertTrue(cards.get(1).skills.isEmpty());
 	}
 
+	/** Board 2026-11-11: the game's Group channel says who is on, plugin or not; party data still fills the rest. */
+	@Test
+	public void cardsTakeOnlineAndWorldFromTheGroupChannel()
+	{
+		GroupRoster roster = new GroupRoster();
+		roster.heard("GroupShip", NOW);
+		roster.heard("GroupArk", NOW - MIN);
+		roster.putStats("GroupArk", stats(330, 12338));
+		List<PanelModel.MemberCard> cards = PanelModel.members(roster, GamePresenceTest.ROSTER.names(), REGIONS, ITEMS,
+			"GroupShip", GamePresenceTest.twoOfFive(), NOW);
+		Map<String, PanelModel.MemberCard> by = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+		cards.forEach(c -> by.put(c.name, c));
+		assertTrue(by.get("GroupOtt").online);
+		assertEquals("Online - W615 (no plugin)", by.get("GroupOtt").status);
+		assertFalse(by.get("GroupPNK").online);
+		assertEquals("Offline (no plugin)", by.get("GroupPNK").status);
+		// Heard a minute ago, but the game says logged out; the last stats stay.
+		assertFalse(by.get("GroupArk").online);
+		assertEquals("Offline - last seen W330, Draynor, 1m ago", by.get("GroupArk").status);
+		assertFalse(by.get("GroupArk").skills.isEmpty());
+		assertTrue(by.get("GroupShip").online);
+
+		List<PanelModel.MemberCard> before = PanelModel.members(roster, GamePresenceTest.ROSTER.names(), REGIONS, ITEMS,
+			"GroupShip", GamePresence.UNKNOWN, NOW);
+		before.forEach(c -> by.put(c.name, c));
+		assertEquals("Not seen yet", by.get("GroupOtt").status);
+		assertTrue(by.get("GroupArk").online);
+	}
+
 	@Test
 	public void bankCardsAreIconGridsMostValuableFirstAndFilterable()
 	{
@@ -114,7 +143,8 @@ public class PanelModelTest
 		roster.putBank("Alex", new BankSnapshot(NOW - 2 * 60 * MIN, items(SHARK, 100, WHIP, 2, COAL, 5)));
 		PanelModel.BankCard b = PanelModel.banks(roster, ITEMS, "", NOW).get(0);
 		// 100 x 800 + 2 x 1,500,000 + 5 x 150 = 3,080,750
-		assertEquals("107 items, 3.1M gp, seen 2h ago", b.summary);
+		assertEquals("107 items, 3.08M gp, seen 2h ago", b.summary);
+		assertEquals("107 items, 3,080,750 gp, seen 2h ago", b.exact);
 		assertEquals(Arrays.asList(WHIP, SHARK, COAL),
 			Arrays.asList(b.items.get(0).id, b.items.get(1).id, b.items.get(2).id));
 
@@ -146,6 +176,25 @@ public class PanelModelTest
 		// From Sam's side his own things read "your".
 		assertEquals("Shark - 5 in your inventory", PanelModel.find("shark", roster, ITEMS, NOW, "sam").get(0).text);
 		assertEquals("3m ago", rows.get(1).ago);
+	}
+
+	@Test
+	public void bigAmountsReadLikeTheGameWithTheExactNumberInTheTooltip()
+	{
+		// Board 2026-11-10: "Coins - 450001 in group storage", "took 40000 x Coins".
+		GroupRoster roster = new GroupRoster();
+		roster.putStorage(new StorageChange(NOW - 3 * MIN, "Sam", items(FakeItems.COINS, 40_000), items(),
+			items(FakeItems.COINS, 450_001)));
+		PanelModel.FindRow row = PanelModel.find("coins", roster, ITEMS, NOW).get(0);
+		assertEquals("Coins - 450K in group storage", row.text);
+		assertEquals("Coins - 450,001 in group storage", row.tooltip);
+		assertEquals("the icon is the stack's own pile", 450_001, row.quantity);
+
+		PanelModel.StorageView v = PanelModel.storage(roster, ITEMS, "Me", null, NOW);
+		assertEquals("Sam took 40K Coins", v.log.get(0).text);
+		assertEquals("Sam took 40,000 Coins", v.log.get(0).exact);
+		assertEquals("450,001 x Coins", v.items.get(0).tooltip());
+		assertEquals("450K", Amounts.GAME.of(v.value));
 	}
 
 	@Test

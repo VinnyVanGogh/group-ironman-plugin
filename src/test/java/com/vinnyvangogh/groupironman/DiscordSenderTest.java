@@ -59,12 +59,64 @@ public class DiscordSenderTest
 	public void noUrlMeansNoNetwork()
 	{
 		sender.post(null, "{}", null);
-		sender.post(DiscordWebhook.route(GroupEvent.Category.DROPS, DiscordWebhook.overrides(new GroupIronmanConfig()
+		sender.post(Webhooks.of(new GroupIronmanConfig()
 		{
-		}), ""), "{}", null);
+		}).url(Webhook.DROPS), "{}", null);
 		sender.pump();
 		assertTrue(sent.isEmpty());
 		assertEquals(0, sender.queued());
+	}
+
+	private static final String OTHER = "https://discord.com/api/webhooks/9/other-token";
+
+	@Test
+	public void eachWebhookHasItsOwnQueueSoOneBusyWebhookNeverHoldsAnother()
+	{
+		sender.post(URL, "a1", null);
+		sender.post(URL, "a2", null);
+		sender.post(OTHER, "b1", null);
+		sender.pump();
+		assertEquals("one in flight per webhook, both at once", 2, sent.size());
+		assertEquals(3, sender.queued());
+	}
+
+	@Test
+	public void a429OnOneWebhookBacksOffThatWebhookOnly()
+	{
+		sender.post(URL, "a1", null);
+		sender.pump();
+		reply(429, "30");
+		sender.post(OTHER, "b1", null);
+		sender.post(URL, "a2", null);
+		now += SEC;
+		sender.pump();
+		assertEquals(2, sent.size());
+		assertEquals("the other webhook still posts", "b1", sent.get(1).json);
+		reply(204, null);
+		sender.post(OTHER, "b2", null);
+		now += SEC;
+		sender.pump();
+		assertEquals("b2", sent.get(2).json);
+	}
+
+	@Test
+	public void theMinuteCapIsPerWebhook()
+	{
+		for (int i = 0; i < DiscordQueue.PER_MINUTE + 1; i++)
+		{
+			sender.post(URL, "a" + i, null);
+			sender.post(OTHER, "b" + i, null);
+		}
+		for (int i = 0; i < 2 * DiscordQueue.PER_MINUTE; i++)
+		{
+			sender.pump();
+			while (!pending.isEmpty())
+			{
+				reply(204, null);
+			}
+			now += SEC;
+		}
+		assertEquals("twenty a minute on each", 2 * DiscordQueue.PER_MINUTE, sent.size());
 	}
 
 	@Test

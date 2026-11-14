@@ -38,7 +38,8 @@ final class LowStock
 
 		String message()
 		{
-			return "Group storage is low on " + item + ": " + have + " left, minimum " + minimum;
+			return "Group storage is low on " + item + ": " + Amounts.GAME.of(have) + " left, minimum "
+				+ Amounts.GAME.of(minimum);
 		}
 	}
 

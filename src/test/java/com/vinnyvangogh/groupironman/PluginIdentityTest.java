@@ -2,6 +2,7 @@ package com.vinnyvangogh.groupironman;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import net.runelite.client.config.ConfigGroup;
@@ -88,9 +89,17 @@ public class PluginIdentityTest
 		// round 2): it does nothing without a group key, and even with one nothing is sent until the player
 		// presses Join. Part A of the group events adds 44 more, every one off: "Share group events", "Post to
 		// Discord", "Attach a screenshot", "Group box", and a Discord and an overlay switch per event kind.
-		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length, switches);
-		assertEquals(54, switches);
-		assertEquals(Collections.singletonList("groupSync"), on);
+		// Part C adds 15 kinds (a Discord and an overlay switch each) and one digest switch per category.
+		// "Easter eggs" (Discord section) adds one more, off. "Show update notes" (Advanced) is the second switch
+		// on by default (Board 2026-11-11): it only writes the welcome or what's new in the game chat, once per
+		// version, and sends nothing anywhere. Group settings add "Don't post my events", off: a member's own
+		// opt-out, never something the group turns on for them.
+		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1,
+			switches);
+		assertEquals(93, switches);
+		List<String> expectedOn = Arrays.asList("groupSync", "showUpdateNotes");
+		Collections.sort(on);
+		assertEquals(expectedOn, on);
 		assertEquals("", DEFAULTS.groupLowStock());
 		assertEquals("no key on a fresh install", "", DEFAULTS.groupKey());
 	}

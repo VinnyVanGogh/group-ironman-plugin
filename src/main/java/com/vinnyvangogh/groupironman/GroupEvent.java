@@ -73,7 +73,22 @@ final class GroupEvent
 		QUEST_POINTS("qp", Category.PROGRESS, Need.NOTHING, false),
 		ONLINE("on", Category.GROUP, Need.TEXT, false),
 		BACK("bk", Category.GROUP, Need.NOTHING, false),
-		BARROWS("br", Category.ACTIVITIES, Need.ITEMS, false);
+		BARROWS("br", Category.ACTIVITIES, Need.ITEMS, false),
+		RAID_UNIQUE("ru", Category.DROPS, Need.TEXT, true),
+		CLUE("cl", Category.ACTIVITIES, Need.TEXT, false),
+		DRY_STREAK("dr", Category.DROPS, Need.TEXT, false),
+		DEATH_VALUE("dv", Category.DEATHS, Need.NOTHING, false),
+		GRAVESTONE_EXPIRING("ge", Category.DEATHS, Need.NOTHING, false),
+		HC_LIFE_LOST("hl", Category.DEATHS, Need.NOTHING, true),
+		WILDERNESS("wl", Category.GROUP, Need.TEXT, false),
+		DIARY("di", Category.PROGRESS, Need.TEXT, false),
+		COMBAT_TASK("ca", Category.PROGRESS, Need.TEXT, false),
+		KC_MILESTONE("km", Category.ACTIVITIES, Need.TEXT, false),
+		PERSONAL_BEST("pb", Category.ACTIVITIES, Need.TEXT, false),
+		WEEKLY_RECAP("wr", Category.GROUP, Need.TEXT, false),
+		SLAYER("sy", Category.ACTIVITIES, Need.TEXT, false),
+		FARMING("fr", Category.ACTIVITIES, Need.TEXT, false),
+		BIRDHOUSE("bh", Category.ACTIVITIES, Need.TEXT, false);
 
 		private static final Map<String, Type> BY_CODE = new HashMap<>();
 
@@ -140,6 +155,11 @@ final class GroupEvent
 	final int world;
 	/** Where it happened, a region name; empty when not known. */
 	final String location;
+	/**
+	 * A level-up's level before it, which one action can skip several of (low Prayer); 0 when not known, as for a
+	 * member's event from the party. This client only: never sent, saved or compared.
+	 */
+	final long previous;
 
 	private GroupEvent(Builder b)
 	{
@@ -153,6 +173,7 @@ final class GroupEvent
 		this.detail = clip(b.detail);
 		this.world = Math.max(0, b.world);
 		this.location = clip(b.location);
+		this.previous = Math.max(0, b.previous);
 	}
 
 	private static String clip(String text)
@@ -196,7 +217,7 @@ final class GroupEvent
 	Builder toBuilder()
 	{
 		return of(type, at, member).text(text).items(items).taken(taken).number(number).detail(detail)
-			.world(world).location(location);
+			.world(world).location(location).previous(previous);
 	}
 
 	GroupEvent withMember(String name)
@@ -251,6 +272,7 @@ final class GroupEvent
 		private String detail;
 		private int world;
 		private String location;
+		private long previous;
 
 		private Builder(Type type, long at, String member)
 		{
@@ -304,6 +326,12 @@ final class GroupEvent
 		Builder location(String v)
 		{
 			location = v;
+			return this;
+		}
+
+		Builder previous(long v)
+		{
+			previous = v;
 			return this;
 		}
 

@@ -3,21 +3,17 @@ package com.vinnyvangogh.groupironman;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import java.util.EnumMap;
-import java.util.Map;
 import net.runelite.client.config.ConfigItem;
 import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
 import static com.vinnyvangogh.groupironman.EventFixtures.items;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class DiscordWebhookTest
 {
 	static final String URL = "https://discord.com/api/webhooks/123456789012345678/AbC-def_GHI123";
-	private static final String DROPS = "https://discord.com/api/webhooks/1/drops-token";
 	private final Gson gson = new Gson();
 	private final FakeItems items = new FakeItems();
 
@@ -33,18 +29,6 @@ public class DiscordWebhookTest
 		assertFalse("another host", DiscordWebhook.valid("https://discord.com.evil.example/api/webhooks/1/x"));
 		assertFalse("not a webhook", DiscordWebhook.valid("https://discord.com/channels/1/2"));
 		assertFalse("no token", DiscordWebhook.valid("https://discord.com/api/webhooks/1/"));
-	}
-
-	@Test
-	public void aCategoryOverrideWinsAndAnInvalidOneFallsBack()
-	{
-		Map<GroupEvent.Category, String> overrides = new EnumMap<>(GroupEvent.Category.class);
-		overrides.put(GroupEvent.Category.DROPS, DROPS);
-		overrides.put(GroupEvent.Category.DEATHS, "not a url");
-		assertEquals(DROPS, DiscordWebhook.route(GroupEvent.Category.DROPS, overrides, URL));
-		assertEquals(URL, DiscordWebhook.route(GroupEvent.Category.DEATHS, overrides, URL));
-		assertEquals(URL, DiscordWebhook.route(GroupEvent.Category.STORAGE, overrides, URL));
-		assertNull("no webhook, no post", DiscordWebhook.route(GroupEvent.Category.STORAGE, overrides, ""));
 	}
 
 	@Test
@@ -64,9 +48,30 @@ public class DiscordWebhookTest
 			embed.getAsJsonObject("thumbnail").get("url").getAsString());
 		assertEquals("2023-11-14T22:13:20Z", embed.get("timestamp").getAsString());
 		assertEquals("Value", embed.getAsJsonArray("fields").get(0).getAsJsonObject().get("name").getAsString());
-		assertEquals("1.5M gp", embed.getAsJsonArray("fields").get(0).getAsJsonObject().get("value").getAsString());
+		assertEquals("1.5M (1,500,000) gp",
+			embed.getAsJsonArray("fields").get(0).getAsJsonObject().get("value").getAsString());
 		assertEquals("302", embed.getAsJsonArray("fields").get(1).getAsJsonObject().get("value").getAsString());
 		assertFalse(embed.has("image"));
+	}
+
+	@Test
+	public void coinsReadLikeTheGameWithTheExactAmountAndAPileIcon()
+	{
+		GroupEvent took = GroupEvent.of(GroupEvent.Type.STORAGE_WITHDRAWAL, NOW, "Alex")
+			.items(items(FakeItems.COINS, 40_000)).build();
+		JsonObject embed = parse(DiscordWebhook.payload(gson, took, items, DiscordStyle.EMBED, "", false))
+			.getAsJsonArray("embeds").get(0).getAsJsonObject();
+		// The exact total is in the Value field; the line's own total stays short so parentheses don't nest.
+		assertEquals("took 40K (40,000) x Coins (40K gp) from group storage",
+			embed.get("description").getAsString());
+		assertEquals("40K (40,000) gp", embed.getAsJsonArray("fields").get(0).getAsJsonObject().get("value")
+			.getAsString());
+		assertEquals("the 10,000 coin pile, not one coin", "https://static.runelite.net/cache/item/icon/1004.png",
+			embed.getAsJsonObject("thumbnail").get("url").getAsString());
+
+		JsonObject plain = parse(DiscordWebhook.payload(gson, took, items, DiscordStyle.PLAIN, "", false));
+		assertEquals("Alex: took 40K (40,000) x Coins (40K gp) from group storage",
+			plain.get("content").getAsString());
 	}
 
 	@Test

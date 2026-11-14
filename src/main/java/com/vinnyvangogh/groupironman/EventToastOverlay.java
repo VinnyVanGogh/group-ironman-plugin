@@ -45,7 +45,7 @@ final class EventToastOverlay extends OverlayPanel
 		for (ToastQueue.Toast t : visible)
 		{
 			panelComponent.getChildren().add(TitleComponent.builder()
-				.text(t.event.member + ": " + EventText.title(t.event.type))
+				.text(t.event.member + ": " + EventText.title(t.event))
 				.color(new Color(t.event.type.category.colour))
 				.build());
 			panelComponent.getChildren().add(LineComponent.builder().left(EventText.describe(t.event, lookup)).build());

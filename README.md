@@ -39,8 +39,13 @@ to share, and only sees other members' data for what they share themselves.
   ![Chatbox output from ::find command with colour-coded results](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/find-chatbox.png)
   *Chatbox `::find` command: instant, colour-coded item location lookup.*
 
-- **Log:** group storage changes by member, and members' drops and new
-  collection log slots since you last played.
+- **Log:** every group event, yours and your group's: drops, deaths, levels,
+  quests, slayer, diaries, storage visits, online and offline and the rest,
+  whether or not they go to Discord or the overlay. "Since you last played"
+  on top, then one section per day. Search by member, item, place or text;
+  filter by category, member and time (today, 7 days, all). Hover a row for
+  the full line and its value; right-click it to copy. The newest 2,000
+  events from the last 30 days are kept across restarts.
 
   ![Log tab showing group storage changes and activity since last played](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/storage-log.png)
   *Log tab: storage deposits/withdrawals and group activity since your last session.*
@@ -54,20 +59,61 @@ to share, and only sees other members' data for what they share themselves.
   level ups, 99s and max total, XP milestones, combat and total level, quests
   and quest points, online / offline, "back after a break", and Barrows
   chests. Each can go to:
-  - **Discord**, through a webhook you set (one per category if you like),
-    as rich embeds or plain text, with an optional screenshot, a mention for
-    big events, and quiet hours. Each member's client posts only that
-    member's own events, so nothing is posted twice.
+  - **Discord**, through a webhook you set (one per category if you like,
+    see [Discord webhooks](#discord-webhooks)), as rich embeds or plain text,
+    with an optional screenshot, a mention for big events, and quiet hours.
+    Each member's client posts only that member's own events, so nothing is
+    posted twice.
   - **In-game banners**, yours and your group's, plus an optional group box
     with who is online and the latest events.
 
   ![In-game chat showing group event broadcasts](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/group-events.png)
   *Group events: in-game broadcasts for member level ups and achievements.*
 
-- **Settings:** granular opt-in toggles for every feature and sharing category.
+- **Settings:** granular opt-in toggles for every feature and sharing
+  category, in eight sections: *Group*, *Discord: connection*, *Discord: what
+  to post*, *Discord: how to post*, *Discord: daily digest*, *In-game*,
+  *Thresholds* and *Advanced* (all but *Group* start closed). See
+  [SETUP.md](SETUP.md#settings).
 
-  ![Settings panel showing configuration toggles for GIM Utilities](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings.png)
-  *Settings: opt-in toggles for group sync, sharing categories, minimums, and commands.*
+  ![Settings panel with its eight sections closed](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-overview.png)
+  *Settings: eight sections, every switch off until you turn it on.*
+
+  <details><summary>Group</summary>
+
+  ![Group settings: sync, group key and what you share](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-group.png)
+
+  </details>
+  <details><summary>Discord: connection</summary>
+
+  ![Discord: connection, the webhooks and the poster name choices](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-connection.png)
+
+  </details>
+  <details><summary>Discord: what to post</summary>
+
+  ![Discord: what to post, one switch per event](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-what-to-post.png)
+
+  </details>
+  <details><summary>Discord: how to post</summary>
+
+  ![Discord: how to post, online status, combining level-ups, screenshots and quiet hours](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-how-to-post.png)
+
+  </details>
+  <details><summary>Discord: daily digest</summary>
+
+  ![Discord: daily digest, the hour and which categories it covers](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-daily-digest.png)
+
+  </details>
+  <details><summary>In-game</summary>
+
+  ![In-game settings: banners, group box, world map, ::find and one banner switch per event](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-in-game.png)
+
+  </details>
+  <details><summary>Thresholds and Advanced</summary>
+
+  ![Thresholds: gp values, level and kill count limits, untradeables to ignore; Advanced: the ::find colours](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-thresholds-advanced.png)
+
+  </details>
 
 No server of its own. Party data goes only through RuneLite's Party service,
 and only names on your in-game group roster are shown. **Only the optional
@@ -75,13 +121,40 @@ Discord webhook you set** is a network call of the plugin's own: it is off
 until you turn on *Post to Discord* and paste a webhook URL, and it sends your
 own events and your IP address to Discord.
 
+## Discord webhooks
+
+*Discord: connection* has seven webhooks. Only **Main** is needed: leave any
+other one empty and its posts go to Main's webhook. Each webhook also has its
+own poster name, kept even when its posts go to Main's: *Webhook's own* (the
+name and avatar set on the webhook in Discord), *Default name* (below), or
+*Custom* (the box under it, which starts filled with the default name; left
+empty, the default name is used).
+
+| Webhook | What it posts | Default name |
+| --- | --- | --- |
+| Main | Anything not listed below: clue rewards, kill count milestones, personal bests, slayer tasks, farming and birdhouse runs, diaries, combat tasks, Wilderness, "back after a break", the weekly recap. Also every category left empty. | Town Crier |
+| Online status | The live board, or the online and offline posts. Changing this webhook starts a new board. | World Hopper |
+| Drops & loot | Valuable drops, pets, collection log slots, untradeable uniques, Barrows and raids chests, "took the last one". | Party Pete |
+| Progress | Level-ups, 99s and maxing, XP milestones, combat level, total level, quests and quest points. | Skillcape Seller |
+| Deaths & danger | Deaths and what they cost, a Hardcore group life lost, a gravestone about to expire. | Death's Office |
+| Group storage | Big deposits and withdrawals, storage visit summaries, storage minimums. | Gielinor Banker |
+| Daily digest | The once-a-day summaries ticked under *Discord: daily digest*. | Varrock Herald |
+
+Each webhook has its own queue and rate limit, so a busy Drops channel never
+holds up a death post.
+
 ## Quick start
 
-1. Install *GIM Utilities* from the Plugin Hub and turn on the switches you
-   want in its settings.
+1. Install *GIM Utilities* from the Plugin Hub. The panel (green badge on the
+   sidebar) shows as soon as the plugin is on; with every switch off it says
+   so and has a button to open the settings.
 2. One member opens the GIM Utilities panel, clicks **Create group key**, then
    **Copy group key**, and sends the key to the group (Discord works).
-3. Everyone else copies it and clicks **Paste group key**.
+3. Everyone else copies it and clicks **Paste group key** (or pastes it into
+   *Group key* in the settings). The panel shows a **Share with your group?**
+   card: **Turn on sharing** ticks *Sync with my group* and every *Share*
+   switch in one click; **Post my events to Discord** appears if you have a
+   webhook set. Nothing turns on without the click.
 4. Each session, click **Join group sync**. The Party plugin is not needed.
 
 ![Panel showing group sync status and join button](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/group-sync.png)
