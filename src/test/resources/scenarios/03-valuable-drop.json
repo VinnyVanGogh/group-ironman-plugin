@@ -1,0 +1,14 @@
+{
+  "name": "Valuable drop",
+  "description": "A Vorkath drop with a whip and sharks, then a sharks-only drop. Only the whip clears the 1M drop minimum. Headless only: NpcLootReceived needs a real NPC.",
+  "steps": [
+    {"kind": "groupEvent", "type": "DROP", "member": "GroupShip", "text": "Vorkath", "items": {"WHIP": 1, "SHARK": 5}, "number": 12},
+    {"kind": "groupEvent", "type": "DROP", "member": "GroupShip", "text": "Vorkath", "items": {"SHARK": 5}, "wait": 30000},
+    {"kind": "tick"}
+  ],
+  "expect": [
+    {"probe": "discord", "count": 1},
+    {"probe": "overlay", "contains": "Abyssal whip"},
+    {"probe": "overlay", "absent": "Shark"}
+  ]
+}
