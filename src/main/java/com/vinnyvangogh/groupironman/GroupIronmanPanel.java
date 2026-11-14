@@ -471,20 +471,26 @@ class GroupIronmanPanel extends PluginPanel
 				redraw();
 				break;
 			case PASTE_KEY:
-				boolean saved = actions.pasteKey(clipboardText());
-				keyNote = saved
-					? "Key saved. Joining your group's sync."
-					: "Your clipboard has no group key. Copy the key a member sent, then press Paste again.";
-				keyNoteAt = System.currentTimeMillis();
-				if (saved)
-				{
-					sharing.pasted(actions.groupKey());
-				}
-				redraw();
+				pasteKey();
 				break;
 			default:
 				break;
 		}
+	}
+
+	/** "Paste group key": saves it, says so, and opens the "Turn on sharing" card for it. */
+	private void pasteKey()
+	{
+		boolean saved = actions.pasteKey(clipboardText());
+		keyNote = saved
+			? "Key saved. Joining your group's sync."
+			: "Your clipboard has no group key. Copy the key a member sent, then press Paste again.";
+		keyNoteAt = System.currentTimeMillis();
+		if (saved)
+		{
+			sharing.pasted(actions.groupKey());
+		}
+		redraw();
 	}
 
 	/** Text on the computer's clipboard, or "" when there is none or it cannot be read. */
