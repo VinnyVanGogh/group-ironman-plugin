@@ -70,6 +70,19 @@ final class GroupOutbox
 		return GroupCodec.encodeStorage(gson, change);
 	}
 
+	/**
+	 * This player's own storage visit: always kept in {@code roster}'s log, so
+	 * the own Log and Storage tabs show it; marked not shared, and null
+	 * returned so nothing is sent, while storage sharing is off (Board
+	 * 2026-11-13: a withdrawal made before ticking the switch looked lost).
+	 */
+	static String ownStorage(Gson gson, Switches switches, StorageChange change, GroupRoster roster)
+	{
+		StorageChange kept = switches.storage ? change : change.notShared();
+		roster.putStorage(kept);
+		return storage(gson, switches, kept);
+	}
+
 	static String stats(Gson gson, Switches switches, MemberStats stats)
 	{
 		if (!switches.stats || stats == null)

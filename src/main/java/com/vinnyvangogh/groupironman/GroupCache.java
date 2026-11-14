@@ -35,6 +35,22 @@ final class GroupCache
 	{
 	}
 
+	/** One storage log entry. */
+	private static JsonObject logEntry(StorageChange c)
+	{
+		JsonObject entry = new JsonObject();
+		entry.addProperty("ts", c.at());
+		entry.addProperty("by", c.member());
+		entry.add("took", ItemCounts.toJson(c.took()));
+		entry.add("dep", ItemCounts.toJson(c.deposited()));
+		if (!c.shared())
+		{
+			// Only written when set, so a file without it reads as shared, as every visit was before.
+			entry.addProperty("ns", true);
+		}
+		return entry;
+	}
+
 	static String write(Gson gson, GroupRoster roster)
 	{
 		JsonObject out = new JsonObject();
@@ -53,12 +69,7 @@ final class GroupCache
 		JsonArray log = new JsonArray();
 		for (StorageChange c : roster.log().entries())
 		{
-			JsonObject entry = new JsonObject();
-			entry.addProperty("ts", c.at());
-			entry.addProperty("by", c.member());
-			entry.add("took", ItemCounts.toJson(c.took()));
-			entry.add("dep", ItemCounts.toJson(c.deposited()));
-			log.add(entry);
+			log.add(logEntry(c));
 		}
 		out.add("log", log);
 
@@ -387,7 +398,7 @@ final class GroupCache
 				roster.log().add(new StorageChange(ts, by.getAsString(),
 					ItemCounts.fromJson(entry.get("took"), GroupCodec.MAX_STORAGE_ITEMS),
 					ItemCounts.fromJson(entry.get("dep"), GroupCodec.MAX_STORAGE_ITEMS),
-					Collections.emptyMap()));
+					Collections.emptyMap(), !isTrue(entry.get("ns"))));
 			}
 		}
 

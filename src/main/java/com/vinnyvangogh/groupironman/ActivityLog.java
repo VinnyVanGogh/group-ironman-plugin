@@ -227,17 +227,19 @@ final class ActivityLog
 		/** The skill to draw for a level or XP event, null for none. */
 		final String skill;
 
-		private Row(GroupEvent e, ItemLookup items, long now, ZoneId zone)
+		private Row(GroupEvent e, ItemLookup items, long now, ZoneId zone, boolean notShared)
 		{
+			String unshared = notShared ? " (" + StorageChange.NOT_SHARED + ")" : "";
 			this.event = e;
-			this.text = EventText.describe(e, items);
+			this.text = EventText.describe(e, items) + unshared;
 			this.ago = BoostText.ago(now, e.at);
 			long value = value(e, items);
 			String when = WHEN.format(Instant.ofEpochMilli(e.at).atZone(zone));
 			String sentence = EventText.sentence(e, Amounts.BOTH.words(items));
 			String worth = value > 0 ? "Value: " + Amounts.BOTH.of(value) + " gp" : "";
-			this.full = EventText.title(e) + "\n" + sentence + (worth.isEmpty() ? "" : "\n" + worth) + "\n" + when;
-			this.copy = "[" + when + "] " + sentence + (worth.isEmpty() ? "" : " (" + worth + ")");
+			this.full = EventText.title(e) + "\n" + sentence + (worth.isEmpty() ? "" : "\n" + worth) + "\n" + when
+				+ (notShared ? "\n" + StorageChange.NOT_SHARED : "");
+			this.copy = "[" + when + "] " + sentence + (worth.isEmpty() ? "" : " (" + worth + ")") + unshared;
 			Map.Entry<Integer, Integer> icon = iconItem(e, items);
 			this.itemId = icon == null ? -1 : icon.getKey();
 			this.quantity = icon == null ? 0 : icon.getValue();
@@ -247,7 +249,14 @@ final class ActivityLog
 
 	static Row row(GroupEvent e, ItemLookup items, long now, ZoneId zone)
 	{
-		return new Row(e, items, now, zone);
+		return new Row(e, items, now, zone, false);
+	}
+
+	/** A row that says why it went nowhere when {@code storage} holds it as an own visit kept to this client. */
+	static Row row(GroupEvent e, ItemLookup items, long now, ZoneId zone, StorageLog storage)
+	{
+		boolean notShared = e.type.category == GroupEvent.Category.STORAGE && storage.notShared(e.at, e.member);
+		return new Row(e, items, now, zone, notShared);
 	}
 
 	/** The gp the event is worth: its items, or the number for a death's loss; 0 when none. */

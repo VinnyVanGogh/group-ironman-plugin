@@ -547,6 +547,24 @@ class GroupService
 		return true;
 	}
 
+	/** The panel's "Turn on sharing" card: what it reads. */
+	SharingPrompt.Settings sharingSettings()
+	{
+		return SharingPrompt.Settings.of(config);
+	}
+
+	/** "Turn on sharing": the player's own click, never on its own. */
+	void turnOnSharing()
+	{
+		SharingPrompt.turnOnSharing((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+	}
+
+	/** "Post my events to Discord": the player's own click. */
+	void postToDiscord()
+	{
+		SharingPrompt.postToDiscord((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+	}
+
 	void reloadConfig()
 	{
 		if (sync != null && !config.groupSync())
@@ -1425,13 +1443,8 @@ class GroupService
 			engine.storage(change, true);
 		}
 
-		GroupOutbox.Switches s = switches();
-		if (!s.storage)
-		{
-			return;
-		}
-		roster.putStorage(change);
-		String payload = GroupOutbox.storage(gson, s, change);
+		// Kept locally whether shared or not; with sharing off it is marked so and nothing is sent.
+		String payload = GroupOutbox.ownStorage(gson, switches(), change, roster);
 		if (payload != null && syncing())
 		{
 			partyService.send(new VvgGroupIronmanMessage(payload));

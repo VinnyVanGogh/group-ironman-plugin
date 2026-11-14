@@ -554,7 +554,10 @@ final class PanelModel
 		return new StorageView(snapshot, total(contents, items), cells(contents, items, filter, true), log);
 	}
 
-	/** "You deposited 5 Trout", "Alex took 2 Shark, deposited 100 Coal". */
+	/**
+	 * "You deposited 5 Trout", "Alex took 2 Shark, deposited 100 Coal", and "You took 4 Prayer potion(4) (not
+	 * shared: Share group storage changes is off)" for an own visit kept to this client.
+	 */
 	static String change(StorageChange c, ItemLookup items, String self)
 	{
 		List<String> parts = new ArrayList<>();
@@ -567,7 +570,7 @@ final class PanelModel
 			parts.add("deposited " + counts(c.deposited(), items));
 		}
 		String who = c.member().equalsIgnoreCase(self) ? "You" : c.member();
-		return who + " " + String.join(", ", parts);
+		return who + " " + String.join(", ", parts) + (c.shared() ? "" : " (" + StorageChange.NOT_SHARED + ")");
 	}
 
 	/** "5 Trout, 40K Coins", amounts in {@code items}' style. */

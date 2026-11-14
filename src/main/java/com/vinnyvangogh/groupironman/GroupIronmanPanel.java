@@ -88,6 +88,12 @@ class GroupIronmanPanel extends PluginPanel
 
 		/** Saves a pasted key; false when the text holds none. */
 		boolean pasteKey(String text);
+
+		/** Ticks Sync with my group and every Share switch ({@link SharingPrompt#SHARING_KEYS}). */
+		void turnOnSharing();
+
+		/** Ticks Post to Discord. */
+		void postToDiscord();
 	}
 
 	/** Everything a redraw needs, captured on the client side. */
@@ -106,11 +112,14 @@ class GroupIronmanPanel extends PluginPanel
 		final GamePresence presence;
 		/** The Settings tab's view, or null before the plugin has started its group settings. */
 		final GroupSettingsTab.View settings;
+		/** What the "Turn on sharing" card reads. */
+		final SharingPrompt.Settings sharing;
 
 		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
 			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GamePresence presence,
-			GroupSettingsTab.View settings)
+			GroupSettingsTab.View settings, SharingPrompt.Settings sharing)
 		{
+			this.sharing = sharing;
 			this.presence = presence;
 			this.settings = settings;
 			this.sync = sync;
@@ -168,6 +177,7 @@ class GroupIronmanPanel extends PluginPanel
 	/** What the last Copy/Paste key press did, shown under the buttons for a while. */
 	private String keyNote;
 	private long keyNoteAt;
+	private final SharingPrompt sharing = new SharingPrompt();
 	private View view;
 
 	GroupIronmanPanel(ItemManager itemManager, SkillIconManager skillIcons, SpriteManager sprites, Actions actions)
@@ -373,12 +383,57 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			header.add(text(keyNote, Color.WHITE));
 		}
+		drawSharingCard(v.sharing);
 		for (String stranger : v.group.strangers())
 		{
 			header.add(text("Not in your group: " + stranger + " (ignored)", ColorScheme.PROGRESS_ERROR_COLOR));
 		}
 		header.revalidate();
 		header.repaint();
+	}
+
+	/** "Turn on sharing" after a pasted key, or while sync is on with every Share switch off. Nothing without a click. */
+	private void drawSharingCard(SharingPrompt.Settings s)
+	{
+		SharingPrompt.Card card = s == null ? null : sharing.card(s);
+		if (card == null)
+		{
+			return;
+		}
+		JPanel box = section();
+		JLabel title = new JLabel("Share with your group?");
+		title.setFont(FontManager.getRunescapeBoldFont());
+		box.add(title);
+		box.add(text(SharingPrompt.TEXT, MUTED));
+		JPanel buttons = new JPanel(new GridLayout(0, 1, 2, 2));
+		buttons.setOpaque(false);
+		if (card.sharing)
+		{
+			buttons.add(cardButton("Turn on sharing", "Ticks Sync with my group and every Share switch",
+				actions::turnOnSharing));
+		}
+		if (card.discord)
+		{
+			buttons.add(cardButton("Post my events to Discord", "Ticks Post to Discord, for your webhook",
+				actions::postToDiscord));
+		}
+		buttons.add(cardButton("Not now", "Hides this until the group key changes", () -> sharing.notNow(s.key)));
+		box.add(buttons);
+		header.add(box);
+	}
+
+	private JButton cardButton(String label, String tooltip, Runnable action)
+	{
+		JButton button = new JButton(label);
+		button.setFont(FontManager.getRunescapeSmallFont());
+		button.setFocusable(false);
+		button.setToolTipText(tooltip);
+		button.addActionListener(e ->
+		{
+			action.run();
+			redraw();
+		});
+		return button;
 	}
 
 	private JButton button(SyncHeader.Button b)
@@ -419,15 +474,26 @@ class GroupIronmanPanel extends PluginPanel
 				redraw();
 				break;
 			case PASTE_KEY:
-				keyNote = actions.pasteKey(clipboardText())
-					? "Key saved. Joining your group's sync."
-					: "Your clipboard has no group key. Copy the key a member sent, then press Paste again.";
-				keyNoteAt = System.currentTimeMillis();
-				redraw();
+				pasteKey();
 				break;
 			default:
 				break;
 		}
+	}
+
+	/** "Paste group key": saves it, says so, and opens the "Turn on sharing" card for it. */
+	private void pasteKey()
+	{
+		boolean saved = actions.pasteKey(clipboardText());
+		keyNote = saved
+			? "Key saved. Joining your group's sync."
+			: "Your clipboard has no group key. Copy the key a member sent, then press Paste again.";
+		keyNoteAt = System.currentTimeMillis();
+		if (saved)
+		{
+			sharing.pasted(actions.groupKey());
+		}
+		redraw();
 	}
 
 	/** Text on the computer's clipboard, or "" when there is none or it cannot be read. */
@@ -847,8 +913,9 @@ class GroupIronmanPanel extends PluginPanel
 	{
 		if (!v.switches.storage)
 		{
-			empty(tab, "Group storage log is off.", "Turn on 'Share group storage changes' in GIM Utilities' settings.");
-			return;
+			// Own visits are still kept here, so a withdrawal made before ticking the switch is not a mystery.
+			tab.add(text("'Share group storage changes' is off: your own visits are kept here only and nothing is"
+				+ " sent, and members' changes don't arrive.", ColorScheme.BRAND_ORANGE));
 		}
 		PanelModel.StorageView s = PanelModel.storage(v.group, v.items, v.self, storageFilter.getText(), now);
 		JPanel contents = section();
@@ -1037,7 +1104,7 @@ class GroupIronmanPanel extends PluginPanel
 			}
 			for (int i = 0; i < s.events.size() && left > 0; i++, left--)
 			{
-				tab.add(logRow(ActivityLog.row(s.events.get(i), v.items, now, zone)));
+				tab.add(logRow(ActivityLog.row(s.events.get(i), v.items, now, zone, v.group.log())));
 			}
 		}
 		if (shown.size() > MAX_LOG_ROWS)
