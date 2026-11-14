@@ -19,8 +19,10 @@ closed, so a first install shows every section's name at once.
 1. **Group**: *Sync with my group*, the *Group key*, what you share (bank,
    group storage changes, stats, inventory and equipment, rune pouch / quiver /
    seed vault, drops and collection log, group events) and *Storage minimums*.
-2. **Discord: connection**: *Post to Discord*, the main webhook and the
-   optional one per category, *Poster name* and the custom names.
+2. **Discord: connection**: *Post to Discord*, then seven webhooks (Main,
+   Online status, Drops & loot, Progress, Deaths & danger, Group storage,
+   Daily digest), each with its poster name choice and custom name. See
+   [Discord webhooks](README.md#discord-webhooks).
 3. **Discord: what to post**: one switch per event, grouped drops, deaths,
    storage, progress, group, activities.
 4. **Discord: how to post**: *Online status* (Posts / Live board / Off),
@@ -78,30 +80,32 @@ Every event switch is off by default:
   (1), *Back after (days)* (7), and *Untradeables to ignore* (clue scrolls,
   keys, totems and the like, by name).
 - **Discord: connection** and **Discord: how to post**: *Post to Discord* (shows RuneLite's third-party
-  warning), the *Discord webhook URL* (must be
-  `https://discord.com/api/webhooks/...`; a password field), optional
-  webhooks per category (drops, deaths, storage, progress, group, activities),
+  warning), the *Main webhook* (must be
+  `https://discord.com/api/webhooks/...`; a password field), six optional
+  category webhooks that fall back to Main when empty (see
+  [Discord webhooks](README.md#discord-webhooks)),
   *Message style* (rich embed or plain text), *Attach a screenshot*, *Mention
   for big events* (e.g. `<@&role id>`, put in front of pets, 99s, maxing and a
   Hardcore group death), *Quiet hours from / until* (posts wait and go
-  when quiet hours end; the same hour twice means none), and *Poster name*:
-  *Webhook's own* (the default: the name and avatar you set on
-  each webhook in Discord), *GIM Utilities*, or *Custom*, which uses the
-  *Custom name* fields (main and one per category). A blank custom name uses
-  the webhook's own; names are cut to 80 characters, and a name Discord
-  refuses (containing "discord", "clyde", `@`, `#`, `:` or ` ``` `, or exactly
-  "everyone" or "here") gets a chat warning and is not used: those posts go
-  out under the webhook's own name, not the main custom name. Every embed's
+  when quiet hours end; the same hour twice means none), and each webhook's
+  *name*: *Webhook's own* (the default: the name and avatar you set on the
+  webhook in Discord), *Default name* (Town Crier, Party Pete and so on), or
+  *Custom*, which uses that webhook's *custom name* box (it starts filled
+  with the default name). A category posting to Main's webhook keeps its own
+  name. A blank custom name uses the default name; names are cut to 80
+  characters, and a name Discord refuses (containing "discord", "clyde", `@`,
+  `#`, `:` or ` ``` `, or exactly "everyone" or "here") gets a chat warning
+  and is not used: those posts go out under the default name. Every embed's
   footer still says GIM Utilities.
 - **Discord: what to post** and the *Banner:* switches in **In-game**: one
   switch per event, for each output. *Online status* (under *Discord: how to
   post*) is *Posts* (the default: a post per
   login and logout), *Live board* (one Group-channel message listing each
-  member, edited in place) or *Off*. Only one member sharing a Group webhook
-  should turn on *Live board*: each member who has it on keeps a board of
-  their own in that channel. Level-up posts use the Progress poster name and
-  the board the Group one; the board's edits count toward the same 20 posts
-  a minute.
+  member, edited in place) or *Off*. Only one member sharing an Online status
+  webhook should turn on *Live board*: each member who has it on keeps a board
+  of their own in that channel. Level-up posts use the Progress poster name and
+  the board the Online status one; the board's edits count toward that
+  webhook's 20 posts a minute (each webhook has its own limit).
 - **In-game**: *Banner time*, *Banner position*, *Most banners at once*, the
   *Group box* (who is online and on which world, and the latest events) and
   how many events it lists.

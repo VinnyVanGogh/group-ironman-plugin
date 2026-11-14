@@ -193,7 +193,7 @@ class GroupEventEngine
 		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient, gson), System::currentTimeMillis,
 			() -> LocalTime.now().getHour());
 		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords,
-			() -> PosterNames.name(config, GroupEvent.Category.PROGRESS));
+			() -> posterName(Webhook.PROGRESS));
 		chooseOnlineStatus();
 		reloadConfig();
 		restorePresence();
@@ -289,8 +289,9 @@ class GroupEventEngine
 		{
 			return;
 		}
-		List<String> lines = new ArrayList<>(webhookWarnings.check(WebhookWarnings.fields(config)));
-		lines.addAll(posterNames.check(config.discordPosterName(), PosterNames.fields(config)));
+		Webhooks webhooks = Webhooks.of(config);
+		List<String> lines = new ArrayList<>(webhookWarnings.check(webhooks.urlFields()));
+		lines.addAll(posterNames.check(webhooks.customNames()));
 		for (String line : lines)
 		{
 			chatMessageManager.queue(QueuedMessage.builder()
@@ -332,12 +333,12 @@ class GroupEventEngine
 	}
 
 	/**
-	 * Timer: the live board, when 'Online status' is the board and the Group category has a webhook. Members are
-	 * read from the roster the party fills; the webhook and the message id stay in this client.
+	 * Timer: the live board, when 'Online status' is the board and the Online status webhook (or Main) is set.
+	 * Members are read from the roster the party fills; the webhook and the message id stay in this client.
 	 */
 	private void boardTick(long now)
 	{
-		String url = config.discordOnlineStatus() == OnlineStatus.LIVE_BOARD ? webhook(GroupEvent.Category.GROUP) : null;
+		String url = config.discordOnlineStatus() == OnlineStatus.LIVE_BOARD ? webhookFor(Webhook.ONLINE) : null;
 		board.target(url, () -> configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY));
 		if (url != null)
 		{
@@ -355,7 +356,7 @@ class GroupEventEngine
 			if (send != null)
 			{
 				board.send(sender, send, StatusBoard.payload(gson, send, config.discordStyle(),
-					PosterNames.name(config, GroupEvent.Category.GROUP)), System::currentTimeMillis);
+					posterName(Webhook.ONLINE)), System::currentTimeMillis);
 			}
 		}
 		String saved = board.takeSaved();
@@ -765,7 +766,7 @@ class GroupEventEngine
 	{
 		return config.discordScreenshot() && config.discordGravestoneScreenshot() == GraveScreenshot.DEATH
 			&& settings.discord.contains(GroupEvent.Type.GRAVESTONE_EXPIRING)
-			&& webhook(GroupEvent.Type.GRAVESTONE_EXPIRING.category) != null;
+			&& webhookFor(Webhook.of(GroupEvent.Type.GRAVESTONE_EXPIRING)) != null;
 	}
 
 	@Subscribe
@@ -1061,14 +1062,15 @@ class GroupEventEngine
 
 	private void flushDigest()
 	{
-		for (GroupEvent.Category category : settings.digest)
+		// Every digest goes to the Daily digest webhook (Main when empty), under its poster name.
+		String url = webhookFor(Webhook.DIGEST);
+		// Draining first would lose the day's lines when the webhook has been cleared.
+		if (url != null)
 		{
-			String url = webhook(category);
-			// Draining first would lose the day's lines when the webhook has been cleared.
-			if (url != null)
+			String name = posterName(Webhook.DIGEST);
+			for (GroupEvent.Category category : settings.digest)
 			{
-				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category),
-					PosterNames.name(config, category)), null);
+				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category), name), null);
 			}
 		}
 		saveProfile(DIGEST_KEY, digest.save());
@@ -1219,14 +1221,23 @@ class GroupEventEngine
 
 	// ---- Discord ----
 
-	/** Where a category posts: null when Discord is off or no valid webhook is set. */
-	private String webhook(GroupEvent.Category category)
+	/**
+	 * Where {@code webhook}'s posts go: its own URL, else Main's ({@link Webhooks#url}); null when Discord is off or
+	 * neither is set. Every sender asks this; none reads a webhook setting itself.
+	 */
+	private String webhookFor(Webhook webhook)
 	{
 		if (!config.discordEnabled() || sender == null)
 		{
 			return null;
 		}
-		return DiscordWebhook.route(category, DiscordWebhook.overrides(config), config.discordWebhookUrl());
+		return Webhooks.of(config).url(webhook);
+	}
+
+	/** The name {@code webhook}'s posts go out under, by its own choice ({@link Webhooks#name}). */
+	private String posterName(Webhook webhook)
+	{
+		return Webhooks.of(config).name(webhook);
 	}
 
 	/**
@@ -1246,7 +1257,7 @@ class GroupEventEngine
 
 	private void toDigest(GroupEvent event)
 	{
-		if (webhook(event.type.category) == null)
+		if (webhookFor(Webhook.DIGEST) == null)
 		{
 			return;
 		}
@@ -1267,7 +1278,7 @@ class GroupEventEngine
 	 */
 	private void toDiscord(GroupEvent event)
 	{
-		String url = webhook(event.type.category);
+		String url = webhookFor(Webhook.of(event.type));
 		if (url == null)
 		{
 			return;
@@ -1328,7 +1339,7 @@ class GroupEventEngine
 	private void flush(DiscordBatch.Pending moment)
 	{
 		DiscordMerge.Post post = DiscordMerge.merge(moment.events, settings, discordWords());
-		String url = post == null ? null : webhook(post.lead.type.category);
+		String url = post == null ? null : webhookFor(Webhook.of(post.lead.type));
 		if (url == null)
 		{
 			return;
@@ -1397,7 +1408,7 @@ class GroupEventEngine
 	{
 		String json = DiscordWebhook.payload(gson, DiscordMerge.single(level, discordWords()), discordWords(),
 			config.discordStyle(), config.discordMention(), png != null, egg,
-			PosterNames.name(config, GroupEvent.Category.PROGRESS));
+			posterName(Webhook.PROGRESS));
 		levels.level(url, level, window, png, json);
 	}
 
@@ -1431,7 +1442,7 @@ class GroupEventEngine
 	{
 		boolean picked = picture && config.discordScreenshot();
 		String json = DiscordWebhook.payload(gson, post, discordWords(), config.discordStyle(),
-			config.discordMention(), picked, egg(events), PosterNames.name(config, post.lead.type.category));
+			config.discordMention(), picked, egg(events), posterName(Webhook.of(post.lead.type)));
 		if (json == null)
 		{
 			return null;
