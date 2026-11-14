@@ -203,7 +203,7 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
-			public boolean save(Map<String, Long> values)
+			public GovernanceSync.SaveResult save(Map<String, Long> values)
 			{
 				return group.saveGroupSettings(values);
 			}
