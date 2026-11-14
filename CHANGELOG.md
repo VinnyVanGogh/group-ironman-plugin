@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Every member location shows a place, never "region 13470"
+
+- A member in the Wilderness Slayer Cave read "region 13470"; it now reads
+  *Wilderness Slayer Cave*.
+- More places are named, from RuneLite's own minigame, agility course,
+  runecrafting altar, teleport and hot-cold area lists.
+- Anywhere still unnamed is described from where it is: *Wilderness lvl
+  17-24 (underground)*, *near Lumbridge*, *under Lumbridge*, *Underground*,
+  *Instance* or *Unmapped area*. The region number is never shown.
+
 ### The leader can share the Discord webhooks with the group
 
 - New in the panel's *Settings* tab, for the group leader only: *Share
