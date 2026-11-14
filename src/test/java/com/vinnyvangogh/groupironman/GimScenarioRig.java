@@ -106,20 +106,30 @@ final class GimScenarioRig
 	{
 		if (e.getContainerId() == InventoryID.INV_GROUP_TEMP)
 		{
-			storage.contents(counts(e.getItemContainer()));
+			commit(storage.contents(now, self, counts(e.getItemContainer())));
 		}
 	}
 
+	/**
+	 * The scenarios' close stands for a close the game saves ("Saving..." shown, which GroupService
+	 * commits on): the save is committed, then the window closes. A discarded visit is the service's
+	 * own unit tests' job, not this rig's.
+	 */
 	@Subscribe
 	public void onWidgetClosed(WidgetClosed e)
 	{
 		if (e.getGroupId() == InterfaceID.SHARED_BANK)
 		{
-			StorageChange change = storage.close(now, self);
-			if (change != null)
-			{
-				roster.putStorage(change);
-			}
+			commit(storage.save(now, self));
+			storage.close(now);
+		}
+	}
+
+	private void commit(StorageChange change)
+	{
+		if (change != null)
+		{
+			roster.putStorage(change);
 		}
 	}
 

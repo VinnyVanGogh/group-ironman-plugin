@@ -14,6 +14,16 @@
   hours hold the repost until the first update they allow.
 - Only the client that keeps the board reposts it (the leader's, on a shared
   webhook). Off: the board is only ever edited.
+### Group storage only logs what the game saved
+
+- Closing group storage without pressing Save no longer logs or posts
+  anything: the game throws those changes away, and so does the plugin.
+- A save is the Save button or the game's "Saving..." message, including a
+  save the game makes as the window closes. Each save still posts only what
+  moved since the last one.
+- When the storage next opens, its contents replace the stored snapshot if
+  they differ (for example a save that failed). That correction is never
+  posted.
 ### Dev builds follow the newest RuneLite
 
 - `./gradlew build`, `test` and `run` now use the newest RuneLite client

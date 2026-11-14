@@ -59,6 +59,7 @@ import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
@@ -76,6 +77,7 @@ import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.events.UserPart;
 import net.runelite.client.util.Filepath;
+import net.runelite.client.util.Text;
 import net.runelite.client.party.messages.UserSync;
 
 /**
@@ -199,6 +201,10 @@ class GroupService
 
 	// Client thread only.
 	private final StorageSession storage = new StorageSession();
+	/** The text child of the game's loading modal ({@link InterfaceID#LOADING_ICON_MODAL}). */
+	private static final int STORAGE_LOADER_TEXT = 1;
+	/** Client thread. Whether "Saving..." showed last tick, so each save is taken once. */
+	private boolean storageSaving;
 	private int ticksSinceRoster = ROSTER_INTERVAL_TICKS;
 	private BankSnapshot lastBank;
 	private boolean statsDirty;
@@ -335,7 +341,8 @@ class GroupService
 		assembler.clear();
 		names.clear();
 		prices.clear();
-		storage.close(0, "");
+		storage.reset();
+		storageSaving = false;
 		lastBank = null;
 		lastStatsSent = null;
 		lastCarriedSent = null;
@@ -681,7 +688,8 @@ class GroupService
 		int id = event.getContainerId();
 		if (id == InventoryID.INV_GROUP_TEMP)
 		{
-			storage.contents(counts(event.getItemContainer()));
+			// Only the first contents of a visit can come back: a silent snapshot correction.
+			commitStorage(storage.contents(System.currentTimeMillis(), localName(), counts(event.getItemContainer())));
 		}
 		else if (id == InventoryID.INV || id == InventoryID.WORN)
 		{
@@ -889,7 +897,8 @@ class GroupService
 	{
 		if (event.getGroupId() == InterfaceID.SHARED_BANK)
 		{
-			commitStorage(storage.close(System.currentTimeMillis(), localName()));
+			// Not a save: closing without Save discards the changes (Board 2026-11-14).
+			storage.close(System.currentTimeMillis());
 		}
 		else if (event.getGroupId() == InterfaceID.BANKMAIN)
 		{
@@ -914,6 +923,7 @@ class GroupService
 			return;
 		}
 		long now = System.currentTimeMillis();
+		watchStorageSave(now);
 		if (!session)
 		{
 			session = true;
@@ -1471,9 +1481,27 @@ class GroupService
 	}
 
 	/**
-	 * Client thread. A Save or the close (the close button saves too): the
-	 * contents become the storage snapshot even when nothing moved, a change
-	 * is logged locally whether or not sync is on, and only a change is sent.
+	 * Client thread. The game's "Saving..." loader (interface 293, child 1) is
+	 * shown for every save, including one a close makes, so its first tick is
+	 * a save; the same check the Group Ironmen Tracker plugin commits on.
+	 */
+	private void watchStorageSave(long now)
+	{
+		Widget loader = client.getWidget(InterfaceID.LOADING_ICON_MODAL, STORAGE_LOADER_TEXT);
+		boolean saving = loader != null && !loader.isHidden()
+			&& "Saving...".equalsIgnoreCase(Text.removeTags(loader.getText()));
+		if (saving && !storageSaving)
+		{
+			commitStorage(storage.save(now, localName()));
+		}
+		storageSaving = saving;
+	}
+
+	/**
+	 * Client thread. A save the game made, or the first contents of a visit
+	 * differing from the last snapshot: the contents become the storage
+	 * snapshot even when nothing moved, a change is logged locally whether or
+	 * not sync is on, and only a change is sent.
 	 */
 	private void commitStorage(StorageChange change)
 	{
