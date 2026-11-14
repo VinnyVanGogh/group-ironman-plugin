@@ -47,7 +47,7 @@ public class StatusBoardTest
 	{
 		posted("a", NOW);
 		assertTrue(saved.endsWith("\t111"));
-		assertFalse("only a hash of the webhook is saved", saved.contains("secretTOKEN") || saved.contains("discord"));
+		assertFalse("only the webhook's id is saved", saved.contains("secretTOKEN") || saved.contains("discord"));
 		assertNull("nothing changed", board.next(NOW + GAP, false));
 		board.show("b", NOW + GAP);
 		StatusBoard.Send edit = board.next(NOW + GAP, false);
@@ -80,7 +80,7 @@ public class StatusBoardTest
 		board.show("b", NOW + GAP);
 		StatusBoard.Send edit = board.next(NOW + GAP, false);
 		board.done(edit, 404, null, -1, NOW + GAP);
-		assertEquals("the id is forgotten", "", board.takeSaved());
+		assertEquals("the id is forgotten", "w123456", board.takeSaved());
 		assertNull("still at most one request per gap", board.next(NOW + GAP + 1, false));
 		StatusBoard.Send again = board.next(NOW + 2 * GAP, false);
 		assertTrue(again.create());
@@ -400,7 +400,7 @@ public class StatusBoardTest
 		assertEquals("then edits it in place", "111", edit.edit);
 		assertEquals(URL + "/messages/111?thread_id=42", DiscordSender.target(edit));
 		answers.remove(0).done(404, null);
-		assertEquals("a deleted board is forgotten", "", board.takeSaved());
+		assertEquals("a deleted board is forgotten", "w123456", board.takeSaved());
 		now += GAP;
 		sendNext();
 		assertNull("and posted again", requests.get(2).edit);
