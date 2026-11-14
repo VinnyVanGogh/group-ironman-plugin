@@ -18,6 +18,11 @@ to share, and only sees other members' data for what they share themselves.
   ![Group tab showing member card with orbs, stats, equipment, and inventory](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/panel-group.png)
   *Group tab: member card with world/location, vitals orbs, stats, worn gear, and inventory.*
 
+  A member who doesn't run the plugin still gets a card: online and world from
+  the game's Group channel, levels from the hiscores.
+
+  ![Group tab with a member without the plugin, levels from the hiscores](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/panel-group-hiscores.png)
+
 - **Banks:** each member's last bank with value and when it was seen.
 
   ![Banks tab showing member bank with item counts and total value](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/member-bank.png)
@@ -49,6 +54,26 @@ to share, and only sees other members' data for what they share themselves.
 
   ![Log tab showing group storage changes and activity since last played](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/storage-log.png)
   *Log tab: storage deposits/withdrawals and group activity since your last session.*
+
+- **Group settings tab:** one set of thresholds and switches for the whole
+  group, saved by the leader or an editor and read-only for everyone else, with
+  the leader's editor list and a grid of who posts what.
+
+  <details><summary>As the leader</summary>
+
+  ![Settings tab as the leader: editors and the group's settings to edit](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-tab-leader.png)
+
+  </details>
+  <details><summary>As a member</summary>
+
+  ![Settings tab as a member: the group's settings, read-only](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-tab-member.png)
+
+  </details>
+  <details><summary>Who posts what</summary>
+
+  ![Who posts what: each member's own choice per event](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-who-posts.png)
+
+  </details>
 
 - Storage minimums with a desktop notification, and optional world map
   markers.
