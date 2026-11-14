@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.util.Map;
+import java.util.function.Supplier;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
@@ -20,12 +21,15 @@ final class GroupBoxOverlay extends OverlayPanel
 	private final ToastQueue toasts;
 	private final GroupIronmanConfig config;
 	private final GroupService group;
+	private final Supplier<EasterEggs.Settings> eggs;
 
-	GroupBoxOverlay(ToastQueue toasts, GroupIronmanConfig config, GroupService group)
+	GroupBoxOverlay(ToastQueue toasts, GroupIronmanConfig config, GroupService group,
+		Supplier<EasterEggs.Settings> eggs)
 	{
 		this.toasts = toasts;
 		this.config = config;
 		this.group = group;
+		this.eggs = eggs;
 		setPosition(OverlayPosition.TOP_LEFT);
 	}
 
@@ -51,10 +55,12 @@ final class GroupBoxOverlay extends OverlayPanel
 			panelComponent.getChildren().add(LineComponent.builder().left(e.getKey())
 				.right(world > 0 ? "W" + world : "").rightColor(Color.GREEN).build());
 		}
+		EasterEggs.Settings egg = eggs.get();
 		for (GroupEvent event : toasts.recent(config.overlayGroupBoxEvents()))
 		{
 			panelComponent.getChildren().add(LineComponent.builder()
-				.left(EventText.sentence(event, group.lookup) + " (" + BoostText.ago(now, event.at) + ")")
+				.left(EasterEggs.tagged(EventText.sentence(event, group.lookup), event, egg)
+					+ " (" + BoostText.ago(now, event.at) + ")")
 				.leftColor(new Color(event.type.category.colour)).build());
 		}
 		return super.render(graphics);
