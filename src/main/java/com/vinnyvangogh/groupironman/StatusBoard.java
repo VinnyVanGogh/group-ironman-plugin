@@ -180,18 +180,24 @@ final class StatusBoard
 		}
 		this.url = hook == null ? null : url;
 		this.hook = hook;
-		String[] f = hook == null ? null : savedLine(url, hook, saved.get());
-		messageId = f == null || f[1].isEmpty() ? null : f[1];
-		postedDay = f == null || f.length < 3 || f[2].isEmpty() ? UNKNOWN_DAY : Long.parseLong(f[2]);
-		oldIds.clear();
-		if (f != null && f.length == 4 && !f[3].isEmpty())
-		{
-			oldIds.addAll(Arrays.asList(f[3].split(",")));
-		}
-		// A line saved under the old URL-hash tag is saved again under the webhook's id.
-		idChanged = f != null && !f[0].equals(hook);
+		restore(hook == null ? null : savedLine(url, hook, saved.get()));
 		sentLines = null;
 		inFlight = null;
+	}
+
+	/** Holding the lock: the saved fields ({@link #savedLine}) for the webhook just targeted; null for none. */
+	private void restore(String[] f)
+	{
+		String[] g = f == null ? new String[]{hook} : f;
+		messageId = g.length < 2 || g[1].isEmpty() ? null : g[1];
+		postedDay = g.length < 3 || g[2].isEmpty() ? UNKNOWN_DAY : Long.parseLong(g[2]);
+		oldIds.clear();
+		if (g.length == 4 && !g[3].isEmpty())
+		{
+			oldIds.addAll(Arrays.asList(g[3].split(",")));
+		}
+		// A line saved under the old URL-hash tag is saved again under the webhook's id.
+		idChanged = !Objects.equals(g[0], hook);
 	}
 
 	/**
@@ -465,7 +471,8 @@ final class StatusBoard
 			return false;
 		}
 		boolean ok = f[1].isEmpty() || f[1].matches(DIGITS);
-		ok &= f.length < 3 || f[2].isEmpty() || f[2].matches(DIGITS);
+		// The day is parsed as a long, so it is held to 18 digits; ids stay text.
+		ok &= f.length < 3 || f[2].isEmpty() || f[2].matches("\\d{1,18}");
 		return ok && (f.length < 4 || f[3].isEmpty() || f[3].matches(DIGITS + "(," + DIGITS + ")*"));
 	}
 
