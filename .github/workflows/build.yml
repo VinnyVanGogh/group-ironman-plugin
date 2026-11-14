@@ -26,3 +26,14 @@ jobs:
       # The Plugin Hub builds against its current client, which can be ahead
       # of the pin in build.gradle.
       - run: ./gradlew test --no-daemon -PruneLiteVersion=1.13.6
+
+      # A failed build's log is long; this puts each compile error and failed
+      # test on the run's summary page as an annotation, readable without it.
+      - name: Failures as annotations
+        if: failure()
+        run: |
+          ./gradlew compileTestJava --no-daemon --console=plain -q 2>&1 | grep -E '\.java:[0-9]+: error' | head -10 | sed 's/^/::error::/' || true
+          for f in build/test-results/test/*.xml; do
+            [ -f "$f" ] && grep -q '<failure' "$f" || continue
+            echo "::error title=$(basename "$f" .xml)::$(grep -A4 '<failure' "$f" | head -6 | tr '\n' ' ' | cut -c1-900)"
+          done
