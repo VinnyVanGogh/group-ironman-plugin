@@ -113,6 +113,27 @@ final class SettingsModel
 		return out;
 	}
 
+	/**
+	 * Shared webhooks in words: who shares them ({@code by}, null when nobody does), never a URL. A member is told
+	 * their own webhook still wins and that 'Post to Discord' is theirs to tick; the leader is told who can read them.
+	 */
+	static List<String> webhookLines(GroupGovernance.Role mine, String by)
+	{
+		List<String> out = new ArrayList<>();
+		if (mine == GroupGovernance.Role.LEADER)
+		{
+			out.add(by == null ? "Your webhooks are yours alone. Share them and members only tick 'Post to Discord'."
+				: "Sharing your webhooks: anyone with the group key can read them.");
+			return out;
+		}
+		if (by != null)
+		{
+			out.add("Using the group's webhooks (set by " + by + ").");
+			out.add("A webhook you paste yourself wins for its category. Tick 'Post to Discord' to post.");
+		}
+		return out;
+	}
+
 	/** The history, newest first, in words. */
 	static List<String> history(GroupSettings settings, long now)
 	{

@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### The leader can share the Discord webhooks with the group
+
+- New in the panel's *Settings* tab, for the group leader only: *Share
+  webhooks with the group*. On, the leader's seven webhooks and their poster
+  names reach every member, so a member only ticks *Post to Discord*.
+- A webhook a member pastes themselves still wins for that category.
+- Members see "Using the group's webhooks (set by ...)" and never the links.
+  They are kept with the group's cache file, not in RuneLite's settings.
+- Anyone with the group key can read shared webhooks. Turning sharing off
+  clears members' copies; a leaked webhook is replaced by deleting it in
+  Discord and pasting a new one, which members pick up.
+- On a shared *Online status* webhook only the leader's client keeps the live
+  board, so the channel gets one board.
+
+### One click to share after joining
+
+- After a group key is saved, the panel shows a *Share with your group?*
+  card. **Turn on sharing** ticks *Sync with my group* and every *Share*
+  switch; **Post my events to Discord** (only with a webhook set) ticks
+  *Post to Discord*; **Not now** hides it until the key changes. Nothing
+  turns on without the click. The panel button now also shows while a group
+  key is saved.
+- With *Share group storage changes* off, your own storage visits are still
+  kept in your Storage and Log tabs, marked *not shared: Share group storage
+  changes is off*. Nothing is sent.
+
 ### Seven Discord webhooks, each with its own poster name
 
 - *Discord: connection* now lists seven webhooks in order: Main, Online

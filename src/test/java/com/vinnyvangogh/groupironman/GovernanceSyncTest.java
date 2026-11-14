@@ -1,9 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
@@ -19,64 +16,13 @@ public class GovernanceSyncTest
 	private static final GroupIronmanConfig DEFAULTS = new GroupIronmanConfig()
 	{
 	};
-	private final Gson gson = new Gson();
 
-	/** One client: its config, what it sent, and its sync. */
-	private final class Client
+	/** One client: its config, what it sent, and its sync ({@link GovernanceClient}). */
+	private final class Client extends GovernanceClient
 	{
-		final String name;
-		final Map<String, String> config = new HashMap<>();
-		final List<String> outbox = new ArrayList<>();
-		GovernanceSync sync;
-
 		Client(String name)
 		{
-			this.name = name;
-			start();
-		}
-
-		/** Starting the plugin: everything is read back from the config. */
-		void start()
-		{
-			sync = new GovernanceSync(gson, new GovernanceSync.Store()
-			{
-				@Override
-				public String get(String key)
-				{
-					return config.get(key);
-				}
-
-				@Override
-				public void set(String key, String value)
-				{
-					if (value == null)
-					{
-						config.remove(key);
-					}
-					else
-					{
-						config.put(key, value);
-					}
-				}
-			}, outbox::add, () ->
-			{
-			});
-			sync.group("GroupShip");
-		}
-
-		/** A game tick while connected: whatever is marked goes to {@code others}. */
-		void tick(Client... others)
-		{
-			sync.flush(MemberPrefs.NONE);
-			for (String payload : outbox)
-			{
-				assertTrue(GovernanceSync.isGovernance(payload));
-				for (Client o : others)
-				{
-					o.sync.receive(name, payload);
-				}
-			}
-			outbox.clear();
+			super(name, new Gson());
 		}
 	}
 
@@ -96,8 +42,9 @@ public class GovernanceSyncTest
 		sam.tick(alex);
 
 		assertTrue(alex.sync.claim("Alex", NOW));
-		assertTrue(alex.sync.save("Alex", levelMin(70), NOW + 1));
-		assertFalse("Sam is not an editor", sam.sync.save("Sam", levelMin(5), NOW + 1));
+		assertEquals(GovernanceSync.SaveResult.SAVED, alex.sync.save("Alex", levelMin(70), NOW + 1));
+		assertEquals("Sam is not an editor", GovernanceSync.SaveResult.NOT_EDITOR,
+			sam.sync.save("Sam", levelMin(5), NOW + 1));
 		alex.tick(sam);
 
 		GroupSettings got = sam.sync.governance().settings();
@@ -140,7 +87,7 @@ public class GovernanceSyncTest
 	}
 
 	@Test
-	public void nothingSentCarriesAWebhookOrThePrivateKey()
+	public void nothingSentCarriesAWebhookUnlessTheLeaderSharesNorEverThePrivateKey()
 	{
 		Client alex = new Client("Alex");
 		alex.sync.claim("Alex", NOW);
@@ -153,6 +100,115 @@ public class GovernanceSyncTest
 			assertFalse(payload.toLowerCase(java.util.Locale.ROOT).contains("webhook"));
 		}
 		assertEquals("announce, roles, settings", 3, alex.outbox.size());
+		alex.outbox.clear();
+
+		// Turning sharing off without ever having shared sends nothing either.
+		assertTrue(alex.sync.shareWebhooks("Alex", false, Webhooks.of(DEFAULTS), NOW + 2));
+		alex.sync.flush(MemberPrefs.NONE);
+		assertTrue(alex.outbox.isEmpty());
+
+		// The leader's "Share webhooks with the group": now, and only now, one document carries them.
+		java.util.Map<Webhook, Webhooks.Setting> hooks = new java.util.EnumMap<>(Webhook.class);
+		hooks.put(Webhook.MAIN, new Webhooks.Setting("https://discord.com/api/webhooks/1/SHAREDTOKEN",
+			DiscordPosterName.WEBHOOK, ""));
+		assertTrue(alex.sync.shareWebhooks("Alex", true, new Webhooks(hooks), NOW + 3));
+		alex.sync.flush(MemberPrefs.NONE);
+		assertEquals(1, alex.outbox.size());
+		assertTrue(alex.outbox.get(0).contains("SHAREDTOKEN"));
+		assertFalse(alex.outbox.get(0).contains(privateHalf));
+		assertFalse("never in the leader's config either", alex.config.values().toString().contains("SHAREDTOKEN"));
+	}
+
+	private static Map<String, Long> current(Client c)
+	{
+		GroupSettingsSchema.Resolved r = new GroupSettingsSchema.Resolved(DEFAULTS, c.sync.governance().settings());
+		Map<String, Long> out = new java.util.TreeMap<>();
+		for (GroupSettingsSchema.Setting s : GroupSettingsSchema.ALL)
+		{
+			out.put(s.key, r.value(s.key));
+		}
+		return out;
+	}
+
+	/** One redraw of {@code c}'s Settings tab. */
+	private static void redraw(SettingsDraft draft, Client c)
+	{
+		GroupGovernance g = c.sync.governance();
+		draft.update(g.myRole(c.name), g.roles(), g.settings(), current(c));
+	}
+
+	/** Board 2026-11-13: Sam had the Settings tab open and Alex's Save did not take. */
+	@Test
+	public void theLeadersSaveTakesWhileAnotherMemberHasTheTabOpen()
+	{
+		Client alex = new Client("Alex");
+		Client sam = new Client("Sam");
+		alex.tick(sam);
+		sam.tick(alex);
+		alex.sync.claim("Alex", NOW);
+		alex.sync.save("Alex", levelMin(50), NOW + 1);
+		alex.tick(sam);
+
+		SettingsDraft alexTab = new SettingsDraft();
+		SettingsDraft samTab = new SettingsDraft();
+		redraw(alexTab, alex);
+		redraw(samTab, sam);
+		alexTab.put("eventLevelMin", 70);
+
+		// Sam, on his Settings tab, turns off posting his events; his client announces it.
+		MemberPrefs out = new MemberPrefs(true, java.util.EnumSet.noneOf(GroupEvent.Type.class),
+			java.util.EnumSet.noneOf(GroupEvent.Type.class));
+		sam.sync.prefs(out);
+		sam.tick(out, alex);
+		// He rejoins the party too: everyone resends.
+		alex.sync.resendAll();
+		alex.tick(sam);
+		sam.sync.resendAll();
+		sam.tick(out, alex);
+		redraw(alexTab, alex);
+		redraw(samTab, sam);
+
+		assertEquals(GovernanceSync.SaveResult.SAVED, alex.sync.save("Alex", alexTab.values(), NOW + 2));
+		alexTab.saved();
+		alex.tick(sam);
+		redraw(alexTab, alex);
+		redraw(samTab, sam);
+
+		assertEquals(2, sam.sync.governance().settings().version);
+		assertEquals(70L, (long) sam.sync.governance().settings().values.get("eventLevelMin"));
+		assertEquals("Sam's tab shows what Alex saved", 70L, (long) samTab.values().get("eventLevelMin"));
+		assertNull(alexTab.notice());
+	}
+
+	@Test
+	public void saveSaysWhyItDidNotTake()
+	{
+		Client alex = new Client("Alex");
+		Client sam = new Client("Sam");
+		alex.tick(sam);
+		sam.tick(alex);
+		alex.sync.claim("Alex", NOW);
+		alex.sync.setEditor("Alex", "Sam", true, NOW + 1);
+		alex.tick(sam);
+		assertEquals(GovernanceSync.SaveResult.SAVED, sam.sync.save("Sam", levelMin(60), NOW + 2));
+		assertEquals(GovernanceSync.SaveResult.UNCHANGED, sam.sync.save("Sam", levelMin(60), NOW + 3));
+		sam.tick(alex);
+
+		alex.sync.setEditor("Alex", "Sam", false, NOW + 4);
+		alex.tick(sam);
+		assertEquals(GovernanceSync.SaveResult.NOT_EDITOR, sam.sync.save("Sam", levelMin(70), NOW + 5));
+		assertEquals("Not saved: you are no longer leader or editor.",
+			GroupSettingsTab.saveNote(GovernanceSync.SaveResult.NOT_EDITOR));
+	}
+
+	@Test
+	public void everySaveResultHasItsOwnNote()
+	{
+		java.util.Set<String> notes = new java.util.HashSet<>();
+		for (GovernanceSync.SaveResult r : GovernanceSync.SaveResult.values())
+		{
+			assertTrue(r + " has a note", notes.add(GroupSettingsTab.saveNote(r)));
+		}
 	}
 
 	@Test

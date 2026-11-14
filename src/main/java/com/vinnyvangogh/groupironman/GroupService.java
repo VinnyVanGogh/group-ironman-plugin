@@ -188,6 +188,8 @@ class GroupService
 	private GroupSync sync;
 	/** Roles and the group's shared settings; null when not running. */
 	private volatile GovernanceSync governance;
+	/** The leader's signed webhooks document as the cache file keeps it, or null. Never put in the config. */
+	private volatile String cachedWebhooks;
 	/** The group event engine, told about storage visits, minimums and members' events; null when not running. */
 	private volatile GroupEventEngine events;
 
@@ -292,7 +294,12 @@ class GroupService
 					configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value);
 				}
 			}
-		}, payload -> partyService.send(new VvgGroupIronmanMessage(payload)), () -> this.onChange.run());
+		}, payload -> partyService.send(new VvgGroupIronmanMessage(payload)), () -> this.onChange.run(), webhooks ->
+		{
+			// The leader's shared webhooks: kept in the group cache file, never the RuneLite config.
+			cachedWebhooks = webhooks;
+			saveCache();
+		});
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
@@ -317,6 +324,7 @@ class GroupService
 		}
 		members = GroupMembers.UNKNOWN;
 		governance = null;
+		cachedWebhooks = null;
 		cacheLoaded = false;
 		session = false;
 		hiscoresOnLogin = true;
@@ -482,11 +490,61 @@ class GroupService
 		return g != null && !self.isEmpty() && g.setEditor(self, name, editor, System.currentTimeMillis());
 	}
 
-	/** The leader's or an editor's "Save to group". False when refused. */
-	boolean saveGroupSettings(Map<String, Long> values)
+	/** The leader's or an editor's "Save to group", and why it did not go out when it did not. */
+	GovernanceSync.SaveResult saveGroupSettings(Map<String, Long> values)
 	{
 		GovernanceSync g = governance;
-		return g != null && !self.isEmpty() && g.save(self, values, System.currentTimeMillis());
+		if (g == null)
+		{
+			return GovernanceSync.SaveResult.NOT_STARTED;
+		}
+		if (self.isEmpty())
+		{
+			return GovernanceSync.SaveResult.NOT_LOGGED_IN;
+		}
+		GovernanceSync.SaveResult r = g.save(self, values, System.currentTimeMillis());
+		return r == GovernanceSync.SaveResult.SAVED && !syncing() ? GovernanceSync.SaveResult.SAVED_OFFLINE : r;
+	}
+
+	/** The leader's "Share webhooks with the group". False when refused: this client is not the leader. */
+	boolean shareWebhooks(boolean share)
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.shareWebhooks(self, share, Webhooks.of(config),
+			System.currentTimeMillis());
+	}
+
+	/** The leader's shared webhooks this client holds, or null when the leader shares none. */
+	GroupWebhooks sharedWebhooks()
+	{
+		GroupGovernance g = governance();
+		return g == null ? null : g.sharedWebhooks();
+	}
+
+	/**
+	 * Where this client's posts go: its own webhooks, with the leader's shared ones filling every field it left
+	 * empty ({@link Webhooks#withGroup}). Every sender asks this.
+	 */
+	Webhooks webhooks()
+	{
+		return Webhooks.of(config).withGroup(sharedWebhooks());
+	}
+
+	/** True when this client is the group's leader, holding the leader's key. */
+	boolean isLeader()
+	{
+		GroupGovernance g = governance();
+		return g != null && !self.isEmpty() && g.myRole(self) == GroupGovernance.Role.LEADER;
+	}
+
+	/** While the leader shares, an edit of the leader's own webhooks goes to the group as a new version. */
+	private void republishWebhooks()
+	{
+		GovernanceSync g = governance;
+		if (g != null && sharedWebhooks() != null && isLeader())
+		{
+			g.shareWebhooks(self, true, Webhooks.of(config), System.currentTimeMillis());
+		}
 	}
 
 	/** "Forget leader": this client only. */
@@ -538,6 +596,24 @@ class GroupService
 		return true;
 	}
 
+	/** The panel's "Turn on sharing" card: what it reads. */
+	SharingPrompt.Settings sharingSettings()
+	{
+		return SharingPrompt.Settings.of(config);
+	}
+
+	/** "Turn on sharing": the player's own click, never on its own. */
+	void turnOnSharing()
+	{
+		SharingPrompt.turnOnSharing((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+	}
+
+	/** "Post my events to Discord": the player's own click. */
+	void postToDiscord()
+	{
+		SharingPrompt.postToDiscord((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+	}
+
 	void reloadConfig()
 	{
 		if (sync != null && !config.groupSync())
@@ -551,6 +627,7 @@ class GroupService
 		{
 			g.prefs(MemberPrefs.of(config));
 		}
+		republishWebhooks();
 		GroupOutbox.Switches s = switches();
 		// Turning a live feature off drops what was collected for it.
 		if (!s.stats)
@@ -1416,13 +1493,8 @@ class GroupService
 			engine.storage(change, true);
 		}
 
-		GroupOutbox.Switches s = switches();
-		if (!s.storage)
-		{
-			return;
-		}
-		roster.putStorage(change);
-		String payload = GroupOutbox.storage(gson, s, change);
+		// Kept locally whether shared or not; with sharing off it is marked so and nothing is sent.
+		String payload = GroupOutbox.ownStorage(gson, switches(), change, roster);
 		if (payload != null && syncing())
 		{
 			partyService.send(new VvgGroupIronmanMessage(payload));
@@ -1722,6 +1794,7 @@ class GroupService
 				log.debug("group cache unreadable, starting empty");
 				return false;
 			}
+			restoreWebhooks(GroupCache.webhooks(gson, json));
 			return true;
 		}
 		catch (Exception e)
@@ -1731,6 +1804,22 @@ class GroupService
 		}
 	}
 
+	/** Executor thread. The cached webhooks document, checked like one from the party; a newer one held wins. */
+	private void restoreWebhooks(String json)
+	{
+		GovernanceSync g = governance;
+		if (json == null || g == null)
+		{
+			return;
+		}
+		if (cachedWebhooks == null)
+		{
+			// Kept as read until the governance accepts (or replaces) it, so a save before the roles load keeps it.
+			cachedWebhooks = json;
+		}
+		g.restoreWebhooks(json);
+	}
+
 	private void saveCache()
 	{
 		if (!cacheLoaded)
@@ -1738,7 +1827,7 @@ class GroupService
 			// Whatever arrived meanwhile is in the roster and goes out with the first save after loading.
 			return;
 		}
-		String json = GroupCache.write(gson, roster);
+		String json = GroupCache.write(gson, roster, cachedWebhooks);
 		executor.execute(() ->
 		{
 			try

@@ -189,6 +189,20 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public void turnOnSharing()
+			{
+				group.turnOnSharing();
+				// The player's own click, as Paste is: joins once, right away, now that sync is on.
+				clientThread.invokeLater(group::joinGroup);
+			}
+
+			@Override
+			public void postToDiscord()
+			{
+				group.postToDiscord();
+			}
+
+			@Override
 			public boolean claim()
 			{
 				return group.claimLeadership();
@@ -201,9 +215,15 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
-			public boolean save(Map<String, Long> values)
+			public GovernanceSync.SaveResult save(Map<String, Long> values)
 			{
 				return group.saveGroupSettings(values);
+			}
+
+			@Override
+			public boolean shareWebhooks(boolean share)
+			{
+				return group.shareWebhooks(share);
 			}
 
 			@Override
@@ -350,7 +370,7 @@ public class GroupIronmanPlugin extends Plugin
 		}
 		GroupIronmanPanel.View view = new GroupIronmanPanel.View(group.syncState(), group.roster(), group.members(),
 			group.lookup, group.switches(), group.regions(), group.since(), group.self(),
-			group.presence(), settingsView(), group.anyOn());
+			group.presence(), settingsView(), group.anyOn(), group.sharingSettings());
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
 	}
@@ -379,8 +399,10 @@ public class GroupIronmanPlugin extends Plugin
 				heard.add(m);
 			}
 		}
+		// Who shares webhooks, never the URLs: the tab has no way to show one.
+		GroupWebhooks shared = g.sharedWebhooks();
 		return new GroupSettingsTab.View(g.myRole(self), g.roles(), g.settings(), g.unclaimed(), group.syncing(),
-			members, self, current, MemberPrefs.of(config), g.prefs(), heard);
+			members, self, current, MemberPrefs.of(config), g.prefs(), heard, shared == null ? null : shared.by);
 	}
 
 	/** Markers only add points to the world map; they never open it (that stays the player's click). */

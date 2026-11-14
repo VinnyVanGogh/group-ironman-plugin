@@ -47,6 +47,8 @@ final class GroupGovernance
 	private GroupSettings settings;
 	private GroupRoles pendingRoles;
 	private GroupSettings pendingSettings;
+	private GroupWebhooks webhooks;
+	private GroupWebhooks pendingWebhooks;
 	/** Name key to the public key in that member's latest announce. */
 	private final Map<String, String> keys = new LinkedHashMap<>();
 	/** Display name to the opt-outs in that member's latest announce. */
@@ -73,6 +75,12 @@ final class GroupGovernance
 	{
 		roles = savedRoles != null && savedRoles.verify() && savedRoles.group.equals(group) ? savedRoles : null;
 		settings = roles != null && savedSettings != null && savedSettings.verify() ? savedSettings : null;
+		// A webhooks document for another group (or none) is dropped; one waiting on these roles is taken.
+		if (!fromLeader(webhooks))
+		{
+			webhooks = null;
+		}
+		applyPendingWebhooks();
 	}
 
 	synchronized GroupRoles roles()
@@ -83,6 +91,28 @@ final class GroupGovernance
 	synchronized GroupSettings settings()
 	{
 		return settings;
+	}
+
+	/**
+	 * The leader's latest webhooks document for this group, shared or not: null when none is held, or when the
+	 * one held is not signed by the current leader with the leader's key (a new leader, a forgotten one).
+	 */
+	synchronized GroupWebhooks webhooks()
+	{
+		return fromLeader(webhooks) ? webhooks : null;
+	}
+
+	/** The leader's shared webhooks, or null when the leader shares none. */
+	synchronized GroupWebhooks sharedWebhooks()
+	{
+		GroupWebhooks w = webhooks();
+		return w != null && w.shared ? w : null;
+	}
+
+	private boolean fromLeader(GroupWebhooks w)
+	{
+		return w != null && roles != null && w.group.equals(group) && roles.isLeader(w.by)
+			&& roles.leaderKey.equals(w.byKey);
 	}
 
 	synchronized Map<String, MemberPrefs> prefs()
@@ -183,6 +213,27 @@ final class GroupGovernance
 		return settings;
 	}
 
+	/**
+	 * The leader's "Share webhooks with the group": on publishes {@code own}'s seven webhooks, off publishes a
+	 * version with none, which clears members' copies. False when this client is not the leader (an editor may
+	 * not); the held document unchanged when nothing changed.
+	 */
+	synchronized boolean shareWebhooks(String self, boolean share, Webhooks own, long now)
+	{
+		if (myRole(self) != Role.LEADER)
+		{
+			return false;
+		}
+		GroupWebhooks held = webhooks();
+		// Never shared and still not: nothing for members to clear, so nothing is made or sent.
+		boolean unchanged = held == null ? !share : held.same(share, own);
+		if (!unchanged)
+		{
+			webhooks = GroupWebhooks.next(held, group, share, own, self, me, now);
+		}
+		return true;
+	}
+
 	/** "Forget group leader": this client only, so a group whose leader lost their key can start over. */
 	synchronized void forgetLeader()
 	{
@@ -273,6 +324,35 @@ final class GroupGovernance
 		return Verdict.ACCEPTED;
 	}
 
+	/**
+	 * The leader's webhooks, from the party or from this client's cache: accepted only when signed by the
+	 * leader the roles pin, with the leader's key, for this group, and newer than what is held. An editor's or
+	 * a member's is refused.
+	 */
+	synchronized Verdict receiveWebhooks(GroupWebhooks incoming)
+	{
+		if (incoming == null || !incoming.verify())
+		{
+			return Verdict.REFUSED;
+		}
+		if (roles == null)
+		{
+			// Also before the group is known: the cache is read before the game says which group this is.
+			pendingWebhooks = incoming.newerThan(pendingWebhooks) ? incoming : pendingWebhooks;
+			return Verdict.PENDING;
+		}
+		if (!fromLeader(incoming))
+		{
+			return Verdict.REFUSED;
+		}
+		if (fromLeader(webhooks) && !incoming.newerThan(webhooks))
+		{
+			return Verdict.STALE;
+		}
+		webhooks = incoming;
+		return Verdict.ACCEPTED;
+	}
+
 	/** Whatever was waiting on a key or on the roles, tried again. */
 	private void applyPending()
 	{
@@ -294,6 +374,17 @@ final class GroupGovernance
 			GroupSettings s = pendingSettings;
 			pendingSettings = null;
 			receiveSettings(s);
+		}
+		applyPendingWebhooks();
+	}
+
+	private void applyPendingWebhooks()
+	{
+		if (pendingWebhooks != null && roles != null)
+		{
+			GroupWebhooks w = pendingWebhooks;
+			pendingWebhooks = null;
+			receiveWebhooks(w);
 		}
 	}
 }

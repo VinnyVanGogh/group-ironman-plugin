@@ -135,7 +135,8 @@ public interface GroupIronmanConfig extends Config
 		keyName = "groupShareStorage",
 		name = "Share group storage changes",
 		description = "When you close group storage, tell your group what you took and deposited, and keep a log"
-			+ " of the last 200 changes. Only members running GIM Utilities with this on are logged.",
+			+ " of the last 200 changes. Only members running GIM Utilities with this on are logged. Off: your own"
+			+ " visits are still kept in your panel, marked not shared, and nothing is sent.",
 		section = groupSection,
 		position = 3
 	)
