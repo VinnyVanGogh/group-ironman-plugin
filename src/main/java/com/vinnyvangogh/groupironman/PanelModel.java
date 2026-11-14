@@ -107,6 +107,14 @@ final class PanelModel
 			this.value = value;
 		}
 
+		/** An empty inventory slot, kept so the items after it stay in their own slots. */
+		static final ItemCell EMPTY = new ItemCell(0, "", 0, 0);
+
+		boolean empty()
+		{
+			return id <= 0;
+		}
+
 		/** "450,001 x Coins": the exact amount, which the icon's own stack text shortens. */
 		String tooltip()
 		{
@@ -244,7 +252,7 @@ final class PanelModel
 
 	/**
 	 * One card per member: the in-game roster first, then anyone else this
-	 * client holds data for, sorted by name; you first. Offline members keep
+	 * client holds data for, in {@link #MEMBER_ORDER}. Offline members keep
 	 * their last stats and items.
 	 */
 	static List<MemberCard> members(GroupRoster group, Collection<String> roster, RegionNames regions, ItemLookup items,
@@ -286,9 +294,17 @@ final class PanelModel
 				? new MemberCard(name, you, online, st, bars(s), skills(s), held, vault, null)
 				: fromHiscores(name, you, online, st, held, vault, group.hiscores(), now));
 		}
-		out.sort(Comparator.comparing((MemberCard c) -> !c.you));
+		out.sort(MEMBER_ORDER);
 		return out;
 	}
+
+	/**
+	 * You, then members online, then offline and never-seen ones, each by name (Board 2026-11-13). Online is the
+	 * card's own: the game's Group channel where it knows, plugin presence otherwise.
+	 */
+	static final Comparator<MemberCard> MEMBER_ORDER = Comparator.comparing((MemberCard c) -> !c.you)
+		.thenComparing(c -> !c.online)
+		.thenComparing(c -> c.name, String.CASE_INSENSITIVE_ORDER);
 
 	/**
 	 * A member who shares no stats: their levels from the hiscores, when looked up. Online, HP and Prayer show
@@ -445,7 +461,15 @@ final class PanelModel
 		if (c != null)
 		{
 			addGroup(out, "Worn", c.worn, items);
-			addGroup(out, "Inventory", c.inventory, items);
+			if (c.slots.isEmpty() || c.inventory.isEmpty())
+			{
+				// A sender from before slots: one cell per item, as before.
+				addGroup(out, "Inventory", c.inventory, items);
+			}
+			else
+			{
+				out.add(new ItemGroup("Inventory", slotCells(c.slots, items)));
+			}
 		}
 		if (x != null)
 		{
@@ -461,6 +485,18 @@ final class PanelModel
 		{
 			out.add(new ItemGroup(title, cells(counts, items, null, false)));
 		}
+	}
+
+	/** One cell per slot in the game's order, {@link ItemCell#EMPTY} for an empty one; noted ids stay noted. */
+	static List<ItemCell> slotCells(List<GroupCodec.Slot> slots, ItemLookup items)
+	{
+		List<ItemCell> out = new ArrayList<>();
+		for (GroupCodec.Slot s : slots)
+		{
+			out.add(s.empty() ? ItemCell.EMPTY
+				: new ItemCell(s.id, items.name(s.id), s.quantity, items.price(s.id) * s.quantity));
+		}
+		return out;
 	}
 
 	private static String seedVault(MemberExtras x, long now)

@@ -5,10 +5,13 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * The JSON inside a {@link VvgGroupIronmanMessage}: one of six kinds, each
@@ -48,6 +51,8 @@ final class GroupCodec
 	static final int MAX_BANK_PARTS = 16;
 	static final int MAX_STORAGE_ITEMS = 500;
 	static final int MAX_CARRIED_ITEMS = 64;
+	/** The game's inventory: 28 slots. */
+	static final int INVENTORY_SLOTS = 28;
 	static final int MAX_SKILLS = 40;
 
 	/** Room for the header fields of a bank part, generously. */
@@ -95,16 +100,88 @@ final class GroupCodec
 		}
 	}
 
+	/** One inventory slot as the game holds it: the raw item id (noted stays noted), or empty. */
+	static final class Slot
+	{
+		static final Slot EMPTY = new Slot(0, 0);
+
+		final int id;
+		final int quantity;
+
+		private Slot(int id, int quantity)
+		{
+			this.id = id;
+			this.quantity = quantity;
+		}
+
+		/** {@link #EMPTY} for the game's empty slot (id -1, quantity 0) and for anything that is not an item. */
+		static Slot of(long id, long quantity)
+		{
+			if (id <= 0 || id >= ItemCounts.MAX_ITEM_ID || quantity <= 0)
+			{
+				return EMPTY;
+			}
+			return new Slot((int) id, (int) Math.min(Integer.MAX_VALUE, quantity));
+		}
+
+		boolean empty()
+		{
+			return id <= 0;
+		}
+	}
+
 	static final class Carried
 	{
+		/** Canonical counts (noted counted as the item): what Find, ::find and totals read. */
 		final Map<Integer, Integer> inventory;
 		final Map<Integer, Integer> worn;
+		/**
+		 * The inventory's {@link #INVENTORY_SLOTS} slots in the game's order, or empty when the sender's build
+		 * shares only counts. Only the Group tab's inventory grid reads these.
+		 */
+		final List<Slot> slots;
 
 		Carried(Map<Integer, Integer> inventory, Map<Integer, Integer> worn)
 		{
+			this(inventory, worn, Collections.emptyList());
+		}
+
+		Carried(Map<Integer, Integer> inventory, Map<Integer, Integer> worn, List<Slot> slots)
+		{
 			this.inventory = ItemCounts.sorted(inventory);
 			this.worn = ItemCounts.sorted(worn);
+			this.slots = inventorySlots(slots);
 		}
+
+		/** The ids drawn in {@link #slots}, for name lookups. */
+		Set<Integer> slotIds()
+		{
+			Set<Integer> out = new TreeSet<>();
+			for (Slot s : slots)
+			{
+				if (!s.empty())
+				{
+					out.add(s.id);
+				}
+			}
+			return out;
+		}
+	}
+
+	/** Exactly {@link #INVENTORY_SLOTS} slots, cut or padded with empties; none stays none. */
+	private static List<Slot> inventorySlots(List<Slot> slots)
+	{
+		if (slots.isEmpty())
+		{
+			return Collections.emptyList();
+		}
+		List<Slot> out = new ArrayList<>(INVENTORY_SLOTS);
+		for (int i = 0; i < INVENTORY_SLOTS; i++)
+		{
+			Slot s = i < slots.size() ? slots.get(i) : null;
+			out.add(s == null ? Slot.EMPTY : s);
+		}
+		return Collections.unmodifiableList(out);
 	}
 
 	/** Exactly one of the fields is set, matching {@link #kind}. */
@@ -205,11 +282,35 @@ final class GroupCodec
 		return out;
 	}
 
+	/** Counts only, the shape every build reads; the disk cache stores carried items this way. */
 	static String encodeCarried(Gson gson, Map<Integer, Integer> inventory, Map<Integer, Integer> worn)
+	{
+		return encodeCarried(gson, inventory, worn, Collections.emptyList());
+	}
+
+	/**
+	 * Counts in {@code inv} and {@code eq} exactly as before, plus {@code is}: the inventory slots in order as
+	 * {@code [id, qty, ...]}, {@code 0, 0} for an empty slot, raw ids so a noted stack draws noted. A build from
+	 * before slots ignores {@code is} as an unknown field and keeps showing counts. At most 28 pairs of numbers
+	 * under 11 digits each: about 650 characters, well inside {@link #MAX_PAYLOAD_CHARS}.
+	 */
+	static String encodeCarried(Gson gson, Map<Integer, Integer> inventory, Map<Integer, Integer> worn,
+		List<Slot> slots)
 	{
 		JsonObject o = header(Kind.CARRIED);
 		o.add("inv", ItemCounts.toJson(inventory));
 		o.add("eq", ItemCounts.toJson(worn));
+		List<Slot> kept = inventorySlots(slots);
+		if (!kept.isEmpty())
+		{
+			JsonArray is = new JsonArray();
+			for (Slot s : kept)
+			{
+				is.add(s.id);
+				is.add(s.quantity);
+			}
+			o.add("is", is);
+		}
 		return gson.toJson(o);
 	}
 
@@ -419,7 +520,8 @@ final class GroupCodec
 			case "carried":
 				return Decoded.of(new Carried(
 					ItemCounts.fromJson(in.get("inv"), MAX_CARRIED_ITEMS),
-					ItemCounts.fromJson(in.get("eq"), MAX_CARRIED_ITEMS)));
+					ItemCounts.fromJson(in.get("eq"), MAX_CARRIED_ITEMS),
+					slotsFrom(in.get("is"))));
 			case "storage":
 				return Decoded.of(new StorageChange(
 					longOr(in.get("ts"), 0),
@@ -454,6 +556,24 @@ final class GroupCodec
 		}
 		Map<Integer, Integer> items = ItemCounts.fromJson(in.get("i"), MAX_BANK_ITEMS);
 		return Decoded.of(new BankPart(ts, (int) part, (int) of, items));
+	}
+
+	/** A bad pair is an empty slot in its place, so the rest keep their positions; past 28 slots is dropped. */
+	private static List<Slot> slotsFrom(JsonElement e)
+	{
+		List<Slot> out = new ArrayList<>();
+		if (e == null || !e.isJsonArray())
+		{
+			return out;
+		}
+		JsonArray array = e.getAsJsonArray();
+		for (int i = 0; i + 1 < array.size() && out.size() < INVENTORY_SLOTS; i += 2)
+		{
+			Long id = ItemCounts.longValue(array.get(i));
+			Long qty = ItemCounts.longValue(array.get(i + 1));
+			out.add(id == null || qty == null ? Slot.EMPTY : Slot.of(id, qty));
+		}
+		return out;
 	}
 
 	/** Bad events are skipped one at a time, like bad item pairs. */

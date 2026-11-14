@@ -136,6 +136,124 @@ public class PanelModelTest
 		assertTrue(by.get("GroupArk").online);
 	}
 
+	private static List<GroupCodec.Slot> slots(int... pairs)
+	{
+		List<GroupCodec.Slot> out = new java.util.ArrayList<>();
+		for (int i = 0; i < pairs.length; i += 2)
+		{
+			out.add(GroupCodec.Slot.of(pairs[i], pairs[i + 1]));
+		}
+		return out;
+	}
+
+	private static PanelModel.ItemGroup inventory(GroupRoster roster, String name)
+	{
+		for (PanelModel.MemberCard c : PanelModel.members(roster, Collections.emptyList(), REGIONS, ITEMS, "Me", NOW))
+		{
+			if (c.name.equals(name))
+			{
+				for (PanelModel.ItemGroup g : c.items)
+				{
+					if (g.title.equals("Inventory"))
+					{
+						return g;
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	/** Board 2026-11-13: 14 potions in 14 slots showed as one cell with "14"; the game shows 14 slots. */
+	@Test
+	public void inventoryShowsTheRealSlotsWhenTheSenderSharesThem()
+	{
+		// Slot 0 coins, slot 1 empty, slots 2..15 one potion each, the rest empty.
+		int[] pairs = new int[32];
+		pairs[0] = COINS;
+		pairs[1] = 5000;
+		for (int i = 2; i < 16; i++)
+		{
+			pairs[i * 2] = PRAYER_POT_4;
+			pairs[i * 2 + 1] = 1;
+		}
+		GroupRoster roster = new GroupRoster();
+		roster.heard("Alex", NOW - MIN);
+		roster.putCarried("Alex", new GroupCodec.Carried(items(COINS, 5000, PRAYER_POT_4, 14), items(), slots(pairs)));
+
+		List<PanelModel.ItemCell> cells = inventory(roster, "Alex").items;
+		assertEquals(28, cells.size());
+		assertEquals(COINS, cells.get(0).id);
+		assertEquals("coins stack in one slot", 5000, cells.get(0).quantity);
+		assertTrue("an empty slot stays where it is", cells.get(1).empty());
+		for (int i = 2; i < 16; i++)
+		{
+			assertEquals("slot " + i, PRAYER_POT_4, cells.get(i).id);
+			assertEquals("slot " + i, 1, cells.get(i).quantity);
+			assertEquals("Prayer potion(4)", cells.get(i).tooltip());
+		}
+		for (int i = 16; i < 28; i++)
+		{
+			assertTrue("slot " + i, cells.get(i).empty());
+		}
+	}
+
+	@Test
+	public void aCountsOnlyMessageStillShowsTheCountsView()
+	{
+		GroupRoster roster = new GroupRoster();
+		roster.heard("Alex", NOW - MIN);
+		roster.putCarried("Alex", new GroupCodec.Carried(items(PRAYER_POT_4, 14), items()));
+		List<PanelModel.ItemCell> cells = inventory(roster, "Alex").items;
+		assertEquals(1, cells.size());
+		assertEquals(14, cells.get(0).quantity);
+		assertFalse(cells.get(0).empty());
+	}
+
+	/** Board 2026-11-13: noted items show noted; Find and totals still count them as the item. */
+	@Test
+	public void aNotedStackDrawsNotedButCountsAsTheItem()
+	{
+		GroupRoster roster = new GroupRoster();
+		roster.heard("Sam", NOW - MIN);
+		roster.putCarried("Sam", new GroupCodec.Carried(items(SHARK, 10), items(), slots(NOTED_SHARK, 10)));
+		PanelModel.ItemCell cell = inventory(roster, "Sam").items.get(0);
+		assertEquals(NOTED_SHARK, cell.id);
+		assertEquals(10, cell.quantity);
+
+		PanelModel.FindRow row = PanelModel.find("shark", roster, ITEMS, NOW).get(0);
+		assertEquals(SHARK, row.itemId);
+		assertEquals("Shark - 10 in Sam's inventory", row.text);
+	}
+
+	/** Board 2026-11-13: you first, then online members, then offline and never-seen ones, each by name. */
+	@Test
+	public void youThenOnlineThenOfflineEachByName()
+	{
+		GroupRoster roster = new GroupRoster();
+		roster.heard("Me", NOW);
+		roster.heard("Zed", NOW - MIN);
+		roster.heard("bob", NOW - MIN);
+		roster.heard("Alice", NOW - 120 * MIN);
+		roster.heard("Yan", NOW - 120 * MIN);
+		List<PanelModel.MemberCard> cards = PanelModel.members(roster, Arrays.asList("carl", "Me", "Abe"), REGIONS,
+			ITEMS, "me", NOW);
+		List<String> names = new java.util.ArrayList<>();
+		cards.forEach(c -> names.add(c.name));
+		// Abe and carl were never seen; they sort with the offline members by name.
+		assertEquals(Arrays.asList("Me", "bob", "Zed", "Abe", "Alice", "carl", "Yan"), names);
+
+		// Online is the card's own online: the Group channel's word wins over plugin presence.
+		List<PanelModel.MemberCard> byGame = PanelModel.members(roster, GamePresenceTest.ROSTER.names(), REGIONS, ITEMS,
+			"GroupShip", GamePresenceTest.twoOfFive(), NOW);
+		boolean seenOffline = false;
+		for (PanelModel.MemberCard c : byGame.subList(1, byGame.size()))
+		{
+			assertFalse(c.name + " is online after an offline card", seenOffline && c.online);
+			seenOffline |= !c.online;
+		}
+	}
+
 	@Test
 	public void bankCardsAreIconGridsMostValuableFirstAndFilterable()
 	{
