@@ -105,4 +105,19 @@ quickly). With version 2's settings (from 60, every 5):
 1. Close and reopen client B. Settings tab: same leader, same version, same
    role, without anyone resending.
 
+## 11. Saving while another member has the tab open
+
+1. On B, open the Settings tab and leave it open.
+2. On A, change two settings: one with the arrows, one by typing a number
+   (do not press Enter or click elsewhere).
+3. On B, tick and untick **Don't post my events** (A's tab redraws).
+4. On A, the two changed values are still there. Press **Save to group**:
+   *Saved and sent to your group.* B shows the new version with both values.
+5. Make B an editor. On A, change a setting but do not save. On B, change a
+   different setting and save. On A the edit is kept, and an orange line says
+   *Your group's settings changed (version N by B). Save will replace them,
+   or Discard to see theirs.* **Discard changes** shows B's values.
+6. On A, press **Save to group** without changing anything: *Nothing to save:
+   these are already your group's settings.*
+
 Report anything that differs, with the step number.

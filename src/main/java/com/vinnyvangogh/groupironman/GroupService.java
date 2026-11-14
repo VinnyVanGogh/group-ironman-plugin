@@ -482,11 +482,20 @@ class GroupService
 		return g != null && !self.isEmpty() && g.setEditor(self, name, editor, System.currentTimeMillis());
 	}
 
-	/** The leader's or an editor's "Save to group". False when refused. */
-	boolean saveGroupSettings(Map<String, Long> values)
+	/** The leader's or an editor's "Save to group", and why it did not go out when it did not. */
+	GovernanceSync.SaveResult saveGroupSettings(Map<String, Long> values)
 	{
 		GovernanceSync g = governance;
-		return g != null && !self.isEmpty() && g.save(self, values, System.currentTimeMillis());
+		if (g == null)
+		{
+			return GovernanceSync.SaveResult.NOT_STARTED;
+		}
+		if (self.isEmpty())
+		{
+			return GovernanceSync.SaveResult.NOT_LOGGED_IN;
+		}
+		GovernanceSync.SaveResult r = g.save(self, values, System.currentTimeMillis());
+		return r == GovernanceSync.SaveResult.SAVED && !syncing() ? GovernanceSync.SaveResult.SAVED_OFFLINE : r;
 	}
 
 	/** "Forget leader": this client only. */
