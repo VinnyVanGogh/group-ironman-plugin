@@ -160,12 +160,23 @@ final class ContainerContents
 	 */
 	boolean inventoryChanged(int fillingBefore, int fillingAfter, int tick)
 	{
-		final SkillingContainer container = clicked;
-		if (container == null || tick - clickedTick > CLICK_TICKS || fillingBefore < 0 || fillingAfter < 0)
+		if (!clickPending(tick) || fillingBefore < 0 || fillingAfter < 0)
 		{
 			return fillingBefore >= 0 && fillingAfter > fillingBefore && grew(tick);
 		}
-		final int moved = clickedFill ? fillingBefore - fillingAfter : fillingAfter - fillingBefore;
+		return moved(clickedFill ? fillingBefore - fillingAfter : fillingAfter - fillingBefore);
+	}
+
+	/** A Fill or Empty clicked recently enough to explain an inventory change on {@code tick}. */
+	private boolean clickPending(int tick)
+	{
+		return clicked != null && tick - clickedTick <= CLICK_TICKS;
+	}
+
+	/** {@code moved} items went in (Fill) or came out (Empty) of the clicked container. */
+	private boolean moved(int moved)
+	{
+		final SkillingContainer container = clicked;
 		final int now = contents(container);
 		if (moved <= 0 || now < 0)
 		{
