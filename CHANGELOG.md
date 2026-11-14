@@ -12,6 +12,11 @@
 - When the storage next opens, its contents replace the stored snapshot if
   they differ (for example a save that failed). That correction is never
   posted.
+### Dev builds follow the newest RuneLite
+
+- `./gradlew build`, `test` and `run` now use the newest RuneLite client
+  release, checked on every run, and print which one they resolved. Pin a run
+  with `-PruneLiteVersion=1.13.6` to compare. Plugin Hub builds are unaffected.
 
 ### Built against RuneLite 1.13.6
 
