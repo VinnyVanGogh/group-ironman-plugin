@@ -35,7 +35,42 @@ final class GroupCache
 	{
 	}
 
+	/** One storage log entry. */
+	private static JsonObject logEntry(StorageChange c)
+	{
+		JsonObject entry = new JsonObject();
+		entry.addProperty("ts", c.at());
+		entry.addProperty("by", c.member());
+		entry.add("took", ItemCounts.toJson(c.took()));
+		entry.add("dep", ItemCounts.toJson(c.deposited()));
+		if (!c.shared())
+		{
+			// Only written when set, so a file without it reads as shared, as every visit was before.
+			entry.addProperty("ns", true);
+		}
+		return entry;
+	}
+
 	static String write(Gson gson, GroupRoster roster)
+	{
+		return write(gson, roster, null);
+	}
+
+	/**
+	 * With {@code webhooks}, the leader's signed {@link GroupWebhooks} document as the party carries it (null for
+	 * none): the one place a member keeps the shared webhooks between sessions, never their RuneLite config.
+	 */
+	static String write(Gson gson, GroupRoster roster, String webhooks)
+	{
+		JsonObject out = json(gson, roster);
+		if (webhooks != null)
+		{
+			out.addProperty("gweb", webhooks);
+		}
+		return gson.toJson(out);
+	}
+
+	private static JsonObject json(Gson gson, GroupRoster roster)
 	{
 		JsonObject out = new JsonObject();
 		out.addProperty("v", VERSION);
@@ -53,12 +88,7 @@ final class GroupCache
 		JsonArray log = new JsonArray();
 		for (StorageChange c : roster.log().entries())
 		{
-			JsonObject entry = new JsonObject();
-			entry.addProperty("ts", c.at());
-			entry.addProperty("by", c.member());
-			entry.add("took", ItemCounts.toJson(c.took()));
-			entry.add("dep", ItemCounts.toJson(c.deposited()));
-			log.add(entry);
+			log.add(logEntry(c));
 		}
 		out.add("log", log);
 
@@ -121,7 +151,7 @@ final class GroupCache
 		}
 		out.add("carried", carried);
 		out.add("hiscores", hiscoresJson(roster.hiscores()));
-		return gson.toJson(out);
+		return out;
 	}
 
 	/** Each member's last hiscore lookup: {@code {"name": {"ts": 1700000000000, "l": {"Attack": 99}}}}. */
@@ -325,6 +355,21 @@ final class GroupCache
 		}
 	}
 
+	/** The webhooks document {@link #write(Gson, GroupRoster, String)} kept, or null; its signature is checked later. */
+	static String webhooks(Gson gson, String json)
+	{
+		try
+		{
+			JsonElement root = json == null ? null : gson.fromJson(json, JsonElement.class);
+			JsonElement w = root != null && root.isJsonObject() ? root.getAsJsonObject().get("gweb") : null;
+			return w != null && w.isJsonPrimitive() ? w.getAsString() : null;
+		}
+		catch (RuntimeException e)
+		{
+			return null;
+		}
+	}
+
 	/** Loads into {@code roster}. Returns false, leaving it untouched, when the text is unreadable. */
 	static boolean read(Gson gson, String json, GroupRoster roster)
 	{
@@ -387,7 +432,7 @@ final class GroupCache
 				roster.log().add(new StorageChange(ts, by.getAsString(),
 					ItemCounts.fromJson(entry.get("took"), GroupCodec.MAX_STORAGE_ITEMS),
 					ItemCounts.fromJson(entry.get("dep"), GroupCodec.MAX_STORAGE_ITEMS),
-					Collections.emptyMap()));
+					Collections.emptyMap(), !isTrue(entry.get("ns"))));
 			}
 		}
 

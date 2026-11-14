@@ -2,16 +2,32 @@ package com.vinnyvangogh.groupironman;
 
 import com.google.inject.Provides;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ChatMessageType;
+import net.runelite.api.Client;
+import net.runelite.api.GameState;
+import net.runelite.api.MenuAction;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.chat.ChatColorType;
+import net.runelite.client.chat.ChatMessageBuilder;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.OverlayMenuClicked;
 import net.runelite.client.events.PartyChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SkillIconManager;
@@ -23,6 +39,8 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.ui.overlay.Overlay;
+import net.runelite.client.ui.overlay.OverlayMenuEntry;
 
 /**
  * GIM Utilities.
@@ -93,8 +111,18 @@ public class GroupIronmanPlugin extends Plugin
 	@Inject
 	private SpriteManager spriteManager;
 
+	@Inject
+	private Client client;
+
+	@Inject
+	private ConfigManager configManager;
+
+	@Inject
+	private ChatMessageManager chatMessageManager;
+
 	private GroupIronmanPanel panel;
 	private NavigationButton navButton;
+	private SidebarButton sidebar;
 
 	@Provides
 	GroupIronmanConfig provideConfig(ConfigManager configManager)
@@ -153,6 +181,68 @@ public class GroupIronmanPlugin extends Plugin
 				}
 				return saved;
 			}
+
+			@Override
+			public void openSettings()
+			{
+				openOwnSettings();
+			}
+
+			@Override
+			public void turnOnSharing()
+			{
+				group.turnOnSharing();
+				// The player's own click, as Paste is: joins once, right away, now that sync is on.
+				clientThread.invokeLater(group::joinGroup);
+			}
+
+			@Override
+			public void postToDiscord()
+			{
+				group.postToDiscord();
+			}
+
+			@Override
+			public boolean claim()
+			{
+				return group.claimLeadership();
+			}
+
+			@Override
+			public boolean setEditor(String name, boolean editor)
+			{
+				return group.setEditor(name, editor);
+			}
+
+			@Override
+			public GovernanceSync.SaveResult save(Map<String, Long> values)
+			{
+				return group.saveGroupSettings(values);
+			}
+
+			@Override
+			public boolean shareWebhooks(boolean share)
+			{
+				return group.shareWebhooks(share);
+			}
+
+			@Override
+			public void forgetLeader()
+			{
+				group.forgetLeader();
+			}
+
+			@Override
+			public void optOut(GroupEvent.Type type, boolean overlay, boolean out)
+			{
+				group.optOut(type, overlay, out);
+			}
+
+			@Override
+			public void optOutAll(boolean out)
+			{
+				group.optOutAll(out);
+			}
 		});
 		navButton = NavigationButton.builder()
 			.tooltip(NAME)
@@ -160,10 +250,57 @@ public class GroupIronmanPlugin extends Plugin
 			.priority(9)
 			.panel(panel)
 			.build();
+		final NavigationButton button = navButton;
+		sidebar = new SidebarButton(() -> clientToolbar.addNavigation(button),
+			() -> clientToolbar.removeNavigation(button));
 		group.startUp(this::redraw, this::getPluginDirectory);
 		events.startUp(group);
 		eventBus.register(events);
-		updateNavButton();
+		sidebar.startUp();
+		redraw();
+
+		// Installed or turned on mid-session: no LOGGED_IN is coming, so say it now.
+		if (client.getGameState() == GameState.LOGGED_IN)
+		{
+			clientThread.invoke(this::postUpdateNotes);
+		}
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		if (event.getGameState() == GameState.LOGGED_IN)
+		{
+			postUpdateNotes();
+		}
+	}
+
+	/**
+	 * Posts the welcome or "what's new" lines once per version (UpdateNotes), and
+	 * stores the version as seen even with the setting off, so turning it on later
+	 * does not bring back notes for an update long past. Client thread.
+	 */
+	private void postUpdateNotes()
+	{
+		final String lastSeen = config.lastSeenVersion();
+		if (!UpdateNotes.needsRecord(lastSeen))
+		{
+			return;
+		}
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_LAST_SEEN_VERSION,
+			UpdateNotes.VERSION);
+		final List<String> lines = UpdateNotes.toShow(lastSeen, config.showUpdateNotes());
+		for (int i = 0; i < lines.size(); i++)
+		{
+			final String message = new ChatMessageBuilder()
+				.append(i == 0 ? ChatColorType.HIGHLIGHT : ChatColorType.NORMAL)
+				.append(lines.get(i))
+				.build();
+			chatMessageManager.queue(QueuedMessage.builder()
+				.type(ChatMessageType.CONSOLE)
+				.runeLiteFormattedMessage(message)
+				.build());
+		}
 	}
 
 	@Override
@@ -176,7 +313,8 @@ public class GroupIronmanPlugin extends Plugin
 		group.shutDown();
 		partyDataService.unsubscribe(this, PartyDataType.values());
 		markers.clear();
-		clientToolbar.removeNavigation(navButton);
+		sidebar.shutDown();
+		sidebar = null;
 		panel = null;
 		navButton = null;
 	}
@@ -184,13 +322,16 @@ public class GroupIronmanPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (!GroupIronmanConfig.GROUP.equals(event.getGroup()))
+		// The plugin's own once-per-version bookkeeping changes nothing the features read.
+		if (!GroupIronmanConfig.GROUP.equals(event.getGroup())
+			|| GroupIronmanConfig.KEY_LAST_SEEN_VERSION.equals(event.getKey()))
 		{
 			return;
 		}
 		group.reloadConfig();
 		events.reloadConfig();
-		updateNavButton();
+		// The sidebar button stays whatever the switches say; the panel shows the change.
+		redraw();
 	}
 
 	@Subscribe
@@ -200,18 +341,24 @@ public class GroupIronmanPlugin extends Plugin
 		redraw();
 	}
 
-	/** The panel button shows only while at least one group feature is on. */
-	private void updateNavButton()
+	/**
+	 * Opens this plugin's page in RuneLite's settings. Posts the event an overlay's
+	 * "Configure" menu entry posts; RuneLite's ConfigPlugin handles it
+	 * ({@code onOverlayMenuClicked}) by opening the settings panel on the overlay's
+	 * plugin. The overlay is a stand-in that is never added or drawn.
+	 */
+	private void openOwnSettings()
 	{
-		if (group.anyOn())
+		Overlay self = new Overlay(this)
 		{
-			clientToolbar.addNavigation(navButton);
-		}
-		else
-		{
-			clientToolbar.removeNavigation(navButton);
-		}
-		redraw();
+			@Override
+			public Dimension render(Graphics2D graphics)
+			{
+				return null;
+			}
+		};
+		eventBus.post(new OverlayMenuClicked(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY_CONFIG, "", NAME),
+			self));
 	}
 
 	private void redraw()
@@ -223,9 +370,39 @@ public class GroupIronmanPlugin extends Plugin
 		}
 		GroupIronmanPanel.View view = new GroupIronmanPanel.View(group.syncState(), group.roster(), group.members(),
 			group.lookup, group.switches(), group.regions(), group.since(), group.self(),
-			group.presence());
+			group.presence(), settingsView(), group.anyOn(), group.sharingSettings());
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
+	}
+
+	/** The Settings tab's view, or null before group settings have started. */
+	private GroupSettingsTab.View settingsView()
+	{
+		GroupGovernance g = group.governance();
+		if (g == null)
+		{
+			return null;
+		}
+		String self = group.self();
+		GroupSettingsSchema.Resolved values = group.groupValues();
+		Map<String, Long> current = new TreeMap<>();
+		for (GroupSettingsSchema.Setting s : GroupSettingsSchema.ALL)
+		{
+			current.put(s.key, values.value(s.key));
+		}
+		List<String> members = GroupSettingsTab.gridMembers(group.members().names(), self);
+		Set<String> heard = new HashSet<>();
+		for (String m : members)
+		{
+			if (g.knownKey(m) != null)
+			{
+				heard.add(m);
+			}
+		}
+		// Who shares webhooks, never the URLs: the tab has no way to show one.
+		GroupWebhooks shared = g.sharedWebhooks();
+		return new GroupSettingsTab.View(g.myRole(self), g.roles(), g.settings(), g.unclaimed(), group.syncing(),
+			members, self, current, MemberPrefs.of(config), g.prefs(), heard, shared == null ? null : shared.by);
 	}
 
 	/** Markers only add points to the world map; they never open it (that stays the player's click). */

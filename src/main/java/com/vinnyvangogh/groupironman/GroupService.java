@@ -186,6 +186,10 @@ class GroupService
 		throw new IOException("plugin data directory not set");
 	};
 	private GroupSync sync;
+	/** Roles and the group's shared settings; null when not running. */
+	private volatile GovernanceSync governance;
+	/** The leader's signed webhooks document as the cache file keeps it, or null. Never put in the config. */
+	private volatile String cachedWebhooks;
 	/** The group event engine, told about storage visits, minimums and members' events; null when not running. */
 	private volatile GroupEventEngine events;
 
@@ -270,6 +274,32 @@ class GroupService
 				partyService.changeParty(passphrase);
 			}
 		});
+		governance = new GovernanceSync(gson, new GovernanceSync.Store()
+		{
+			@Override
+			public String get(String key)
+			{
+				return configManager.getConfiguration(GroupIronmanConfig.GROUP, key);
+			}
+
+			@Override
+			public void set(String key, String value)
+			{
+				if (value == null)
+				{
+					configManager.unsetConfiguration(GroupIronmanConfig.GROUP, key);
+				}
+				else
+				{
+					configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value);
+				}
+			}
+		}, payload -> partyService.send(new VvgGroupIronmanMessage(payload)), () -> this.onChange.run(), webhooks ->
+		{
+			// The leader's shared webhooks: kept in the group cache file, never the RuneLite config.
+			cachedWebhooks = webhooks;
+			saveCache();
+		});
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
@@ -293,6 +323,8 @@ class GroupService
 			sync.leaveOwn();
 		}
 		members = GroupMembers.UNKNOWN;
+		governance = null;
+		cachedWebhooks = null;
 		cacheLoaded = false;
 		session = false;
 		hiscoresOnLogin = true;
@@ -417,10 +449,129 @@ class GroupService
 		}
 	}
 
-	/** "Create group key" and "New key": a fresh random key, which the player then shares. */
+	/**
+	 * "Create group key" and "New key": a fresh random key, which the player
+	 * then shares. The member who creates the key leads a group that has no
+	 * leader yet (Board 2026-11-10); a group that has one keeps it.
+	 */
 	void newKey()
 	{
 		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_KEY, GroupKey.generate());
+		claimLeadership();
+	}
+
+	// ---- Group settings and roles (the panel's Settings tab) ----
+
+	/** Roles and the group's settings on this client, or null when not running. */
+	GroupGovernance governance()
+	{
+		GovernanceSync g = governance;
+		return g == null ? null : g.governance();
+	}
+
+	/** The value of each shared setting now: the group's, or this member's own config while it has none. */
+	GroupSettingsSchema.Resolved groupValues()
+	{
+		GroupGovernance g = governance();
+		return new GroupSettingsSchema.Resolved(config, g == null ? null : g.settings());
+	}
+
+	/** "Claim leadership", shown only while this client knows of no leader. False when refused. */
+	boolean claimLeadership()
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.claim(self, System.currentTimeMillis());
+	}
+
+	/** The leader's "Make editor" and "Remove editor". False when refused. */
+	boolean setEditor(String name, boolean editor)
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.setEditor(self, name, editor, System.currentTimeMillis());
+	}
+
+	/** The leader's or an editor's "Save to group", and why it did not go out when it did not. */
+	GovernanceSync.SaveResult saveGroupSettings(Map<String, Long> values)
+	{
+		GovernanceSync g = governance;
+		if (g == null)
+		{
+			return GovernanceSync.SaveResult.NOT_STARTED;
+		}
+		if (self.isEmpty())
+		{
+			return GovernanceSync.SaveResult.NOT_LOGGED_IN;
+		}
+		GovernanceSync.SaveResult r = g.save(self, values, System.currentTimeMillis());
+		return r == GovernanceSync.SaveResult.SAVED && !syncing() ? GovernanceSync.SaveResult.SAVED_OFFLINE : r;
+	}
+
+	/** The leader's "Share webhooks with the group". False when refused: this client is not the leader. */
+	boolean shareWebhooks(boolean share)
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.shareWebhooks(self, share, Webhooks.of(config),
+			System.currentTimeMillis());
+	}
+
+	/** The leader's shared webhooks this client holds, or null when the leader shares none. */
+	GroupWebhooks sharedWebhooks()
+	{
+		GroupGovernance g = governance();
+		return g == null ? null : g.sharedWebhooks();
+	}
+
+	/**
+	 * Where this client's posts go: its own webhooks, with the leader's shared ones filling every field it left
+	 * empty ({@link Webhooks#withGroup}). Every sender asks this.
+	 */
+	Webhooks webhooks()
+	{
+		return Webhooks.of(config).withGroup(sharedWebhooks());
+	}
+
+	/** True when this client is the group's leader, holding the leader's key. */
+	boolean isLeader()
+	{
+		GroupGovernance g = governance();
+		return g != null && !self.isEmpty() && g.myRole(self) == GroupGovernance.Role.LEADER;
+	}
+
+	/** While the leader shares, an edit of the leader's own webhooks goes to the group as a new version. */
+	private void republishWebhooks()
+	{
+		GovernanceSync g = governance;
+		if (g != null && sharedWebhooks() != null && isLeader())
+		{
+			g.shareWebhooks(self, true, Webhooks.of(config), System.currentTimeMillis());
+		}
+	}
+
+	/** "Forget leader": this client only. */
+	void forgetLeader()
+	{
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.forgetLeader();
+		}
+	}
+
+	/** This member's own "don't post" (or overlay "don't show") for one kind. */
+	void optOut(GroupEvent.Type type, boolean overlay, boolean out)
+	{
+		String key = overlay ? GroupIronmanConfig.KEY_MUTE_TYPES : GroupIronmanConfig.KEY_OPT_OUT_TYPES;
+		Set<GroupEvent.Type> types = MemberPrefs.parse(overlay ? config.overlayMuteTypes() : config.eventOptOutTypes());
+		if (out ? types.add(type) : types.remove(type))
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, key, MemberPrefs.format(types));
+		}
+	}
+
+	/** "Don't post my events". */
+	void optOutAll(boolean out)
+	{
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_OPT_OUT_ALL, out);
 	}
 
 	/** What "Copy group key" puts on the clipboard, or null without a key. */
@@ -445,6 +596,24 @@ class GroupService
 		return true;
 	}
 
+	/** The panel's "Turn on sharing" card: what it reads. */
+	SharingPrompt.Settings sharingSettings()
+	{
+		return SharingPrompt.Settings.of(config);
+	}
+
+	/** "Turn on sharing": the player's own click, never on its own. */
+	void turnOnSharing()
+	{
+		SharingPrompt.turnOnSharing((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+	}
+
+	/** "Post my events to Discord": the player's own click. */
+	void postToDiscord()
+	{
+		SharingPrompt.postToDiscord((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+	}
+
 	void reloadConfig()
 	{
 		if (sync != null && !config.groupSync())
@@ -453,6 +622,12 @@ class GroupService
 			sync.leaveOwn();
 		}
 		lowStock = LowStock.parse(config.groupLowStock());
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.prefs(MemberPrefs.of(config));
+		}
+		republishWebhooks();
 		GroupOutbox.Switches s = switches();
 		// Turning a live feature off drops what was collected for it.
 		if (!s.stats)
@@ -764,6 +939,7 @@ class GroupService
 		{
 			return;
 		}
+		flushGovernance();
 		GroupOutbox.Switches s = switches();
 
 		if (s.stats)
@@ -800,6 +976,11 @@ class GroupService
 		boolean first = !members.known() && now.known();
 		boolean changed = !now.names().equals(members.names()) || !now.group().equals(members.group());
 		members = now;
+		GovernanceSync g = governance;
+		if (g != null && now.known())
+		{
+			g.group(now.group());
+		}
 		if (first && syncing())
 		{
 			partyService.send(new UserSync());
@@ -1043,6 +1224,12 @@ class GroupService
 			statsDirty = true;
 			carriedDirty = true;
 			extrasDirty = true;
+			GovernanceSync g = governance;
+			if (g != null)
+			{
+				// Sent on the next tick: roles first, then the settings they authorise.
+				g.resendAll();
+			}
 			if (!syncing())
 			{
 				return;
@@ -1073,6 +1260,11 @@ class GroupService
 
 	void onPartyChanged()
 	{
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.resendAll();
+		}
 		assembler.clear();
 		roster.clearStrangers();
 		lastStatsSent = null;
@@ -1124,7 +1316,7 @@ class GroupService
 		GroupCodec.Decoded decoded = GroupCodec.decode(gson, message.getPayload());
 		if (decoded == null)
 		{
-			log.debug("ignored unreadable group payload from {}", message.getMemberId());
+			notData(name, message);
 			return;
 		}
 		GroupOutbox.Switches s = switches();
@@ -1208,6 +1400,29 @@ class GroupService
 		onChange.run();
 	}
 
+	/** A payload {@link GroupCodec} does not read: roles, group settings or an announce, or one from a newer build. */
+	private void notData(String name, VvgGroupIronmanMessage message)
+	{
+		GovernanceSync g = governance;
+		String payload = message.getPayload();
+		if (g != null && GovernanceSync.isGovernance(payload) && g.receive(name, payload))
+		{
+			roster.heard(name, System.currentTimeMillis());
+			return;
+		}
+		log.debug("ignored unreadable group payload from {}", message.getMemberId());
+	}
+
+	/** Game tick, connected: roles, settings and this member's announce, whichever changed. */
+	private void flushGovernance()
+	{
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.flush(MemberPrefs.of(config));
+		}
+	}
+
 	/**
 	 * A member's events. Drops and log slots go in the log under the drops
 	 * switch, as in 1.0.0; the rest only under "Share group events". Each new
@@ -1278,13 +1493,8 @@ class GroupService
 			engine.storage(change, true);
 		}
 
-		GroupOutbox.Switches s = switches();
-		if (!s.storage)
-		{
-			return;
-		}
-		roster.putStorage(change);
-		String payload = GroupOutbox.storage(gson, s, change);
+		// Kept locally whether shared or not; with sharing off it is marked so and nothing is sent.
+		String payload = GroupOutbox.ownStorage(gson, switches(), change, roster);
 		if (payload != null && syncing())
 		{
 			partyService.send(new VvgGroupIronmanMessage(payload));
@@ -1584,6 +1794,7 @@ class GroupService
 				log.debug("group cache unreadable, starting empty");
 				return false;
 			}
+			restoreWebhooks(GroupCache.webhooks(gson, json));
 			return true;
 		}
 		catch (Exception e)
@@ -1593,6 +1804,22 @@ class GroupService
 		}
 	}
 
+	/** Executor thread. The cached webhooks document, checked like one from the party; a newer one held wins. */
+	private void restoreWebhooks(String json)
+	{
+		GovernanceSync g = governance;
+		if (json == null || g == null)
+		{
+			return;
+		}
+		if (cachedWebhooks == null)
+		{
+			// Kept as read until the governance accepts (or replaces) it, so a save before the roles load keeps it.
+			cachedWebhooks = json;
+		}
+		g.restoreWebhooks(json);
+	}
+
 	private void saveCache()
 	{
 		if (!cacheLoaded)
@@ -1600,7 +1827,7 @@ class GroupService
 			// Whatever arrived meanwhile is in the roster and goes out with the first save after loading.
 			return;
 		}
-		String json = GroupCache.write(gson, roster);
+		String json = GroupCache.write(gson, roster, cachedWebhooks);
 		executor.execute(() ->
 		{
 			try
@@ -1636,7 +1863,7 @@ class GroupService
 		return dataDirectory.call().joinSegment(CACHE_FILE);
 	}
 
-	/** Kept for the panel: is any group feature on, so the panel button should show. */
+	/** Kept for the panel: is any group feature on; false shows its "everything is off" notice. */
 	boolean anyOn()
 	{
 		return switches().any() || !lowStock.isEmpty();

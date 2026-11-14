@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
@@ -71,8 +72,8 @@ import net.runelite.client.ui.components.IconTextField;
 @Slf4j
 class GroupIronmanPanel extends PluginPanel
 {
-	/** What the buttons in the header do. */
-	interface Actions
+	/** What the buttons in the header, and in the Settings tab, do. */
+	interface Actions extends GroupSettingsTab.Actions
 	{
 		void join();
 
@@ -87,6 +88,15 @@ class GroupIronmanPanel extends PluginPanel
 
 		/** Saves a pasted key; false when the text holds none. */
 		boolean pasteKey(String text);
+
+		/** Opens GIM Utilities' own page in RuneLite's settings. */
+		void openSettings();
+
+		/** Ticks Sync with my group and every Share switch ({@link SharingPrompt#SHARING_KEYS}). */
+		void turnOnSharing();
+
+		/** Ticks Post to Discord. */
+		void postToDiscord();
 	}
 
 	/** Everything a redraw needs, captured on the client side. */
@@ -103,11 +113,21 @@ class GroupIronmanPanel extends PluginPanel
 		final String self;
 		/** Who is online, plugin or not, as the game's Group channel shows it. */
 		final GamePresence presence;
+		/** The Settings tab's view, or null before the plugin has started its group settings. */
+		final GroupSettingsTab.View settings;
+		/** Any share or sync feature on; false leads the panel with the "everything is off" notice. */
+		final boolean anyOn;
+		/** What the "Turn on sharing" card reads. */
+		final SharingPrompt.Settings sharing;
 
 		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
-			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GamePresence presence)
+			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GamePresence presence,
+			GroupSettingsTab.View settings, boolean anyOn, SharingPrompt.Settings sharing)
 		{
+			this.anyOn = anyOn;
+			this.sharing = sharing;
 			this.presence = presence;
+			this.settings = settings;
 			this.sync = sync;
 			this.group = group;
 			this.members = members;
@@ -138,6 +158,7 @@ class GroupIronmanPanel extends PluginPanel
 	/** The minimap orbs' own icons, by bar label; filled in as the sprites load. */
 	private final Map<String, BufferedImage> orbIcons = new ConcurrentHashMap<>();
 	private final Actions actions;
+	private final GroupSettingsTab settingsTab;
 
 	private final JPanel header = new Column();
 	private final CardLayout cards = new CardLayout();
@@ -156,10 +177,13 @@ class GroupIronmanPanel extends PluginPanel
 	private boolean updatingMembers;
 	/** Member cards the player collapsed, by name. */
 	private final Set<String> collapsed = new HashSet<>();
+	/** Bank cards folded in the Banks tab, kept apart from the Group tab's. */
+	private final BankFolds bankFolds = new BankFolds();
 	private String current = "Group";
 	/** What the last Copy/Paste key press did, shown under the buttons for a while. */
 	private String keyNote;
 	private long keyNoteAt;
+	private final SharingPrompt sharing = new SharingPrompt();
 	private View view;
 
 	GroupIronmanPanel(ItemManager itemManager, SkillIconManager skillIcons, SpriteManager sprites, Actions actions)
@@ -171,12 +195,13 @@ class GroupIronmanPanel extends PluginPanel
 		this.itemManager = itemManager;
 		this.skillIcons = skillIcons;
 		this.actions = actions;
+		this.settingsTab = new GroupSettingsTab(actions, this::redraw);
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
 
 		JPanel top = new Column();
 		top.add(header);
-		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log"));
+		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Settings"));
 		add(top, BorderLayout.NORTH);
 
 		addTab("Group", null);
@@ -184,6 +209,7 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Storage", storageFilter);
 		addTab("Find", findQuery);
 		addTab("Log", logControls());
+		addTab("Settings", null);
 		add(views, BorderLayout.CENTER);
 	}
 
@@ -221,6 +247,10 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		drawHeader(v);
 		JPanel tab = tabs.get(current);
+		if (settingsUnchanged(tab, v))
+		{
+			return;
+		}
 		tab.removeAll();
 		long now = System.currentTimeMillis();
 		try
@@ -239,6 +269,9 @@ class GroupIronmanPanel extends PluginPanel
 				case "Log":
 					drawLog(tab, v, now);
 					break;
+				case "Settings":
+					drawSettings(tab, v, now);
+					break;
 				default:
 					drawGroup(tab, v, now);
 					break;
@@ -256,9 +289,30 @@ class GroupIronmanPanel extends PluginPanel
 		tab.repaint();
 	}
 
+	/** The Settings tab is on screen and shows the same as before: rebuilding would lose a half-typed number. */
+	private boolean settingsUnchanged(JPanel tab, View v)
+	{
+		if (!"Settings".equals(current) || tab.getComponentCount() == 0)
+		{
+			return false;
+		}
+		return v.settings == null || !settingsTab.changed(v.settings);
+	}
+
+	private void drawSettings(JPanel tab, View v, long now)
+	{
+		if (v.settings == null)
+		{
+			empty(tab, "Group settings are starting.", "Open this tab again in a moment.");
+			return;
+		}
+		settingsTab.draw(tab, v.settings, now);
+	}
+
 	private JPanel tabBar(String... names)
 	{
-		JPanel bar = new JPanel(new GridLayout(1, names.length, 2, 0));
+		// Two rows of three: six tabs in one row cut their names off at the panel's width.
+		JPanel bar = new JPanel(new GridLayout(0, 3, 2, 2));
 		bar.setBorder(new EmptyBorder(6, 0, 6, 0));
 		ButtonGroup group = new ButtonGroup();
 		for (String name : names)
@@ -314,7 +368,11 @@ class GroupIronmanPanel extends PluginPanel
 	private void drawHeader(View v)
 	{
 		header.removeAll();
-		SyncHeader h = SyncHeader.of(v.sync, v.group.othersOnline(v.self, System.currentTimeMillis()), v.members);
+		if (SidebarButton.offNotice(v.anyOn))
+		{
+			header.add(offNotice());
+		}
+		SyncHeader h =SyncHeader.of(v.sync, v.group.othersOnline(v.self, System.currentTimeMillis()), v.members);
 		JLabel title = new JLabel(h.title);
 		title.setFont(FontManager.getRunescapeBoldFont());
 		title.setForeground(h.ok ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.BRAND_ORANGE);
@@ -335,12 +393,75 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			header.add(text(keyNote, Color.WHITE));
 		}
+		drawSharingCard(v.sharing);
 		for (String stranger : v.group.strangers())
 		{
 			header.add(text("Not in your group: " + stranger + " (ignored)", ColorScheme.PROGRESS_ERROR_COLOR));
 		}
 		header.revalidate();
 		header.repaint();
+	}
+
+	/** Every switch is off: say so first, with a way to the settings, so the panel never looks broken. */
+	private JPanel offNotice()
+	{
+		JPanel box = new Column();
+		box.setBorder(new EmptyBorder(0, 0, 8, 0));
+		JLabel line = text(SidebarButton.OFF_TEXT, ColorScheme.BRAND_ORANGE);
+		line.setFont(FontManager.getRunescapeBoldFont());
+		box.add(line);
+		JButton open = new JButton(SidebarButton.OFF_BUTTON);
+		open.setFont(FontManager.getRunescapeSmallFont());
+		open.setFocusable(false);
+		open.addActionListener(e -> actions.openSettings());
+		JPanel row = new JPanel(new GridLayout(1, 1));
+		row.add(open);
+		box.add(row);
+		return box;
+	}
+
+	/** "Turn on sharing" after a pasted key, or while sync is on with every Share switch off. Nothing without a click. */
+	private void drawSharingCard(SharingPrompt.Settings s)
+	{
+		SharingPrompt.Card card = s == null ? null : sharing.card(s);
+		if (card == null)
+		{
+			return;
+		}
+		JPanel box = section();
+		JLabel title = new JLabel("Share with your group?");
+		title.setFont(FontManager.getRunescapeBoldFont());
+		box.add(title);
+		box.add(text(SharingPrompt.TEXT, MUTED));
+		JPanel buttons = new JPanel(new GridLayout(0, 1, 2, 2));
+		buttons.setOpaque(false);
+		if (card.sharing)
+		{
+			buttons.add(cardButton("Turn on sharing", "Ticks Sync with my group and every Share switch",
+				actions::turnOnSharing));
+		}
+		if (card.discord)
+		{
+			buttons.add(cardButton("Post my events to Discord", "Ticks Post to Discord, for your webhook",
+				actions::postToDiscord));
+		}
+		buttons.add(cardButton("Not now", "Hides this until the group key changes", () -> sharing.notNow(s.key)));
+		box.add(buttons);
+		header.add(box);
+	}
+
+	private JButton cardButton(String label, String tooltip, Runnable action)
+	{
+		JButton button = new JButton(label);
+		button.setFont(FontManager.getRunescapeSmallFont());
+		button.setFocusable(false);
+		button.setToolTipText(tooltip);
+		button.addActionListener(e ->
+		{
+			action.run();
+			redraw();
+		});
+		return button;
 	}
 
 	private JButton button(SyncHeader.Button b)
@@ -381,15 +502,26 @@ class GroupIronmanPanel extends PluginPanel
 				redraw();
 				break;
 			case PASTE_KEY:
-				keyNote = actions.pasteKey(clipboardText())
-					? "Key saved. Joining your group's sync."
-					: "Your clipboard has no group key. Copy the key a member sent, then press Paste again.";
-				keyNoteAt = System.currentTimeMillis();
-				redraw();
+				pasteKey();
 				break;
 			default:
 				break;
 		}
+	}
+
+	/** "Paste group key": saves it, says so, and opens the "Turn on sharing" card for it. */
+	private void pasteKey()
+	{
+		boolean saved = actions.pasteKey(clipboardText());
+		keyNote = saved
+			? "Key saved. Joining your group's sync."
+			: "Your clipboard has no group key. Copy the key a member sent, then press Paste again.";
+		keyNoteAt = System.currentTimeMillis();
+		if (saved)
+		{
+			sharing.pasted(actions.groupKey());
+		}
+		redraw();
 	}
 
 	/** Text on the computer's clipboard, or "" when there is none or it cannot be read. */
@@ -438,24 +570,13 @@ class GroupIronmanPanel extends PluginPanel
 		boolean open = !collapsed.contains(c.name);
 		body.setVisible(open);
 
-		// A drawn arrow: the RuneScape font has no glyph for ▾/▸ and showed a box.
-		JLabel name = new JLabel(c.name + (c.you ? " (you)" : ""), new Arrow(open), SwingConstants.LEFT);
-		name.setIconTextGap(4);
-		name.setFont(FontManager.getRunescapeBoldFont());
-		name.setForeground(c.online || c.you ? Color.WHITE : MUTED);
-		name.addMouseListener(new MouseAdapter()
+		card.add(foldHeader(c.name + (c.you ? " (you)" : ""), open, c.online || c.you ? Color.WHITE : MUTED, () ->
 		{
-			@Override
-			public void mousePressed(MouseEvent e)
+			if (!collapsed.remove(c.name))
 			{
-				if (!collapsed.remove(c.name))
-				{
-					collapsed.add(c.name);
-				}
-				redraw();
+				collapsed.add(c.name);
 			}
-		});
-		card.add(name);
+		}));
 		card.add(text(c.status, c.online ? ColorScheme.PROGRESS_COMPLETE_COLOR : MUTED));
 
 		addStats(body, c);
@@ -496,6 +617,26 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		card.add(body);
 		return card;
+	}
+
+	/** A card's clickable title with its fold arrow; {@code toggle} flips the card, then the tab redraws. */
+	private JLabel foldHeader(String title, boolean open, Color color, Runnable toggle)
+	{
+		// A drawn arrow: the RuneScape font has no glyph for ▾/▸ and showed a box.
+		JLabel name = new JLabel(title, new Arrow(open), SwingConstants.LEFT);
+		name.setIconTextGap(4);
+		name.setFont(FontManager.getRunescapeBoldFont());
+		name.setForeground(color);
+		name.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mousePressed(MouseEvent e)
+			{
+				toggle.run();
+				redraw();
+			}
+		});
+		return name;
 	}
 
 	/** The orbs, where the numbers came from when not shared, and the skill grid. */
@@ -747,25 +888,62 @@ class GroupIronmanPanel extends PluginPanel
 			empty(tab, "No banks yet.", "Open and close your bank. Members' banks appear after they do the same.");
 			return;
 		}
+		bankFolds.filter(bankFilter.getText());
+		Map<String, Boolean> matches = new LinkedHashMap<>();
+		banks.forEach(b -> matches.put(b.member, !b.items.isEmpty()));
+		if (banks.size() >= 2)
+		{
+			tab.add(foldAllLink(matches));
+		}
 		for (PanelModel.BankCard b : banks)
 		{
-			JPanel card = section();
-			boolean mine = !v.self.isEmpty() && v.self.equalsIgnoreCase(b.member);
-			JLabel name = new JLabel(mine ? "Your bank (" + b.member + ")" : b.member + "'s bank");
-			name.setFont(FontManager.getRunescapeBoldFont());
-			card.add(name);
-			card.add(tip(text(b.summary, MUTED), b.exact));
-			card.add(b.items.isEmpty() ? text("No item matches the filter.", MUTED) : itemGrid(b.items));
-			tab.add(card);
+			tab.add(bankCard(b, v, matches.get(b.member)));
 		}
+	}
+
+	/** Collapse all while any bank is open, Expand all once every one is folded. */
+	private JComponent foldAllLink(Map<String, Boolean> matches)
+	{
+		boolean anyOpen = bankFolds.anyOpen(matches.keySet(), matches::get);
+		JLabel link = new JLabel(anyOpen ? "Collapse all" : "Expand all");
+		link.setFont(FontManager.getRunescapeSmallFont());
+		link.setForeground(ColorScheme.BRAND_ORANGE);
+		link.setBorder(new EmptyBorder(0, 0, 4, 0));
+		link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		link.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mousePressed(MouseEvent e)
+			{
+				bankFolds.setAll(matches.keySet(), !anyOpen);
+				redraw();
+			}
+		});
+		return link;
+	}
+
+	private JComponent bankCard(PanelModel.BankCard b, View v, boolean matches)
+	{
+		JPanel card = section();
+		boolean open = bankFolds.open(b.member, matches);
+		boolean mine = !v.self.isEmpty() && v.self.equalsIgnoreCase(b.member);
+		card.add(foldHeader(mine ? "Your bank (" + b.member + ")" : b.member + "'s bank", open, Color.WHITE,
+			() -> bankFolds.toggle(b.member, matches)));
+		card.add(tip(text(b.summary, MUTED), b.exact));
+		if (open)
+		{
+			card.add(b.items.isEmpty() ? text("No item matches the filter.", MUTED) : itemGrid(b.items));
+		}
+		return card;
 	}
 
 	private void drawStorage(JPanel tab, View v, long now)
 	{
 		if (!v.switches.storage)
 		{
-			empty(tab, "Group storage log is off.", "Turn on 'Share group storage changes' in GIM Utilities' settings.");
-			return;
+			// Own visits are still kept here, so a withdrawal made before ticking the switch is not a mystery.
+			tab.add(text("'Share group storage changes' is off: your own visits are kept here only and nothing is"
+				+ " sent, and members' changes don't arrive.", ColorScheme.BRAND_ORANGE));
 		}
 		PanelModel.StorageView s = PanelModel.storage(v.group, v.items, v.self, storageFilter.getText(), now);
 		JPanel contents = section();
@@ -954,7 +1132,7 @@ class GroupIronmanPanel extends PluginPanel
 			}
 			for (int i = 0; i < s.events.size() && left > 0; i++, left--)
 			{
-				tab.add(logRow(ActivityLog.row(s.events.get(i), v.items, now, zone)));
+				tab.add(logRow(ActivityLog.row(s.events.get(i), v.items, now, zone, v.group.log())));
 			}
 		}
 		if (shown.size() > MAX_LOG_ROWS)
@@ -1007,7 +1185,7 @@ class GroupIronmanPanel extends PluginPanel
 		tab.add(text(next, MUTED));
 	}
 
-	private static JLabel heading(String text)
+	static JLabel heading(String text)
 	{
 		JLabel label = new JLabel(text);
 		label.setFont(FontManager.getRunescapeBoldFont());
@@ -1016,7 +1194,7 @@ class GroupIronmanPanel extends PluginPanel
 		return label;
 	}
 
-	private static JLabel text(String text, Color color)
+	static JLabel text(String text, Color color)
 	{
 		// The html wrapper makes long lines wrap at the panel width. Text from
 		// peers is escaped first: a display name or item name is data, not markup.

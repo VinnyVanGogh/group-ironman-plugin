@@ -156,6 +156,8 @@ class GroupEventEngine
 	/** Level-ups of one skill as one post, edited in place. Any thread; message ids in memory only. */
 	private LevelPosts levels;
 	private volatile EventSettings settings = EventSettings.OFF;
+	/** The shared settings the event settings were built from: quiet hours, grace and Easter eggs read these. */
+	private volatile GroupSettingsSchema.Resolved values;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
 	/** The death's frame for the gravestone warning; memory only, so a restart loses it. */
 	private final GraveShot graveShot = new GraveShot();
@@ -191,7 +193,7 @@ class GroupEventEngine
 		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient, gson), System::currentTimeMillis,
 			() -> LocalTime.now().getHour());
 		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords,
-			() -> PosterNames.name(config, GroupEvent.Category.PROGRESS));
+			() -> posterName(Webhook.PROGRESS));
 		chooseOnlineStatus();
 		reloadConfig();
 		restorePresence();
@@ -245,18 +247,35 @@ class GroupEventEngine
 		settings = EventSettings.OFF;
 	}
 
+	/** A config change, or new group settings (they are kept in the config, so both arrive here). */
 	void reloadConfig()
 	{
-		settings = EventSettings.from(config);
+		GroupSettingsSchema.Resolved v = group == null ? new GroupSettingsSchema.Resolved(config, null)
+			: group.groupValues();
+		values = v;
+		settings = EventSettings.from(config, v, MemberPrefs.of(config));
 		if (sender != null)
 		{
-			sender.quietHours(config.discordQuietStart(), config.discordQuietEnd());
+			sender.quietHours(v.intValue("discordQuietStart"), v.intValue("discordQuietEnd"));
 		}
 		if (toastOverlay != null)
 		{
 			toastOverlay.reposition();
 		}
 		warnBadWebhooks();
+	}
+
+	/** The shared values now; this member's own config until the first {@link #reloadConfig}. */
+	private GroupSettingsSchema.Resolved resolved()
+	{
+		GroupSettingsSchema.Resolved v = values;
+		return v != null ? v : new GroupSettingsSchema.Resolved(config, null);
+	}
+
+	/** The group's offline grace when it has settings, else this member's own. */
+	private int offlineGrace()
+	{
+		return resolved().intValue("discordOfflineGrace");
 	}
 
 	/**
@@ -270,8 +289,10 @@ class GroupEventEngine
 		{
 			return;
 		}
-		List<String> lines = new ArrayList<>(webhookWarnings.check(WebhookWarnings.fields(config)));
-		lines.addAll(posterNames.check(config.discordPosterName(), PosterNames.fields(config)));
+		// This member's own fields only: a leader's shared webhook is not theirs to fix, and its URL is never named.
+		Webhooks webhooks = Webhooks.of(config);
+		List<String> lines = new ArrayList<>(webhookWarnings.check(webhooks.urlFields()));
+		lines.addAll(posterNames.check(webhooks.customNames()));
 		for (String line : lines)
 		{
 			chatMessageManager.queue(QueuedMessage.builder()
@@ -293,9 +314,9 @@ class GroupEventEngine
 			synchronized (presenceLock)
 			{
 				// The name is the one the login gave: after a logout localPlayer() is "You".
-				offline = presence.poll(System.currentTimeMillis(), config.discordOfflineGrace());
+				offline = presence.poll(System.currentTimeMillis(), offlineGrace());
 				savePresence();
-				others = channelPosts.poll(System.currentTimeMillis(), config.discordOfflineGrace());
+				others = channelPosts.poll(System.currentTimeMillis(), offlineGrace());
 			}
 			if (offline != null)
 			{
@@ -313,12 +334,17 @@ class GroupEventEngine
 	}
 
 	/**
-	 * Timer: the live board, when 'Online status' is the board and the Group category has a webhook. Members are
-	 * read from the roster the party fills; the webhook and the message id stay in this client.
+	 * Timer: the live board, when 'Online status' is the board and the Online status webhook (or Main) is set.
+	 * Members are read from the roster the party fills; the webhook and the message id stay in this client. On
+	 * the leader's shared webhook only the leader's client keeps it ({@link StatusBoard#keeps}).
 	 */
 	private void boardTick(long now)
 	{
-		String url = config.discordOnlineStatus() == OnlineStatus.LIVE_BOARD ? webhook(GroupEvent.Category.GROUP) : null;
+		String url = webhookFor(Webhook.ONLINE);
+		if (!StatusBoard.keeps(config.discordOnlineStatus(), webhooks(), group.isLeader()))
+		{
+			url = null;
+		}
 		board.target(url, () -> configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY));
 		if (url != null)
 		{
@@ -329,13 +355,14 @@ class GroupEventEngine
 			{
 				board.show(lines, now);
 			}
-			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), config.discordQuietStart(),
-				config.discordQuietEnd());
+			GroupSettingsSchema.Resolved v = resolved();
+			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), v.intValue("discordQuietStart"),
+				v.intValue("discordQuietEnd"));
 			StatusBoard.Send send = board.next(now, quiet);
 			if (send != null)
 			{
 				board.send(sender, send, StatusBoard.payload(gson, send, config.discordStyle(),
-					PosterNames.name(config, GroupEvent.Category.GROUP)), System::currentTimeMillis);
+					posterName(Webhook.ONLINE)), System::currentTimeMillis);
 			}
 		}
 		String saved = board.takeSaved();
@@ -381,7 +408,7 @@ class GroupEventEngine
 		synchronized (presenceLock)
 		{
 			posts = channelPosts.update(game, n -> plugin.contains(GroupMembers.key(n)) || GroupMembers.key(n)
-				.equals(self), System.currentTimeMillis(), config.discordOfflineGrace());
+				.equals(self), System.currentTimeMillis(), offlineGrace());
 		}
 		routeChannelPosts(posts);
 	}
@@ -745,7 +772,7 @@ class GroupEventEngine
 	{
 		return config.discordScreenshot() && config.discordGravestoneScreenshot() == GraveScreenshot.DEATH
 			&& settings.discord.contains(GroupEvent.Type.GRAVESTONE_EXPIRING)
-			&& webhook(GroupEvent.Type.GRAVESTONE_EXPIRING.category) != null;
+			&& webhookFor(Webhook.of(GroupEvent.Type.GRAVESTONE_EXPIRING)) != null;
 	}
 
 	@Subscribe
@@ -1041,14 +1068,15 @@ class GroupEventEngine
 
 	private void flushDigest()
 	{
-		for (GroupEvent.Category category : settings.digest)
+		// Every digest goes to the Daily digest webhook (Main when empty), under its poster name.
+		String url = webhookFor(Webhook.DIGEST);
+		// Draining first would lose the day's lines when the webhook has been cleared.
+		if (url != null)
 		{
-			String url = webhook(category);
-			// Draining first would lose the day's lines when the webhook has been cleared.
-			if (url != null)
+			String name = posterName(Webhook.DIGEST);
+			for (GroupEvent.Category category : settings.digest)
 			{
-				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category),
-					PosterNames.name(config, category)), null);
+				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category), name), null);
 			}
 		}
 		saveProfile(DIGEST_KEY, digest.save());
@@ -1069,7 +1097,7 @@ class GroupEventEngine
 		List<GroupEvent> posts;
 		synchronized (presenceLock)
 		{
-			posts = presence.login(now, client.getWorld(), name, config.discordOfflineGrace());
+			posts = presence.login(now, client.getWorld(), name, offlineGrace());
 			savePresence();
 		}
 		for (GroupEvent e : posts)
@@ -1199,14 +1227,30 @@ class GroupEventEngine
 
 	// ---- Discord ----
 
-	/** Where a category posts: null when Discord is off or no valid webhook is set. */
-	private String webhook(GroupEvent.Category category)
+	/**
+	 * Where {@code webhook}'s posts go: its own URL, else Main's ({@link Webhooks#url}); null when Discord is off or
+	 * neither is set. Every sender asks this; none reads a webhook setting itself.
+	 */
+	private String webhookFor(Webhook webhook)
 	{
 		if (!config.discordEnabled() || sender == null)
 		{
 			return null;
 		}
-		return DiscordWebhook.route(category, DiscordWebhook.overrides(config), config.discordWebhookUrl());
+		return webhooks().url(webhook);
+	}
+
+	/** The name {@code webhook}'s posts go out under, by its own choice ({@link Webhooks#name}). */
+	private String posterName(Webhook webhook)
+	{
+		return webhooks().name(webhook);
+	}
+
+	/** This member's own webhooks, with the leader's shared ones filling any left empty ({@link GroupService#webhooks}). */
+	private Webhooks webhooks()
+	{
+		GroupService g = group;
+		return g == null ? Webhooks.of(config) : g.webhooks();
 	}
 
 	/**
@@ -1226,7 +1270,7 @@ class GroupEventEngine
 
 	private void toDigest(GroupEvent event)
 	{
-		if (webhook(event.type.category) == null)
+		if (webhookFor(Webhook.DIGEST) == null)
 		{
 			return;
 		}
@@ -1247,7 +1291,7 @@ class GroupEventEngine
 	 */
 	private void toDiscord(GroupEvent event)
 	{
-		String url = webhook(event.type.category);
+		String url = webhookFor(Webhook.of(event.type));
 		if (url == null)
 		{
 			return;
@@ -1308,7 +1352,7 @@ class GroupEventEngine
 	private void flush(DiscordBatch.Pending moment)
 	{
 		DiscordMerge.Post post = DiscordMerge.merge(moment.events, settings, discordWords());
-		String url = post == null ? null : webhook(post.lead.type.category);
+		String url = post == null ? null : webhookFor(Webhook.of(post.lead.type));
 		if (url == null)
 		{
 			return;
@@ -1377,14 +1421,14 @@ class GroupEventEngine
 	{
 		String json = DiscordWebhook.payload(gson, DiscordMerge.single(level, discordWords()), discordWords(),
 			config.discordStyle(), config.discordMention(), png != null, egg,
-			PosterNames.name(config, GroupEvent.Category.PROGRESS));
+			posterName(Webhook.PROGRESS));
 		levels.level(url, level, window, png, json);
 	}
 
 	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
 	private String egg(List<GroupEvent> events)
 	{
-		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(config));
+		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(resolved()));
 	}
 
 	/**
@@ -1411,7 +1455,7 @@ class GroupEventEngine
 	{
 		boolean picked = picture && config.discordScreenshot();
 		String json = DiscordWebhook.payload(gson, post, discordWords(), config.discordStyle(),
-			config.discordMention(), picked, egg(events), PosterNames.name(config, post.lead.type.category));
+			config.discordMention(), picked, egg(events), posterName(Webhook.of(post.lead.type)));
 		if (json == null)
 		{
 			return null;

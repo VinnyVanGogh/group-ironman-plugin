@@ -13,14 +13,16 @@ plugin is, see the [README](README.md).
 
 ## Settings
 
-The settings panel has eight sections, in this order. The last two start
-closed.
+The settings panel has eight sections, in this order. All but Group start
+closed, so a first install shows every section's name at once.
 
 1. **Group**: *Sync with my group*, the *Group key*, what you share (bank,
    group storage changes, stats, inventory and equipment, rune pouch / quiver /
    seed vault, drops and collection log, group events) and *Storage minimums*.
-2. **Discord: connection**: *Post to Discord*, the main webhook and the
-   optional one per category, *Poster name* and the custom names.
+2. **Discord: connection**: *Post to Discord*, then seven webhooks (Main,
+   Online status, Drops & loot, Progress, Deaths & danger, Group storage,
+   Daily digest), each with its poster name choice and custom name. See
+   [Discord webhooks](README.md#discord-webhooks).
 3. **Discord: what to post**: one switch per event, grouped drops, deaths,
    storage, progress, group, activities.
 4. **Discord: how to post**: *Online status* (Posts / Live board / Off),
@@ -38,7 +40,9 @@ closed.
    Hover a setting for its full meaning ("at least this much").
 8. **Advanced** (closed): the `::find` colours: *Search colour*, *Colour item
    names*, *Your bank colour*, *Member bank colour*, *Storage colour*,
-   *Carried colour* and *Item name colour*.
+   *Carried colour* and *Item name colour*. Also *Show update notes* (on by
+   default): a welcome in the game chat on a fresh install, and what is new
+   once after each update.
 
 Moving or renaming a setting never resets it: each is saved under the same
 key it always was. The gp boxes show plain digits (`1000000`): RuneLite's
@@ -47,7 +51,8 @@ number box is too narrow for `1,000,000` with commas.
 **Sharing** (in *Group*), all off by default, including `::find` (in
 *In-game*). Each one works on its own, and each only shows you other members'
 data while you share the same thing yourself. With every switch off the plugin
-sends nothing, collects nothing, and its side panel button is hidden.
+sends nothing and collects nothing; its side panel stays, opening with an
+*Everything is off* notice and a button to these settings.
 
 | Setting | What it sends to your party |
 | --- | --- |
@@ -76,30 +81,32 @@ Every event switch is off by default:
   (1), *Back after (days)* (7), and *Untradeables to ignore* (clue scrolls,
   keys, totems and the like, by name).
 - **Discord: connection** and **Discord: how to post**: *Post to Discord* (shows RuneLite's third-party
-  warning), the *Discord webhook URL* (must be
-  `https://discord.com/api/webhooks/...`; a password field), optional
-  webhooks per category (drops, deaths, storage, progress, group, activities),
+  warning), the *Main webhook* (must be
+  `https://discord.com/api/webhooks/...`; a password field), six optional
+  category webhooks that fall back to Main when empty (see
+  [Discord webhooks](README.md#discord-webhooks)),
   *Message style* (rich embed or plain text), *Attach a screenshot*, *Mention
   for big events* (e.g. `<@&role id>`, put in front of pets, 99s, maxing and a
   Hardcore group death), *Quiet hours from / until* (posts wait and go
-  when quiet hours end; the same hour twice means none), and *Poster name*:
-  *Webhook's own* (the default: the name and avatar you set on
-  each webhook in Discord), *GIM Utilities*, or *Custom*, which uses the
-  *Custom name* fields (main and one per category). A blank custom name uses
-  the webhook's own; names are cut to 80 characters, and a name Discord
-  refuses (containing "discord", "clyde", `@`, `#`, `:` or ` ``` `, or exactly
-  "everyone" or "here") gets a chat warning and is not used: those posts go
-  out under the webhook's own name, not the main custom name. Every embed's
+  when quiet hours end; the same hour twice means none), and each webhook's
+  *name*: *Webhook's own* (the default: the name and avatar you set on the
+  webhook in Discord), *Default name* (Town Crier, Party Pete and so on), or
+  *Custom*, which uses that webhook's *custom name* box (it starts filled
+  with the default name). A category posting to Main's webhook keeps its own
+  name. A blank custom name uses the default name; names are cut to 80
+  characters, and a name Discord refuses (containing "discord", "clyde", `@`,
+  `#`, `:` or ` ``` `, or exactly "everyone" or "here") gets a chat warning
+  and is not used: those posts go out under the default name. Every embed's
   footer still says GIM Utilities.
 - **Discord: what to post** and the *Banner:* switches in **In-game**: one
   switch per event, for each output. *Online status* (under *Discord: how to
   post*) is *Posts* (the default: a post per
   login and logout), *Live board* (one Group-channel message listing each
-  member, edited in place) or *Off*. Only one member sharing a Group webhook
-  should turn on *Live board*: each member who has it on keeps a board of
-  their own in that channel. Level-up posts use the Progress poster name and
-  the board the Group one; the board's edits count toward the same 20 posts
-  a minute.
+  member, edited in place) or *Off*. Only one member sharing an Online status
+  webhook should turn on *Live board*: each member who has it on keeps a board
+  of their own in that channel. Level-up posts use the Progress poster name and
+  the board the Online status one; the board's edits count toward that
+  webhook's 20 posts a minute (each webhook has its own limit).
 - **In-game**: *Banner time*, *Banner position*, *Most banners at once*, the
   *Group box* (who is online and on which world, and the latest events) and
   how many events it lists.
@@ -197,16 +204,30 @@ user folder), so your other plugins and settings come along.
    ([RuneLite wiki: Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts)):
    click the **Jagex account** icon on the sidebar, add your account, pick
    your character, then click **Play Now**.
-3. **Turn sharing on.** Everyone opens *GIM Utilities* in the plugin settings
-   and turns on the switches they want. The GIM Utilities panel (a green badge
-   on the sidebar) appears once any switch is on. The built-in **Party**
-   plugin is not needed and can stay off.
-4. **Share a group key, once.** One member opens the GIM Utilities panel and
+3. **Share a group key, then turn sharing on in one click.** The GIM Utilities
+   panel (a green badge on the sidebar) is there whenever the plugin is on;
+   with every switch off it opens with *Everything is off. Turn on what you
+   want to share.* and an **Open GIM Utilities settings** button. One member
    clicks **Create group key**, then **Copy group key**, and sends the key to
    the group outside the game (Discord, a DM). The game chatbox takes no
    paste, and plugins never type into it. Everyone else copies the key and
-   clicks **Paste group key** in the panel, which saves it and joins. Pasting
-   it into *Group key* in the settings works too.
+   clicks **Paste group key** in the panel (or pastes it into *Group key* in
+   the settings). The panel then shows a **Share with your group?** card:
+   - **Turn on sharing** ticks *Sync with my group* and every *Share* switch
+     (bank, group storage changes, stats, inventory and equipment, pouch /
+     quiver / vault, drops and collection log, group events), and joins.
+   - **Post my events to Discord** shows only when you have a Discord webhook
+     set, and ticks *Post to Discord*.
+   - **Not now** hides the card until the group key changes.
+
+   Nothing turns on without your click; untick any switch later in settings.
+   The card also shows while sync is on but every Share switch is off. With
+   *Share group storage changes* off, your own storage visits still appear in
+   your Storage and Log tabs, marked *not shared: Share group storage changes
+   is off*; nothing is sent. The built-in **Party** plugin is not needed and
+   can stay off.
+4. **Check the key.** Pasting the key saves it and joins. **New key** replaces
+   a leaked one; everyone pastes the new key.
 5. **Join.** Each member clicks **Join group sync** in the panel header, once
    per session. Joining on its own at login is a rejected Plugin Hub feature,
    so it waits for the click. The header then reads *Connected, N members
@@ -231,7 +252,7 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
      Temurin Java 11 (about 200 MB) and checks its SHA-256 fingerprint
      against the one written in the launcher before unpacking it. If the
      fingerprint does not match, it stops.
-   - `[2/3]` downloads the GIM Utilities source at tag `gim-test-1` from
+   - `[2/3]` downloads the GIM Utilities source at tag `gim-test-2` from
      GitHub. Run from inside a checkout (`tools\windows\`), it uses that
      checkout instead.
    - `[3/3]` builds and starts RuneLite. The first run takes a few minutes
@@ -247,12 +268,23 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
    `.cmd` in Notepad first to read exactly what it does. If you see "Windows
    cannot access the specified file", right-click the file, choose
    **Properties**, tick **Unblock**, click **OK**, and double-click again.
+   **If "Smart App Control blocked a file that may be unsafe"** (Windows 11):
+   Smart App Control blocks scripts marked as downloaded. Do not turn it off
+   (Windows only lets you turn it back on by reinstalling). Instead open
+   **PowerShell** from the Start menu and paste this one line; a file
+   PowerShell downloads carries no "from the internet" mark:
+
+   ```
+   $f="$env:LOCALAPPDATA\Run-GimUtilities.cmd"; iwr -UseBasicParsing https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/gim-test-2/tools/windows/Run-GimUtilities.cmd -OutFile $f; cmd /c $f
+   ```
+
+   Next time, start it with `cmd /c "$env:LOCALAPPDATA\Run-GimUtilities.cmd"`.
 4. Carry on from step 2 above (log in, turn sharing on, share the key, join). To
    stop, close the RuneLite window.
 
 For whoever cuts the test release: the launcher downloads
-`github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-1.zip`
-with no login, so the repo has to be public and the `gim-test-1` tag pushed
+`github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-2.zip`
+with no login, so the repo has to be public and the `gim-test-2` tag pushed
 before friends run it. To test a different tag, change `$SourceRef` at the
 top of the launcher. The checksum step has its own tests:
 `pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1`.
@@ -260,7 +292,7 @@ top of the launcher. The checksum step has its own tests:
 The `windows-launcher` GitHub Actions workflow runs the launcher end to end
 on a clean Windows runner with `GU_BUILD_ONLY=1` set, which makes `[3/3]` run
 `gradlew build` instead of opening RuneLite. It runs both the `.cmd` in the
-commit and the `.cmd` attached to the `gim-test-1` release, byte for byte.
+commit and the `.cmd` attached to the `gim-test-2` release, byte for byte.
 **Whenever `tools/windows/Run-GimUtilities.cmd` changes, re-upload it to the
 release** (as committed, with CRLF line endings), or the `release-asset` leg
 fails and players keep downloading the old one.

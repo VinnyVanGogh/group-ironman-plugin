@@ -5,7 +5,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -62,29 +61,6 @@ final class DiscordWebhook
 			s = s.substring(1, s.length() - 1).trim();
 		}
 		return s;
-	}
-
-	/** The category's own webhook when it is set and valid, else the main one, else null: nothing is posted. */
-	static String route(GroupEvent.Category category, Map<GroupEvent.Category, String> overrides, String main)
-	{
-		String own = overrides.get(category);
-		if (valid(own))
-		{
-			return clean(own);
-		}
-		return valid(main) ? clean(main) : null;
-	}
-
-	static Map<GroupEvent.Category, String> overrides(GroupIronmanConfig config)
-	{
-		Map<GroupEvent.Category, String> out = new EnumMap<>(GroupEvent.Category.class);
-		out.put(GroupEvent.Category.DROPS, config.discordDropsUrl());
-		out.put(GroupEvent.Category.DEATHS, config.discordDeathsUrl());
-		out.put(GroupEvent.Category.STORAGE, config.discordStorageUrl());
-		out.put(GroupEvent.Category.PROGRESS, config.discordProgressUrl());
-		out.put(GroupEvent.Category.GROUP, config.discordGroupUrl());
-		out.put(GroupEvent.Category.ACTIVITIES, config.discordActivitiesUrl());
-		return out;
 	}
 
 	/** {@link #digest(Gson, GroupEvent.Category, List, String)} under today's name, "GIM Utilities". */

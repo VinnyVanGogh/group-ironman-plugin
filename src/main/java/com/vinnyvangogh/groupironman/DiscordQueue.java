@@ -7,7 +7,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The posts waiting for Discord, and when the next may go. Pure and
+ * The posts waiting for one Discord webhook URL, and when the next may go ({@link DiscordSender} keeps one per
+ * URL, so every limit below is per webhook). Pure and
  * clock-driven, so rate limits, back-off and quiet hours are tested without
  * a network.
  *
