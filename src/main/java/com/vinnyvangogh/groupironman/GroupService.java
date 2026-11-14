@@ -490,11 +490,20 @@ class GroupService
 		return g != null && !self.isEmpty() && g.setEditor(self, name, editor, System.currentTimeMillis());
 	}
 
-	/** The leader's or an editor's "Save to group". False when refused. */
-	boolean saveGroupSettings(Map<String, Long> values)
+	/** The leader's or an editor's "Save to group", and why it did not go out when it did not. */
+	GovernanceSync.SaveResult saveGroupSettings(Map<String, Long> values)
 	{
 		GovernanceSync g = governance;
-		return g != null && !self.isEmpty() && g.save(self, values, System.currentTimeMillis());
+		if (g == null)
+		{
+			return GovernanceSync.SaveResult.NOT_STARTED;
+		}
+		if (self.isEmpty())
+		{
+			return GovernanceSync.SaveResult.NOT_LOGGED_IN;
+		}
+		GovernanceSync.SaveResult r = g.save(self, values, System.currentTimeMillis());
+		return r == GovernanceSync.SaveResult.SAVED && !syncing() ? GovernanceSync.SaveResult.SAVED_OFFLINE : r;
 	}
 
 	/** The leader's "Share webhooks with the group". False when refused: this client is not the leader. */
@@ -585,6 +594,24 @@ class GroupService
 		}
 		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_KEY, key);
 		return true;
+	}
+
+	/** The panel's "Turn on sharing" card: what it reads. */
+	SharingPrompt.Settings sharingSettings()
+	{
+		return SharingPrompt.Settings.of(config);
+	}
+
+	/** "Turn on sharing": the player's own click, never on its own. */
+	void turnOnSharing()
+	{
+		SharingPrompt.turnOnSharing((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+	}
+
+	/** "Post my events to Discord": the player's own click. */
+	void postToDiscord()
+	{
+		SharingPrompt.postToDiscord((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
 	}
 
 	void reloadConfig()
@@ -1466,13 +1493,8 @@ class GroupService
 			engine.storage(change, true);
 		}
 
-		GroupOutbox.Switches s = switches();
-		if (!s.storage)
-		{
-			return;
-		}
-		roster.putStorage(change);
-		String payload = GroupOutbox.storage(gson, s, change);
+		// Kept locally whether shared or not; with sharing off it is marked so and nothing is sent.
+		String payload = GroupOutbox.ownStorage(gson, switches(), change, roster);
 		if (payload != null && syncing())
 		{
 			partyService.send(new VvgGroupIronmanMessage(payload));

@@ -145,11 +145,15 @@ holds up a death post.
 
 ## Quick start
 
-1. Install *GIM Utilities* from the Plugin Hub and turn on the switches you
-   want in its settings.
-2. One member opens the GIM Utilities panel, clicks **Create group key**, then
-   **Copy group key**, and sends the key to the group (Discord works).
-3. Everyone else copies it and clicks **Paste group key**.
+1. Install *GIM Utilities* from the Plugin Hub.
+2. One member turns on any switch in its settings, opens the GIM Utilities
+   panel, clicks **Create group key**, then **Copy group key**, and sends the
+   key to the group (Discord works).
+3. Everyone else pastes it into *Group key* in the settings (or clicks
+   **Paste group key** in the panel). The panel shows a **Share with your
+   group?** card: **Turn on sharing** ticks *Sync with my group* and every
+   *Share* switch in one click; **Post my events to Discord** appears if you
+   have a webhook set. Nothing turns on without the click.
 4. Each session, click **Join group sync**. The Party plugin is not needed.
 
 ![Panel showing group sync status and join button](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/group-sync.png)

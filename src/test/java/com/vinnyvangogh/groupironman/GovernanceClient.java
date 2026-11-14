@@ -66,7 +66,13 @@ class GovernanceClient
 	/** A game tick while connected: whatever is marked goes to {@code others}. */
 	void tick(GovernanceClient... others)
 	{
-		sync.flush(MemberPrefs.NONE);
+		tick(MemberPrefs.NONE, others);
+	}
+
+	/** As {@link #tick(GovernanceClient...)}, with this member's own opt-outs as they are now. */
+	void tick(MemberPrefs prefs, GovernanceClient... others)
+	{
+		sync.flush(prefs);
 		for (String payload : outbox)
 		{
 			assertTrue(GovernanceSync.isGovernance(payload));

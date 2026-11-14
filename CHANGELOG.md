@@ -16,6 +16,18 @@
 - On a shared *Online status* webhook only the leader's client keeps the live
   board, so the channel gets one board.
 
+### One click to share after joining
+
+- After a group key is saved, the panel shows a *Share with your group?*
+  card. **Turn on sharing** ticks *Sync with my group* and every *Share*
+  switch; **Post my events to Discord** (only with a webhook set) ticks
+  *Post to Discord*; **Not now** hides it until the key changes. Nothing
+  turns on without the click. The panel button now also shows while a group
+  key is saved.
+- With *Share group storage changes* off, your own storage visits are still
+  kept in your Storage and Log tabs, marked *not shared: Share group storage
+  changes is off*. Nothing is sent.
+
 ### Seven Discord webhooks, each with its own poster name
 
 - *Discord: connection* now lists seven webhooks in order: Main, Online
