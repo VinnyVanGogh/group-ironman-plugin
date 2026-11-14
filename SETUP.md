@@ -253,6 +253,17 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
    `.cmd` in Notepad first to read exactly what it does. If you see "Windows
    cannot access the specified file", right-click the file, choose
    **Properties**, tick **Unblock**, click **OK**, and double-click again.
+   **If "Smart App Control blocked a file that may be unsafe"** (Windows 11):
+   Smart App Control blocks scripts marked as downloaded. Do not turn it off
+   (Windows only lets you turn it back on by reinstalling). Instead open
+   **PowerShell** from the Start menu and paste this one line; a file
+   PowerShell downloads carries no "from the internet" mark:
+
+   ```
+   $f="$env:LOCALAPPDATA\Run-GimUtilities.cmd"; iwr -UseBasicParsing https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/gim-test-2/tools/windows/Run-GimUtilities.cmd -OutFile $f; cmd /c $f
+   ```
+
+   Next time, start it with `cmd /c "$env:LOCALAPPDATA\Run-GimUtilities.cmd"`.
 4. Carry on from step 2 above (log in, turn sharing on, share the key, join). To
    stop, close the RuneLite window.
 
