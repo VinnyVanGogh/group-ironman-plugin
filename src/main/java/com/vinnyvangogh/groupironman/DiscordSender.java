@@ -109,6 +109,20 @@ final class DiscordSender
 		}
 	}
 
+	/**
+	 * Queues deleting {@code messageId}, sent by {@code url}'s webhook (Discord "Delete Webhook Message",
+	 * {@code DELETE /webhooks/{id}/{token}/messages/{message.id}}: "Deletes a message that was created by the
+	 * webhook. Returns a 204 No Content response on success"; discord/discord-api-docs main,
+	 * developers/resources/webhook.mdx). The outcome goes to {@code result}.
+	 */
+	void delete(String url, String messageId, DiscordQueue.Result result)
+	{
+		if (url != null && messageId != null)
+		{
+			offer(DiscordQueue.Post.delete(url, messageId, result));
+		}
+	}
+
 	/** A post a full queue pushed out is told so, outside the queue's lock: its owner may queue another. */
 	private void offer(DiscordQueue.Post post)
 	{
@@ -140,7 +154,7 @@ final class DiscordSender
 		{
 			if (status < 200 || status >= 300)
 			{
-				log.debug("discord webhook {} failed: {}", post.edit == null ? "post" : "edit",
+				log.debug("discord webhook {} failed: {}", post.delete ? "delete" : post.edit == null ? "post" : "edit",
 					status == 0 ? "network error" : "HTTP " + status);
 			}
 			// Counted in queued() from leaving the queue until its owner has heard the outcome, so nobody sees an
@@ -220,25 +234,35 @@ final class DiscordSender
 		queues.values().forEach(DiscordQueue::clear);
 	}
 
+	/** The HTTP request for {@code post}: a POST, a PATCH for an edit, a DELETE (no body) for a delete. */
+	static Request request(DiscordQueue.Post post)
+	{
+		Request.Builder builder = new Request.Builder().url(target(post));
+		if (post.delete)
+		{
+			return builder.delete().build();
+		}
+		RequestBody body;
+		if (post.png == null)
+		{
+			body = RequestBody.create(JSON, post.json);
+		}
+		else
+		{
+			body = new MultipartBody.Builder().setType(MultipartBody.FORM)
+				.addFormDataPart("payload_json", post.json)
+				.addFormDataPart("files[0]", DiscordWebhook.SCREENSHOT, RequestBody.create(PNG, post.png))
+				.build();
+		}
+		return (post.edit == null ? builder.post(body) : builder.patch(body)).build();
+	}
+
 	/** The client's transport: RuneLite's own OkHttpClient, asynchronous. */
 	static Transport okHttp(OkHttpClient http, Gson gson)
 	{
 		return (post, done) ->
 		{
-			RequestBody body;
-			if (post.png == null)
-			{
-				body = RequestBody.create(JSON, post.json);
-			}
-			else
-			{
-				body = new MultipartBody.Builder().setType(MultipartBody.FORM)
-					.addFormDataPart("payload_json", post.json)
-					.addFormDataPart("files[0]", DiscordWebhook.SCREENSHOT, RequestBody.create(PNG, post.png))
-					.build();
-			}
-			Request.Builder builder = new Request.Builder().url(target(post));
-			Request request = (post.edit == null ? builder.post(body) : builder.patch(body)).build();
+			Request request = request(post);
 			boolean wantsId = post.edit == null && post.result != null;
 			http.newCall(request).enqueue(new Callback()
 			{

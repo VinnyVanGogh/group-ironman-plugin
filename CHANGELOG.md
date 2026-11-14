@@ -13,6 +13,48 @@
   build's messages as before.
 - Member cards are ordered you first, then members online, then offline and
   not-yet-seen members, each group by name.
+### Every member location shows a place, never "region 13470"
+
+- A member in the Wilderness Slayer Cave read "region 13470"; it now reads
+  *Wilderness Slayer Cave*.
+- More places are named, from RuneLite's own minigame, agility course,
+  runecrafting altar, teleport and hot-cold area lists.
+- Anywhere still unnamed is described from where it is: *Wilderness lvl
+  17-24 (underground)*, *near Lumbridge*, *under Lumbridge*, *Underground*,
+  *Instance* or *Unmapped area*. The region number is never shown.
+### The live board comes back to the bottom of the channel once a day
+
+- New setting under *Discord: how to post*: **Repost board daily**, on by
+  default. With *Online status* on *Live board*, the first board update after
+  your midnight posts the board again at the bottom of the channel and then
+  deletes yesterday's, so the channel still holds one board. The rest of the
+  day it is edited in place, as before.
+- The new board goes first; yesterday's is deleted only once the new one is
+  saved, so a failed post never leaves the channel without a board. Quiet
+  hours hold the repost until the first update they allow.
+- Only the client that keeps the board reposts it (the leader's, on a shared
+  webhook). Off: the board is only ever edited.
+### Group storage only logs what the game saved
+
+- Closing group storage without pressing Save no longer logs or posts
+  anything: the game throws those changes away, and so does the plugin.
+- A save is the Save button or the game's "Saving..." message, including a
+  save the game makes as the window closes. Each save still posts only what
+  moved since the last one.
+- When the storage next opens, its contents replace the stored snapshot if
+  they differ (for example a save that failed). That correction is never
+  posted.
+### Dev builds follow the newest RuneLite
+
+- `./gradlew build`, `test` and `run` now use the newest RuneLite client
+  release, checked on every run, and print which one they resolved. Pin a run
+  with `-PruneLiteVersion=1.13.6` to compare. Plugin Hub builds are unaffected.
+
+### Built against RuneLite 1.13.6
+
+- Was 1.13.5. The test client now loads the Plugin Hub index for the Hub's
+  current RuneLite, so other Hub plugins run at their newest versions
+  (e.g. Combat Vitals) alongside this one.
 
 ### The leader can share the Discord webhooks with the group
 

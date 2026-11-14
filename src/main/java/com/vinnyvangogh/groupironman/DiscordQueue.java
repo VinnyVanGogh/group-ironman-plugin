@@ -45,10 +45,12 @@ final class DiscordQueue
 		final String json;
 		/** A PNG to attach, or null. */
 		final byte[] png;
-		/** The message this post edits in place, or null for a new message. */
+		/** The message this post edits in place (or deletes), or null for a new message. */
 		final String edit;
 		/** Told once how it went (never for a retry); null when nobody asks. A new post with one waits for its id. */
 		final Result result;
+		/** Deletes {@link #edit} instead of editing it; {@link #json} is null. */
+		final boolean delete;
 		int attempts;
 
 		Post(String url, String json, byte[] png)
@@ -58,11 +60,23 @@ final class DiscordQueue
 
 		Post(String url, String json, byte[] png, String edit, Result result)
 		{
+			this(url, json, png, edit, result, false);
+		}
+
+		private Post(String url, String json, byte[] png, String edit, Result result, boolean delete)
+		{
 			this.url = url;
 			this.json = json;
 			this.png = png;
 			this.edit = edit;
 			this.result = result;
+			this.delete = delete;
+		}
+
+		/** Deletes {@code messageId}, sent by {@code url}'s webhook. */
+		static Post delete(String url, String messageId, Result result)
+		{
+			return new Post(url, null, null, messageId, result, true);
 		}
 	}
 

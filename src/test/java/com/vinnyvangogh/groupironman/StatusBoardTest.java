@@ -439,6 +439,255 @@ public class StatusBoardTest
 		assertTrue("dropped, so tried again", board.next(now + GAP, false).create());
 	}
 
+	// ---- Board 2026-11-14: the board comes back to the bottom of the channel once a day ----
+
+	private static final long DAY = 20_000;
+
+	/** Posts the board on {@code day} with daily reposts on, answered with message id 111, and saves it. */
+	private void postedOn(long day, long at)
+	{
+		target(URL);
+		board.show("a", at);
+		StatusBoard.Send send = board.next(at, false, day, true);
+		assertTrue(send.create());
+		board.done(send, 200, "111", -1, at);
+		saved = board.takeSaved();
+	}
+
+	/** The repost on {@code day}: a new board that replaces 111. */
+	private StatusBoard.Send repost(long day, long at)
+	{
+		board.show("b", at);
+		StatusBoard.Send send = board.next(at, false, day, true);
+		assertTrue("the first send of a new day posts", send.create());
+		assertEquals("and replaces yesterday's", "111", send.replaces);
+		return send;
+	}
+
+	@Test
+	public void sameDaySendsOnlyEdit()
+	{
+		postedOn(DAY, NOW);
+		board.show("b", NOW + GAP);
+		StatusBoard.Send edit = board.next(NOW + GAP, false, DAY, true);
+		assertFalse(edit.create());
+		assertEquals("111", edit.messageId);
+		assertNull(edit.replaces);
+		board.done(edit, 200, null, -1, NOW + GAP);
+		assertNull("an edit changes nothing saved", board.takeSaved());
+		assertNull("nothing left to send", board.next(NOW + 2 * GAP, false, DAY, true));
+	}
+
+	@Test
+	public void theFirstSendAfterMidnightPostsThenDeletesTheOldBoard()
+	{
+		postedOn(DAY, NOW);
+		StatusBoard.Send post = repost(DAY + 1, NOW + GAP);
+		board.done(post, 200, "222", -1, NOW + GAP);
+		assertNull("no delete before the new id is saved", board.next(NOW + 3 * GAP, false, DAY + 1, true));
+		saved = board.takeSaved();
+		assertTrue(saved, saved.contains("\t222\t"));
+
+		StatusBoard.Send delete = board.next(NOW + GAP + 1, false, DAY + 1, true);
+		assertTrue("then the old board is deleted, without waiting the gap", delete.delete);
+		assertEquals("111", delete.messageId);
+		assertNull("a delete has no body", StatusBoard.payload(GSON, delete, DiscordStyle.EMBED, null));
+		assertNull("one in flight at a time", board.next(NOW + 5 * GAP, false, DAY + 1, true));
+		board.done(delete, 204, null, -1, NOW + 2 * GAP);
+		saved = board.takeSaved();
+		assertTrue("the saved line forgets the deleted board", saved.endsWith("\t222\t" + (DAY + 1)));
+
+		board.show("c", NOW + 3 * GAP);
+		StatusBoard.Send edit = board.next(NOW + 3 * GAP, false, DAY + 1, true);
+		assertEquals("the rest of the day edits the new board", "222", edit.messageId);
+		assertFalse(edit.create() || edit.delete);
+	}
+
+	@Test
+	public void aNewDayRepostsEvenWhenNothingChanged()
+	{
+		postedOn(DAY, NOW);
+		assertNull(board.next(NOW + GAP, false, DAY, true));
+		StatusBoard.Send post = board.next(NOW + 2 * GAP, false, DAY + 1, true);
+		assertTrue(post.create());
+		assertEquals("a", post.lines);
+	}
+
+	@Test
+	public void aFailedRepostKeepsTheOldBoardAndDeletesNothing()
+	{
+		postedOn(DAY, NOW);
+		long at = NOW + GAP;
+		for (int status : new int[]{0, DiscordQueue.DROPPED})
+		{
+			board.done(repost(DAY + 1, at), status, null, -1, at);
+			assertNull("status " + status + ": nothing saved", board.takeSaved());
+			at += GAP;
+			StatusBoard.Send next = board.next(at, false, DAY + 1, true);
+			assertTrue("status " + status + ": tries the repost again, never a delete", next.create() && !next.delete);
+			assertEquals("111", next.replaces);
+			board.done(next, 0, null, -1, at);
+			at += GAP;
+		}
+		long day = DAY + 1;
+		for (int status : new int[]{400, 500})
+		{
+			board.done(repost(day, at), status, null, -1, at);
+			assertNull("status " + status + ": nothing saved", board.takeSaved());
+			assertNull("and not tried again every gap", board.next(at + GAP, false, day, true));
+			board.show("c" + status, at + GAP);
+			StatusBoard.Send edit = board.next(at + GAP, false, day, true);
+			assertFalse("yesterday's board is kept and edited", edit.create() || edit.delete);
+			assertEquals("111", edit.messageId);
+			board.done(edit, 200, null, -1, at + GAP);
+			at += 2 * GAP;
+			StatusBoard.Send tomorrow = board.next(at, false, day + 1, true);
+			assertTrue("tomorrow tries again", tomorrow.create());
+			assertEquals("111", tomorrow.replaces);
+			board.done(tomorrow, 400, null, -1, at);
+			at += GAP;
+			day += 2;
+		}
+		assertNull(board.takeSaved());
+	}
+
+	@Test
+	public void aRepost429WaitsItsRetryAfterAndStillReplaces()
+	{
+		postedOn(DAY, NOW);
+		board.done(repost(DAY + 1, NOW + GAP), 429, null, 60_000, NOW + GAP);
+		assertNull(board.next(NOW + 2 * GAP, false, DAY + 1, true));
+		StatusBoard.Send again = board.next(NOW + GAP + 60_000, false, DAY + 1, true);
+		assertTrue(again.create());
+		assertEquals("111", again.replaces);
+	}
+
+	@Test
+	public void aDelete404IsIgnored()
+	{
+		postedOn(DAY, NOW);
+		board.done(repost(DAY + 1, NOW + GAP), 200, "222", -1, NOW + GAP);
+		saved = board.takeSaved();
+		StatusBoard.Send delete = board.next(NOW + GAP, false, DAY + 1, true);
+		board.done(delete, 404, null, -1, NOW + GAP);
+		assertTrue("already gone: forgotten", board.takeSaved().endsWith("\t222\t" + (DAY + 1)));
+		assertNull("not deleted again", board.next(NOW + 5 * GAP, false, DAY + 1, true));
+		board.show("c", NOW + 5 * GAP);
+		assertEquals("and the new board is not forgotten", "222",
+			board.next(NOW + 5 * GAP, false, DAY + 1, true).messageId);
+	}
+
+	@Test
+	public void aDelete429IsTriedAgainAfterItsRetryAfter()
+	{
+		postedOn(DAY, NOW);
+		board.done(repost(DAY + 1, NOW + GAP), 200, "222", -1, NOW + GAP);
+		board.takeSaved();
+		board.done(board.next(NOW + GAP, false, DAY + 1, true), 429, null, 30_000, NOW + GAP);
+		assertNull(board.next(NOW + GAP + 29_999, false, DAY + 1, true));
+		assertTrue(board.next(NOW + GAP + 30_000, false, DAY + 1, true).delete);
+	}
+
+	@Test
+	public void theSettingOffNeverReposts()
+	{
+		postedOn(DAY, NOW);
+		board.show("b", NOW + GAP);
+		StatusBoard.Send edit = board.next(NOW + GAP, false, DAY + 5, false);
+		assertFalse(edit.create());
+		assertEquals("111", edit.messageId);
+		board.done(edit, 200, null, -1, NOW + GAP);
+		assertNull("and an unchanged board is not sent for the day", board.next(NOW + 2 * GAP, false, DAY + 6, false));
+	}
+
+	@Test
+	public void aNonKeeperNeverReposts()
+	{
+		// The engine targets no webhook unless StatusBoard.keeps (SharedWebhooksTest pins who keeps it).
+		postedOn(DAY, NOW);
+		board.target(null, () -> saved);
+		board.show("b", NOW + GAP);
+		assertNull(board.next(NOW + GAP, false, DAY + 1, true));
+		assertNull(board.next(NOW + 10 * GAP, false, DAY + 2, true));
+	}
+
+	@Test
+	public void quietHoursHoldTheRepostUntilTheFirstAllowedSend()
+	{
+		postedOn(DAY, NOW);
+		board.show("b", NOW + GAP);
+		assertNull("quiet hours", board.next(NOW + GAP, true, DAY + 1, true));
+		StatusBoard.Send post = board.next(NOW + 2 * GAP, false, DAY + 1, true);
+		assertTrue("the first allowed send reposts", post.create());
+		assertEquals("111", post.replaces);
+	}
+
+	@Test
+	public void aRestartKeepsTheBoardsDayAndAPendingDelete()
+	{
+		postedOn(DAY, NOW);
+		StatusBoard sameDay = new StatusBoard();
+		sameDay.target(URL, () -> saved);
+		sameDay.show("b", NOW);
+		assertFalse("posted today: a restart edits", sameDay.next(NOW, false, DAY, true).create());
+
+		board.done(repost(DAY + 1, NOW + GAP), 200, "222", -1, NOW + GAP);
+		saved = board.takeSaved();
+		StatusBoard restarted = new StatusBoard();
+		restarted.target(URL, () -> saved);
+		StatusBoard.Send delete = restarted.next(NOW + GAP, false, DAY + 1, true);
+		assertTrue("closed before the delete: it still goes", delete.delete);
+		assertEquals("111", delete.messageId);
+	}
+
+	@Test
+	public void aBoardSavedBeforeDailyRepostsIsRepostedOnItsFirstSend()
+	{
+		saved = Integer.toHexString(URL.hashCode()) + "\t111";
+		target(URL);
+		board.show("a", NOW);
+		StatusBoard.Send send = board.next(NOW, false, DAY, true);
+		assertTrue("its day is unknown, so it is brought down", send.create());
+		assertEquals("111", send.replaces);
+	}
+
+	@Test
+	public void theRepostAndDeleteGoThroughTheSendersQueue()
+	{
+		String thread = URL + "?thread_id=42";
+		board.target(thread, () -> null);
+		board.show("a", now);
+		sendOn(DAY);
+		answers.remove(0).done(200, null, "111");
+		board.takeSaved();
+
+		now += GAP;
+		sendOn(DAY + 1);
+		DiscordQueue.Post post = requests.get(1);
+		assertNull("the repost is a post", post.edit);
+		assertEquals(URL + "?thread_id=42&wait=true", DiscordSender.target(post));
+		answers.remove(0).done(200, null, "222");
+		board.takeSaved();
+
+		sendOn(DAY + 1);
+		DiscordQueue.Post delete = requests.get(2);
+		assertTrue(delete.delete);
+		assertEquals("Delete Webhook Message, in the thread", URL + "/messages/111?thread_id=42",
+			DiscordSender.target(delete));
+		assertEquals("DELETE", DiscordSender.request(delete).method());
+		assertEquals("PATCH", DiscordSender.request(new DiscordQueue.Post(URL, "{}", null, "1", null)).method());
+		assertEquals("POST", DiscordSender.request(post).method());
+		answers.remove(0).done(204, null);
+		assertTrue(board.takeSaved().endsWith("\t222\t" + (DAY + 1)));
+	}
+
+	private void sendOn(long day)
+	{
+		StatusBoard.Send send = board.next(now, false, day, true);
+		board.send(sender, send, StatusBoard.payload(GSON, send, DiscordStyle.EMBED, null), () -> now);
+		sender.pump();
+	}
+
 	@Test
 	public void anUpgradeKeepsWhatItsOldSwitchDid()
 	{

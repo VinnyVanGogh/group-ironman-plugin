@@ -691,6 +691,15 @@ public interface GroupIronmanConfig extends Config
 		return OnlineStatus.POSTS;
 	}
 
+	@ConfigItem(keyName = "discordRepostBoard", name = "Repost board daily", description = "With Online status"
+		+ " on Live board: the first update after your midnight posts the board again at the bottom of the"
+		+ " channel and deletes yesterday's, so the channel keeps one board. Off: it is only ever edited.",
+		section = discordHowSection, position = 13)
+	default boolean discordRepostBoard()
+	{
+		return true;
+	}
+
 	@Range(max = 10)
 	@Units(Units.MINUTES)
 	@ConfigItem(keyName = "discordOfflineGrace", name = "Offline grace", description = "Minutes a logout waits"
