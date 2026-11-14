@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Inventories look like the game's, and online members come first
+
+- A member's inventory in the Group tab now shows their real 28 slots: each
+  item in the slot it is in, 14 potions as 14 slots (not one cell with
+  "14"), coins and runes as one stack, empty slots kept, and noted items
+  drawn noted. Find, `::find` and bank and storage totals still count noted
+  items as the item. A member on an older build still shows the old view
+  (one cell per item) until they update; their client keeps reading this
+  build's messages as before.
+- Member cards are ordered you first, then members online, then offline and
+  not-yet-seen members, each group by name.
+
 ### One click to share after joining
 
 - After a group key is saved, the panel shows a *Share with your group?*
