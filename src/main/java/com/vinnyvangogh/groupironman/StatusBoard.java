@@ -187,7 +187,7 @@ final class StatusBoard
 	 */
 	synchronized Send next(long now, boolean quiet, long day, boolean repost)
 	{
-		if (url == null || inFlight != null || now < notBefore)
+		if (held(now))
 		{
 			return null;
 		}
@@ -202,6 +202,12 @@ final class StatusBoard
 			return null;
 		}
 		return send(now, new Send(url, replaces == null ? messageId : null, lines, changedAt, replaces, day, false));
+	}
+
+	/** Holding the lock: no webhook, a request already out, or a Retry-After still running. */
+	private boolean held(long now)
+	{
+		return url == null || inFlight != null || now < notBefore;
 	}
 
 	/** Holding the lock: the board a post on {@code day} replaces, when one was posted on an earlier day. */
