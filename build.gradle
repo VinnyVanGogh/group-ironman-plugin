@@ -31,8 +31,36 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok:1.18.30'
 
 	testImplementation 'junit:junit:4.12'
+	// UI tests only (src/test/java/com/vinnyvangogh/testkit/ui): stands in for the client's
+	// ItemManager, SpriteManager and ConfigManager, which need a running game. Test scope
+	// never reaches the Hub jar: the Hub replaces this file and builds main only.
+	testImplementation 'org.mockito:mockito-core:5.14.2'
 	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion
 	testImplementation group: 'net.runelite', name:'jshell', version: runeLiteVersion
+}
+
+// UI tests drive the plugin's own Swing panels without a window, so they run
+// headless by default: on CI, and on the Mac without taking focus. The two
+// clipboard tests need a display and skip without one; run them with
+//   ./gradlew test -Pheadful
+tasks.named('test', Test) {
+	systemProperty 'java.awt.headless', project.hasProperty('headful') ? 'false' : 'true'
+}
+
+// Renders the README's screenshots (ReadmeShots) into docs/images at fixed
+// sizes, from made-up scenes. ./gradlew test renders the same shots into
+// build/screenshots, so a broken shot fails the build first.
+tasks.register('screenshots', Test) {
+	description = 'Renders the README screenshots into docs/images'
+	group = 'documentation'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	filter {
+		includeTestsMatching 'com.vinnyvangogh.groupironman.ReadmeShots'
+	}
+	systemProperty 'java.awt.headless', 'true'
+	systemProperty 'screenshots.dir', file('docs/images').absolutePath
+	outputs.upToDateWhen { false }
 }
 
 // Do NOT add gson, guice, okhttp or anything else that arrives transitively
