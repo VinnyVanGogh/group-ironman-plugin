@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Built against RuneLite 1.13.6
+
+- Was 1.13.5. The test client now loads the Plugin Hub index for the Hub's
+  current RuneLite, so other Hub plugins run at their newest versions
+  (e.g. Combat Vitals) alongside this one.
+
 ### The leader can share the Discord webhooks with the group
 
 - New in the panel's *Settings* tab, for the group leader only: *Share
