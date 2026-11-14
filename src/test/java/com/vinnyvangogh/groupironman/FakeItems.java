@@ -7,6 +7,8 @@ import java.util.Map;
 final class FakeItems implements ItemLookup
 {
 	static final int SHARK = 385;
+	/** The game's noted shark; the sender's counts canonicalise it to {@link #SHARK}. */
+	static final int NOTED_SHARK = 386;
 	static final int COAL = 453;
 	static final int RUNE_SCIM = 1333;
 	static final int PRAYER_POT_4 = 2434;
@@ -25,6 +27,7 @@ final class FakeItems implements ItemLookup
 	FakeItems()
 	{
 		add(SHARK, "Shark", 800);
+		add(NOTED_SHARK, "Shark", 800);
 		add(COAL, "Coal", 150);
 		add(RUNE_SCIM, "Rune scimitar", 15_000);
 		add(PRAYER_POT_4, "Prayer potion(4)", 9_000);

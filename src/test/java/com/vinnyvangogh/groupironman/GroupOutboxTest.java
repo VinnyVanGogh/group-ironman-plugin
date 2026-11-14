@@ -26,6 +26,11 @@ public class GroupOutboxTest
 		return m;
 	}
 
+	private static GroupCodec.Carried carried()
+	{
+		return new GroupCodec.Carried(one(), one());
+	}
+
 	private static MemberStats stats()
 	{
 		Map<String, MemberStats.Level> skills = new LinkedHashMap<>();
@@ -45,7 +50,7 @@ public class GroupOutboxTest
 		assertTrue(GroupOutbox.bank(GSON, ALL_OFF, new BankSnapshot(1, one())).isEmpty());
 		assertNull(GroupOutbox.storage(GSON, ALL_OFF, new StorageChange(1, "", one(), one(), one())));
 		assertNull(GroupOutbox.stats(GSON, ALL_OFF, stats()));
-		assertNull(GroupOutbox.carried(GSON, ALL_OFF, one(), one()));
+		assertNull(GroupOutbox.carried(GSON, ALL_OFF, carried()));
 	}
 
 	@Test
@@ -55,7 +60,7 @@ public class GroupOutboxTest
 		assertEquals(1, GroupOutbox.bank(GSON, bankOnly, new BankSnapshot(1, one())).size());
 		assertNull(GroupOutbox.storage(GSON, bankOnly, new StorageChange(1, "", one(), one(), one())));
 		assertNull(GroupOutbox.stats(GSON, bankOnly, stats()));
-		assertNull(GroupOutbox.carried(GSON, bankOnly, one(), one()));
+		assertNull(GroupOutbox.carried(GSON, bankOnly, carried()));
 	}
 
 	@Test
@@ -64,7 +69,7 @@ public class GroupOutboxTest
 		assertEquals(1, GroupOutbox.bank(GSON, ALL_ON, new BankSnapshot(1, one())).size());
 		assertNotNull(GroupOutbox.storage(GSON, ALL_ON, new StorageChange(1, "", one(), one(), one())));
 		assertNotNull(GroupOutbox.stats(GSON, ALL_ON, stats()));
-		assertNotNull(GroupOutbox.carried(GSON, ALL_ON, one(), one()));
+		assertNotNull(GroupOutbox.carried(GSON, ALL_ON, carried()));
 	}
 
 	@Test
@@ -79,7 +84,7 @@ public class GroupOutboxTest
 		assertTrue(extrasOnly.any());
 		assertNotNull(GroupOutbox.extras(GSON, extrasOnly, extras));
 		assertTrue(GroupOutbox.events(GSON, extrasOnly, events).isEmpty());
-		assertNull(GroupOutbox.carried(GSON, extrasOnly, one(), one()));
+		assertNull(GroupOutbox.carried(GSON, extrasOnly, carried()));
 
 		GroupOutbox.Switches dropsOnly = new GroupOutbox.Switches(false, false, false, false, false, true);
 		assertNull(GroupOutbox.extras(GSON, dropsOnly, extras));

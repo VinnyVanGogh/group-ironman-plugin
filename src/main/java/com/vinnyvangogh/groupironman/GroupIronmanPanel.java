@@ -750,7 +750,10 @@ class GroupIronmanPanel extends PluginPanel
 		return -1;
 	}
 
-	/** The inventory tab's 4 x 7 grid. Shared data has counts, not slots, so items fill it in order. */
+	/**
+	 * The inventory tab's 4 x 7 grid. From a sender that shares slots each cell is that slot, empties included;
+	 * from an older sender, one cell per item in order.
+	 */
 	private JComponent inventoryLayout(List<PanelModel.ItemCell> items)
 	{
 		JPanel grid = new JPanel(new GridLayout(7, 4, 1, 1));
@@ -758,14 +761,14 @@ class GroupIronmanPanel extends PluginPanel
 		int shown = 0;
 		for (PanelModel.ItemCell item : items)
 		{
-			if (shown == 28)
+			if (shown == GroupCodec.INVENTORY_SLOTS)
 			{
 				break;
 			}
-			grid.add(smallItem(item));
+			grid.add(item.empty() ? emptySlot() : smallItem(item));
 			shown++;
 		}
-		for (; shown < 28; shown++)
+		for (; shown < GroupCodec.INVENTORY_SLOTS; shown++)
 		{
 			grid.add(emptySlot());
 		}

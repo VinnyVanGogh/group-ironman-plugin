@@ -1344,6 +1344,7 @@ class GroupService
 				roster.putCarried(name, decoded.carried);
 				resolve(decoded.carried.inventory.keySet());
 				resolve(decoded.carried.worn.keySet());
+				resolve(decoded.carried.slotIds());
 				break;
 			case STORAGE:
 				if (!s.storage)
@@ -1616,9 +1617,10 @@ class GroupService
 	/** Client thread. */
 	private void sendCarried(GroupOutbox.Switches s)
 	{
-		Map<Integer, Integer> inventory = counts(client.getItemContainer(InventoryID.INV));
-		Map<Integer, Integer> worn = counts(client.getItemContainer(InventoryID.WORN));
-		String payload = GroupOutbox.carried(gson, s, inventory, worn);
+		ItemContainer inv = client.getItemContainer(InventoryID.INV);
+		GroupCodec.Carried carried = new GroupCodec.Carried(counts(inv),
+			counts(client.getItemContainer(InventoryID.WORN)), inventorySlots(inv));
+		String payload = GroupOutbox.carried(gson, s, carried);
 		if (payload == null || Objects.equals(payload, lastCarriedSent))
 		{
 			return;
@@ -1626,10 +1628,31 @@ class GroupService
 		partyService.send(new VvgGroupIronmanMessage(payload));
 		lastCarriedSent = payload;
 		ticksSinceCarried = 0;
-		resolveNow(inventory.keySet());
-		resolveNow(worn.keySet());
-		roster.putCarried(localName(), new GroupCodec.Carried(inventory, worn));
+		resolveNow(carried.inventory.keySet());
+		resolveNow(carried.worn.keySet());
+		resolveNow(carried.slotIds());
+		roster.putCarried(localName(), carried);
 		onChange.run();
+	}
+
+	/** Client thread. The inventory's slots in order with raw ids, so a noted stack draws noted; none without one. */
+	private static List<GroupCodec.Slot> inventorySlots(ItemContainer container)
+	{
+		List<GroupCodec.Slot> out = new ArrayList<>();
+		if (container == null)
+		{
+			return out;
+		}
+		for (Item item : container.getItems())
+		{
+			out.add(GroupCodec.Slot.of(item.getId(), item.getQuantity()));
+		}
+		// The game trims trailing empty slots; an inventory with nothing in it is still 28 empty slots.
+		if (out.isEmpty())
+		{
+			out.add(GroupCodec.Slot.EMPTY);
+		}
+		return out;
 	}
 
 	/** Client thread. Counts by canonical id; bank fillers and placeholders are not items. */

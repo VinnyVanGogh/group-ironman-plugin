@@ -131,6 +131,90 @@ public class GroupCodecTest
 		assertEquals(items(4151, 1), d.carried.worn);
 	}
 
+	private static List<GroupCodec.Slot> slots(int... pairs)
+	{
+		List<GroupCodec.Slot> out = new java.util.ArrayList<>();
+		for (int i = 0; i < pairs.length; i += 2)
+		{
+			out.add(GroupCodec.Slot.of(pairs[i], pairs[i + 1]));
+		}
+		return out;
+	}
+
+	@Test
+	public void inventorySlotsTravelInOrderWithEmptiesAndRawIds()
+	{
+		// Coins, a gap, two potions, a noted shark stack (386): the counts say shark, the slot says noted shark.
+		List<GroupCodec.Slot> sent = slots(995, 5000, 0, 0, 2434, 1, 2434, 1, 386, 10);
+		String payload = GroupCodec.encodeCarried(GSON, items(995, 5000, 2434, 2, 385, 10), items(4151, 1), sent);
+		GroupCodec.Decoded d = GroupCodec.decode(GSON, payload);
+		assertEquals(GroupCodec.INVENTORY_SLOTS, d.carried.slots.size());
+		assertEquals(995, d.carried.slots.get(0).id);
+		assertEquals(5000, d.carried.slots.get(0).quantity);
+		assertTrue(d.carried.slots.get(1).empty());
+		assertEquals(2434, d.carried.slots.get(2).id);
+		assertEquals(2434, d.carried.slots.get(3).id);
+		assertEquals(386, d.carried.slots.get(4).id);
+		assertEquals(10, d.carried.slots.get(4).quantity);
+		for (int i = 5; i < GroupCodec.INVENTORY_SLOTS; i++)
+		{
+			assertTrue("slot " + i, d.carried.slots.get(i).empty());
+		}
+		assertEquals("counts stay canonical for Find and totals", items(995, 5000, 2434, 2, 385, 10), d.carried.inventory);
+	}
+
+	/** A build from before slots (gim-test-2) reads only inv and eq, so those must be exactly what it always got. */
+	@Test
+	public void theSlotMessageKeepsTheOldFieldsForAnOldReader()
+	{
+		Map<Integer, Integer> inv = items(2434, 14);
+		Map<Integer, Integer> worn = items(4151, 1);
+		int[] fourteen = new int[28];
+		for (int i = 0; i < 28; i += 2)
+		{
+			fourteen[i] = 2434;
+			fourteen[i + 1] = 1;
+		}
+		com.google.gson.JsonObject withSlots = GSON.fromJson(
+			GroupCodec.encodeCarried(GSON, inv, worn, slots(fourteen)), com.google.gson.JsonObject.class);
+		assertTrue(withSlots.has("is"));
+		withSlots.remove("is");
+		assertEquals("old fields and version unchanged", GroupCodec.encodeCarried(GSON, inv, worn), GSON.toJson(withSlots));
+
+		GroupCodec.Decoded d = GroupCodec.decode(GSON, GroupCodec.encodeCarried(GSON, inv, worn, slots(fourteen)));
+		assertEquals(inv, d.carried.inventory);
+		assertEquals(worn, d.carried.worn);
+	}
+
+	@Test
+	public void anOldCarriedMessageHasNoSlots()
+	{
+		GroupCodec.Decoded d = GroupCodec.decode(GSON, "{\"v\":1,\"k\":\"carried\",\"inv\":[2434,14],\"eq\":[]}");
+		assertTrue(d.carried.slots.isEmpty());
+		assertEquals(items(2434, 14), d.carried.inventory);
+		assertTrue("no slots sent, none encoded", !GroupCodec.encodeCarried(GSON, items(1, 1), items()).contains("\"is\""));
+	}
+
+	@Test
+	public void badSlotsBecomeEmptyInPlaceAndAPeerCannotSendMoreThan28()
+	{
+		StringBuilder sb = new StringBuilder("{\"v\":1,\"k\":\"carried\",\"inv\":[],\"eq\":[],\"is\":[-1,5,385,0,\"x\",1,995,7");
+		for (int i = 0; i < 100; i++)
+		{
+			sb.append(",385,1");
+		}
+		sb.append("]}");
+		List<GroupCodec.Slot> got = GroupCodec.decode(GSON, sb.toString()).carried.slots;
+		assertEquals(GroupCodec.INVENTORY_SLOTS, got.size());
+		assertTrue(got.get(0).empty());
+		assertTrue(got.get(1).empty());
+		assertTrue(got.get(2).empty());
+		assertEquals(995, got.get(3).id);
+		assertEquals(385, got.get(27).id);
+		assertTrue("not an array: no slots", GroupCodec.decode(GSON,
+			"{\"v\":1,\"k\":\"carried\",\"inv\":[],\"is\":{}}").carried.slots.isEmpty());
+	}
+
 	@Test
 	public void aNewerSenderWithExtraFieldsIsStillRead()
 	{

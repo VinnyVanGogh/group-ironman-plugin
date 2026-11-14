@@ -92,13 +92,13 @@ final class GroupOutbox
 		return GroupCodec.encodeStats(gson, stats);
 	}
 
-	static String carried(Gson gson, Switches switches, Map<Integer, Integer> inventory, Map<Integer, Integer> worn)
+	static String carried(Gson gson, Switches switches, GroupCodec.Carried carried)
 	{
 		if (!switches.carried)
 		{
 			return null;
 		}
-		return GroupCodec.encodeCarried(gson, inventory, worn);
+		return GroupCodec.encodeCarried(gson, carried.inventory, carried.worn, carried.slots);
 	}
 
 	static String extras(Gson gson, Switches switches, MemberExtras extras)
