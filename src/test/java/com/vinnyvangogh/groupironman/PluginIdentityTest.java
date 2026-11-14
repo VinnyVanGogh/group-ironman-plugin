@@ -92,10 +92,11 @@ public class PluginIdentityTest
 		// Part C adds 15 kinds (a Discord and an overlay switch each) and one digest switch per category.
 		// "Easter eggs" (Discord section) adds one more, off. "Show update notes" (Advanced) is the second switch
 		// on by default (Board 2026-11-11): it only writes the welcome or what's new in the game chat, once per
-		// version, and sends nothing anywhere.
-		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1,
+		// version, and sends nothing anywhere. Group settings add "Don't post my events", off: a member's own
+		// opt-out, never something the group turns on for them.
+		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1,
 			switches);
-		assertEquals(92, switches);
+		assertEquals(93, switches);
 		List<String> expectedOn = Arrays.asList("groupSync", "showUpdateNotes");
 		Collections.sort(on);
 		assertEquals(expectedOn, on);

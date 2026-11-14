@@ -357,6 +357,38 @@ This amends the roster line in round 2 ("no hiscores or Wise Old Man
 calls"): the roster still comes only from the game; hiscores add levels, not
 members.
 
+### Phase 0 addendum — group settings and roles (2026-11-10)
+
+Board, 2026-11-10: group-synced settings with a leader and editors, and
+per-member opt-outs.
+
+**21. Shared settings, signed roles — allowed.** *Nearest rules:* Data &
+Privacy, "no exposing player information over HTTP" and "no crowdsourcing
+data about other players": what travels is the group's own preferences
+(numbers and switches) and each member's own posting opt-outs, only to the
+members' own party, through `PartyService` like every other kind (#8 to
+#17). No new network call, and no webhook URL ever leaves its owner's
+client (`GroupSettingsSchemaTest`, `GovernanceSyncTest`). *Forbidden
+language features:* none. Signatures are ECDSA P-256 from the JDK's own
+`java.security` (no library, no reflection, no JNI); `GroupKey` already uses
+`SecureRandom` from the same package. *Precedent:* the base client's
+`party` plugin already relays member-chosen state; Discord-posting Hub
+plugins (#18) carry per-event switches, here shared instead of typed five
+times. Each member still posts only their own events (#18).
+
+**Trust model.** Member names are the ones `GroupService.sender` checks
+against the in-game roster. The leader's key is pinned on first accept (a
+claim is accepted only when the claimant's own announce shows the same key);
+later roles must be signed by it; settings must be signed by the leader or a
+current editor with the key the roles hold. A member who controls their own
+client can still refuse to apply the group's settings to themselves: that is
+their client, and their posts only. Recovery when a leader loses their
+RuneLite config is "Forget leader" on each client, then a new claim.
+
+**Storage.** Kept in the `gimutilities` config group under keys with no
+`@ConfigItem` (`memberIdentity`, `groupRoles`, `groupSettings`): no new file
+I/O (Board rule).
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection**, and therefore any integration that reads another plugin's

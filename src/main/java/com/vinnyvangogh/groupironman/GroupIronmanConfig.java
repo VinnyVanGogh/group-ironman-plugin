@@ -35,6 +35,9 @@ public interface GroupIronmanConfig extends Config
 
 	/** Frozen. */
 	String KEY_GROUP_KEY = "groupKey";
+	String KEY_OPT_OUT_ALL = "eventOptOutAll";
+	String KEY_OPT_OUT_TYPES = "eventOptOutTypes";
+	String KEY_MUTE_TYPES = "overlayMuteTypes";
 
 	/** Frozen. Written by the plugin once per version (UpdateNotes). */
 	String KEY_LAST_SEEN_VERSION = "lastSeenVersion";
@@ -345,6 +348,15 @@ public interface GroupIronmanConfig extends Config
 	default String discordNameActivities()
 	{
 		return "";
+	}
+
+	@ConfigItem(keyName = KEY_OPT_OUT_ALL, name = "Don't post my events", description = "Yours alone, whatever"
+		+ " your group's settings say: none of your events go to Discord. Per-kind choices are in the panel's"
+		+ " Settings tab. Your group's leader and editors can see this choice.", section = discordConnectionSection,
+		position = 16)
+	default boolean eventOptOutAll()
+	{
+		return false;
 	}
 
 	// ---- 3. Discord: what to post. Drops, deaths, storage, progress, group, activities. ----
@@ -1129,16 +1141,26 @@ public interface GroupIronmanConfig extends Config
 		return 1;
 	}
 
+	@ConfigItem(keyName = "eventLevelEvery", name = "Post every N levels", description = "From 'Level ups from"
+		+ " level', only every Nth level counts (e.g. 5: 60, 65, 70). 1 is every level. 99s, max total, total level"
+		+ " milestones and combat levels always count. Your group's settings replace this once its leader saves"
+		+ " them in the panel's Settings tab.", section = thresholdsSection, position = 5)
+	@Range(min = 1, max = 98)
+	default int eventLevelEvery()
+	{
+		return 1;
+	}
+
 	@ConfigItem(keyName = "eventKcEvery", name = "KC milestone every", description = "Kill count milestone every:"
 		+ " a boss kill count milestone every this many kills. 0 turns them off.", section = thresholdsSection,
-		position = 5)
+		position = 6)
 	default int eventKcEvery()
 	{
 		return 100;
 	}
 
 	@ConfigItem(keyName = "eventBackAfterDays", name = "Back after (days)", description = "Logging in after at"
-		+ " least this many days away counts as 'Back after a break'.", section = thresholdsSection, position = 6)
+		+ " least this many days away counts as 'Back after a break'.", section = thresholdsSection, position = 7)
 	@Range(min = 1, max = 365)
 	default int eventBackAfterDays()
 	{
@@ -1146,7 +1168,7 @@ public interface GroupIronmanConfig extends Config
 	}
 
 	@ConfigItem(keyName = "eventGravestoneWarnMinutes", name = "Gravestone warning", description = "Minutes left: how"
-		+ " long before a gravestone's 15 minutes run out to warn.", section = thresholdsSection, position = 7)
+		+ " long before a gravestone's 15 minutes run out to warn.", section = thresholdsSection, position = 8)
 	@Range(min = 1, max = 14)
 	@Units(Units.MINUTES)
 	default int eventGravestoneWarnMinutes()
@@ -1156,7 +1178,7 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigItem(keyName = "eventUntradeableIgnore", name = "Untradeables to ignore", description = "Untradeable"
 		+ " drops whose name starts with one of these (comma separated) are not uniques.",
-		section = thresholdsSection, position = 8)
+		section = thresholdsSection, position = 9)
 	default String eventUntradeableIgnore()
 	{
 		return EventDetect.DEFAULT_UNTRADEABLE_IGNORE;
@@ -1230,6 +1252,20 @@ public interface GroupIronmanConfig extends Config
 		+ " update notes were handled. Written by the plugin.", hidden = true, section = advancedSection,
 		position = 8)
 	default String lastSeenVersion()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = KEY_OPT_OUT_TYPES, name = "Kinds not to post", description = "Set from the panel's"
+		+ " Settings tab.", hidden = true, section = advancedSection, position = 9)
+	default String eventOptOutTypes()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = KEY_MUTE_TYPES, name = "Kinds not to show", description = "Set from the panel's"
+		+ " Settings tab.", hidden = true, section = advancedSection, position = 10)
+	default String overlayMuteTypes()
 	{
 		return "";
 	}

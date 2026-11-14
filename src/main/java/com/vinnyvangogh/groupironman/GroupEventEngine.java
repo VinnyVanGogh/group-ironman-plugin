@@ -156,6 +156,8 @@ class GroupEventEngine
 	/** Level-ups of one skill as one post, edited in place. Any thread; message ids in memory only. */
 	private LevelPosts levels;
 	private volatile EventSettings settings = EventSettings.OFF;
+	/** The shared settings the event settings were built from: quiet hours, grace and Easter eggs read these. */
+	private volatile GroupSettingsSchema.Resolved values;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
 	/** The death's frame for the gravestone warning; memory only, so a restart loses it. */
 	private final GraveShot graveShot = new GraveShot();
@@ -245,18 +247,35 @@ class GroupEventEngine
 		settings = EventSettings.OFF;
 	}
 
+	/** A config change, or new group settings (they are kept in the config, so both arrive here). */
 	void reloadConfig()
 	{
-		settings = EventSettings.from(config);
+		GroupSettingsSchema.Resolved v = group == null ? new GroupSettingsSchema.Resolved(config, null)
+			: group.groupValues();
+		values = v;
+		settings = EventSettings.from(config, v, MemberPrefs.of(config));
 		if (sender != null)
 		{
-			sender.quietHours(config.discordQuietStart(), config.discordQuietEnd());
+			sender.quietHours(v.intValue("discordQuietStart"), v.intValue("discordQuietEnd"));
 		}
 		if (toastOverlay != null)
 		{
 			toastOverlay.reposition();
 		}
 		warnBadWebhooks();
+	}
+
+	/** The shared values now; this member's own config until the first {@link #reloadConfig}. */
+	private GroupSettingsSchema.Resolved resolved()
+	{
+		GroupSettingsSchema.Resolved v = values;
+		return v != null ? v : new GroupSettingsSchema.Resolved(config, null);
+	}
+
+	/** The group's offline grace when it has settings, else this member's own. */
+	private int offlineGrace()
+	{
+		return resolved().intValue("discordOfflineGrace");
 	}
 
 	/**
@@ -293,9 +312,9 @@ class GroupEventEngine
 			synchronized (presenceLock)
 			{
 				// The name is the one the login gave: after a logout localPlayer() is "You".
-				offline = presence.poll(System.currentTimeMillis(), config.discordOfflineGrace());
+				offline = presence.poll(System.currentTimeMillis(), offlineGrace());
 				savePresence();
-				others = channelPosts.poll(System.currentTimeMillis(), config.discordOfflineGrace());
+				others = channelPosts.poll(System.currentTimeMillis(), offlineGrace());
 			}
 			if (offline != null)
 			{
@@ -329,8 +348,9 @@ class GroupEventEngine
 			{
 				board.show(lines, now);
 			}
-			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), config.discordQuietStart(),
-				config.discordQuietEnd());
+			GroupSettingsSchema.Resolved v = resolved();
+			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), v.intValue("discordQuietStart"),
+				v.intValue("discordQuietEnd"));
 			StatusBoard.Send send = board.next(now, quiet);
 			if (send != null)
 			{
@@ -381,7 +401,7 @@ class GroupEventEngine
 		synchronized (presenceLock)
 		{
 			posts = channelPosts.update(game, n -> plugin.contains(GroupMembers.key(n)) || GroupMembers.key(n)
-				.equals(self), System.currentTimeMillis(), config.discordOfflineGrace());
+				.equals(self), System.currentTimeMillis(), offlineGrace());
 		}
 		routeChannelPosts(posts);
 	}
@@ -1069,7 +1089,7 @@ class GroupEventEngine
 		List<GroupEvent> posts;
 		synchronized (presenceLock)
 		{
-			posts = presence.login(now, client.getWorld(), name, config.discordOfflineGrace());
+			posts = presence.login(now, client.getWorld(), name, offlineGrace());
 			savePresence();
 		}
 		for (GroupEvent e : posts)
@@ -1384,7 +1404,7 @@ class GroupEventEngine
 	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
 	private String egg(List<GroupEvent> events)
 	{
-		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(config));
+		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(resolved()));
 	}
 
 	/**

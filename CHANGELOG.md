@@ -105,6 +105,36 @@
   events, none older than 30 days. A cache from before starts the feed from
   its drops and storage logs.
 
+### Group settings, a leader and editors
+
+- New **Settings** tab in the panel. Thresholds, which events post to
+  Discord and show as overlays, the daily digest, Easter eggs, quiet hours
+  and the offline grace can now be the group's: the leader (or an editor)
+  saves them once and every member's client uses them.
+- The member who creates the group key leads a group that has no leader; a
+  group made before this update gets a **Claim leadership** button. The
+  leader makes and removes editors. Roles and settings are signed, so a
+  member cannot promote themselves or send settings of their own.
+- Each save is a new version; who changed what, and when, is listed under
+  *Recent changes*. A member who was offline picks up the latest when they
+  join.
+- The first save copies the leader's own current settings. Until then each
+  member keeps using their own, as before.
+- Yours alone, whatever the group says: **Don't post my events**, and per
+  event kind *Post* and *Show*. The leader and editors see a read-only grid
+  of who posts what.
+- Webhook URLs, the mention, *Post to Discord*, *Online status* and every
+  *Share* switch stay each member's own and are never sent to the group. So
+  the group can never turn login posts on beside a member's live board.
+- New group setting **Post every N levels** (default 1, under *Thresholds*):
+  from *Level ups from level*, only every Nth level posts or shows (5: 60,
+  65, 70). 99s, max total, total level milestones and combat levels always
+  do. One action that jumps past a multiple (Prayer 3 → 7 with 5) still
+  counts.
+- With *Combine level-ups* on, every N applies first: one post for 60, edited
+  in place to "59 → 65" when 65 comes, not at each level in between.
+- *Don't post my events* is the last setting under *Discord: connection*.
+
 ### Amounts read like the game
 
 - Quantities and gp values use the game's stack text everywhere: *Coins -
