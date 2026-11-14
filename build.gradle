@@ -21,7 +21,7 @@ repositories {
 //   https://repo.runelite.net/net/runelite/client/maven-metadata.xml
 // To test against another client without changing the pin (e.g. the Plugin
 // Hub's current one): ./gradlew test -PruneLiteVersion=1.13.6
-def runeLiteVersion = project.findProperty('runeLiteVersion') ?: '1.13.5'
+def runeLiteVersion = project.findProperty('runeLiteVersion') ?: '1.13.6'
 def pluginMainClass = 'com.vinnyvangogh.groupironman.GroupIronmanPluginTest'
 
 dependencies {
