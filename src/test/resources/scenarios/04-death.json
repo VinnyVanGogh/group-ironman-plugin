@@ -1,0 +1,12 @@
+{
+  "name": "Death",
+  "description": "This player dies to Vorkath. Headless only: ActorDeath must carry the client's own local player.",
+  "steps": [
+    {"kind": "groupEvent", "type": "DEATH", "member": "GroupShip", "text": "Vorkath", "location": "Ungael", "world": 302},
+    {"kind": "tick"}
+  ],
+  "expect": [
+    {"probe": "discord", "count": 1},
+    {"probe": "overlay", "contains": "GroupShip: died, killed by Vorkath"}
+  ]
+}

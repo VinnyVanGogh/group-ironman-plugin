@@ -1,0 +1,11 @@
+{
+  "name": "Settings save from a second member",
+  "description": "GroupIan, the group's leader, saves 'Level-up minimum' 70 in the Settings tab; it reaches this client over the party. Headless only: party payloads are dropped unless the sender is a real party member.",
+  "steps": [
+    {"kind": "settingsSave", "member": "GroupIan", "values": {"eventLevelMin": 70}}
+  ],
+  "expect": [
+    {"probe": "settings.saves", "contains": "GroupIan: SAVED"},
+    {"probe": "settings", "contains": "eventLevelMin=70"}
+  ]
+}

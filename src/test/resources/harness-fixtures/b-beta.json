@@ -1,0 +1,6 @@
+{
+  "name": "Beta",
+  "steps": [
+    {"kind": "chat", "type": "GAMEMESSAGE", "message": "hello"}
+  ]
+}
