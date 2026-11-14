@@ -425,7 +425,7 @@ public interface GroupIronmanConfig extends Config
 	@ConfigItem(keyName = KEY_OPT_OUT_ALL, name = "Don't post my events", description = "Yours alone, whatever"
 		+ " your group's settings say: none of your events go to Discord. Per-kind choices are in the panel's"
 		+ " Settings tab. Your group's leader and editors can see this choice.", section = discordConnectionSection,
-		position = 16)
+		position = 24)
 	default boolean eventOptOutAll()
 	{
 		return false;
