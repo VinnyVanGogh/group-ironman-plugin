@@ -389,6 +389,50 @@ RuneLite config is "Forget leader" on each client, then a new claim.
 `@ConfigItem` (`memberIdentity`, `groupRoles`, `groupSettings`): no new file
 I/O (Board rule).
 
+### Research — which group storage actions save (2026-11-14)
+
+Bug (Board 2026-11-14): 1,000 logs deposited, the window left without Save,
+the game kept nothing, yet the deposit was logged and posted to Discord.
+The close was treated as a save (`StorageSession.close` diffed and committed).
+
+What the client receives, with sources:
+
+- **The storage container is a working copy.** The only group-storage
+  inventory in RuneLite's gameval is `InventoryID.INV_GROUP_TEMP = 659`
+  (runelite-api `gameval/InventoryID.java`); there is no separate "saved"
+  container. Its contents while open include unsaved moves.
+- **Saving shows the game's loading modal.** `InterfaceID.LOADING_ICON_MODAL
+  = 293` (runelite-api `gameval/InterfaceID.java`); child 1 reads
+  "Saving..." while the game saves group storage. The Group Ironmen Tracker
+  plugin on the Plugin Hub commits the shared bank only on that text
+  (`christoabrown/group-ironmen-tracker`, `GroupIronmenTrackerPlugin.java`,
+  `onGameTick`: `GROUP_STORAGE_LOADER = 293`, child 1, `"saving..."` then
+  `commitTransaction()`). This is both the evidence and the precedent.
+- **Closing does not reliably save.** The Board's test (walk away: not
+  saved). Players report closing saves for some accounts and not others
+  (r/ironscape, "Group ironman shared storage 'save' help", 2024), so no
+  close path can be assumed to save. Whichever path does save shows
+  "Saving...", so the loader covers it without guessing.
+- **Saves can fail.** "Unable to save changes to group storage. Please try
+  again later" (r/2007scape reports, 2021-2023). The OSRS Wiki "Group
+  storage" page says nothing about saving (checked 2026-11-14).
+- No varbit or varp for "unsaved changes" was found in gameval (unverified
+  beyond a name search of the published `VarbitID` source).
+
+What the plugin does now:
+
+1. Commits on the Save button (as before) and on the first tick
+   "Saving..." shows, also up to 5 s after the window closed (a save the
+   close itself makes). Each save posts only what moved since the last.
+2. Closing records nothing.
+3. Truth check: the first contents the server sends on the next open are
+   what the game kept. If they differ from the last snapshot committed, they
+   replace it silently (an empty change: no log line, no post, nothing sent).
+
+Not verifiable from here: the "Saving..." text in today's client and
+whether X / Escape / logout save on the Board's account. In-game check:
+deposit, walk away, reopen (nothing logged); deposit, Save (one post).
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection**, and therefore any integration that reads another plugin's

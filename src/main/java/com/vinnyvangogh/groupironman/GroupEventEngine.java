@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import java.awt.Image;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -358,7 +359,7 @@ class GroupEventEngine
 			GroupSettingsSchema.Resolved v = resolved();
 			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), v.intValue("discordQuietStart"),
 				v.intValue("discordQuietEnd"));
-			StatusBoard.Send send = board.next(now, quiet);
+			StatusBoard.Send send = board.next(now, quiet, LocalDate.now().toEpochDay(), config.discordRepostBoard());
 			if (send != null)
 			{
 				board.send(sender, send, StatusBoard.payload(gson, send, config.discordStyle(),
