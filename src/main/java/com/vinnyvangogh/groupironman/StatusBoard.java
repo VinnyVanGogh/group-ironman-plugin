@@ -196,19 +196,24 @@ final class StatusBoard
 			// Deleting makes no noise in the channel, so neither quiet hours nor the gap hold it.
 			return send(now, new Send(url, oldId, null, 0, null, day, true));
 		}
-		boolean reposting = repost && messageId != null && day > postedDay;
-		if (!due(reposting) || quiet || now - lastTry < MIN_GAP_MS)
+		String replaces = repost ? reposting(day) : null;
+		if (!due(replaces) || quiet || now - lastTry < MIN_GAP_MS)
 		{
 			return null;
 		}
-		String replaces = reposting ? messageId : null;
-		return send(now, new Send(url, reposting ? null : messageId, lines, changedAt, replaces, day, false));
+		return send(now, new Send(url, replaces == null ? messageId : null, lines, changedAt, replaces, day, false));
+	}
+
+	/** Holding the lock: the board a post on {@code day} replaces, when one was posted on an earlier day. */
+	private String reposting(long day)
+	{
+		return day > postedDay ? messageId : null;
 	}
 
 	/** Holding the lock: there are lines to send, and they changed or the day's repost is due. */
-	private boolean due(boolean reposting)
+	private boolean due(String replaces)
 	{
-		return lines != null && (reposting || !lines.equals(sentLines));
+		return lines != null && (replaces != null || !lines.equals(sentLines));
 	}
 
 	/** Holding the lock: {@code send} goes out now. */
@@ -236,7 +241,16 @@ final class StatusBoard
 		{
 			sent(send, newId);
 		}
-		else if (status == 404 && !send.create())
+		else
+		{
+			failed(send, status, retryAfterMs, now);
+		}
+	}
+
+	/** Holding the lock: Discord refused {@code send}, a post or an edit, or it never got there. */
+	private void failed(Send send, int status, long retryAfterMs, long now)
+	{
+		if (status == 404 && !send.create())
 		{
 			// Deleted in Discord: the next send posts a new board.
 			messageId = null;
@@ -244,7 +258,7 @@ final class StatusBoard
 		}
 		else if (status == 429)
 		{
-			notBefore = now + (retryAfterMs >= 0 ? retryAfterMs : MIN_GAP_MS);
+			waitRetryAfter(retryAfterMs, now);
 		}
 		else if (status >= 400)
 		{
@@ -283,13 +297,19 @@ final class StatusBoard
 	{
 		if (status == 429)
 		{
-			notBefore = now + (retryAfterMs >= 0 ? retryAfterMs : MIN_GAP_MS);
+			waitRetryAfter(retryAfterMs, now);
 		}
 		else if (status != DiscordQueue.DROPPED)
 		{
 			oldId = null;
 			idChanged = true;
 		}
+	}
+
+	/** Holding the lock: a 429 holds every request for its Retry-After, or the gap when it gave none. */
+	private void waitRetryAfter(long retryAfterMs, long now)
+	{
+		notBefore = now + (retryAfterMs >= 0 ? retryAfterMs : MIN_GAP_MS);
 	}
 
 	/**
