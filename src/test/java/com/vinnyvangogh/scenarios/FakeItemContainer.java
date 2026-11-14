@@ -3,10 +3,11 @@ package com.vinnyvangogh.scenarios;
 import java.util.List;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
+import net.runelite.api.Node;
 
 /**
  * An {@link ItemContainer} holding a fixed list of items, for an {@code ItemContainerChanged} with no game behind
- * it. The interface's eight methods are all here, answered the way the game's container answers them.
+ * it, answered the way the game's container answers.
  */
 public final class FakeItemContainer implements ItemContainer
 {
@@ -75,6 +76,26 @@ public final class FakeItemContainer implements ItemContainer
 			}
 		}
 		return n;
+	}
+
+	// ItemContainer is also a Node of the game's hash table. Not in any table.
+
+	@Override
+	public Node getNext()
+	{
+		return null;
+	}
+
+	@Override
+	public Node getPrevious()
+	{
+		return null;
+	}
+
+	@Override
+	public long getHash()
+	{
+		return id;
 	}
 
 	@Override
