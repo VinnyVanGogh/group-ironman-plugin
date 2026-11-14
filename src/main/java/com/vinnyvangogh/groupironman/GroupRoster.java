@@ -3,6 +3,7 @@ package com.vinnyvangogh.groupironman;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -297,6 +298,12 @@ final class GroupRoster
 			out.add(new GroupSearch.Source(e.getKey(), "inventory", e.getValue().inventory, -1));
 			// Reads "GroupShip equipped 1" in ::find and the Find tab (Board 2026-11-04).
 			out.add(new GroupSearch.Source(e.getKey(), "equipped", e.getValue().worn, -1));
+			// "Yew logs: Alex log basket 14" (Board 2026-11-14), only where every item inside is known.
+			for (Map.Entry<SkillingContainer, GroupCodec.Held> held : e.getValue().contents.entrySet())
+			{
+				out.add(new GroupSearch.Source(e.getKey(), held.getKey().label.toLowerCase(Locale.ROOT),
+					held.getValue().items, -1));
+			}
 		}
 		for (Map.Entry<String, MemberExtras> e : extras().entrySet())
 		{
