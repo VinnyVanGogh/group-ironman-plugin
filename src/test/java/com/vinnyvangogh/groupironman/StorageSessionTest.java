@@ -57,6 +57,16 @@ public class StorageSessionTest
 			return PanelModel.storage(roster, ITEMS, "me", null, now).log;
 		}
 
+		/** Open with 40 Sharks, then 5 Trout deposited and not yet saved. */
+		StorageSession depositFiveTrout()
+		{
+			StorageSession s = new StorageSession();
+			s.open();
+			commit(s.contents(NOW, "Me", items(SHARK, 40)));
+			commit(s.contents(NOW, "Me", items(SHARK, 40, TROUT, 5)));
+			return s;
+		}
+
 		Map<Integer, Integer> snapshot()
 		{
 			return roster.storageItems();
@@ -84,10 +94,7 @@ public class StorageSessionTest
 	public void depositSaveDepositMoreThenCloseWithoutSavePostsOnlyTheSavedPart()
 	{
 		Sink sink = new Sink();
-		StorageSession s = new StorageSession();
-		s.open();
-		sink.commit(s.contents(NOW, "Me", items(SHARK, 40)));
-		sink.commit(s.contents(NOW, "Me", items(SHARK, 40, TROUT, 5)));
+		StorageSession s = sink.depositFiveTrout();
 		sink.commit(s.save(NOW + 1, "Me"));
 		sink.commit(s.contents(NOW + 2, "Me", items(SHARK, 40, TROUT, 5, COAL, 9)));
 		s.close(NOW + 3);
@@ -101,10 +108,7 @@ public class StorageSessionTest
 	public void containerThatDisagreesOnTheNextOpenCorrectsTheSnapshotWithoutAPost()
 	{
 		Sink sink = new Sink();
-		StorageSession s = new StorageSession();
-		s.open();
-		sink.commit(s.contents(NOW, "Me", items(SHARK, 40)));
-		sink.commit(s.contents(NOW, "Me", items(SHARK, 40, TROUT, 5)));
+		StorageSession s = sink.depositFiveTrout();
 		sink.commit(s.save(NOW + 1, "Me"));
 		s.close(NOW + 2);
 		assertEquals(1, sink.posted.size());
@@ -158,10 +162,7 @@ public class StorageSessionTest
 	public void depositSaveCloseLogsExactlyOneLine()
 	{
 		Sink sink = new Sink();
-		StorageSession s = new StorageSession();
-		s.open();
-		sink.commit(s.contents(NOW, "Me", items(SHARK, 40)));
-		sink.commit(s.contents(NOW, "Me", items(SHARK, 40, TROUT, 5)));
+		StorageSession s = sink.depositFiveTrout();
 		sink.commit(s.save(NOW, "Me"));
 		// The "Saving..." the same Save shows: nothing new moved.
 		sink.commit(s.save(NOW + 600, "Me"));
@@ -177,10 +178,7 @@ public class StorageSessionTest
 	public void aClosePathTheGameSavesOnPostsOnce()
 	{
 		Sink sink = new Sink();
-		StorageSession s = new StorageSession();
-		s.open();
-		sink.commit(s.contents(NOW, "Me", items(SHARK, 40)));
-		sink.commit(s.contents(NOW, "Me", items(SHARK, 40, TROUT, 5)));
+		StorageSession s = sink.depositFiveTrout();
 		s.close(NOW + 600);
 		// "Saving..." shows just after the window closed.
 		sink.commit(s.save(NOW + 1_200, "Me"));
