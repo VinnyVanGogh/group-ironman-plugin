@@ -56,6 +56,14 @@ else
 	pass "no external processes"
 fi
 
+# The scenario harness (TESTING.md) is test-only; main code must never reach it.
+if out=$(hits 'com\.vinnyvangogh\.scenarios'); [ -n "$out" ]; then
+	fail "src/main uses the test-only scenario harness"
+	printf '%s\n' "$out" | sed 's/^/         /'
+else
+	pass "scenario harness stays in src/test"
+fi
+
 if out=$(hits '\bsun\.misc\.Unsafe\b|\borg\.lwjgl\b|System\.loadLibrary|\bnative\b +[a-zA-Z]'); [ -n "$out" ]; then
 	fail "native / unsafe memory access"
 	printf '%s\n' "$out" | sed 's/^/         /'

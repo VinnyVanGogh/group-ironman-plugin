@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Dev builds follow the newest RuneLite
+
+- `./gradlew build`, `test` and `run` now use the newest RuneLite client
+  release, checked on every run, and print which one they resolved. Pin a run
+  with `-PruneLiteVersion=1.13.6` to compare. Plugin Hub builds are unaffected.
+
+### Built against RuneLite 1.13.6
+
+- Was 1.13.5. The test client now loads the Plugin Hub index for the Hub's
+  current RuneLite, so other Hub plugins run at their newest versions
+  (e.g. Combat Vitals) alongside this one.
+
 ### The leader can share the Discord webhooks with the group
 
 - New in the panel's *Settings* tab, for the group leader only: *Share
