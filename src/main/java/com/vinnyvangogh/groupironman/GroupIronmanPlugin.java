@@ -177,6 +177,20 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public void turnOnSharing()
+			{
+				group.turnOnSharing();
+				// The player's own click, as Paste is: joins once, right away, now that sync is on.
+				clientThread.invokeLater(group::joinGroup);
+			}
+
+			@Override
+			public void postToDiscord()
+			{
+				group.postToDiscord();
+			}
+
+			@Override
 			public boolean claim()
 			{
 				return group.claimLeadership();
@@ -303,10 +317,13 @@ public class GroupIronmanPlugin extends Plugin
 		redraw();
 	}
 
-	/** The panel button shows only while at least one group feature is on. */
+	/**
+	 * The panel button shows while at least one group feature is on, or a group key is saved: a member who
+	 * pastes the key into settings with every switch off then finds the "Turn on sharing" card there.
+	 */
 	private void updateNavButton()
 	{
-		if (group.anyOn())
+		if (group.anyOn() || group.groupKey() != null)
 		{
 			clientToolbar.addNavigation(navButton);
 		}
@@ -326,7 +343,7 @@ public class GroupIronmanPlugin extends Plugin
 		}
 		GroupIronmanPanel.View view = new GroupIronmanPanel.View(group.syncState(), group.roster(), group.members(),
 			group.lookup, group.switches(), group.regions(), group.since(), group.self(),
-			group.presence(), settingsView());
+			group.presence(), settingsView(), group.sharingSettings());
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
 	}

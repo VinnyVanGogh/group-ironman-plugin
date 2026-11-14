@@ -203,16 +203,29 @@ user folder), so your other plugins and settings come along.
    ([RuneLite wiki: Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts)):
    click the **Jagex account** icon on the sidebar, add your account, pick
    your character, then click **Play Now**.
-3. **Turn sharing on.** Everyone opens *GIM Utilities* in the plugin settings
-   and turns on the switches they want. The GIM Utilities panel (a green badge
-   on the sidebar) appears once any switch is on. The built-in **Party**
-   plugin is not needed and can stay off.
-4. **Share a group key, once.** One member opens the GIM Utilities panel and
-   clicks **Create group key**, then **Copy group key**, and sends the key to
-   the group outside the game (Discord, a DM). The game chatbox takes no
-   paste, and plugins never type into it. Everyone else copies the key and
-   clicks **Paste group key** in the panel, which saves it and joins. Pasting
-   it into *Group key* in the settings works too.
+3. **Share a group key, then turn sharing on in one click.** One member turns
+   on any switch in *GIM Utilities* settings so the panel (a green badge on
+   the sidebar) appears, clicks **Create group key**, then **Copy group
+   key**, and sends the key to the group outside the game (Discord, a DM). The
+   game chatbox takes no paste, and plugins never type into it. Everyone else
+   copies the key and pastes it into *Group key* in the GIM Utilities
+   settings, or clicks **Paste group key** if the panel is already open. The
+   panel appears once a key is saved, with a **Share with your group?** card:
+   - **Turn on sharing** ticks *Sync with my group* and every *Share* switch
+     (bank, group storage changes, stats, inventory and equipment, pouch /
+     quiver / vault, drops and collection log, group events), and joins.
+   - **Post my events to Discord** shows only when you have a Discord webhook
+     set, and ticks *Post to Discord*.
+   - **Not now** hides the card until the group key changes.
+
+   Nothing turns on without your click; untick any switch later in settings.
+   The card also shows while sync is on but every Share switch is off. With
+   *Share group storage changes* off, your own storage visits still appear in
+   your Storage and Log tabs, marked *not shared: Share group storage changes
+   is off*; nothing is sent. The built-in **Party** plugin is not needed and
+   can stay off.
+4. **Check the key.** Pasting the key saves it and joins. **New key** replaces
+   a leaked one; everyone pastes the new key.
 5. **Join.** Each member clicks **Join group sync** in the panel header, once
    per session. Joining on its own at login is a rejected Plugin Hub feature,
    so it waits for the click. The header then reads *Connected, N members
