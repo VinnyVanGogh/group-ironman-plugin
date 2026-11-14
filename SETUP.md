@@ -51,7 +51,8 @@ number box is too narrow for `1,000,000` with commas.
 **Sharing** (in *Group*), all off by default, including `::find` (in
 *In-game*). Each one works on its own, and each only shows you other members'
 data while you share the same thing yourself. With every switch off the plugin
-sends nothing, collects nothing, and its side panel button is hidden.
+sends nothing and collects nothing; its side panel stays, opening with an
+*Everything is off* notice and a button to these settings.
 
 | Setting | What it sends to your party |
 | --- | --- |
@@ -203,14 +204,15 @@ user folder), so your other plugins and settings come along.
    ([RuneLite wiki: Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts)):
    click the **Jagex account** icon on the sidebar, add your account, pick
    your character, then click **Play Now**.
-3. **Share a group key, then turn sharing on in one click.** One member turns
-   on any switch in *GIM Utilities* settings so the panel (a green badge on
-   the sidebar) appears, clicks **Create group key**, then **Copy group
-   key**, and sends the key to the group outside the game (Discord, a DM). The
-   game chatbox takes no paste, and plugins never type into it. Everyone else
-   copies the key and pastes it into *Group key* in the GIM Utilities
-   settings, or clicks **Paste group key** if the panel is already open. The
-   panel appears once a key is saved, with a **Share with your group?** card:
+3. **Share a group key, then turn sharing on in one click.** The GIM Utilities
+   panel (a green badge on the sidebar) is there whenever the plugin is on;
+   with every switch off it opens with *Everything is off. Turn on what you
+   want to share.* and an **Open GIM Utilities settings** button. One member
+   clicks **Create group key**, then **Copy group key**, and sends the key to
+   the group outside the game (Discord, a DM). The game chatbox takes no
+   paste, and plugins never type into it. Everyone else copies the key and
+   clicks **Paste group key** in the panel (or pastes it into *Group key* in
+   the settings). The panel then shows a **Share with your group?** card:
    - **Turn on sharing** ticks *Sync with my group* and every *Share* switch
      (bank, group storage changes, stats, inventory and equipment, pouch /
      quiver / vault, drops and collection log, group events), and joins.
@@ -250,7 +252,7 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
      Temurin Java 11 (about 200 MB) and checks its SHA-256 fingerprint
      against the one written in the launcher before unpacking it. If the
      fingerprint does not match, it stops.
-   - `[2/3]` downloads the GIM Utilities source at tag `gim-test-2` from
+   - `[2/3]` downloads the GIM Utilities source at tag `gim-test-3` from
      GitHub. Run from inside a checkout (`tools\windows\`), it uses that
      checkout instead.
    - `[3/3]` builds and starts RuneLite. The first run takes a few minutes
@@ -273,7 +275,7 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
    PowerShell downloads carries no "from the internet" mark:
 
    ```
-   $f="$env:LOCALAPPDATA\Run-GimUtilities.cmd"; iwr -UseBasicParsing https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/gim-test-2/tools/windows/Run-GimUtilities.cmd -OutFile $f; cmd /c $f
+   $f="$env:LOCALAPPDATA\Run-GimUtilities.cmd"; iwr -UseBasicParsing https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/gim-test-3/tools/windows/Run-GimUtilities.cmd -OutFile $f; cmd /c $f
    ```
 
    Next time, start it with `cmd /c "$env:LOCALAPPDATA\Run-GimUtilities.cmd"`.
@@ -281,8 +283,8 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
    stop, close the RuneLite window.
 
 For whoever cuts the test release: the launcher downloads
-`github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-2.zip`
-with no login, so the repo has to be public and the `gim-test-2` tag pushed
+`github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-3.zip`
+with no login, so the repo has to be public and the `gim-test-3` tag pushed
 before friends run it. To test a different tag, change `$SourceRef` at the
 top of the launcher. The checksum step has its own tests:
 `pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1`.
@@ -290,7 +292,7 @@ top of the launcher. The checksum step has its own tests:
 The `windows-launcher` GitHub Actions workflow runs the launcher end to end
 on a clean Windows runner with `GU_BUILD_ONLY=1` set, which makes `[3/3]` run
 `gradlew build` instead of opening RuneLite. It runs both the `.cmd` in the
-commit and the `.cmd` attached to the `gim-test-2` release, byte for byte.
+commit and the `.cmd` attached to the `gim-test-3` release, byte for byte.
 **Whenever `tools/windows/Run-GimUtilities.cmd` changes, re-upload it to the
 release** (as committed, with CRLF line endings), or the `release-asset` leg
 fails and players keep downloading the old one.

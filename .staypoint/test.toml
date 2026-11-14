@@ -1,0 +1,6 @@
+suite = "required"
+
+[[commands]]
+name      = "gradle"
+runner    = "gradle_test"
+timeout_s = 900

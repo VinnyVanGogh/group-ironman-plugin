@@ -188,6 +188,8 @@ class GroupService
 	private GroupSync sync;
 	/** Roles and the group's shared settings; null when not running. */
 	private volatile GovernanceSync governance;
+	/** The leader's signed webhooks document as the cache file keeps it, or null. Never put in the config. */
+	private volatile String cachedWebhooks;
 	/** The group event engine, told about storage visits, minimums and members' events; null when not running. */
 	private volatile GroupEventEngine events;
 
@@ -292,7 +294,12 @@ class GroupService
 					configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value);
 				}
 			}
-		}, payload -> partyService.send(new VvgGroupIronmanMessage(payload)), () -> this.onChange.run());
+		}, payload -> partyService.send(new VvgGroupIronmanMessage(payload)), () -> this.onChange.run(), webhooks ->
+		{
+			// The leader's shared webhooks: kept in the group cache file, never the RuneLite config.
+			cachedWebhooks = webhooks;
+			saveCache();
+		});
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
@@ -317,6 +324,7 @@ class GroupService
 		}
 		members = GroupMembers.UNKNOWN;
 		governance = null;
+		cachedWebhooks = null;
 		cacheLoaded = false;
 		session = false;
 		hiscoresOnLogin = true;
@@ -498,6 +506,47 @@ class GroupService
 		return r == GovernanceSync.SaveResult.SAVED && !syncing() ? GovernanceSync.SaveResult.SAVED_OFFLINE : r;
 	}
 
+	/** The leader's "Share webhooks with the group". False when refused: this client is not the leader. */
+	boolean shareWebhooks(boolean share)
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.shareWebhooks(self, share, Webhooks.of(config),
+			System.currentTimeMillis());
+	}
+
+	/** The leader's shared webhooks this client holds, or null when the leader shares none. */
+	GroupWebhooks sharedWebhooks()
+	{
+		GroupGovernance g = governance();
+		return g == null ? null : g.sharedWebhooks();
+	}
+
+	/**
+	 * Where this client's posts go: its own webhooks, with the leader's shared ones filling every field it left
+	 * empty ({@link Webhooks#withGroup}). Every sender asks this.
+	 */
+	Webhooks webhooks()
+	{
+		return Webhooks.of(config).withGroup(sharedWebhooks());
+	}
+
+	/** True when this client is the group's leader, holding the leader's key. */
+	boolean isLeader()
+	{
+		GroupGovernance g = governance();
+		return g != null && !self.isEmpty() && g.myRole(self) == GroupGovernance.Role.LEADER;
+	}
+
+	/** While the leader shares, an edit of the leader's own webhooks goes to the group as a new version. */
+	private void republishWebhooks()
+	{
+		GovernanceSync g = governance;
+		if (g != null && sharedWebhooks() != null && isLeader())
+		{
+			g.shareWebhooks(self, true, Webhooks.of(config), System.currentTimeMillis());
+		}
+	}
+
 	/** "Forget leader": this client only. */
 	void forgetLeader()
 	{
@@ -578,6 +627,7 @@ class GroupService
 		{
 			g.prefs(MemberPrefs.of(config));
 		}
+		republishWebhooks();
 		GroupOutbox.Switches s = switches();
 		// Turning a live feature off drops what was collected for it.
 		if (!s.stats)
@@ -1767,6 +1817,7 @@ class GroupService
 				log.debug("group cache unreadable, starting empty");
 				return false;
 			}
+			restoreWebhooks(GroupCache.webhooks(gson, json));
 			return true;
 		}
 		catch (Exception e)
@@ -1776,6 +1827,22 @@ class GroupService
 		}
 	}
 
+	/** Executor thread. The cached webhooks document, checked like one from the party; a newer one held wins. */
+	private void restoreWebhooks(String json)
+	{
+		GovernanceSync g = governance;
+		if (json == null || g == null)
+		{
+			return;
+		}
+		if (cachedWebhooks == null)
+		{
+			// Kept as read until the governance accepts (or replaces) it, so a save before the roles load keeps it.
+			cachedWebhooks = json;
+		}
+		g.restoreWebhooks(json);
+	}
+
 	private void saveCache()
 	{
 		if (!cacheLoaded)
@@ -1783,7 +1850,7 @@ class GroupService
 			// Whatever arrived meanwhile is in the roster and goes out with the first save after loading.
 			return;
 		}
-		String json = GroupCache.write(gson, roster);
+		String json = GroupCache.write(gson, roster, cachedWebhooks);
 		executor.execute(() ->
 		{
 			try
@@ -1819,7 +1886,7 @@ class GroupService
 		return dataDirectory.call().joinSegment(CACHE_FILE);
 	}
 
-	/** Kept for the panel: is any group feature on, so the panel button should show. */
+	/** Kept for the panel: is any group feature on; false shows its "everything is off" notice. */
 	boolean anyOn()
 	{
 		return switches().any() || !lowStock.isEmpty();

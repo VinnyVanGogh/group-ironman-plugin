@@ -2,6 +2,7 @@ package com.vinnyvangogh.groupironman;
 
 import com.google.inject.Provides;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.HashSet;
@@ -15,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.MenuAction;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatColorType;
@@ -25,6 +27,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.OverlayMenuClicked;
 import net.runelite.client.events.PartyChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SkillIconManager;
@@ -36,6 +39,8 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.ui.overlay.Overlay;
+import net.runelite.client.ui.overlay.OverlayMenuEntry;
 
 /**
  * GIM Utilities.
@@ -117,6 +122,7 @@ public class GroupIronmanPlugin extends Plugin
 
 	private GroupIronmanPanel panel;
 	private NavigationButton navButton;
+	private SidebarButton sidebar;
 
 	@Provides
 	GroupIronmanConfig provideConfig(ConfigManager configManager)
@@ -177,6 +183,12 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public void openSettings()
+			{
+				openOwnSettings();
+			}
+
+			@Override
 			public void turnOnSharing()
 			{
 				group.turnOnSharing();
@@ -209,6 +221,12 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public boolean shareWebhooks(boolean share)
+			{
+				return group.shareWebhooks(share);
+			}
+
+			@Override
 			public void forgetLeader()
 			{
 				group.forgetLeader();
@@ -232,10 +250,14 @@ public class GroupIronmanPlugin extends Plugin
 			.priority(9)
 			.panel(panel)
 			.build();
+		final NavigationButton button = navButton;
+		sidebar = new SidebarButton(() -> clientToolbar.addNavigation(button),
+			() -> clientToolbar.removeNavigation(button));
 		group.startUp(this::redraw, this::getPluginDirectory);
 		events.startUp(group);
 		eventBus.register(events);
-		updateNavButton();
+		sidebar.startUp();
+		redraw();
 
 		// Installed or turned on mid-session: no LOGGED_IN is coming, so say it now.
 		if (client.getGameState() == GameState.LOGGED_IN)
@@ -291,7 +313,8 @@ public class GroupIronmanPlugin extends Plugin
 		group.shutDown();
 		partyDataService.unsubscribe(this, PartyDataType.values());
 		markers.clear();
-		clientToolbar.removeNavigation(navButton);
+		sidebar.shutDown();
+		sidebar = null;
 		panel = null;
 		navButton = null;
 	}
@@ -307,7 +330,8 @@ public class GroupIronmanPlugin extends Plugin
 		}
 		group.reloadConfig();
 		events.reloadConfig();
-		updateNavButton();
+		// The sidebar button stays whatever the switches say; the panel shows the change.
+		redraw();
 	}
 
 	@Subscribe
@@ -318,20 +342,23 @@ public class GroupIronmanPlugin extends Plugin
 	}
 
 	/**
-	 * The panel button shows while at least one group feature is on, or a group key is saved: a member who
-	 * pastes the key into settings with every switch off then finds the "Turn on sharing" card there.
+	 * Opens this plugin's page in RuneLite's settings. Posts the event an overlay's
+	 * "Configure" menu entry posts; RuneLite's ConfigPlugin handles it
+	 * ({@code onOverlayMenuClicked}) by opening the settings panel on the overlay's
+	 * plugin. The overlay is a stand-in that is never added or drawn.
 	 */
-	private void updateNavButton()
+	private void openOwnSettings()
 	{
-		if (group.anyOn() || group.groupKey() != null)
+		Overlay self = new Overlay(this)
 		{
-			clientToolbar.addNavigation(navButton);
-		}
-		else
-		{
-			clientToolbar.removeNavigation(navButton);
-		}
-		redraw();
+			@Override
+			public Dimension render(Graphics2D graphics)
+			{
+				return null;
+			}
+		};
+		eventBus.post(new OverlayMenuClicked(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY_CONFIG, "", NAME),
+			self));
 	}
 
 	private void redraw()
@@ -343,7 +370,7 @@ public class GroupIronmanPlugin extends Plugin
 		}
 		GroupIronmanPanel.View view = new GroupIronmanPanel.View(group.syncState(), group.roster(), group.members(),
 			group.lookup, group.switches(), group.regions(), group.since(), group.self(),
-			group.presence(), settingsView(), group.sharingSettings());
+			group.presence(), settingsView(), group.anyOn(), group.sharingSettings());
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
 	}
@@ -372,8 +399,10 @@ public class GroupIronmanPlugin extends Plugin
 				heard.add(m);
 			}
 		}
+		// Who shares webhooks, never the URLs: the tab has no way to show one.
+		GroupWebhooks shared = g.sharedWebhooks();
 		return new GroupSettingsTab.View(g.myRole(self), g.roles(), g.settings(), g.unclaimed(), group.syncing(),
-			members, self, current, MemberPrefs.of(config), g.prefs(), heard);
+			members, self, current, MemberPrefs.of(config), g.prefs(), heard, shared == null ? null : shared.by);
 	}
 
 	/** Markers only add points to the world map; they never open it (that stays the player's click). */
