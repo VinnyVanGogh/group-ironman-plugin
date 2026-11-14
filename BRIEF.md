@@ -239,7 +239,7 @@ assumed from its name.
 | 5 | Clue reward, counts by tier | "You have completed N tier Treasure Trails", reward container | As #20 | Unverified wording |
 | 7 | Dry streak | Kill count line, drop names | Adds no game information; display of past kills | Wiki rates read 2026-11-09, Vorkath and Zulrah only (`DryStreak`) |
 | 9 | Value lost on death, gravestone | `ActorDeath`, carried items before and after | Own items only | [Gravestone](https://oldschool.runescape.wiki/w/Gravestone): 15 min, paused logged out |
-| 10 | Gravestone expiring | Tick count, `GRAVESTONE_VISIBLE` | Own grave only. Idle pauses are not modelled, so it warns early, never late | Gameval name; meaning assumed |
+| 10 | Gravestone expiring | Tick count, `GRAVESTONE_VISIBLE` | Own grave only. Idle pauses are not modelled, so it warns early, never late. No warning unless the death lost something and the varbit was seen on (Board 2026-11-10: no grave, no warning) | Gameval name; meaning assumed, so the warning now depends on it: confirm in game |
 | 11 | Hardcore life lost | `GIM_HARDCORE_DEATHS`, `GIM_GROUPSIZE` | Own group's own varbits | Gameval names; [one life per player](https://oldschool.runescape.wiki/w/Group_Ironman_Mode) |
 | 12 | Wilderness, skulled | `INSIDE_WILDERNESS`, own skull icon | PvP Restrictions: this player's own state only, nothing about any opponent. Situational overlays are display only | Gameval name |
 | 30 | Diary tier | `*_DIARY_*_COMPLETE`, `ATJUN_*_DONE` | Own progress | Gameval names; `ATJUN_HARD_DONE` not confirmed |
@@ -257,14 +257,150 @@ offset, so a crop's post can come late but not early. Bird houses use Time
 Tracking's 50 minute average. A crop that catches disease out of sight is still
 reported, as it is in Time Tracking.
 
+### Phase 0 addendum — optional server sync (2026-11-11, RUNELITE-117)
+
+Board, 2026-11-11: an optional server of our own (Cloudflare Workers + D1)
+for group sync without Party, a web settings page, Discord bot settings and a
+group dashboard. Design and threat model: `docs/plans/gim-server.md`. The
+server lives in its own repo; the plugin side lives on the long-lived
+`server-sync` branch until the Board merges it. **None of #22–#25 is on
+`main`.** Numbers start at #22 because open PR #19 takes #21.
+
+**22. Group sync through our own server — allowed, with precedent, under
+conditions.** *Nearest rules:* Data & Privacy, "no exposing player
+information over HTTP" and "no crowdsourcing data about other players".
+*Verdict* (runelite-compliance, Board session 2026-11-11): allowed **only
+if** (a) it is opt-in (`serverSync`, off by default, with the third-party
+warning in its description); (b) a group's data is readable only by that
+group: a group secret derived from the group key, per-member tokens, no
+public pages, no lookups by player name and no cross-group queries; and
+(c) nothing about non-members is stored. Each member's client sends only its
+own player's data, the same subset Party carries today (#8–#17).
+*Precedent:* Hub plugin **Group Ironmen Tracker**
+(`christoabrown/group-ironmen-tracker`, 21,557 installs) syncs banks,
+storage, stats and location to its own server and site, without Party. Its
+Hub manifest carries `warning=This plugin submits your IP address, and may
+submit various account data, to a 3rd party server not controlled or
+verified by the RuneLite Developers.` Expect the same warning on ours, and
+document it in the README and the Hub PR. Connecting on login without a click
+is an HTTP call, not a party join or a game action, so the "joining a party
+without a click" line below does not cover it. Plugin rules still hold:
+injected `OkHttpClient` with `enqueue` (or its `newWebSocket`), never the
+client thread, no reflection, `Filepath` for local files (main `6c7036a`).
+
+**23. Settings changed remotely (web page, Discord) — allowed, no precedent.**
+No rule was found that covers it, and no precedent was found. *Reasoning:*
+the settings change only what this plugin displays and posts. None of them
+touches game input, menus, combat information or other players' data.
+Applying them is a second opt-in per member (`serverAllowRemoteSettings`, off
+by default). An allowlist excludes the sync opt-ins, the group key and every
+webhook URL; webhook URLs never leave the client. Revisit if a reviewer
+objects.
+
+**24. Group web dashboard — allowed, with precedent.** It shows a group only
+its own shared data (#22 conditions). *Precedent:* Group Ironmen Tracker's
+site.
+
+**25. Discord bot that edits settings — allowed.** It runs outside the game
+client (HTTP interactions on the Worker) and never posts game data. Its
+commands are limited to Manage Server by default and re-checked on the
+server. Same reasoning as #23.
+
+### Phase 0 addendum — hiscore levels for members without the plugin (2026-11-11)
+
+Board in-game test, 2026-11-11: the Group tab should show something for a
+roster member who never ran GIM Utilities, and for one never seen online.
+
+**26. Hiscore lookup of your own group's members — allowed, with
+precedent.** *The feature, as what the player now knows:* the public hiscore
+skill levels of the people on their own in-game Group Ironman roster. *Nearest
+rules:* Data & Privacy, "no crowdsourcing data about other players" and "no
+exposing player information over HTTP". Neither applies: the levels are
+already public on Jagex's own hiscores, the lookup is a read from Jagex
+(`secure.runescape.com`) by RuneLite's own `HiscoreClient`, nothing about any
+player is sent anywhere, and the result never leaves this client: it is not
+relayed over Party (#8–#17) or posted to Discord (#18). Only names on the
+in-game roster (`GroupMembers`) are looked up, never a typed or arbitrary
+name, so this is not a lookup tool. Not PvP scouting: group members cannot be
+attacked by each other, and hiscore levels say nothing about a fight.
+*Precedent:* the base client's **Hiscore** plugin
+(`net.runelite.client.plugins.hiscore`) looks up any player's levels with the
+same `HiscoreClient` (runelite-client 1.13.5, `HiscoreClient.lookupAsync`,
+read with `javap` 2026-11-11); its right-click *Lookup* runs on players the
+user meets. Group Ironmen Tracker (#8, #22) shows each member's skills on its
+site; whether it reads them from the hiscores was not checked in this run.
+
+*Conditions this build keeps* (`HiscoreBook`, `GroupService.lookUpHiscores`):
+- RuneLite's injected `HiscoreClient` only, no HTTP client of our own; its
+  `lookupAsync` runs on OkHttp's threads, never the client thread.
+- Only members who share no stats, never this player. Shared plugin data
+  always wins over hiscores in the panel (`PanelModel.members`).
+- At most one lookup per member every 6 hours (Board), started only on this
+  player's login or the member coming online in the Group channel. A failed
+  lookup retries on its own after 15 min, doubling to at most 6 h: no storm.
+  Failure shows "Hiscores unavailable".
+- Results are kept in the group cache with their time ("From hiscores, 2h
+  ago"). Run and special attack are never on the hiscores: for an online
+  member they show 100%, dimmed, "assumed, not shared" (Board). Items are
+  never invented: a member who never shared them shows none.
+- Endpoint: `HiscoreEndpoint.NORMAL`. RuneLite 1.13.5 has no Group Ironman
+  endpoint (`IRONMAN`, `HARDCORE_IRONMAN`, `ULTIMATE_IRONMAN` only), and the
+  main hiscores rank every account type. *Unverified:* that every group
+  member is on the main hiscores; a skill below the ranking threshold shows as
+  missing, not as level 1.
+- No new switch: the lookup sends nothing about anyone and goes to Jagex, not
+  a third party, so the third-party warning does not apply. It runs only
+  while some GIM Utilities feature is on (`anyOn`). If the Board wants it
+  switchable, that is a new key, off by default, frozen at first release.
+
+This amends the roster line in round 2 ("no hiscores or Wise Old Man
+calls"): the roster still comes only from the game; hiscores add levels, not
+members.
+
+### Phase 0 addendum — group settings and roles (2026-11-10)
+
+Board, 2026-11-10: group-synced settings with a leader and editors, and
+per-member opt-outs.
+
+**21. Shared settings, signed roles — allowed.** *Nearest rules:* Data &
+Privacy, "no exposing player information over HTTP" and "no crowdsourcing
+data about other players": what travels is the group's own preferences
+(numbers and switches) and each member's own posting opt-outs, only to the
+members' own party, through `PartyService` like every other kind (#8 to
+#17). No new network call, and no webhook URL ever leaves its owner's
+client (`GroupSettingsSchemaTest`, `GovernanceSyncTest`). *Forbidden
+language features:* none. Signatures are ECDSA P-256 from the JDK's own
+`java.security` (no library, no reflection, no JNI); `GroupKey` already uses
+`SecureRandom` from the same package. *Precedent:* the base client's
+`party` plugin already relays member-chosen state; Discord-posting Hub
+plugins (#18) carry per-event switches, here shared instead of typed five
+times. Each member still posts only their own events (#18).
+
+**Trust model.** Member names are the ones `GroupService.sender` checks
+against the in-game roster. The leader's key is pinned on first accept (a
+claim is accepted only when the claimant's own announce shows the same key);
+later roles must be signed by it; settings must be signed by the leader or a
+current editor with the key the roles hold. A member who controls their own
+client can still refuse to apply the group's settings to themselves: that is
+their client, and their posts only. Recovery when a leader loses their
+RuneLite config is "Forget leader" on each client, then a new claim.
+
+**Storage.** Kept in the `gimutilities` config group under keys with no
+`@ConfigItem` (`memberIdentity`, `groupRoles`, `groupSettings`): no new file
+I/O (Board rule).
+
 ### Out of scope — do not implement, do not propose workarounds
 
 - **Reflection**, and therefore any integration that reads another plugin's
   state. If integration is ever wanted, the channel is
   `net.runelite.client.events.PluginMessage`.
 - **Every network call** of our own but the optional Discord webhook the
-  player sets (#18), and any server. Group Ironmen Tracker needs a website;
-  this plugin's point is that it does not.
+  player sets (#18), and any server, **on `main`**. Group Ironmen Tracker
+  needs a website; this plugin's point is that it does not. *Amended
+  2026-11-11 (Board):* the opt-in server sync in #22–#25 is the one exception,
+  on the `server-sync` branch only, until the Board merges it. *Amended
+  2026-11-11 (Board):* reading roster members' public levels through
+  RuneLite's own `HiscoreClient` (#26) is allowed on `main`; it sends nothing.
 - **Automating anything**: moving items, withdrawing, walking. Input
   Restrictions.
 - **Joining a party without a click**, on login or on a timer, and **putting

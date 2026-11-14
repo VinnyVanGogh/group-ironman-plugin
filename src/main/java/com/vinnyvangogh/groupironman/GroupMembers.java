@@ -13,8 +13,9 @@ import java.util.TreeSet;
  * <p>Read from the game's own Group Ironman clan:
  * {@code client.getClanSettings(ClanID.GROUP_IRONMAN).getMembers()}, falling
  * back to {@code client.getClanChannel(ClanID.GROUP_IRONMAN)} when settings
- * are not loaded. No hiscores or Wise Old Man calls: the roster the game shows
- * is authoritative and needs no network.
+ * are not loaded. No hiscores or Wise Old Man calls for the roster: the roster
+ * the game shows is authoritative and needs no network. (Hiscores only add
+ * levels for members already on it: {@link HiscoreBook}.)
  *
  * <p>A party member whose name is not on it is ignored and listed as "Not in
  * your group", so a stranger who somehow has the passphrase sees nothing they

@@ -17,6 +17,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -99,6 +100,10 @@ class GroupEventEngine
 	 * client closed in it can post the offline on the next start. Not a setting: never shown.
 	 */
 	static final String PRESENCE_KEY = "presencePending";
+	/** Config key: the live board's message id, with a hash of its webhook. Not a setting; never sent to the party. */
+	static final String BOARD_KEY = "statusBoardMessage";
+	/** Config key: set once 'Online status' has been chosen for this install, so an upgrade keeps its old choice. */
+	static final String ONLINE_STATUS_CHOSEN_KEY = "onlineStatusChosen";
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
 		GroupEvent.Type.WILDERNESS, GroupEvent.Type.HC_LIFE_LOST);
 
@@ -137,18 +142,27 @@ class GroupEventEngine
 
 	private final ToastQueue toasts = new ToastQueue();
 	private final WebhookWarnings webhookWarnings = new WebhookWarnings();
+	private final PosterNames posterNames = new PosterNames();
 	private final ProgressTracker progress = new ProgressTracker(Skill.values().length - 1);
 	/** Guards {@link #presence}: the client thread logs in and out, the executor polls. */
 	private final Object presenceLock = new Object();
 	private PresenceDebounce presence = new PresenceDebounce(ZoneId.systemDefault());
+	/** Members without the plugin, as the Group channel sees them; guarded by {@link #presenceLock} too. */
+	private final ChannelPosts channelPosts = new ChannelPosts(ZoneId.systemDefault());
 	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()),
-		this::toDigest);
+		this::toDigest, this::toLog);
 	/** Client thread: Discord events waiting for the rest of their moment. */
 	private final DiscordBatch batch = new DiscordBatch();
 	/** Level-ups of one skill as one post, edited in place. Any thread; message ids in memory only. */
 	private LevelPosts levels;
 	private volatile EventSettings settings = EventSettings.OFF;
+	/** The shared settings the event settings were built from: quiet hours, grace and Easter eggs read these. */
+	private volatile GroupSettingsSchema.Resolved values;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
+	/** The death's frame for the gravestone warning; memory only, so a restart loses it. */
+	private final GraveShot graveShot = new GraveShot();
+	/** Level-up pictures, taken once the chat shows the level. Client thread. */
+	private final LevelShot levelShot = new LevelShot();
 	private volatile Digest digest = new Digest();
 	private DryStreak dry = DryStreak.parse("");
 	private Digest.Week week = Digest.Week.parse("");
@@ -156,6 +170,9 @@ class GroupEventEngine
 	private int varWait = -1;
 	private int scheduleTicks;
 	private DiscordSender sender;
+	private final StatusBoard board = new StatusBoard();
+	/** This player for the live board: set on the client thread, read by the timer. Null before a login. */
+	private volatile StatusBoard.Self boardSelf;
 	private ScheduledFuture<?> pump;
 	private EventToastOverlay toastOverlay;
 	private GroupBoxOverlay boxOverlay;
@@ -175,7 +192,9 @@ class GroupEventEngine
 		group.events(this);
 		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient, gson), System::currentTimeMillis,
 			() -> LocalTime.now().getHour());
-		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords);
+		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords,
+			() -> posterName(Webhook.PROGRESS));
+		chooseOnlineStatus();
 		reloadConfig();
 		restorePresence();
 		toastOverlay = new EventToastOverlay(toasts, config, group.lookup);
@@ -214,8 +233,11 @@ class GroupEventEngine
 		{
 			sender.clear();
 		}
+		// The queue's board request is gone with it: forget it was out, so a restart sends again.
+		board.target(null, () -> null);
 		// Unsent posts are dropped at shutdown, as the sender's queue is.
 		batch.drain();
+		levelShot.clear();
 		if (levels != null)
 		{
 			levels.clear();
@@ -225,18 +247,35 @@ class GroupEventEngine
 		settings = EventSettings.OFF;
 	}
 
+	/** A config change, or new group settings (they are kept in the config, so both arrive here). */
 	void reloadConfig()
 	{
-		settings = EventSettings.from(config);
+		GroupSettingsSchema.Resolved v = group == null ? new GroupSettingsSchema.Resolved(config, null)
+			: group.groupValues();
+		values = v;
+		settings = EventSettings.from(config, v, MemberPrefs.of(config));
 		if (sender != null)
 		{
-			sender.quietHours(config.discordQuietStart(), config.discordQuietEnd());
+			sender.quietHours(v.intValue("discordQuietStart"), v.intValue("discordQuietEnd"));
 		}
 		if (toastOverlay != null)
 		{
 			toastOverlay.reposition();
 		}
 		warnBadWebhooks();
+	}
+
+	/** The shared values now; this member's own config until the first {@link #reloadConfig}. */
+	private GroupSettingsSchema.Resolved resolved()
+	{
+		GroupSettingsSchema.Resolved v = values;
+		return v != null ? v : new GroupSettingsSchema.Resolved(config, null);
+	}
+
+	/** The group's offline grace when it has settings, else this member's own. */
+	private int offlineGrace()
+	{
+		return resolved().intValue("discordOfflineGrace");
 	}
 
 	/**
@@ -250,7 +289,11 @@ class GroupEventEngine
 		{
 			return;
 		}
-		for (String line : webhookWarnings.check(WebhookWarnings.fields(config)))
+		// This member's own fields only: a leader's shared webhook is not theirs to fix, and its URL is never named.
+		Webhooks webhooks = Webhooks.of(config);
+		List<String> lines = new ArrayList<>(webhookWarnings.check(webhooks.urlFields()));
+		lines.addAll(posterNames.check(webhooks.customNames()));
+		for (String line : lines)
 		{
 			chatMessageManager.queue(QueuedMessage.builder()
 				.type(ChatMessageType.GAMEMESSAGE)
@@ -267,17 +310,21 @@ class GroupEventEngine
 			levels.tick();
 			sender.pump();
 			GroupEvent offline;
+			List<GroupEvent> others;
 			synchronized (presenceLock)
 			{
 				// The name is the one the login gave: after a logout localPlayer() is "You".
-				offline = presence.poll(System.currentTimeMillis(), config.discordOfflineGrace());
+				offline = presence.poll(System.currentTimeMillis(), offlineGrace());
 				savePresence();
+				others = channelPosts.poll(System.currentTimeMillis(), offlineGrace());
 			}
 			if (offline != null)
 			{
 				// Not own(): that is client thread only. The router is fine here, as before.
 				router.route(offline, true, settings, group.lookup);
 			}
+			routeChannelPosts(others);
+			boardTick(System.currentTimeMillis());
 		}
 		catch (RuntimeException e)
 		{
@@ -286,7 +333,120 @@ class GroupEventEngine
 		}
 	}
 
+	/**
+	 * Timer: the live board, when 'Online status' is the board and the Online status webhook (or Main) is set.
+	 * Members are read from the roster the party fills; the webhook and the message id stay in this client. On
+	 * the leader's shared webhook only the leader's client keeps it ({@link StatusBoard#keeps}).
+	 */
+	private void boardTick(long now)
+	{
+		String url = webhookFor(Webhook.ONLINE);
+		if (!StatusBoard.keeps(config.discordOnlineStatus(), webhooks(), group.isLeader()))
+		{
+			url = null;
+		}
+		board.target(url, () -> configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY));
+		if (url != null)
+		{
+			// Logged out too: the last plugin user's client marks the board as no longer kept current.
+			String lines = StatusBoard.lines(group.members(), group.roster().lastHeard(), group.roster().lastSeen(),
+				group.roster().allStats(), boardSelf, group.presence(), now);
+			if (!lines.isEmpty())
+			{
+				board.show(lines, now);
+			}
+			GroupSettingsSchema.Resolved v = resolved();
+			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), v.intValue("discordQuietStart"),
+				v.intValue("discordQuietEnd"));
+			StatusBoard.Send send = board.next(now, quiet);
+			if (send != null)
+			{
+				board.send(sender, send, StatusBoard.payload(gson, send, config.discordStyle(),
+					posterName(Webhook.ONLINE)), System::currentTimeMillis);
+			}
+		}
+		String saved = board.takeSaved();
+		if (saved != null && saved.isEmpty())
+		{
+			configManager.unsetConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY);
+		}
+		else if (saved != null)
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY, saved);
+		}
+	}
+
+	/** Once per install: an upgrade keeps what its old "Online and offline" switch did ({@link OnlineStatus#upgrading}). */
+	private void chooseOnlineStatus()
+	{
+		if (configManager.getConfiguration(GroupIronmanConfig.GROUP, ONLINE_STATUS_CHOSEN_KEY) != null)
+		{
+			return;
+		}
+		OnlineStatus kept = OnlineStatus.upgrading(config.discordOnline(), config.discordEnabled());
+		if (kept != null)
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, "discordOnlineStatus", kept);
+		}
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, ONLINE_STATUS_CHOSEN_KEY, "1");
+	}
+
 	// ---- Inputs from GroupService ----
+
+	/**
+	 * Client thread: the game's Group channel changed. Logins and logouts of members without the plugin become
+	 * Online posts ({@link ChannelPosts}); members with it post their own.
+	 */
+	void gamePresence(GamePresence game)
+	{
+		Player me = client.getLocalPlayer();
+		String self = me == null || me.getName() == null ? "" : GroupMembers.key(me.getName());
+		Set<String> plugin = new HashSet<>();
+		group.roster().lastHeard().keySet().forEach(n -> plugin.add(GroupMembers.key(n)));
+		group.roster().allStats().keySet().forEach(n -> plugin.add(GroupMembers.key(n)));
+		List<GroupEvent> posts;
+		synchronized (presenceLock)
+		{
+			posts = channelPosts.update(game, n -> plugin.contains(GroupMembers.key(n)) || GroupMembers.key(n)
+				.equals(self), System.currentTimeMillis(), offlineGrace());
+		}
+		routeChannelPosts(posts);
+	}
+
+	/**
+	 * Any thread: posts for members without the plugin. Every client shows them in its Log and overlay; only the
+	 * one plugin user that {@link ChannelPosts#leads} sends them to Discord, so each is posted once.
+	 */
+	private void routeChannelPosts(List<GroupEvent> posts)
+	{
+		if (posts.isEmpty())
+		{
+			return;
+		}
+		boolean leads = leadsChannelPosts(System.currentTimeMillis());
+		for (GroupEvent e : posts)
+		{
+			router.route(e, leads, settings, group.lookup);
+		}
+	}
+
+	/** The plugin users the others hear and the game does not say left, without this player; then who leads. */
+	private boolean leadsChannelPosts(long now)
+	{
+		StatusBoard.Self self = boardSelf;
+		String name = self == null ? "" : self.name;
+		GamePresence game = group.presence();
+		List<String> others = new ArrayList<>();
+		group.roster().lastHeard().forEach((member, at) ->
+		{
+			if (Presence.online(at, now) && game.state(member) != GamePresence.State.OFFLINE
+				&& !GroupMembers.key(member).equals(GroupMembers.key(name)))
+			{
+				others.add(member);
+			}
+		});
+		return ChannelPosts.leads(name, group.syncing(), others);
+	}
 
 	/** A member's event from the party, already filed under their name. */
 	void member(GroupEvent event)
@@ -357,11 +517,11 @@ class GroupEventEngine
 		}
 	}
 
-	/** Worth noticing at all: an output wants it, or members get it from us. */
+	/** Worth noticing at all: an output (the Log takes every kind) wants it, or members get it from us. */
 	private boolean wanted(GroupEvent.Type type)
 	{
 		EventSettings s = settings;
-		return s.wants(type) || s.share && type.travels() && !type.logged();
+		return s.detects(type) || s.share && type.travels() && !type.logged();
 	}
 
 	@Subscribe
@@ -458,6 +618,17 @@ class GroupEventEngine
 			return;
 		}
 		watchChat(message, now);
+		gameMessage(message, now);
+	}
+
+	/** A game message that is not a count: a level-up line (for its picture), a pet or a collection log slot. */
+	private void gameMessage(String message, long now)
+	{
+		if (levelShot.chat(message, now))
+		{
+			shootLevels(now);
+			return;
+		}
 		if (EventText.isPet(message) && wanted(GroupEvent.Type.PET))
 		{
 			own(GroupEvent.of(GroupEvent.Type.PET, now, group.localPlayer()).build());
@@ -572,10 +743,20 @@ class GroupEventEngine
 			group.resolveItems(items.keySet());
 			watchers.died(items, where == null ? "" : where, client.getWorld());
 		}
-		if (!wanted(GroupEvent.Type.DEATH))
+		int grave = graveShot.died();
+		if (wanted(GroupEvent.Type.DEATH))
 		{
-			return;
+			deathPost(me, where);
 		}
+		// No death post took the frame (death posts off, or joined an open moment): take it for the grave alone.
+		if (keepsDeathFrame() && graveShot.ask(grave))
+		{
+			drawManager.requestNextFrameListener(image -> executor.execute(() -> graveShot.keep(grave, png(image))));
+		}
+	}
+
+	private void deathPost(Player me, String where)
+	{
 		Actor killer = me.getInteracting();
 		boolean hardcore = client.getVarbitValue(VarbitID.IRONMAN) == EventDetect.HARDCORE_GROUP_IRONMAN;
 		own(GroupEvent.of(GroupEvent.Type.DEATH, System.currentTimeMillis(), group.localPlayer())
@@ -584,6 +765,14 @@ class GroupEventEngine
 			.world(client.getWorld())
 			.number(hardcore ? GroupEvent.LIFE_LOST : 0)
 			.build());
+	}
+
+	/** The gravestone warning posts to Discord with "Where I died" ({@link GraveScreenshot#DEATH}) and screenshots on. */
+	private boolean keepsDeathFrame()
+	{
+		return config.discordScreenshot() && config.discordGravestoneScreenshot() == GraveScreenshot.DEATH
+			&& settings.discord.contains(GroupEvent.Type.GRAVESTONE_EXPIRING)
+			&& webhookFor(Webhook.of(GroupEvent.Type.GRAVESTONE_EXPIRING)) != null;
 	}
 
 	@Subscribe
@@ -661,11 +850,13 @@ class GroupEventEngine
 		{
 			// No ticks until the new world loads: post the held moments now. A hop is never a logout.
 			batch.drain().forEach(this::flush);
+			levelShot.drain().forEach(this::shoot);
 		}
 		else if (state == GameState.LOGIN_SCREEN)
 		{
 			// No more ticks until the next login: post what is held now.
 			batch.drain().forEach(this::flush);
+			levelShot.drain().forEach(this::shoot);
 			// A logout ends every level streak; an edit already owed still goes.
 			levels.close();
 			// A world hop (HOPPING) is never a logout: it posts nothing, whatever the grace.
@@ -673,10 +864,18 @@ class GroupEventEngine
 			{
 				presence.logout(System.currentTimeMillis());
 				savePresence();
+				// The channel goes with this player: the next login's channel is a new baseline.
+				channelPosts.reset();
+			}
+			StatusBoard.Self was = boardSelf;
+			if (was != null && was.online)
+			{
+				boardSelf = new StatusBoard.Self(was.name, false, was.world, System.currentTimeMillis());
 			}
 			// Another account may log in next: start every baseline over.
 			progress.reset();
 			watchers.reset();
+			graveShot.free();
 			backWait = -1;
 			varWait = -1;
 		}
@@ -687,6 +886,7 @@ class GroupEventEngine
 	{
 		long now = System.currentTimeMillis();
 		batch.due(now).forEach(this::flush);
+		shootLevels(now);
 		Player me = client.getLocalPlayer();
 		if (me == null || me.getName() == null)
 		{
@@ -698,6 +898,13 @@ class GroupEventEngine
 			login(now, me.getName());
 		}
 		checkBack(now);
+		StatusBoard.Self was = boardSelf;
+		if (was != null && was.online && was.world != client.getWorld())
+		{
+			// A hop: the board moves the world, and posts nothing.
+			boardSelf = new StatusBoard.Self(was.name, true, client.getWorld(), 0);
+		}
+		slayer(now, me.getName());
 		GroupEvent combat = progress.combat(me.getCombatLevel(), now, me.getName());
 		if (combat != null && wanted(combat.type))
 		{
@@ -706,6 +913,23 @@ class GroupEventEngine
 		readInterfaces(now);
 		dry.due(now).forEach(this::own);
 		watch(now, me);
+	}
+
+	/**
+	 * The NPC dialogue, where a Slayer master hands out a task (RuneLite's SlayerPlugin read the same widget,
+	 * {@code DIALOG_NPC_TEXT}, before 1f6ae893), and a finished task still waiting for its streak line.
+	 */
+	private void slayer(long now, String name)
+	{
+		if (!wanted(GroupEvent.Type.SLAYER))
+		{
+			return;
+		}
+		Widget text = client.getWidget(InterfaceID.ChatLeft.TEXT);
+		Widget npc = client.getWidget(InterfaceID.ChatLeft.NAME);
+		boolean open = text != null && !text.isHidden();
+		watchers.slayerDialog(open ? text.getText() : null, npc == null ? "" : npc.getText(), now, name);
+		watchers.slayerTick(now, name);
 	}
 
 	/** The quest, Barrows and clue interfaces, a tick or two after they loaded. */
@@ -744,19 +968,31 @@ class GroupEventEngine
 			watchers.poll(id -> id == EventWatchers.SKULL ? (me.getSkullIcon() != -1 ? 1 : 0) : client.getVarbitValue(id),
 				now, name);
 		}
-		if (wanted(GroupEvent.Type.DEATH_VALUE))
+		deathTick(now, name);
+		farmTick(now, me);
+		if (++scheduleTicks >= SCHEDULE_EVERY_TICKS)
 		{
+			scheduleTicks = 0;
+			schedule(now, name);
+		}
+	}
+
+	/** After a death: its value once settled, then the gravestone's timer and the death frame it holds. */
+	private void deathTick(long now, String name)
+	{
+		if (wanted(GroupEvent.Type.DEATH_VALUE) || wanted(GroupEvent.Type.GRAVESTONE_EXPIRING))
+		{
+			// Also for the gravestone alone: its warning lists what the death left in it.
 			watchers.deathTick(carried(), group.lookup, now, name);
 		}
 		if (wanted(GroupEvent.Type.GRAVESTONE_EXPIRING))
 		{
 			watchers.graveTick(client.getVarbitValue(VarbitID.GRAVESTONE_VISIBLE), settings.graveWarnMinutes, now, name);
 		}
-		farmTick(now, me);
-		if (++scheduleTicks >= SCHEDULE_EVERY_TICKS)
+		if (!watchers.graveOut())
 		{
-			scheduleTicks = 0;
-			schedule(now, name);
+			// Warned (already posted, the picture read), looted, or never wanted: the death's frame goes.
+			graveShot.free();
 		}
 	}
 
@@ -832,13 +1068,15 @@ class GroupEventEngine
 
 	private void flushDigest()
 	{
-		for (GroupEvent.Category category : settings.digest)
+		// Every digest goes to the Daily digest webhook (Main when empty), under its poster name.
+		String url = webhookFor(Webhook.DIGEST);
+		// Draining first would lose the day's lines when the webhook has been cleared.
+		if (url != null)
 		{
-			String url = webhook(category);
-			// Draining first would lose the day's lines when the webhook has been cleared.
-			if (url != null)
+			String name = posterName(Webhook.DIGEST);
+			for (GroupEvent.Category category : settings.digest)
 			{
-				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category)), null);
+				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category), name), null);
 			}
 		}
 		saveProfile(DIGEST_KEY, digest.save());
@@ -855,10 +1093,11 @@ class GroupEventEngine
 		{
 			varWait = VAR_WAIT_TICKS;
 		}
+		boardSelf = new StatusBoard.Self(name, true, client.getWorld(), 0);
 		List<GroupEvent> posts;
 		synchronized (presenceLock)
 		{
-			posts = presence.login(now, client.getWorld(), name, config.discordOfflineGrace());
+			posts = presence.login(now, client.getWorld(), name, offlineGrace());
 			savePresence();
 		}
 		for (GroupEvent e : posts)
@@ -988,14 +1227,30 @@ class GroupEventEngine
 
 	// ---- Discord ----
 
-	/** Where a category posts: null when Discord is off or no valid webhook is set. */
-	private String webhook(GroupEvent.Category category)
+	/**
+	 * Where {@code webhook}'s posts go: its own URL, else Main's ({@link Webhooks#url}); null when Discord is off or
+	 * neither is set. Every sender asks this; none reads a webhook setting itself.
+	 */
+	private String webhookFor(Webhook webhook)
 	{
 		if (!config.discordEnabled() || sender == null)
 		{
 			return null;
 		}
-		return DiscordWebhook.route(category, DiscordWebhook.overrides(config), config.discordWebhookUrl());
+		return webhooks().url(webhook);
+	}
+
+	/** The name {@code webhook}'s posts go out under, by its own choice ({@link Webhooks#name}). */
+	private String posterName(Webhook webhook)
+	{
+		return webhooks().name(webhook);
+	}
+
+	/** This member's own webhooks, with the leader's shared ones filling any left empty ({@link GroupService#webhooks}). */
+	private Webhooks webhooks()
+	{
+		GroupService g = group;
+		return g == null ? Webhooks.of(config) : g.webhooks();
 	}
 
 	/**
@@ -1003,9 +1258,19 @@ class GroupEventEngine
 	 * digest. Separate from {@link #toDiscord}, which posts it now when its
 	 * kind is ticked: the digest is a summary on top, never a hold.
 	 */
+	/** The sidebar Log: every routed event, yours and members'. */
+	private void toLog(GroupEvent event)
+	{
+		GroupService g = group;
+		if (g != null)
+		{
+			g.logEvent(event);
+		}
+	}
+
 	private void toDigest(GroupEvent event)
 	{
-		if (webhook(event.type.category) == null)
+		if (webhookFor(Webhook.DIGEST) == null)
 		{
 			return;
 		}
@@ -1026,7 +1291,7 @@ class GroupEventEngine
 	 */
 	private void toDiscord(GroupEvent event)
 	{
-		String url = webhook(event.type.category);
+		String url = webhookFor(Webhook.of(event.type));
 		if (url == null)
 		{
 			return;
@@ -1034,20 +1299,47 @@ class GroupEventEngine
 		DiscordMerge.Family family = DiscordMerge.family(event.type);
 		if (family == null)
 		{
-			// A logout settles at the login screen: nothing worth a picture.
-			post(url, DiscordMerge.single(event, discordWords()), Collections.singletonList(event),
-				event.type != GroupEvent.Type.ONLINE, null);
+			GraveShot.Choice shot = picture(event);
+			post(url, DiscordMerge.single(event, discordWords()), Collections.singletonList(event), shot.picture,
+				shot.png);
 			return;
 		}
 		List<DiscordBatch.Pending> done = new ArrayList<>();
 		DiscordBatch.Pending moment = batch.add(event, System.currentTimeMillis(),
 			DiscordMerge.window(family, settings), done);
-		if (moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot())
+		if (framesAtStart(event, moment, done))
 		{
-			// The frame of the moment itself, not of whenever the post goes out (a death's respawn).
-			drawManager.requestNextFrameListener(image -> executor.execute(() -> moment.screenshot = png(image)));
+			// The frame of the moment itself, not of whenever the post goes out (a death's respawn). A death's
+			// frame is also the gravestone warning's, when that wants it: encoded once, held for that grave.
+			int live = graveShot.live();
+			int grave = family == DiscordMerge.Family.DEATH && keepsDeathFrame() && graveShot.ask(live) ? live : 0;
+			drawManager.requestNextFrameListener(image -> executor.execute(() ->
+			{
+				moment.screenshot = png(image);
+				graveShot.keep(grave, moment.screenshot);
+			}));
 		}
 		done.forEach(this::flush);
+	}
+
+	/**
+	 * A moment just opened, still to be posted, wants the frame of its start. Not a level-up's: that frame waits
+	 * for its chat line ({@link LevelShot}) and is taken when the moment is posted.
+	 */
+	private boolean framesAtStart(GroupEvent event, DiscordBatch.Pending moment, List<DiscordBatch.Pending> done)
+	{
+		return moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot()
+			&& event.type != GroupEvent.Type.LEVEL_UP;
+	}
+
+	/** The picture for a post made at once: a logout settles at the login screen, a gravestone by its setting. */
+	private GraveShot.Choice picture(GroupEvent event)
+	{
+		if (event.type == GroupEvent.Type.GRAVESTONE_EXPIRING)
+		{
+			return graveShot.choose(config.discordGravestoneScreenshot(), config.discordScreenshot());
+		}
+		return event.type == GroupEvent.Type.ONLINE ? GraveShot.Choice.NOTHING : GraveShot.Choice.NEXT_FRAME;
 	}
 
 	/** Names and prices, amounts read the Discord way: "450K (450,001)" (Board 2026-11-10). */
@@ -1056,53 +1348,87 @@ class GroupEventEngine
 		return Amounts.BOTH.words(group.lookup);
 	}
 
-	/** Client thread. One held moment as one post. */
+	/** Client thread. One held moment as one post; a level-up's waits for its picture ({@link LevelShot}). */
 	private void flush(DiscordBatch.Pending moment)
 	{
 		DiscordMerge.Post post = DiscordMerge.merge(moment.events, settings, discordWords());
-		String url = post == null ? null : webhook(post.lead.type.category);
-		if (url != null && !combineLevels(url, moment))
+		String url = post == null ? null : webhookFor(Webhook.of(post.lead.type));
+		if (url == null)
 		{
-			post(url, post, moment.events, true, moment.screenshot);
+			return;
 		}
+		Consumer<byte[]> send = combineLevels(url, moment);
+		if (send == null)
+		{
+			send = poster(url, post, moment.events, true);
+		}
+		if (send == null)
+		{
+			return;
+		}
+		GroupEvent level = firstLevelUp(moment.events);
+		if (!config.discordScreenshot() || moment.screenshot != null)
+		{
+			send.accept(moment.screenshot);
+		}
+		else if (level != null)
+		{
+			levelShot.hold(level.text, level.number, level.at, send);
+			shootLevels(System.currentTimeMillis());
+		}
+		else
+		{
+			nextFrame(send);
+		}
+	}
+
+	private static GroupEvent firstLevelUp(List<GroupEvent> events)
+	{
+		return events.stream().filter(e -> e.type == GroupEvent.Type.LEVEL_UP).findFirst().orElse(null);
+	}
+
+	/** Client thread. The level-up pictures due now: one frame each, for every post waiting on it. */
+	private void shootLevels(long now)
+	{
+		levelShot.due(now).forEach(this::shoot);
+	}
+
+	private void shoot(LevelShot.Held shot)
+	{
+		nextFrame(png -> shot.sends.forEach(send -> send.accept(png)));
 	}
 
 	/**
 	 * A moment that is one skill's level-up joins that skill's post when the combine window is on: the first
-	 * posts and is kept, later ones edit it ({@link LevelThreads}). False when the moment posts as usual.
+	 * posts and is kept, later ones edit it ({@link LevelThreads}). Returns what sends it, given the picture; null
+	 * when the moment posts as usual.
 	 */
-	private boolean combineLevels(String url, DiscordBatch.Pending moment)
+	private Consumer<byte[]> combineLevels(String url, DiscordBatch.Pending moment)
 	{
 		long window = TimeUnit.MINUTES.toMillis(config.discordCombineLevels());
 		GroupEvent level = window > 0 ? LevelThreads.combinable(moment.events) : null;
 		if (level == null)
 		{
-			return false;
+			return null;
 		}
 		// The egg reads the item cache: on the client thread, as every other post's does.
 		String egg = egg(moment.events);
-		if (!config.discordScreenshot() || moment.screenshot != null)
-		{
-			levelUp(url, level, window, moment.screenshot, egg);
-			return true;
-		}
-		drawManager.requestNextFrameListener(image -> executor.execute(() ->
-			levelUp(url, level, window, png(image), egg)));
-		return true;
+		return png -> levelUp(url, level, window, png, egg);
 	}
 
 	/** Any thread. A level-up into its streak, with the usual level-up post should it start a new one. */
 	private void levelUp(String url, GroupEvent level, long window, byte[] png, String egg)
 	{
 		String json = DiscordWebhook.payload(gson, DiscordMerge.single(level, discordWords()), discordWords(),
-			config.discordStyle(), config.discordMention(), png != null, egg);
+			config.discordStyle(), config.discordMention(), png != null, egg,
+			posterName(Webhook.PROGRESS));
 		levels.level(url, level, window, png, json);
 	}
 
 	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
 	private String egg(List<GroupEvent> events)
 	{
-		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(config));
+		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(resolved()));
 	}
 
 	/**
@@ -1111,22 +1437,36 @@ class GroupEventEngine
 	 */
 	private void post(String url, DiscordMerge.Post post, List<GroupEvent> events, boolean picture, byte[] shot)
 	{
-		DiscordStyle style = config.discordStyle();
-		String mention = config.discordMention();
+		Consumer<byte[]> send = poster(url, post, events, picture);
+		if (send == null)
+		{
+			return;
+		}
+		if (!picture || !config.discordScreenshot() || shot != null)
+		{
+			send.accept(shot);
+			return;
+		}
+		nextFrame(send);
+	}
+
+	/** Client thread. What sends a post, given its picture (dropped when none is wanted); null for nothing to say. */
+	private Consumer<byte[]> poster(String url, DiscordMerge.Post post, List<GroupEvent> events, boolean picture)
+	{
 		boolean picked = picture && config.discordScreenshot();
-		String json = DiscordWebhook.payload(gson, post, discordWords(), style, mention, picked, egg(events));
+		String json = DiscordWebhook.payload(gson, post, discordWords(), config.discordStyle(),
+			config.discordMention(), picked, egg(events), posterName(Webhook.of(post.lead.type)));
 		if (json == null)
 		{
-			return;
+			return null;
 		}
-		if (!picked || shot != null)
-		{
-			sender.post(url, json, picked ? shot : null);
-			return;
-		}
-		// The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread.
-		drawManager.requestNextFrameListener(image -> executor.execute(() ->
-			sender.post(url, json, png(image))));
+		return png -> sender.post(url, json, picked ? png : null);
+	}
+
+	/** The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread. */
+	private void nextFrame(Consumer<byte[]> send)
+	{
+		drawManager.requestNextFrameListener(image -> executor.execute(() -> send.accept(png(image))));
 	}
 
 	private static byte[] png(Image image)

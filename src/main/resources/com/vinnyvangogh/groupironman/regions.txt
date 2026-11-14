@@ -278,6 +278,38 @@ Woodcutting Guild Dungeon=6298
 Wyvern Cave=14495,14496
 Yanille Agility Dungeon=10388
 
+# Wilderness
+# Region id = (x >> 6) << 8 | (y >> 6), from each place's map coordinates on
+# its OSRS Wiki page (oldschool.runescape.wiki, infobox map, 2026-11-10):
+#   Chaos Temple (church) 2946-2958,3816-3826   Chaos Temple (Wilderness) 3240,3608
+#   Ferox Enclave 3137,3623 (straddles x 3136)  Lava Maze 3072,3854 (straddles x 3072)
+#   Graveyard of Shadows 3164,3672              Bandit Camp (Wilderness) 3037,3685
+#   Mage Arena 3082-3129,3912-3955; bank 3090,3956
+#   Dark Warriors' Fortress 3029,3630           Wilderness Agility Course 3004,3937
+#   Rogues' Castle 3286,3933                    Resource Area 3174-3197,3924-3945
+#   Demonic Ruins 3289,3885                     Lava Dragon Isle 3204,3828
+#   Bone Yard 3236,3746                         Fountain of Rune 3366-3388,3885-3903
+# Edgeville Wilderness is the y 3520-3583 strip north of Edgeville (12342).
+# The Wilderness spans x 2944-3391, y 3520-3967: every region of it not named
+# above falls back to "Wilderness", never a bare region number.
+Chaos Temple=11835
+Chaos Temple (Wilderness)=12856
+Ferox Enclave=12600,12344
+Lava Maze=12348,12092
+Graveyard of Shadows=12601
+Bandit Camp (Wilderness)=12089
+Mage Arena=12349
+Dark Warriors' Fortress=12088
+Wilderness Agility Course=11837
+Rogues' Castle=13117
+Resource Area=12605
+Demonic Ruins=13116
+Lava Dragon Isle=12859
+Bone Yard=12858
+Fountain of Rune=13372
+Edgeville Wilderness=12087,12343
+Wilderness=11831,11832,11833,11834,11835,11836,11837,12087,12088,12089,12090,12091,12092,12093,12343,12344,12345,12346,12347,12348,12349,12599,12600,12601,12602,12603,12604,12605,12855,12856,12857,12858,12859,12860,12861,13111,13112,13113,13114,13115,13116,13117,13367,13368,13369,13370,13371,13372,13373
+
 # Areas
 Abyssal Area=12108
 Abyssal Nexus=12106

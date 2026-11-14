@@ -35,17 +35,34 @@ final class PanelModel
 		final String label;
 		final int current;
 		final int max;
+		/** Not shared by the member but assumed (run and spec at 100% from hiscores): drawn dimmed. */
+		final boolean assumed;
+		/** Where the number came from when it was not shared, or null: "from hiscores". */
+		final String note;
 
 		Bar(String label, int current, int max)
+		{
+			this(label, current, max, false, null);
+		}
+
+		Bar(String label, int current, int max, boolean assumed, String note)
 		{
 			this.label = label;
 			this.current = current;
 			this.max = max;
+			this.assumed = assumed;
+			this.note = note;
 		}
 
 		String text()
 		{
 			return current + "/" + max;
+		}
+
+		/** "HP 72/99", "HP 99/99 (from hiscores)", "Run 100/100 (assumed, not shared)". */
+		String tooltip()
+		{
+			return label + " " + text() + (note == null ? "" : " (" + note + ")");
 		}
 	}
 
@@ -122,9 +139,14 @@ final class PanelModel
 		final List<ItemGroup> items;
 		/** "Seed vault: 12 kinds, 340 seeds (seen 3d ago)", or null. */
 		final String seedVault;
+		/**
+		 * Where the stats came from when the member shares none: "From hiscores, 2h ago", "Hiscores unavailable",
+		 * or null for shared stats or nothing at all.
+		 */
+		final String source;
 
 		MemberCard(String name, boolean you, boolean online, String status, List<Bar> bars, List<SkillCell> skills,
-			List<ItemGroup> items, String seedVault)
+			List<ItemGroup> items, String seedVault, String source)
 		{
 			this.name = name;
 			this.you = you;
@@ -134,8 +156,12 @@ final class PanelModel
 			this.skills = skills;
 			this.items = items;
 			this.seedVault = seedVault;
+			this.source = source;
 		}
 	}
+
+	static final String FROM_HISCORES = "from hiscores";
+	static final String ASSUMED = "assumed, not shared";
 
 	static final class BankCard
 	{
@@ -224,6 +250,16 @@ final class PanelModel
 	static List<MemberCard> members(GroupRoster group, Collection<String> roster, RegionNames regions, ItemLookup items,
 		String self, long now)
 	{
+		return members(group, roster, regions, items, self, GamePresence.UNKNOWN, now);
+	}
+
+	/**
+	 * As above, with online and world from the game's Group channel ({@link GamePresence}) where it knows them,
+	 * so members without the plugin show too; party data still fills everything else.
+	 */
+	static List<MemberCard> members(GroupRoster group, Collection<String> roster, RegionNames regions, ItemLookup items,
+		String self, GamePresence game, long now)
+	{
 		Map<String, MemberStats> stats = group.allStats();
 		Map<String, GroupCodec.Carried> carried = group.allCarried();
 		Map<String, MemberExtras> extras = group.extras();
@@ -240,13 +276,87 @@ final class PanelModel
 		{
 			boolean you = name.equalsIgnoreCase(self);
 			long at = heard.getOrDefault(name, 0L);
-			boolean online = Presence.online(at, now);
+			GamePresence.State g = game.state(name);
+			boolean online = g == GamePresence.State.ONLINE || g == GamePresence.State.UNKNOWN && Presence.online(at, now);
 			MemberStats s = stats.get(name);
-			out.add(new MemberCard(name, you, online, status(s, at, online, regions, now), bars(s), skills(s),
-				itemGroups(carried.get(name), extras.get(name), items), seedVault(extras.get(name), now)));
+			String st = status(s, at, g, game.world(name), regions, now);
+			List<ItemGroup> held = itemGroups(carried.get(name), extras.get(name), items);
+			String vault = seedVault(extras.get(name), now);
+			out.add(s != null
+				? new MemberCard(name, you, online, st, bars(s), skills(s), held, vault, null)
+				: fromHiscores(name, you, online, st, held, vault, group.hiscores(), now));
 		}
 		out.sort(Comparator.comparing((MemberCard c) -> !c.you));
 		return out;
+	}
+
+	/**
+	 * A member who shares no stats: their levels from the hiscores, when looked up. Online, HP and Prayer show
+	 * full at their hiscore level and Run and Spec at an assumed 100%, dimmed (Board 2026-11-11). Offline, levels
+	 * only. Items are whatever they shared before, or none: nothing is made up.
+	 */
+	private static MemberCard fromHiscores(String name, boolean you, boolean online, String status,
+		List<ItemGroup> held, String vault, HiscoreBook hiscores, long now)
+	{
+		HiscoreBook.Entry h = hiscores.entry(name);
+		List<Bar> bars = h != null && online ? hiscoreBars(h) : new ArrayList<>();
+		List<SkillCell> skills = new ArrayList<>();
+		if (h != null)
+		{
+			Map<String, MemberStats.Level> levels = new TreeMap<>();
+			h.levels.forEach((skill, level) -> levels.put(skill, new MemberStats.Level(level, level)));
+			skills = skills(new MemberStats(levels, 0, 0, 0, 0));
+		}
+		return new MemberCard(name, you, online, status, bars, skills, held, vault,
+			hiscoreSource(h, hiscores.unavailable(name), now));
+	}
+
+	static List<Bar> hiscoreBars(HiscoreBook.Entry h)
+	{
+		List<Bar> out = new ArrayList<>();
+		Integer hp = h.levels.get("Hitpoints");
+		Integer prayer = h.levels.get("Prayer");
+		if (hp != null)
+		{
+			out.add(new Bar("HP", hp, hp, false, FROM_HISCORES));
+		}
+		if (prayer != null)
+		{
+			out.add(new Bar("Prayer", prayer, prayer, false, FROM_HISCORES));
+		}
+		out.add(new Bar("Run", 100, 100, true, ASSUMED));
+		out.add(new Bar("Spec", 100, 100, true, ASSUMED));
+		return out;
+	}
+
+	/** "From hiscores, 2h ago", with " (hiscores unavailable)" after a failed refresh; null when neither. */
+	static String hiscoreSource(HiscoreBook.Entry h, boolean unavailable, long now)
+	{
+		if (h == null)
+		{
+			return unavailable ? "Hiscores unavailable" : null;
+		}
+		return "From hiscores, " + BoostText.ago(now, h.at) + (unavailable ? " (hiscores unavailable)" : "");
+	}
+
+	/**
+	 * The card's line with the game's word on it: online on the game's world when only the game says so, offline
+	 * when the game says so, and " (no plugin)" for a member whose client never reported.
+	 */
+	private static String status(MemberStats s, long heardAt, GamePresence.State game, int gameWorld,
+		RegionNames regions, long now)
+	{
+		String tag = heardAt > 0 || s != null ? "" : " (no plugin)";
+		boolean heard = Presence.online(heardAt, now);
+		if (game == GamePresence.State.ONLINE && !heard)
+		{
+			return (gameWorld > 0 ? "Online - W" + gameWorld : "Online") + tag;
+		}
+		if (game == GamePresence.State.OFFLINE)
+		{
+			return heardAt > 0 ? status(s, heardAt, false, regions, now) : "Offline" + tag;
+		}
+		return status(s, heardAt, heard, regions, now);
 	}
 
 	static String status(MemberStats s, long heardAt, boolean online, RegionNames regions, long now)
@@ -444,7 +554,10 @@ final class PanelModel
 		return new StorageView(snapshot, total(contents, items), cells(contents, items, filter, true), log);
 	}
 
-	/** "You deposited 5 Trout", "Alex took 2 Shark, deposited 100 Coal". */
+	/**
+	 * "You deposited 5 Trout", "Alex took 2 Shark, deposited 100 Coal", and "You took 4 Prayer potion(4) (not
+	 * shared: Share group storage changes is off)" for an own visit kept to this client.
+	 */
 	static String change(StorageChange c, ItemLookup items, String self)
 	{
 		List<String> parts = new ArrayList<>();
@@ -457,7 +570,7 @@ final class PanelModel
 			parts.add("deposited " + counts(c.deposited(), items));
 		}
 		String who = c.member().equalsIgnoreCase(self) ? "You" : c.member();
-		return who + " " + String.join(", ", parts);
+		return who + " " + String.join(", ", parts) + (c.shared() ? "" : " (" + StorageChange.NOT_SHARED + ")");
 	}
 
 	/** "5 Trout, 40K Coins", amounts in {@code items}' style. */

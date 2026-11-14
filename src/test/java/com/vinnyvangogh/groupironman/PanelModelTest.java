@@ -107,6 +107,35 @@ public class PanelModelTest
 		assertTrue(cards.get(1).skills.isEmpty());
 	}
 
+	/** Board 2026-11-11: the game's Group channel says who is on, plugin or not; party data still fills the rest. */
+	@Test
+	public void cardsTakeOnlineAndWorldFromTheGroupChannel()
+	{
+		GroupRoster roster = new GroupRoster();
+		roster.heard("GroupShip", NOW);
+		roster.heard("GroupArk", NOW - MIN);
+		roster.putStats("GroupArk", stats(330, 12338));
+		List<PanelModel.MemberCard> cards = PanelModel.members(roster, GamePresenceTest.ROSTER.names(), REGIONS, ITEMS,
+			"GroupShip", GamePresenceTest.twoOfFive(), NOW);
+		Map<String, PanelModel.MemberCard> by = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+		cards.forEach(c -> by.put(c.name, c));
+		assertTrue(by.get("GroupOtt").online);
+		assertEquals("Online - W615 (no plugin)", by.get("GroupOtt").status);
+		assertFalse(by.get("GroupPNK").online);
+		assertEquals("Offline (no plugin)", by.get("GroupPNK").status);
+		// Heard a minute ago, but the game says logged out; the last stats stay.
+		assertFalse(by.get("GroupArk").online);
+		assertEquals("Offline - last seen W330, Draynor, 1m ago", by.get("GroupArk").status);
+		assertFalse(by.get("GroupArk").skills.isEmpty());
+		assertTrue(by.get("GroupShip").online);
+
+		List<PanelModel.MemberCard> before = PanelModel.members(roster, GamePresenceTest.ROSTER.names(), REGIONS, ITEMS,
+			"GroupShip", GamePresence.UNKNOWN, NOW);
+		before.forEach(c -> by.put(c.name, c));
+		assertEquals("Not seen yet", by.get("GroupOtt").status);
+		assertTrue(by.get("GroupArk").online);
+	}
+
 	@Test
 	public void bankCardsAreIconGridsMostValuableFirstAndFilterable()
 	{

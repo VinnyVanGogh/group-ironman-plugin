@@ -2,6 +2,127 @@
 
 ## Unreleased
 
+### The leader can share the Discord webhooks with the group
+
+- New in the panel's *Settings* tab, for the group leader only: *Share
+  webhooks with the group*. On, the leader's seven webhooks and their poster
+  names reach every member, so a member only ticks *Post to Discord*.
+- A webhook a member pastes themselves still wins for that category.
+- Members see "Using the group's webhooks (set by ...)" and never the links.
+  They are kept with the group's cache file, not in RuneLite's settings.
+- Anyone with the group key can read shared webhooks. Turning sharing off
+  clears members' copies; a leaked webhook is replaced by deleting it in
+  Discord and pasting a new one, which members pick up.
+- On a shared *Online status* webhook only the leader's client keeps the live
+  board, so the channel gets one board.
+
+### One click to share after joining
+
+- After a group key is saved, the panel shows a *Share with your group?*
+  card. **Turn on sharing** ticks *Sync with my group* and every *Share*
+  switch; **Post my events to Discord** (only with a webhook set) ticks
+  *Post to Discord*; **Not now** hides it until the key changes. Nothing
+  turns on without the click. The panel button now also shows while a group
+  key is saved.
+- With *Share group storage changes* off, your own storage visits are still
+  kept in your Storage and Log tabs, marked *not shared: Share group storage
+  changes is off*. Nothing is sent.
+
+### Seven Discord webhooks, each with its own poster name
+
+- *Discord: connection* now lists seven webhooks in order: Main, Online
+  status, Drops & loot, Progress, Deaths & danger, Group storage and Daily
+  digest. Leave any but Main empty and its posts go to Main's webhook. See
+  the table in the README for what each one carries.
+- Each webhook has its own *name* choice: *Webhook's own*, *Default name* or
+  *Custom*. The default names: Town Crier, World Hopper, Party Pete,
+  Skillcape Seller, Death's Office, Gielinor Banker, Varrock Herald. A
+  category posting to Main's webhook keeps its own name.
+- Each *Custom name* box starts filled with that webhook's default name, and
+  an empty or refused box uses the default name (it used to use the
+  webhook's own).
+- The daily digest now goes to the *Daily digest* webhook (or Main), not to
+  each category's webhook.
+- The *Activities* webhook is retired: clue, kill count, personal best,
+  slayer, farming and birdhouse posts go to Main, Barrows chests to Drops &
+  loot. *Back after a break* moves from the Group webhook to Main.
+- Each webhook has its own send queue and rate limit, so one busy or
+  rate-limited webhook never holds up another.
+- Kept: the main webhook, its poster name and its custom name use the same
+  keys, so they carry over. The old Drops, Deaths, Storage, Progress and
+  Group webhook fields and their custom names carry over too (Group is now
+  *Online status*). The one *Poster name* choice now applies to Main only;
+  the other webhooks start on *Webhook's own*.
+
+### Welcome and update notes in the game chat
+
+- A fresh install says hello in the game chat once: four short lines on
+  joining your group, connecting Discord, and what you get.
+- After a later update, the first login lists what is new, once per version.
+- New setting *Show update notes* (in *Advanced*, on by default) turns both
+  off. The version is still marked as seen with it off, so turning it back on
+  never brings back old notes.
+
+### Settings open on a short list
+
+- Every settings section but *Group* starts closed, so a first install shows
+  all eight section names at once.
+- *Offline grace (minutes)* is now *Offline grace*, with *mins* in the box,
+  so its name is no longer cut off. Same key, same value.
+
+### Settings names that fit
+
+- Long setting names no longer get cut off with "..." in the settings panel.
+  Shorter names: *Combine level-ups*, *Grave picture*, *Valuable drop (gp)*,
+  *Big storage (gp)*, *Clue reward (gp)*, *Shared drops (gp)*, *KC milestone
+  every*, *Gravestone warning*, *Share pouch, quiver, vault*, *Banner:
+  Gravestone expiring*, and the `::find` colours (*Search colour*, *Your bank
+  colour* and so on). The full meaning is in each setting's tooltip.
+- *Poster name*'s first choice is now *Webhook's own*, and *Grave picture*'s
+  is *Where I died*: a long choice made the dropdown squeeze the name to
+  "P...".
+- gp boxes show plain digits, so 1,000,000 shows as `1000000` instead of
+  being cut to `1,000,00`. *Gravestone warning* shows `5 mins`.
+- Nothing resets: every setting keeps its saved value.
+
+### Hiscore levels for members without the plugin
+
+- Group tab cards for members who never ran GIM Utilities, online or never
+  seen, now show their skill levels from the OSRS hiscores, read with
+  RuneLite's own hiscore lookup, marked *From hiscores, 2h ago*.
+- Online, such a member also shows HP and Prayer at their hiscore level, and
+  Run and Spec at 100%, dimmed, with the tooltip *assumed, not shared*.
+- Looked up when you log in and when a member comes online, at most once
+  every 6 hours per member, and kept across restarts. A failed lookup shows
+  *Hiscores unavailable* and retries later, backing off up to 6 hours.
+- Shared plugin data always wins. Inventory and worn items are never made
+  up: a member who never shared them shows none.
+
+### Live board: last seen for everyone
+
+- Offline members read *last seen 2 hours ago on world 302* (Discord's own
+  relative time, so it stays current without edits) instead of just
+  *offline*. Members without the plugin get theirs from when a plugin user
+  last saw them online in the Group channel.
+- When the last plugin user logs out, the board's final edit keeps every
+  member's last seen and ends with *Nobody with GIM Utilities is online, so
+  these may be out of date (as of ...)*.
+- Last seen is kept in the group cache, so it survives a restart.
+
+### Online status for members without the plugin
+
+- Who is online, and on which world, now comes from the game's own Ironman
+  Group channel (the in-game Group tab), so members who don't run the plugin
+  show too. The Friends list is the fallback before the channel loads.
+- Live board: *online (world 615)* or *offline* for every member, with a
+  subtle *(no plugin)* tag for members whose client never reported. *unknown*
+  only before the game has said.
+- The Group overlay no longer says *Nobody else online* while the game shows
+  others online. Sidebar cards show *Online - W615 (no plugin)* or *Offline*.
+- Online posts: logins and logouts of members without the plugin are posted
+  too, with the same offline grace, by one plugin user only (the first by name
+  of those online in the group's party).
+
 ### One Discord post per skill's level streak
 
 - New setting **Combine level-ups within (minutes)**, default 30, 0 turns it
@@ -15,6 +136,56 @@
 - If the post was deleted or the webhook changed, the next update is posted as
   a new message, and that one is edited from then on. Message ids are kept in
   memory only.
+- One action that gains several levels (low Prayer from bones) reads from the
+  level before it: *Prayer 3 → 6 (+3)*, not *5 → 6*.
+- After three edits in a row lost to Discord or the network, or a post pushed
+  out of a full queue, the streak ends and the next level posts fresh.
+- Level-up posts use the Progress poster name.
+
+### The Log shows every group event
+
+- The sidebar Log lists every event the overlay and Discord know about,
+  yours and members', from the same events: an event is logged even when its
+  Discord and overlay switches are off. Every kind is detected while the
+  plugin runs, for the Log.
+- Search (member, item, place, text), category chips (Drops, Deaths,
+  Storage, Progress, Group, Activities), a member picker and a time range.
+- "Since you last played" stays on top; the rest is grouped by day. Each row
+  has the item or skill icon, member, short line and time; hover for the
+  full line and value (*1.5M (1,501,600) gp*); right-click to copy.
+- Kept in the group cache file under a new `feed` key: the newest 2,000
+  events, none older than 30 days. A cache from before starts the feed from
+  its drops and storage logs.
+
+### Group settings, a leader and editors
+
+- New **Settings** tab in the panel. Thresholds, which events post to
+  Discord and show as overlays, the daily digest, Easter eggs, quiet hours
+  and the offline grace can now be the group's: the leader (or an editor)
+  saves them once and every member's client uses them.
+- The member who creates the group key leads a group that has no leader; a
+  group made before this update gets a **Claim leadership** button. The
+  leader makes and removes editors. Roles and settings are signed, so a
+  member cannot promote themselves or send settings of their own.
+- Each save is a new version; who changed what, and when, is listed under
+  *Recent changes*. A member who was offline picks up the latest when they
+  join.
+- The first save copies the leader's own current settings. Until then each
+  member keeps using their own, as before.
+- Yours alone, whatever the group says: **Don't post my events**, and per
+  event kind *Post* and *Show*. The leader and editors see a read-only grid
+  of who posts what.
+- Webhook URLs, the mention, *Post to Discord*, *Online status* and every
+  *Share* switch stay each member's own and are never sent to the group. So
+  the group can never turn login posts on beside a member's live board.
+- New group setting **Post every N levels** (default 1, under *Thresholds*):
+  from *Level ups from level*, only every Nth level posts or shows (5: 60,
+  65, 70). 99s, max total, total level milestones and combat levels always
+  do. One action that jumps past a multiple (Prayer 3 → 7 with 5) still
+  counts.
+- With *Combine level-ups* on, every N applies first: one post for 60, edited
+  in place to "59 → 65" when 65 comes, not at each level in between.
+- *Don't post my events* is the last setting under *Discord: connection*.
 
 ### Amounts read like the game
 
@@ -30,6 +201,33 @@
 - Item icons show the stack's own picture: a big coin pile for big stacks.
   The panel's Find rows now draw the stack too, and Discord thumbnails use
   the coin pile for the amount.
+
+### Online status: a live board
+
+- New setting **Online status**: *Posts*, *Live board* or *Off*. It replaces
+  the "Online and offline" switch; an install that had it ticked stays on
+  *Posts*, one that used Discord without it is *Off*, and a new install starts
+  on *Posts*: a member opts into *Live board*.
+- *Live board* keeps one message in the Group channel listing each member:
+  online (with the world) or offline (last seen, kept current by Discord). It
+  is edited on each login, logout and hop, at most once every 10 seconds and
+  never in quiet hours. If the message is deleted, the next change posts a new
+  one. Only members whose clients run the plugin are reported; the others show
+  *unknown*. The webhook and the message id stay on your client: neither is
+  sent to the group.
+- Each member with *Live board* and a Group webhook keeps their own board, so
+  only one member sharing a Group webhook should turn it on.
+- The board's posts and edits share the Discord queue with every other post
+  (at most 20 a minute) and use the Group poster name.
+
+### Slayer posts fixed
+
+- Checking the enchanted gem no longer posts *task done*: a task is done only
+  on the line that sends you back to a Slayer master (RuneLite's own rule).
+- A task from a master's dialogue now posts (it posted nothing), as does a
+  partner's: *New Slayer task: 19 x Icefiends (Turael)*. The gem's check never
+  posts the task you already have.
+- A finished task reads *Slayer task done: Icefiends (streak 1, 2 points)*.
 
 ### Online and offline posts
 

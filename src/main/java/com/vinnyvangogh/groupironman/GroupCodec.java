@@ -299,7 +299,7 @@ final class GroupCodec
 	 * world, {@code l} location. A 1.0.0 build reads {@code d} and {@code c}
 	 * exactly as before and skips every other code.
 	 */
-	private static JsonObject eventJson(GroupEvent e)
+	static JsonObject eventJson(GroupEvent e)
 	{
 		JsonObject event = new JsonObject();
 		event.addProperty("t", e.type.code);

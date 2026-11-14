@@ -38,9 +38,11 @@ final class EasterEggs
 			this.freeloaderAt = freeloaderAt;
 		}
 
-		static Settings of(GroupIronmanConfig config)
+		/** The group's Easter egg settings when it has them, else this member's own. */
+		static Settings of(GroupSettingsSchema.Resolved values)
 		{
-			return new Settings(config.discordEasterEggs(), config.discordLegendAt(), config.discordFreeloaderAt());
+			return new Settings(values.on("discordEasterEggs"), values.value("discordLegendAt"),
+				values.value("discordFreeloaderAt"));
 		}
 	}
 
@@ -54,18 +56,47 @@ final class EasterEggs
 	private static final Set<GroupEvent.Type> NAMED = Collections.unmodifiableSet(EnumSet.of(
 		GroupEvent.Type.RAID_UNIQUE, GroupEvent.Type.CLOG));
 
-	/** Checked in order; the first that applies wins. Deaths are first so a spade outranks a free trip. */
+	/**
+	 * Checked in order; the first that applies wins. Deaths are first so a spade outranks a free trip. The memes
+	 * each key on one event type, so their order only matters where noted: the total-level "maxed" post comes
+	 * before the one-skill 99, and the gold ring comes after Legend so a big deposit stays legendary.
+	 */
 	private static final List<Rule> RULES = Collections.unmodifiableList(Arrays.<Rule>asList(
 		(e, l, s) -> clueDeath(e, l) ? EasterEggLines.CLUE_HUNTERS : null,
 		(e, l, s) -> nothingLost(e) ? EasterEggLines.FREE_TRIP : null,
 		(e, l, s) -> e.type == GroupEvent.Type.PET ? EasterEggLines.PET : null,
+		at(GroupEvent.Type.LEVEL_UP, 73, EasterEggLines.LEVEL_73),
+		at(GroupEvent.Type.LEVEL_UP, 92, EasterEggLines.LEVEL_92),
+		named(GroupEvent.Type.MAXED, "total", EasterEggLines.MAXED_TOTAL),
+		(e, l, s) -> e.type == GroupEvent.Type.MAXED ? EasterEggLines.SKILL_99 : null,
+		at(GroupEvent.Type.COMBAT_LEVEL, 126, EasterEggLines.COMBAT_126),
+		at(GroupEvent.Type.TOTAL_LEVEL, 2000, EasterEggLines.TOTAL_2000),
+		at(GroupEvent.Type.XP_MILESTONE, 200_000_000L, EasterEggLines.XP_200M),
+		named(GroupEvent.Type.QUEST, "Cook's Assistant", EasterEggLines.COOKS_ASSISTANT),
+		named(GroupEvent.Type.QUEST, "Dragon Slayer I", EasterEggLines.DRAGON_SLAYER),
+		named(GroupEvent.Type.QUEST, "Recipe for Disaster", EasterEggLines.RECIPE_FOR_DISASTER),
+		named(GroupEvent.Type.DEATH, "TzTok-Jad", EasterEggLines.JAD),
+		(e, l, s) -> e.type == GroupEvent.Type.DRY_STREAK ? EasterEggLines.SIT : null,
 		(e, l, s) -> bonesOnly(e) ? EasterEggLines.BONES_ONLY : null,
 		EasterEggs::itemRow,
 		(e, l, s) -> freeloader(e, l, s) ? EasterEggLines.FREELOADER : null,
-		(e, l, s) -> legend(e, l, s) ? EasterEggLines.LEGEND : null));
+		(e, l, s) -> legend(e, l, s) ? EasterEggLines.LEGEND : null,
+		(e, l, s) -> deposited(e).containsKey(EasterEggLines.GOLD_RING) ? EasterEggLines.BUYING_GF : null));
 
 	private EasterEggs()
 	{
+	}
+
+	/** This type of event at exactly this number: a level, a total, an XP milestone. */
+	private static Rule at(GroupEvent.Type type, long number, String[] lines)
+	{
+		return (e, l, s) -> e.type == type && e.number == number ? lines : null;
+	}
+
+	/** This type of event with this text, any case: a quest name, a killer, "total". */
+	private static Rule named(GroupEvent.Type type, String text, String[] lines)
+	{
+		return (e, l, s) -> e.type == type && text.equalsIgnoreCase(e.text) ? lines : null;
 	}
 
 	/** The egg for one Discord post's events (a merged moment): the first event with one wins. */

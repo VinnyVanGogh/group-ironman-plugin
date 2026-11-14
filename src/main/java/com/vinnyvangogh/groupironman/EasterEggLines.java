@@ -20,6 +20,7 @@ final class EasterEggLines
 	static final String[] FREE_TRIP = {
 		"Free trip to Lumbridge, no charge.",
 		"Nothing to lose, nothing lost. Suspiciously intentional.",
+		"Ironman death insurance: own nothing.",
 	};
 	/** A death where all that was lost is a spade, maybe with clue items. */
 	static final String[] CLUE_HUNTERS = {
@@ -28,6 +29,66 @@ final class EasterEggLines
 	static final String[] PET = {
 		"Congrats, you can stop now.",
 		"Look who followed you home.",
+		"Pet! Now pretend you were going for it.",
+	};
+
+	// Community memes, each tied to one event the plugin already posts. Real people only in widely known,
+	// affectionate memes (B0aty's 73, Zezima), and never aimed at the player in the group.
+	/** A level up to 73 in any skill: the B0aty 73 meme. */
+	static final String[] LEVEL_73 = {
+		"73. B0aty would approve.",
+		"Seventy-three. A B0aty classic.",
+	};
+	/** A level up to 92: 92 is halfway to 99 in XP. */
+	static final String[] LEVEL_92 = {
+		"92: halfway to 99.",
+		"Halfway to 99. Only the other half to go.",
+	};
+	/** A 99 in one skill. */
+	static final String[] SKILL_99 = {
+		"Cape on, emote out.",
+		"99! Time to stand in a bank and emote.",
+	};
+	/** Maxed: every skill at 99. */
+	static final String[] MAXED_TOTAL = {
+		"Move over, Zezima.",
+		"Maxed. Zezima would be impressed.",
+	};
+	/** Combat level 126, the highest there is. */
+	static final String[] COMBAT_126 = {
+		"126. Max combat, max swagger.",
+	};
+	/** Total level 2000. */
+	static final String[] TOTAL_2000 = {
+		"Welcome to the 2K total club.",
+	};
+	/** 200M XP in a skill, the most it can hold. */
+	static final String[] XP_200M = {
+		"200M. The XP counter has nowhere left to go.",
+	};
+	/** Quest completions, keyed by the quest name as posted. */
+	static final String[] COOKS_ASSISTANT = {
+		"The Duke gets his birthday cake after all.",
+	};
+	static final String[] DRAGON_SLAYER = {
+		"Rune platebody unlocked. Elvarg had it coming.",
+	};
+	static final String[] RECIPE_FOR_DISASTER = {
+		"Barrows gloves! An ironman rite of passage.",
+	};
+	/** A death to TzTok-Jad. */
+	static final String[] JAD = {
+		"Jad claims another fire cape hopeful.",
+		"Pray mage, pray range, try again.",
+	};
+	/** A dry streak post: the "sit" meme, kindly. */
+	static final String[] SIT = {
+		"Sit. (Affectionately.)",
+		"The RNG says sit. Keep going.",
+	};
+	/** A gold ring put in group storage: "buying gf". */
+	static final String[] BUYING_GF = {
+		"Buying gf, paying in gold rings.",
 	};
 	/** A "valuable" drop that is only Bones: the drop threshold is set very low. */
 	static final String[] BONES_ONLY = {
@@ -65,6 +126,7 @@ final class EasterEggLines
 	static final int DRAGON_CHAINBODY = 3140;
 	static final int ABYSSAL_WHIP = 4151;
 	static final int DRAGON_MED_HELM = 1149;
+	static final int GOLD_RING = 1635;
 
 	static final Map<Integer, String[]> ITEMS;
 
@@ -98,7 +160,9 @@ final class EasterEggLines
 	static List<String> all()
 	{
 		List<String> out = new ArrayList<>();
-		for (String[] lines : Arrays.asList(FREE_TRIP, CLUE_HUNTERS, PET, BONES_ONLY, LEGEND, FREELOADER))
+		for (String[] lines : Arrays.asList(FREE_TRIP, CLUE_HUNTERS, PET, BONES_ONLY, LEGEND, FREELOADER, LEVEL_73,
+			LEVEL_92, SKILL_99, MAXED_TOTAL, COMBAT_126, TOTAL_2000, XP_200M, COOKS_ASSISTANT, DRAGON_SLAYER,
+			RECIPE_FOR_DISASTER, JAD, SIT, BUYING_GF))
 		{
 			out.addAll(Arrays.asList(lines));
 		}

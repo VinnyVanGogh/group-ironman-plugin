@@ -11,8 +11,9 @@ import net.runelite.client.ui.overlay.components.TitleComponent;
 
 /**
  * The combined group box: who is online and on which world, then the latest
- * events. Off by default ("Group box"). Online is the same "heard from in
- * the last three minutes" the panel uses ({@link Presence}).
+ * events. Off by default ("Group box"). Online is what the game's Group channel
+ * shows, plugin or not ({@link GamePresence}), and members heard from in the
+ * last three minutes ({@link Presence}) unless the game says they left.
  */
 final class GroupBoxOverlay extends OverlayPanel
 {
@@ -37,15 +38,16 @@ final class GroupBoxOverlay extends OverlayPanel
 		}
 		long now = System.currentTimeMillis();
 		panelComponent.getChildren().add(TitleComponent.builder().text("Group").build());
-		Map<String, MemberStats> online = group.roster().onlineStats(now);
+		Map<String, Integer> online = GamePresence.othersOnline(group.roster().onlineStats(now), group.presence(),
+			group.self());
 		if (online.isEmpty())
 		{
 			panelComponent.getChildren().add(LineComponent.builder().left("Nobody else online").leftColor(Color.GRAY)
 				.build());
 		}
-		for (Map.Entry<String, MemberStats> e : online.entrySet())
+		for (Map.Entry<String, Integer> e : online.entrySet())
 		{
-			int world = e.getValue().world();
+			int world = e.getValue();
 			panelComponent.getChildren().add(LineComponent.builder().left(e.getKey())
 				.right(world > 0 ? "W" + world : "").rightColor(Color.GREEN).build());
 		}

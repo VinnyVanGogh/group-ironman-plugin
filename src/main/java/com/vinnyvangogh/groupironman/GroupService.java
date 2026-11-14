@@ -1,14 +1,15 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
@@ -24,6 +26,8 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.EnumComposition;
 import net.runelite.api.EnumID;
+import net.runelite.api.Friend;
+import net.runelite.api.FriendContainer;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
@@ -37,6 +41,9 @@ import net.runelite.api.clan.ClanMember;
 import net.runelite.api.clan.ClanSettings;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.ClanChannelChanged;
+import net.runelite.api.events.ClanMemberJoined;
+import net.runelite.api.events.ClanMemberLeft;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -53,7 +60,6 @@ import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.Notifier;
-import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
@@ -63,9 +69,13 @@ import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStats;
 import net.runelite.client.game.ItemStack;
+import net.runelite.client.hiscore.HiscoreClient;
+import net.runelite.client.hiscore.HiscoreEndpoint;
+import net.runelite.client.hiscore.HiscoreResult;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.events.UserPart;
+import net.runelite.client.util.Filepath;
 import net.runelite.client.party.messages.UserSync;
 
 /**
@@ -81,7 +91,10 @@ import net.runelite.client.party.messages.UserSync;
  *
  * <p>Data only ever comes from this player's own client: their bank and
  * group storage as the game shows them, their own stats. Nothing is read
- * from another player and nothing goes anywhere but RuneLite Party.
+ * from another player and nothing goes anywhere but RuneLite Party. The one
+ * exception is read, not sent: roster members who share no stats are looked up
+ * on the public OSRS hiscores with RuneLite's own {@link HiscoreClient}
+ * ({@link HiscoreBook}), and the result stays on this client.
  */
 @Slf4j
 class GroupService
@@ -120,7 +133,11 @@ class GroupService
 		}
 	}
 
-	/** Its own folder, never Build Guard's: both plugins may run side by side. */
+	/**
+	 * The folder under .runelite the cache used before the Filepath API. Now only the
+	 * PluginDescriptor's legacyDataDirectory, which RuneLite migrates into the plugin's data
+	 * directory. Never Build Guard's: both plugins may run side by side.
+	 */
 	static final String CACHE_DIR = "gim-utilities";
 	private static final String CACHE_FILE = "group-cache.json";
 
@@ -154,6 +171,9 @@ class GroupService
 	@Inject
 	private ConfigManager configManager;
 
+	@Inject
+	private HiscoreClient hiscoreClient;
+
 	private final GroupRoster roster = new GroupRoster();
 	private final BankAssembler assembler = new BankAssembler();
 	private final Map<Integer, String> names = new ConcurrentHashMap<>();
@@ -161,12 +181,21 @@ class GroupService
 	/** Equipment slot per item, read on the client thread with the name (ItemManager stats need it). */
 	private final Map<Integer, Integer> slots = new ConcurrentHashMap<>();
 	private Runnable onChange = () -> { };
+	private Callable<Filepath> dataDirectory = () ->
+	{
+		throw new IOException("plugin data directory not set");
+	};
 	private GroupSync sync;
+	/** Roles and the group's shared settings; null when not running. */
+	private volatile GovernanceSync governance;
+	/** The leader's signed webhooks document as the cache file keeps it, or null. Never put in the config. */
+	private volatile String cachedWebhooks;
 	/** The group event engine, told about storage visits, minimums and members' events; null when not running. */
 	private volatile GroupEventEngine events;
 
 	private volatile LowStock lowStock = LowStock.parse("");
 	private volatile GroupMembers members = GroupMembers.UNKNOWN;
+	private volatile GamePresence presence = GamePresence.UNKNOWN;
 
 	// Client thread only.
 	private final StorageSession storage = new StorageSession();
@@ -191,6 +220,8 @@ class GroupService
 	private Map<Integer, Integer> seedVault = new TreeMap<>();
 	private long seedVaultAt = -1;
 	private boolean session;
+	/** This login has not asked the hiscores about the roster yet. */
+	private boolean hiscoresOnLogin = true;
 
 	private volatile RegionNames regions = RegionNames.parse("");
 	/** Nothing is written to disk until the file has been read, or a save would replace it with less. */
@@ -221,9 +252,14 @@ class GroupService
 		}
 	};
 
-	void startUp(Runnable onChange)
+	/**
+	 * @param dataDirectory the plugin's own data directory (Plugin#getPluginDirectory). Called on
+	 *                      the executor, since the first call may migrate the legacy folder.
+	 */
+	void startUp(Runnable onChange, Callable<Filepath> dataDirectory)
 	{
 		this.onChange = onChange;
+		this.dataDirectory = dataDirectory;
 		sync = new GroupSync(new GroupSync.Party()
 		{
 			@Override
@@ -237,6 +273,32 @@ class GroupService
 			{
 				partyService.changeParty(passphrase);
 			}
+		});
+		governance = new GovernanceSync(gson, new GovernanceSync.Store()
+		{
+			@Override
+			public String get(String key)
+			{
+				return configManager.getConfiguration(GroupIronmanConfig.GROUP, key);
+			}
+
+			@Override
+			public void set(String key, String value)
+			{
+				if (value == null)
+				{
+					configManager.unsetConfiguration(GroupIronmanConfig.GROUP, key);
+				}
+				else
+				{
+					configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value);
+				}
+			}
+		}, payload -> partyService.send(new VvgGroupIronmanMessage(payload)), () -> this.onChange.run(), webhooks ->
+		{
+			// The leader's shared webhooks: kept in the group cache file, never the RuneLite config.
+			cachedWebhooks = webhooks;
+			saveCache();
 		});
 		cacheLoaded = false;
 		since = 0;
@@ -261,8 +323,11 @@ class GroupService
 			sync.leaveOwn();
 		}
 		members = GroupMembers.UNKNOWN;
+		governance = null;
+		cachedWebhooks = null;
 		cacheLoaded = false;
 		session = false;
+		hiscoresOnLogin = true;
 		seedVault = new TreeMap<>();
 		seedVaultAt = -1;
 		lastExtrasSent = null;
@@ -384,10 +449,129 @@ class GroupService
 		}
 	}
 
-	/** "Create group key" and "New key": a fresh random key, which the player then shares. */
+	/**
+	 * "Create group key" and "New key": a fresh random key, which the player
+	 * then shares. The member who creates the key leads a group that has no
+	 * leader yet (Board 2026-11-10); a group that has one keeps it.
+	 */
 	void newKey()
 	{
 		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_KEY, GroupKey.generate());
+		claimLeadership();
+	}
+
+	// ---- Group settings and roles (the panel's Settings tab) ----
+
+	/** Roles and the group's settings on this client, or null when not running. */
+	GroupGovernance governance()
+	{
+		GovernanceSync g = governance;
+		return g == null ? null : g.governance();
+	}
+
+	/** The value of each shared setting now: the group's, or this member's own config while it has none. */
+	GroupSettingsSchema.Resolved groupValues()
+	{
+		GroupGovernance g = governance();
+		return new GroupSettingsSchema.Resolved(config, g == null ? null : g.settings());
+	}
+
+	/** "Claim leadership", shown only while this client knows of no leader. False when refused. */
+	boolean claimLeadership()
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.claim(self, System.currentTimeMillis());
+	}
+
+	/** The leader's "Make editor" and "Remove editor". False when refused. */
+	boolean setEditor(String name, boolean editor)
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.setEditor(self, name, editor, System.currentTimeMillis());
+	}
+
+	/** The leader's or an editor's "Save to group", and why it did not go out when it did not. */
+	GovernanceSync.SaveResult saveGroupSettings(Map<String, Long> values)
+	{
+		GovernanceSync g = governance;
+		if (g == null)
+		{
+			return GovernanceSync.SaveResult.NOT_STARTED;
+		}
+		if (self.isEmpty())
+		{
+			return GovernanceSync.SaveResult.NOT_LOGGED_IN;
+		}
+		GovernanceSync.SaveResult r = g.save(self, values, System.currentTimeMillis());
+		return r == GovernanceSync.SaveResult.SAVED && !syncing() ? GovernanceSync.SaveResult.SAVED_OFFLINE : r;
+	}
+
+	/** The leader's "Share webhooks with the group". False when refused: this client is not the leader. */
+	boolean shareWebhooks(boolean share)
+	{
+		GovernanceSync g = governance;
+		return g != null && !self.isEmpty() && g.shareWebhooks(self, share, Webhooks.of(config),
+			System.currentTimeMillis());
+	}
+
+	/** The leader's shared webhooks this client holds, or null when the leader shares none. */
+	GroupWebhooks sharedWebhooks()
+	{
+		GroupGovernance g = governance();
+		return g == null ? null : g.sharedWebhooks();
+	}
+
+	/**
+	 * Where this client's posts go: its own webhooks, with the leader's shared ones filling every field it left
+	 * empty ({@link Webhooks#withGroup}). Every sender asks this.
+	 */
+	Webhooks webhooks()
+	{
+		return Webhooks.of(config).withGroup(sharedWebhooks());
+	}
+
+	/** True when this client is the group's leader, holding the leader's key. */
+	boolean isLeader()
+	{
+		GroupGovernance g = governance();
+		return g != null && !self.isEmpty() && g.myRole(self) == GroupGovernance.Role.LEADER;
+	}
+
+	/** While the leader shares, an edit of the leader's own webhooks goes to the group as a new version. */
+	private void republishWebhooks()
+	{
+		GovernanceSync g = governance;
+		if (g != null && sharedWebhooks() != null && isLeader())
+		{
+			g.shareWebhooks(self, true, Webhooks.of(config), System.currentTimeMillis());
+		}
+	}
+
+	/** "Forget leader": this client only. */
+	void forgetLeader()
+	{
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.forgetLeader();
+		}
+	}
+
+	/** This member's own "don't post" (or overlay "don't show") for one kind. */
+	void optOut(GroupEvent.Type type, boolean overlay, boolean out)
+	{
+		String key = overlay ? GroupIronmanConfig.KEY_MUTE_TYPES : GroupIronmanConfig.KEY_OPT_OUT_TYPES;
+		Set<GroupEvent.Type> types = MemberPrefs.parse(overlay ? config.overlayMuteTypes() : config.eventOptOutTypes());
+		if (out ? types.add(type) : types.remove(type))
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, key, MemberPrefs.format(types));
+		}
+	}
+
+	/** "Don't post my events". */
+	void optOutAll(boolean out)
+	{
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_OPT_OUT_ALL, out);
 	}
 
 	/** What "Copy group key" puts on the clipboard, or null without a key. */
@@ -412,6 +596,24 @@ class GroupService
 		return true;
 	}
 
+	/** The panel's "Turn on sharing" card: what it reads. */
+	SharingPrompt.Settings sharingSettings()
+	{
+		return SharingPrompt.Settings.of(config);
+	}
+
+	/** "Turn on sharing": the player's own click, never on its own. */
+	void turnOnSharing()
+	{
+		SharingPrompt.turnOnSharing((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+	}
+
+	/** "Post my events to Discord": the player's own click. */
+	void postToDiscord()
+	{
+		SharingPrompt.postToDiscord((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+	}
+
 	void reloadConfig()
 	{
 		if (sync != null && !config.groupSync())
@@ -420,6 +622,12 @@ class GroupService
 			sync.leaveOwn();
 		}
 		lowStock = LowStock.parse(config.groupLowStock());
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.prefs(MemberPrefs.of(config));
+		}
+		republishWebhooks();
 		GroupOutbox.Switches s = switches();
 		// Turning a live feature off drops what was collected for it.
 		if (!s.stats)
@@ -508,6 +716,11 @@ class GroupService
 			session = false;
 			roster.markPlayed(System.currentTimeMillis());
 			saveCache();
+		}
+		if (event.getGameState() == GameState.LOGIN_SCREEN)
+		{
+			hiscoresOnLogin = true;
+			refreshPresence();
 		}
 	}
 
@@ -637,6 +850,21 @@ class GroupService
 		}
 	}
 
+	/**
+	 * Any thread. One routed event, yours or a member's, into the Log tab's
+	 * feed. Kept on disk with the rest of the cache; duplicates (a resend) are
+	 * dropped by the feed.
+	 */
+	void logEvent(GroupEvent event)
+	{
+		if (!roster.feed().add(event))
+		{
+			return;
+		}
+		saveCache();
+		onChange.run();
+	}
+
 	/** Client thread. Logs one of this player's own events and tells the party. */
 	private void recordEvent(GroupEvent event)
 	{
@@ -705,11 +933,13 @@ class GroupService
 		{
 			roster.markPlayed(now);
 		}
+		recordSeen(now);
 		refreshRoster();
 		if (!syncing())
 		{
 			return;
 		}
+		flushGovernance();
 		GroupOutbox.Switches s = switches();
 
 		if (s.stats)
@@ -746,6 +976,11 @@ class GroupService
 		boolean first = !members.known() && now.known();
 		boolean changed = !now.names().equals(members.names()) || !now.group().equals(members.group());
 		members = now;
+		GovernanceSync g = governance;
+		if (g != null && now.known())
+		{
+			g.group(now.group());
+		}
 		if (first && syncing())
 		{
 			partyService.send(new UserSync());
@@ -754,6 +989,170 @@ class GroupService
 		{
 			onChange.run();
 		}
+		refreshPresence();
+		hiscoresAfterRoster();
+	}
+
+	/** Client thread. Once per login, every roster member, seen online or not; otherwise only failed lookups' retries. */
+	private void hiscoresAfterRoster()
+	{
+		boolean login = hiscoresOnLogin && cacheLoaded && members.known();
+		if (login)
+		{
+			hiscoresOnLogin = false;
+		}
+		lookUpHiscores(members.names(), login);
+	}
+
+	/**
+	 * Client thread. Starts a hiscore lookup, on OkHttp's threads, for each of {@code names} that is not this
+	 * player, shares no stats (shared data always wins) and is due ({@link HiscoreBook#begin}). {@code asked}:
+	 * this player just logged in or these members just came online.
+	 */
+	private void lookUpHiscores(Collection<String> names, boolean asked)
+	{
+		if (!cacheLoaded || !anyOn() || names.isEmpty())
+		{
+			return;
+		}
+		Set<String> shared = new HashSet<>();
+		roster.allStats().keySet().forEach(n -> shared.add(GroupMembers.key(n)));
+		shared.add(GroupMembers.key(self));
+		long now = System.currentTimeMillis();
+		for (String name : names)
+		{
+			if (!shared.contains(GroupMembers.key(name)) && roster.hiscores().begin(name, now, asked))
+			{
+				hiscoreClient.lookupAsync(name, HiscoreEndpoint.NORMAL)
+					.whenComplete((result, error) -> hiscoreDone(name, result, error));
+			}
+		}
+	}
+
+	/** OkHttp thread. A null result is a name not on the hiscores; it shows as unavailable, like an error. */
+	private void hiscoreDone(String name, HiscoreResult result, Throwable error)
+	{
+		long now = System.currentTimeMillis();
+		Map<String, Integer> levels = error == null ? HiscoreBook.levels(result) : Collections.emptyMap();
+		if (levels.isEmpty())
+		{
+			log.debug("hiscore lookup for a group member failed", error);
+			roster.hiscores().failed(name, now);
+		}
+		else
+		{
+			roster.hiscores().succeeded(name, levels, now);
+			saveCache();
+		}
+		onChange.run();
+	}
+
+	/**
+	 * Client thread: the Group channel changed, a member joined it or left it. RuneLite posts
+	 * {@code ClanChannelChanged} (with {@code getClanId()}) when a channel loads or goes, and
+	 * {@code ClanMemberJoined} / {@code ClanMemberLeft} (with {@code getClanChannel()}) as members log in and out.
+	 */
+	@Subscribe
+	public void onClanChannelChanged(ClanChannelChanged event)
+	{
+		if (event.getClanId() == ClanID.GROUP_IRONMAN)
+		{
+			refreshPresence();
+		}
+	}
+
+	@Subscribe
+	public void onClanMemberJoined(ClanMemberJoined event)
+	{
+		groupChannelEvent(event.getClanChannel());
+	}
+
+	@Subscribe
+	public void onClanMemberLeft(ClanMemberLeft event)
+	{
+		groupChannelEvent(event.getClanChannel());
+	}
+
+	private void groupChannelEvent(ClanChannel channel)
+	{
+		if (channel != null && channel == client.getClanChannel(ClanID.GROUP_IRONMAN))
+		{
+			refreshPresence();
+		}
+	}
+
+	/**
+	 * Client thread, each tick logged in: this player, and every member the game shows online (the Group channel,
+	 * plugin or not), were seen now on their world. The live board's "last seen"; saved with the group cache.
+	 */
+	private void recordSeen(long now)
+	{
+		if (!self.isEmpty())
+		{
+			roster.seen(self, new LastSeen(now, client.getWorld(), true));
+		}
+		presence.online().forEach((name, world) -> roster.seen(name, new LastSeen(now, world, false)));
+	}
+
+	/** Who in the group is online and where, as the game shows it; {@link GamePresence#UNKNOWN} logged out. */
+	GamePresence presence()
+	{
+		return presence;
+	}
+
+	/** Client thread. Re-reads {@link #presence} and, when it changed, tells the panel and the event engine. */
+	private void refreshPresence()
+	{
+		GamePresence now = client.getGameState() == GameState.LOGGED_IN
+			? GamePresence.read(members, readChannel(), readFriends()) : GamePresence.UNKNOWN;
+		if (now.equals(presence))
+		{
+			return;
+		}
+		GamePresence before = presence;
+		presence = now;
+		lookUpHiscores(GamePresence.cameOnline(members.names(), before, now), true);
+		GroupEventEngine e = events;
+		if (e != null)
+		{
+			e.gamePresence(now);
+		}
+		onChange.run();
+	}
+
+	/** Client thread. The Group channel's members and worlds, null before it loads. */
+	private Map<String, Integer> readChannel()
+	{
+		ClanChannel channel = client.getClanChannel(ClanID.GROUP_IRONMAN);
+		if (channel == null || channel.getMembers() == null)
+		{
+			return null;
+		}
+		Map<String, Integer> out = new HashMap<>();
+		for (ClanChannelMember m : channel.getMembers())
+		{
+			out.put(m.getName(), m.getWorld());
+		}
+		return out;
+	}
+
+	/** Client thread. The Friends list's names and worlds (0 offline), null before it loads. */
+	private Map<String, Integer> readFriends()
+	{
+		FriendContainer friends = client.getFriendContainer();
+		if (friends == null || friends.getMembers() == null)
+		{
+			return null;
+		}
+		Map<String, Integer> out = new HashMap<>();
+		for (Friend f : friends.getMembers())
+		{
+			if (f != null && f.getName() != null)
+			{
+				out.put(f.getName(), f.getWorld());
+			}
+		}
+		return out;
 	}
 
 	/** Client thread. {@code ClanSettings} lists every member; the channel only those online, so it is the fallback. */
@@ -769,15 +1168,10 @@ class GroupService
 			}
 			return GroupMembers.of(settings.getName(), names);
 		}
-		ClanChannel channel = client.getClanChannel(ClanID.GROUP_IRONMAN);
-		if (channel != null && channel.getMembers() != null)
+		Map<String, Integer> online = readChannel();
+		if (online != null)
 		{
-			List<String> names = new ArrayList<>();
-			for (ClanChannelMember m : channel.getMembers())
-			{
-				names.add(m.getName());
-			}
-			return GroupMembers.of(channel.getName(), names);
+			return GroupMembers.of(client.getClanChannel(ClanID.GROUP_IRONMAN).getName(), online.keySet());
 		}
 		return GroupMembers.UNKNOWN;
 	}
@@ -830,6 +1224,12 @@ class GroupService
 			statsDirty = true;
 			carriedDirty = true;
 			extrasDirty = true;
+			GovernanceSync g = governance;
+			if (g != null)
+			{
+				// Sent on the next tick: roles first, then the settings they authorise.
+				g.resendAll();
+			}
 			if (!syncing())
 			{
 				return;
@@ -860,6 +1260,11 @@ class GroupService
 
 	void onPartyChanged()
 	{
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.resendAll();
+		}
 		assembler.clear();
 		roster.clearStrangers();
 		lastStatsSent = null;
@@ -911,7 +1316,7 @@ class GroupService
 		GroupCodec.Decoded decoded = GroupCodec.decode(gson, message.getPayload());
 		if (decoded == null)
 		{
-			log.debug("ignored unreadable group payload from {}", message.getMemberId());
+			notData(name, message);
 			return;
 		}
 		GroupOutbox.Switches s = switches();
@@ -995,6 +1400,29 @@ class GroupService
 		onChange.run();
 	}
 
+	/** A payload {@link GroupCodec} does not read: roles, group settings or an announce, or one from a newer build. */
+	private void notData(String name, VvgGroupIronmanMessage message)
+	{
+		GovernanceSync g = governance;
+		String payload = message.getPayload();
+		if (g != null && GovernanceSync.isGovernance(payload) && g.receive(name, payload))
+		{
+			roster.heard(name, System.currentTimeMillis());
+			return;
+		}
+		log.debug("ignored unreadable group payload from {}", message.getMemberId());
+	}
+
+	/** Game tick, connected: roles, settings and this member's announce, whichever changed. */
+	private void flushGovernance()
+	{
+		GovernanceSync g = governance;
+		if (g != null)
+		{
+			g.flush(MemberPrefs.of(config));
+		}
+	}
+
 	/**
 	 * A member's events. Drops and log slots go in the log under the drops
 	 * switch, as in 1.0.0; the rest only under "Share group events". Each new
@@ -1065,13 +1493,8 @@ class GroupService
 			engine.storage(change, true);
 		}
 
-		GroupOutbox.Switches s = switches();
-		if (!s.storage)
-		{
-			return;
-		}
-		roster.putStorage(change);
-		String payload = GroupOutbox.storage(gson, s, change);
+		// Kept locally whether shared or not; with sharing off it is marked so and nothing is sent.
+		String payload = GroupOutbox.ownStorage(gson, switches(), change, roster);
 		if (payload != null && syncing())
 		{
 			partyService.send(new VvgGroupIronmanMessage(payload));
@@ -1354,26 +1777,47 @@ class GroupService
 	/** Executor thread. False when there is no file or it cannot be read. */
 	private boolean readCache()
 	{
-		File file = cacheFile();
-		if (!file.isFile())
-		{
-			return false;
-		}
 		try
 		{
-			String json = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+			Filepath file = cacheFile();
+			if (!file.isFile())
+			{
+				return false;
+			}
+			String json;
+			try (InputStream in = file.openInputStream())
+			{
+				json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+			}
 			if (!GroupCache.read(gson, json, roster))
 			{
 				log.debug("group cache unreadable, starting empty");
 				return false;
 			}
+			restoreWebhooks(GroupCache.webhooks(gson, json));
 			return true;
 		}
-		catch (IOException e)
+		catch (Exception e)
 		{
 			log.debug("could not read group cache", e);
 			return false;
 		}
+	}
+
+	/** Executor thread. The cached webhooks document, checked like one from the party; a newer one held wins. */
+	private void restoreWebhooks(String json)
+	{
+		GovernanceSync g = governance;
+		if (json == null || g == null)
+		{
+			return;
+		}
+		if (cachedWebhooks == null)
+		{
+			// Kept as read until the governance accepts (or replaces) it, so a save before the roles load keeps it.
+			cachedWebhooks = json;
+		}
+		g.restoreWebhooks(json);
 	}
 
 	private void saveCache()
@@ -1383,30 +1827,43 @@ class GroupService
 			// Whatever arrived meanwhile is in the roster and goes out with the first save after loading.
 			return;
 		}
-		String json = GroupCache.write(gson, roster);
+		String json = GroupCache.write(gson, roster, cachedWebhooks);
 		executor.execute(() ->
 		{
-			File file = cacheFile();
 			try
 			{
-				Files.createDirectories(file.getParentFile().toPath());
-				File tmp = new File(file.getParentFile(), CACHE_FILE + ".tmp");
-				Files.write(tmp.toPath(), json.getBytes(StandardCharsets.UTF_8));
-				Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+				Filepath file = cacheFile();
+				Filepath dir = file.getParent();
+				dir.createDirectories();
+				// Write a temp file beside the cache, then move it over, so a crash never leaves half a file.
+				Filepath tmp = dir.createTempFile("group-cache", ".tmp");
+				try
+				{
+					try (OutputStream out = tmp.openOutputStream())
+					{
+						out.write(json.getBytes(StandardCharsets.UTF_8));
+					}
+					tmp.moveTo(file, StandardCopyOption.REPLACE_EXISTING);
+				}
+				finally
+				{
+					tmp.deleteIfExists();
+				}
 			}
-			catch (IOException e)
+			catch (Exception e)
 			{
 				log.debug("could not write group cache", e);
 			}
 		});
 	}
 
-	private static File cacheFile()
+	/** Executor thread. The cache inside the plugin's data directory (.runelite/plugin-data/gim-utilities). */
+	private Filepath cacheFile() throws Exception
 	{
-		return new File(new File(RuneLite.RUNELITE_DIR, CACHE_DIR), CACHE_FILE);
+		return dataDirectory.call().joinSegment(CACHE_FILE);
 	}
 
-	/** Kept for the panel: is any group feature on, so the panel button should show. */
+	/** Kept for the panel: is any group feature on; false shows its "everything is off" notice. */
 	boolean anyOn()
 	{
 		return switches().any() || !lowStock.isEmpty();

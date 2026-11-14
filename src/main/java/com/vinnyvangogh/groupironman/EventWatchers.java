@@ -2,6 +2,7 @@ package com.vinnyvangogh.groupironman;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,10 +78,13 @@ final class EventWatchers
 	private int settle;
 	private int graveLeft;
 	private boolean graveSeen;
+	/** What the death cost, once counted: the grave's contents, as far as this client knows. */
+	private Map<Integer, Integer> graveItems = Collections.emptyMap();
 	private String graveWhere = "";
 	private int graveWorld;
 	private String deathWhere = "";
 	private int deathWorld;
+	private final SlayerWatch slayer = new SlayerWatch(this::emit);
 
 	EventWatchers(Consumer<GroupEvent> out, Predicate<GroupEvent.Type> wanted)
 	{
@@ -120,6 +124,8 @@ final class EventWatchers
 		settle = 0;
 		graveLeft = 0;
 		graveSeen = false;
+		graveItems = Collections.emptyMap();
+		slayer.reset();
 	}
 
 	// ---- Chat ----
@@ -147,23 +153,19 @@ final class EventWatchers
 			emit(GroupEvent.of(GroupEvent.Type.COMBAT_TASK, now, me).text(task[1]).detail(task[0]).build());
 			return;
 		}
-		slayer(message, now, me);
+		slayer.chat(message, now, me);
 	}
 
-	private void slayer(String message, long now, String me)
+	/** Each tick: the NPC dialogue open now (null text when none), for a master handing out a Slayer task. */
+	void slayerDialog(String text, String npc, long now, String me)
 	{
-		long done = EventChat.slayerDone(message);
-		if (done >= 0)
-		{
-			emit(GroupEvent.of(GroupEvent.Type.SLAYER, now, me).text("task done").number(done).build());
-			return;
-		}
-		EventText.Count assigned = EventChat.slayerNew(message);
-		if (assigned != null)
-		{
-			emit(GroupEvent.of(GroupEvent.Type.SLAYER, now, me).text("new task: " + assigned.name)
-				.number(assigned.count).build());
-		}
+		slayer.dialog(text, npc, now, me);
+	}
+
+	/** Each tick, for a finished Slayer task whose streak line never came. */
+	void slayerTick(long now, String me)
+	{
+		slayer.tick(now, me);
 	}
 
 	private void raidLine(String message, long now, String me, Set<String> group, Collection<String> present)
@@ -317,6 +319,7 @@ final class EventWatchers
 		deathWorld = world;
 		graveLeft = GRAVE_TICKS;
 		graveSeen = false;
+		graveItems = Collections.emptyMap();
 		graveWhere = where;
 		graveWorld = world;
 	}
@@ -338,13 +341,23 @@ final class EventWatchers
 			}
 		}
 		carriedAtDeath = null;
+		if (graveLeft > 0)
+		{
+			graveItems = lost;
+			// Nothing left the player (nothing to lose, or a safe death): the game spawns no grave to warn about.
+			if (lost.isEmpty())
+			{
+				graveLeft = 0;
+			}
+		}
 		emit(GroupEvent.of(GroupEvent.Type.DEATH_VALUE, now, me).items(lost).number(EventText.value(lost, lookup))
 			.location(deathWhere).world(deathWorld).detail("gravestone: 15 min").build());
 	}
 
 	/**
 	 * Each tick while a grave may be out. {@code visible} is the game's grave varbit: once it has been seen on,
-	 * its going off means the grave was collected. If it is never seen on, the warning still fires.
+	 * its going off means the grave was collected. If it is never seen on, no grave spawned (a safe or instanced
+	 * death) and nothing is warned (Board 2026-11-10: only warn when a gravestone exists for that death).
 	 */
 	void graveTick(int visible, int warnMinutes, long now, String me)
 	{
@@ -365,8 +378,18 @@ final class EventWatchers
 		if (graveLeft == warnMinutes * TICKS_PER_MINUTE)
 		{
 			graveLeft = 0;
+			if (!graveSeen)
+			{
+				return;
+			}
 			emit(GroupEvent.of(GroupEvent.Type.GRAVESTONE_EXPIRING, now, me).number(warnMinutes).location(graveWhere)
-				.world(graveWorld).build());
+				.world(graveWorld).items(graveItems).build());
 		}
+	}
+
+	/** True while a grave is out and its warning has not gone yet. */
+	boolean graveOut()
+	{
+		return graveLeft > 0;
 	}
 }

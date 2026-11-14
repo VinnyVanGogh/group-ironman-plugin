@@ -21,6 +21,8 @@ final class LevelThreads
 {
 	/** At most one edit per message this often. */
 	static final long EDIT_GAP = TimeUnit.SECONDS.toMillis(10);
+	/** Edits in a row a server or network failure may cost before the streak gives up and posts fresh. */
+	static final int MAX_EDIT_FAILURES = 3;
 	private static final int MAX_LEVEL = 99;
 
 	/** One skill's run of level-ups and its post. Read and written only under the owner's lock. */
@@ -41,13 +43,16 @@ final class LevelThreads
 		/** Holds a level the post does not show yet. */
 		boolean dirty;
 		long sentAt;
+		/** Edits in a row lost to a server or network failure. */
+		int failures;
 
 		private Streak(GroupEvent e, String url, long now, byte[] png)
 		{
 			this.member = e.member;
 			this.skill = e.text;
 			this.url = url;
-			this.from = e.number - 1;
+			// One action can gain several levels (low Prayer): the level before it, when the event knows it.
+			this.from = e.previous > 0 ? e.previous : e.number - 1;
 			this.first = now;
 			this.to = e.number;
 			this.last = now;
@@ -138,9 +143,8 @@ final class LevelThreads
 			s.sentAt = now;
 			return;
 		}
-		// Nothing to edit: the next level-up of the skill starts a new post.
-		s.dirty = false;
-		open.values().remove(s);
+		// Nothing to edit (refused, failed, or dropped by a full queue): the skill's next level-up posts anew.
+		end(s);
 	}
 
 	/** The edits to send now: posted streaks with a newer level, each at most once per {@link #EDIT_GAP}. */
@@ -171,14 +175,17 @@ final class LevelThreads
 
 	/**
 	 * How an edit went. Discord refusing it (404 for a deleted message, or any 4xx) gives back the post to send in
-	 * its place, its outcome to {@link #posted}; a server or network failure tries the edit again later. Null
-	 * when there is nothing more to send.
+	 * its place, its outcome to {@link #posted}. A server or network failure tries the edit again later, up to
+	 * {@link #MAX_EDIT_FAILURES} in a row; then, or when the queue dropped the edit unsent
+	 * ({@link DiscordQueue#DROPPED}), the streak ends and the skill's next level posts anew. Null when there is
+	 * nothing more to send.
 	 */
 	synchronized Edit edited(Streak s, int status)
 	{
 		s.busy = false;
 		if (ok(status))
 		{
+			s.failures = 0;
 			return null;
 		}
 		if (status >= 400 && status < 500)
@@ -188,8 +195,20 @@ final class LevelThreads
 			s.busy = true;
 			return new Edit(s);
 		}
+		if (status == DiscordQueue.DROPPED || ++s.failures >= MAX_EDIT_FAILURES)
+		{
+			end(s);
+			return null;
+		}
 		s.dirty = true;
 		return null;
+	}
+
+	/** Holding the lock: no more edits or joining; {@link #due} forgets it. */
+	private void end(Streak s)
+	{
+		s.dirty = false;
+		open.values().remove(s);
 	}
 
 	/** A logout: no more joining, but an edit already owed still goes. */

@@ -22,8 +22,9 @@ public class WebhookWarningsTest
 		assertTrue(DiscordWebhook.valid("“" + GOOD + "”"));
 		assertTrue(DiscordWebhook.valid(" \"" + GOOD + "\"\n"));
 		assertEquals(GOOD, DiscordWebhook.clean("\"" + GOOD + "\""));
-		assertEquals("the route posts to the stripped URL", GOOD,
-			DiscordWebhook.route(GroupEvent.Category.DROPS, new LinkedHashMap<>(), "'" + GOOD + "'"));
+		Map<Webhook, Webhooks.Setting> main = new java.util.EnumMap<>(Webhook.class);
+		main.put(Webhook.MAIN, new Webhooks.Setting("'" + GOOD + "'", DiscordPosterName.WEBHOOK, ""));
+		assertEquals("the route posts to the stripped URL", GOOD, new Webhooks(main).url(Webhook.DROPS));
 		assertFalse("a quote inside is still wrong", DiscordWebhook.valid(GOOD + "\"x"));
 	}
 

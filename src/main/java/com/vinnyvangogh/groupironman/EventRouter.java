@@ -19,6 +19,7 @@ final class EventRouter
 	private final Consumer<GroupEvent> discord;
 	private final Consumer<GroupEvent> overlay;
 	private final Consumer<GroupEvent> digest;
+	private final Consumer<GroupEvent> log;
 
 	EventRouter(Consumer<GroupEvent> discord, Consumer<GroupEvent> overlay)
 	{
@@ -34,9 +35,23 @@ final class EventRouter
 	 */
 	EventRouter(Consumer<GroupEvent> discord, Consumer<GroupEvent> overlay, Consumer<GroupEvent> digest)
 	{
+		this(discord, overlay, digest, e ->
+		{
+		});
+	}
+
+	/**
+	 * {@code log} is the sidebar Log tab. It takes every event that passes the
+	 * thresholds, yours and members', whichever Discord and overlay switches
+	 * are on (Board 2026-11-10): the Log has no switch of its own.
+	 */
+	EventRouter(Consumer<GroupEvent> discord, Consumer<GroupEvent> overlay, Consumer<GroupEvent> digest,
+		Consumer<GroupEvent> log)
+	{
 		this.discord = discord;
 		this.overlay = overlay;
 		this.digest = digest;
+		this.log = log;
 	}
 
 	/** {@code own}: this player's event, from this client; false for a member's from the party. */
@@ -47,6 +62,7 @@ final class EventRouter
 		{
 			return;
 		}
+		log.accept(kept);
 		if (settings.overlay.contains(kept.type))
 		{
 			overlay.accept(kept);
@@ -71,7 +87,7 @@ final class EventRouter
 			case CLUE:
 				return atLeast(event, settings.clueMin);
 			case LEVEL_UP:
-				return atLeast(event, settings.levelMin);
+				return everyN(atLeast(event, settings.levelMin), settings.levelEvery);
 			case STORAGE_DEPOSIT:
 			case STORAGE_WITHDRAWAL:
 				return atLeast(event, settings.storageMin);
@@ -83,6 +99,29 @@ final class EventRouter
 	private static GroupEvent atLeast(GroupEvent event, long min)
 	{
 		return event.number >= min ? event : null;
+	}
+
+	/**
+	 * "Post every N levels": only levels that are a multiple of {@code every}.
+	 * 99 always counts; 99s, max total, total level milestones and combat
+	 * levels are kinds of their own and never come through here. One action
+	 * that gains several levels (low Prayer, 3 → 7 with N = 5) counts when it
+	 * passes a multiple, so a jump never skips the level it crossed.
+	 *
+	 * <p>This filter runs before "Combine level-ups": a skill's streak post is
+	 * made of the levels that pass it, so with N = 5 one post reads 59 → 65
+	 * and is edited when 70 comes, not at every level in between.
+	 */
+	private static GroupEvent everyN(GroupEvent levelUp, int every)
+	{
+		if (levelUp == null || every <= 1 || levelUp.number >= ProgressTracker.MAX_LEVEL)
+		{
+			return levelUp;
+		}
+		long before = levelUp.previous > 0 && levelUp.previous < levelUp.number ? levelUp.previous
+			: levelUp.number - 1;
+		// The highest multiple of N at or below the new level is above the old one.
+		return levelUp.number / every * every > before ? levelUp : null;
 	}
 
 	private static GroupEvent valuableStacks(GroupEvent event, long min, ItemLookup lookup)

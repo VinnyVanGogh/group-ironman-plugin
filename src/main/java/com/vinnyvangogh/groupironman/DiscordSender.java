@@ -5,6 +5,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 import lombok.extern.slf4j.Slf4j;
@@ -20,8 +23,8 @@ import okhttp3.Response;
 /**
  * Posts queued events to Discord, one at a time, off the client thread.
  *
- * <p>{@link #pump} is called on a timer; it takes the next post the
- * {@link DiscordQueue} allows and hands it to the {@link Transport}, which in
+ * <p>{@link #pump} is called on a timer; for each webhook URL it takes the next
+ * post that URL's {@link DiscordQueue} allows and hands it to the {@link Transport}, which in
  * the client is RuneLite's injected {@link OkHttpClient} with
  * {@code enqueue}, so nothing blocks any thread of ours (AGENTS.md, HTTP).
  *
@@ -52,7 +55,13 @@ final class DiscordSender
 	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 	private static final MediaType PNG = MediaType.parse("image/png");
 
-	private final DiscordQueue queue = new DiscordQueue();
+	/**
+	 * One queue per webhook URL: Discord rate-limits each webhook on its own, so a busy or 429'd Drops webhook
+	 * never holds back the Deaths one, and each keeps its own order and per-minute cap.
+	 */
+	private final Map<String, DiscordQueue> queues = new ConcurrentHashMap<>();
+	/** Replies whose outcome is being handed to the post's owner right now ({@link #queued}). */
+	private final AtomicInteger settling = new AtomicInteger();
 	private final Transport transport;
 	private final LongSupplier clock;
 	private final IntSupplier hour;
@@ -79,7 +88,7 @@ final class DiscordSender
 		{
 			return;
 		}
-		queue.offer(new DiscordQueue.Post(url, json, png));
+		offer(new DiscordQueue.Post(url, json, png));
 	}
 
 	/** Queues a new post whose final outcome, and the created message's id, go to {@code result}. */
@@ -87,7 +96,7 @@ final class DiscordSender
 	{
 		if (url != null && json != null)
 		{
-			queue.offer(new DiscordQueue.Post(url, json, png, null, result));
+			offer(new DiscordQueue.Post(url, json, png, null, result));
 		}
 	}
 
@@ -96,19 +105,37 @@ final class DiscordSender
 	{
 		if (url != null && json != null && messageId != null)
 		{
-			queue.offer(new DiscordQueue.Post(url, json, png, messageId, result));
+			offer(new DiscordQueue.Post(url, json, png, messageId, result));
 		}
 	}
 
-	/** Sends the next post if the queue allows one now. Any thread; called by the timer. */
+	/** A post a full queue pushed out is told so, outside the queue's lock: its owner may queue another. */
+	private void offer(DiscordQueue.Post post)
+	{
+		DiscordQueue queue = queues.computeIfAbsent(post.url, u -> new DiscordQueue());
+		for (DiscordQueue.Post dropped : queue.offer(post))
+		{
+			dropped.result.done(DiscordQueue.DROPPED, null);
+		}
+	}
+
+	/** Sends each webhook's next post, where its queue allows one now. Any thread; called by the timer. */
 	void pump()
 	{
 		long now = clock.getAsLong();
-		DiscordQueue.Post post = queue.next(now, DiscordQueue.quiet(hour.getAsInt(), quietStart, quietEnd));
-		if (post == null)
+		boolean quiet = DiscordQueue.quiet(hour.getAsInt(), quietStart, quietEnd);
+		for (DiscordQueue queue : queues.values())
 		{
-			return;
+			DiscordQueue.Post post = queue.next(now, quiet);
+			if (post != null)
+			{
+				send(queue, post);
+			}
 		}
+	}
+
+	private void send(DiscordQueue queue, DiscordQueue.Post post)
+	{
 		transport.send(post, (status, retryAfter, messageId) ->
 		{
 			if (status < 200 || status >= 300)
@@ -116,10 +143,20 @@ final class DiscordSender
 				log.debug("discord webhook {} failed: {}", post.edit == null ? "post" : "edit",
 					status == 0 ? "network error" : "HTTP " + status);
 			}
-			boolean again = queue.done(status, DiscordQueue.retryAfterMs(retryAfter), clock.getAsLong());
-			if (!again && post.result != null)
+			// Counted in queued() from leaving the queue until its owner has heard the outcome, so nobody sees an
+			// empty sender while a reply's message id is still on its way to its owner.
+			settling.incrementAndGet();
+			try
 			{
-				post.result.done(status, messageId);
+				boolean again = queue.done(status, DiscordQueue.retryAfterMs(retryAfter), clock.getAsLong());
+				if (!again && post.result != null)
+				{
+					post.result.done(status, messageId);
+				}
+			}
+			finally
+			{
+				settling.decrementAndGet();
 			}
 		});
 	}
@@ -127,16 +164,31 @@ final class DiscordSender
 	/**
 	 * Where a post goes. A new post that wants its message id waits for it ({@code ?wait=true}); an edit goes to
 	 * {@code /messages/<id>} under the webhook (Discord "Edit Webhook Message",
-	 * {@code PATCH /webhooks/{id}/{token}/messages/{message.id}}).
+	 * {@code PATCH /webhooks/{id}/{token}/messages/{message.id}}). A query the webhook already has (a
+	 * {@code thread_id}) is kept, after the path, and {@code wait} joins it rather than starting a second one.
 	 */
 	static String target(DiscordQueue.Post post)
 	{
-		String base = post.url.endsWith("/") ? post.url.substring(0, post.url.length() - 1) : post.url;
+		if (post.edit == null && post.result == null)
+		{
+			return post.url;
+		}
+		int q = post.url.indexOf('?');
+		String path = q < 0 ? post.url : post.url.substring(0, q);
+		String query = q < 0 ? "" : post.url.substring(q + 1);
+		if (path.endsWith("/"))
+		{
+			path = path.substring(0, path.length() - 1);
+		}
 		if (post.edit != null)
 		{
-			return base + "/messages/" + post.edit;
+			path += "/messages/" + post.edit;
 		}
-		return post.result != null ? base + "?wait=true" : post.url;
+		else
+		{
+			query = query.isEmpty() ? "wait=true" : query + "&wait=true";
+		}
+		return query.isEmpty() ? path : path + "?" + query;
 	}
 
 	/** The message id in a {@code ?wait=true} reply's message object; null when there is none. */
@@ -160,12 +212,12 @@ final class DiscordSender
 
 	int queued()
 	{
-		return queue.size();
+		return queues.values().stream().mapToInt(DiscordQueue::size).sum() + settling.get();
 	}
 
 	void clear()
 	{
-		queue.clear();
+		queues.values().forEach(DiscordQueue::clear);
 	}
 
 	/** The client's transport: RuneLite's own OkHttpClient, asynchronous. */
@@ -212,7 +264,19 @@ final class DiscordSender
 				{
 					try
 					{
-						return r.isSuccessful() && r.body() != null ? messageId(gson, r.body().string()) : null;
+						if (!r.isSuccessful())
+						{
+							return null;
+						}
+						String id = r.body() == null ? null : messageId(gson, r.body().string());
+						if (id == null)
+						{
+							// No URL: the status and content type say enough. Without the id the streak cannot be
+							// edited, so the skill's next level posts anew.
+							log.debug("discord webhook reply has no message id: HTTP {} {}", r.code(),
+								r.header("Content-Type"));
+						}
+						return id;
 					}
 					catch (IOException e)
 					{

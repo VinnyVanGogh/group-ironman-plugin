@@ -5,16 +5,19 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * What survives a restart: members' last banks, the storage log, the last
  * group storage contents, members' rune pouch, quiver and seed vault, the
- * drops log, when each member was last heard from and when this player last
+ * drops log, the Log tab's feed of every event ({@code feed}), when each member was last heard from and last seen
+ * online ({@code seen}, for the live board) and when this player last
  * played, as one JSON document. Each member's last stats (world, place, HP,
  * prayer, run, levels) and carried items are kept too, so an offline member's
  * card shows where they were and what they had the last time you were both
- * online.
+ * online. Hiscore levels for members who do not share stats ({@link HiscoreBook}) are kept with when they were
+ * read, so they show across restarts too.
  *
  * <p>Pure, {@code String} in and out. The plugin reads and writes the file
  * ({@code .runelite/gim-utilities/group-cache.json}) off the client thread. A
@@ -25,12 +28,49 @@ final class GroupCache
 {
 	static final int VERSION = 1;
 	static final int MAX_MEMBERS = 50;
+	/** A world number past this in the file is not a world: read as unknown. */
+	private static final int MAX_WORLD = 65535;
 
 	private GroupCache()
 	{
 	}
 
+	/** One storage log entry. */
+	private static JsonObject logEntry(StorageChange c)
+	{
+		JsonObject entry = new JsonObject();
+		entry.addProperty("ts", c.at());
+		entry.addProperty("by", c.member());
+		entry.add("took", ItemCounts.toJson(c.took()));
+		entry.add("dep", ItemCounts.toJson(c.deposited()));
+		if (!c.shared())
+		{
+			// Only written when set, so a file without it reads as shared, as every visit was before.
+			entry.addProperty("ns", true);
+		}
+		return entry;
+	}
+
 	static String write(Gson gson, GroupRoster roster)
+	{
+		return write(gson, roster, null);
+	}
+
+	/**
+	 * With {@code webhooks}, the leader's signed {@link GroupWebhooks} document as the party carries it (null for
+	 * none): the one place a member keeps the shared webhooks between sessions, never their RuneLite config.
+	 */
+	static String write(Gson gson, GroupRoster roster, String webhooks)
+	{
+		JsonObject out = json(gson, roster);
+		if (webhooks != null)
+		{
+			out.addProperty("gweb", webhooks);
+		}
+		return gson.toJson(out);
+	}
+
+	private static JsonObject json(Gson gson, GroupRoster roster)
 	{
 		JsonObject out = new JsonObject();
 		out.addProperty("v", VERSION);
@@ -48,12 +88,7 @@ final class GroupCache
 		JsonArray log = new JsonArray();
 		for (StorageChange c : roster.log().entries())
 		{
-			JsonObject entry = new JsonObject();
-			entry.addProperty("ts", c.at());
-			entry.addProperty("by", c.member());
-			entry.add("took", ItemCounts.toJson(c.took()));
-			entry.add("dep", ItemCounts.toJson(c.deposited()));
-			log.add(entry);
+			log.add(logEntry(c));
 		}
 		out.add("log", log);
 
@@ -90,6 +125,7 @@ final class GroupCache
 			events.add(entry);
 		}
 		out.add("events", events);
+		out.add("feed", feedJson(roster));
 
 		JsonObject heard = new JsonObject();
 		for (Map.Entry<String, Long> e : roster.lastHeard().entrySet())
@@ -97,6 +133,7 @@ final class GroupCache
 			heard.addProperty(e.getKey(), e.getValue());
 		}
 		out.add("heard", heard);
+		out.add("seen", seenJson(roster));
 		out.addProperty("played", roster.lastPlayed());
 
 		// Round 2: the last stats and carried items per member, for offline cards. Stored as
@@ -113,7 +150,184 @@ final class GroupCache
 			carried.addProperty(e.getKey(), GroupCodec.encodeCarried(gson, e.getValue().inventory, e.getValue().worn));
 		}
 		out.add("carried", carried);
-		return gson.toJson(out);
+		out.add("hiscores", hiscoresJson(roster.hiscores()));
+		return out;
+	}
+
+	/** Each member's last hiscore lookup: {@code {"name": {"ts": 1700000000000, "l": {"Attack": 99}}}}. */
+	private static JsonObject hiscoresJson(HiscoreBook book)
+	{
+		JsonObject out = new JsonObject();
+		for (Map.Entry<String, HiscoreBook.Entry> e : book.all().entrySet())
+		{
+			JsonObject entry = new JsonObject();
+			entry.addProperty("ts", e.getValue().at);
+			JsonObject levels = new JsonObject();
+			e.getValue().levels.forEach(levels::addProperty);
+			entry.add("l", levels);
+			out.add(e.getKey(), entry);
+		}
+		return out;
+	}
+
+	/** A file from before hiscores has no key and loads as before. */
+	private static void readHiscores(JsonElement in, HiscoreBook book)
+	{
+		if (in == null || !in.isJsonObject())
+		{
+			return;
+		}
+		int n = 0;
+		for (Map.Entry<String, JsonElement> e : in.getAsJsonObject().entrySet())
+		{
+			if (n++ >= MAX_MEMBERS || !e.getValue().isJsonObject())
+			{
+				continue;
+			}
+			JsonObject entry = e.getValue().getAsJsonObject();
+			Long ts = ItemCounts.longValue(entry.get("ts"));
+			JsonElement l = entry.get("l");
+			if (ts != null && l != null && l.isJsonObject())
+			{
+				book.restore(e.getKey(), ts, levelsFrom(l.getAsJsonObject()));
+			}
+		}
+	}
+
+	/** The numbers in {@code l}; {@link HiscoreBook#restore} drops the ones out of range. */
+	private static Map<String, Integer> levelsFrom(JsonObject l)
+	{
+		Map<String, Integer> levels = new LinkedHashMap<>();
+		for (Map.Entry<String, JsonElement> s : l.entrySet())
+		{
+			Long level = ItemCounts.longValue(s.getValue());
+			if (level != null)
+			{
+				levels.put(s.getKey(), (int) Math.max(0, Math.min(level, Integer.MAX_VALUE)));
+			}
+		}
+		return levels;
+	}
+
+	/**
+	 * The Log tab's feed: every event as the party sends it ({@link GroupCodec#eventJson}),
+	 * plus {@code by} and, for a storage summary, {@code tk} its withdrawals.
+	 */
+	private static JsonArray feedJson(GroupRoster roster)
+	{
+		JsonArray feed = new JsonArray();
+		for (GroupEvent e : roster.feed().entries())
+		{
+			JsonObject entry = GroupCodec.eventJson(e);
+			entry.addProperty("by", e.member);
+			if (!e.taken.isEmpty())
+			{
+				entry.add("tk", ItemCounts.toJson(e.taken));
+			}
+			feed.add(entry);
+		}
+		return feed;
+	}
+
+	/** When each member was last seen online ({@link LastSeen}): {@code ts}, {@code w} the world, {@code p} plugin. */
+	private static JsonObject seenJson(GroupRoster roster)
+	{
+		JsonObject seen = new JsonObject();
+		for (Map.Entry<String, LastSeen> e : roster.lastSeen().entrySet())
+		{
+			JsonObject s = new JsonObject();
+			s.addProperty("ts", e.getValue().at);
+			s.addProperty("w", e.getValue().world);
+			s.addProperty("p", e.getValue().plugin);
+			seen.add(e.getKey(), s);
+		}
+		return seen;
+	}
+
+	/** A file from before last-seen was kept has none, and loads as before. */
+	private static void readSeen(JsonElement in, GroupRoster roster)
+	{
+		if (in == null || !in.isJsonObject())
+		{
+			return;
+		}
+		int n = 0;
+		for (Map.Entry<String, JsonElement> e : in.getAsJsonObject().entrySet())
+		{
+			LastSeen s = n++ < MAX_MEMBERS ? lastSeen(e.getValue()) : null;
+			if (s != null)
+			{
+				roster.seen(e.getKey(), s);
+			}
+		}
+	}
+
+	/** One {@code seen} entry; null without a time. */
+	private static LastSeen lastSeen(JsonElement item)
+	{
+		if (!item.isJsonObject())
+		{
+			return null;
+		}
+		JsonObject s = item.getAsJsonObject();
+		Long at = ItemCounts.longValue(s.get("ts"));
+		if (at == null || at <= 0)
+		{
+			return null;
+		}
+		Long world = ItemCounts.longValue(s.get("w"));
+		int w = world == null || world < 0 || world > MAX_WORLD ? 0 : world.intValue();
+		return new LastSeen(at, w, isTrue(s.get("p")));
+	}
+
+	private static boolean isTrue(JsonElement p)
+	{
+		return p != null && p.isJsonPrimitive() && p.getAsJsonPrimitive().isBoolean() && p.getAsBoolean();
+	}
+
+	/**
+	 * The feed. A file from before it existed has none: the feed starts from
+	 * that file's drops log and storage log, so the Log tab keeps its history.
+	 */
+	private static void readFeed(JsonElement feed, GroupRoster roster)
+	{
+		if (feed == null || !feed.isJsonArray())
+		{
+			seedFeed(roster);
+			return;
+		}
+		for (JsonElement item : feed.getAsJsonArray())
+		{
+			GroupEvent event = feedEvent(item);
+			if (event != null)
+			{
+				roster.feed().add(event);
+			}
+		}
+	}
+
+	/** One feed entry; null when it has no member or is not an event this build reads. */
+	private static GroupEvent feedEvent(JsonElement item)
+	{
+		JsonElement by = item.isJsonObject() ? item.getAsJsonObject().get("by") : null;
+		GroupEvent event = by == null || !by.isJsonPrimitive() ? null
+			: GroupCodec.eventFrom(item.getAsJsonObject(), by.getAsString());
+		return event == null ? null : event.toBuilder()
+			.taken(ItemCounts.fromJson(item.getAsJsonObject().get("tk"), GroupCodec.MAX_STORAGE_ITEMS)).build();
+	}
+
+	/** A feed from an older file's drops log and storage log, already read into {@code roster}. */
+	private static void seedFeed(GroupRoster roster)
+	{
+		for (GroupEvent e : roster.events().entries())
+		{
+			roster.feed().add(e);
+		}
+		for (StorageChange c : roster.log().entries())
+		{
+			roster.feed().add(GroupEvent.of(GroupEvent.Type.STORAGE_SUMMARY, c.at(), c.member())
+				.items(c.deposited()).taken(c.took()).build());
+		}
 	}
 
 	private static void readPayloads(Gson gson, JsonElement in, GroupRoster roster)
@@ -138,6 +352,21 @@ final class GroupCache
 			{
 				roster.putCarried(e.getKey(), d.carried);
 			}
+		}
+	}
+
+	/** The webhooks document {@link #write(Gson, GroupRoster, String)} kept, or null; its signature is checked later. */
+	static String webhooks(Gson gson, String json)
+	{
+		try
+		{
+			JsonElement root = json == null ? null : gson.fromJson(json, JsonElement.class);
+			JsonElement w = root != null && root.isJsonObject() ? root.getAsJsonObject().get("gweb") : null;
+			return w != null && w.isJsonPrimitive() ? w.getAsString() : null;
+		}
+		catch (RuntimeException e)
+		{
+			return null;
 		}
 	}
 
@@ -203,7 +432,7 @@ final class GroupCache
 				roster.log().add(new StorageChange(ts, by.getAsString(),
 					ItemCounts.fromJson(entry.get("took"), GroupCodec.MAX_STORAGE_ITEMS),
 					ItemCounts.fromJson(entry.get("dep"), GroupCodec.MAX_STORAGE_ITEMS),
-					Collections.emptyMap()));
+					Collections.emptyMap(), !isTrue(entry.get("ns"))));
 			}
 		}
 
@@ -261,6 +490,9 @@ final class GroupCache
 			}
 		}
 
+		// After "log" and "events": an older file's feed starts from them.
+		readFeed(in.get("feed"), roster);
+
 		JsonElement heard = in.get("heard");
 		if (heard != null && heard.isJsonObject())
 		{
@@ -275,6 +507,8 @@ final class GroupCache
 			}
 		}
 
+		readSeen(in.get("seen"), roster);
+
 		Long played = ItemCounts.longValue(in.get("played"));
 		if (played != null && played > 0)
 		{
@@ -282,6 +516,7 @@ final class GroupCache
 		}
 		readPayloads(gson, in.get("stats"), roster);
 		readPayloads(gson, in.get("carried"), roster);
+		readHiscores(in.get("hiscores"), roster.hiscores());
 		return true;
 	}
 }
