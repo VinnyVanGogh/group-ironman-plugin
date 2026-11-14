@@ -13,16 +13,28 @@ repositories {
 	mavenCentral()
 }
 
-// Pinned, not 'latest.release' as the upstream example-plugin ships it. The
-// Plugin Hub manifest points at one commit of this repo, so the build that
-// commit produces has to be reproducible; a floating dependency means a build
-// that passed yesterday can fail today for reasons nothing in this repo
-// changed. Bump deliberately, checking:
+// Dev builds always use the newest RuneLite client: 'latest.release', the same
+// form RuneLite's own example-plugin template uses. The Plugin Hub replaces this
+// file at submission (build=standard) and builds against its own client, so this
+// only decides what ./gradlew build / test / run use here. Following the newest
+// client matters for the dev client too: it loads the Plugin Hub index for its
+// own version, so on an old pin other Hub plugins stay on old builds.
+//
+// Trade-off: a RuneLite release can break this build on a day nothing in this
+// repo changed. To tell the two apart, pin one run to a known-good client:
+//   ./gradlew build -PruneLiteVersion=1.13.6
+// Releases are listed at:
 //   https://repo.runelite.net/net/runelite/client/maven-metadata.xml
-// To test against another client without changing the pin (e.g. the Plugin
-// Hub's current one): ./gradlew test -PruneLiteVersion=1.13.6
-def runeLiteVersion = project.findProperty('runeLiteVersion') ?: '1.13.6'
+def runeLiteVersion = project.findProperty('runeLiteVersion') ?: 'latest.release'
 def pluginMainClass = 'com.vinnyvangogh.groupironman.GroupIronmanPluginTest'
+
+// Re-check repo.runelite.net for a newer release on every build instead of
+// Gradle's default 24-hour cache of dynamic versions. Gradle has no per-module
+// setting for this, but the RuneLite artifacts are the only dynamic versions in
+// this file, so nothing else is affected. --offline still builds from the cache.
+configurations.configureEach {
+	resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
+}
 
 dependencies {
 	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
@@ -46,7 +58,28 @@ tasks.withType(JavaCompile).configureEach {
 	options.release.set(11)
 }
 
+// Prints which RuneLite client this build resolved, so a failing test or a
+// client that will not start says which release it was. Runs before test and
+// run, and on its own: ./gradlew printRuneLiteVersion
+tasks.register('printRuneLiteVersion') {
+	group = 'help'
+	description = 'Prints the RuneLite client version this build resolved.'
+	def requested = runeLiteVersion
+	def classpath = configurations.testRuntimeClasspath
+	doLast {
+		def client = classpath.incoming.resolutionResult.allComponents
+			.collect { it.moduleVersion }
+			.find { it != null && it.group == 'net.runelite' && it.name == 'client' }
+		logger.lifecycle("RuneLite client ${client?.version ?: 'not resolved'} (requested ${requested})")
+	}
+}
+
+tasks.named('test') {
+	dependsOn 'printRuneLiteVersion'
+}
+
 tasks.register('run', JavaExec) {
+	dependsOn 'printRuneLiteVersion'
 	classpath = sourceSets.test.runtimeClasspath
 	mainClass = pluginMainClass
 
