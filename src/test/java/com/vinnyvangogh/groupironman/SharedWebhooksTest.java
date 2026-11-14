@@ -4,9 +4,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.google.gson.Gson;
-import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
@@ -25,7 +23,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class SharedWebhooksTest
 {
-	private static final String GROUP = "GroupShip";
+	private static final String GROUP = GovernanceClient.GROUP;
 	private static final String TOKEN = "LEADERSECRETTOKEN";
 	private static final String MAIN = "https://discord.com/api/webhooks/111/" + TOKEN + "main";
 	private static final String PROGRESS = "https://discord.com/api/webhooks/222/" + TOKEN + "progress";
@@ -34,66 +32,12 @@ public class SharedWebhooksTest
 	private static final String OWN_ONLINE = "https://discord.com/api/webhooks/555/membersownonline";
 	private final Gson gson = new Gson();
 
-	/** One client: its config, its group cache file, what it sent, and its sync. */
-	private final class Client
+	/** One client ({@link GovernanceClient}), with the leader's shared webhooks it holds. */
+	private static final class Client extends GovernanceClient
 	{
-		final String name;
-		final Map<String, String> config = new HashMap<>();
-		final List<String> outbox = new ArrayList<>();
-		String cache;
-		GovernanceSync sync;
-
 		Client(String name)
 		{
-			this.name = name;
-			start();
-		}
-
-		/** Starting the plugin: the config is read at once, the cache file a moment later. */
-		void start()
-		{
-			sync = new GovernanceSync(gson, new GovernanceSync.Store()
-			{
-				@Override
-				public String get(String key)
-				{
-					return config.get(key);
-				}
-
-				@Override
-				public void set(String key, String value)
-				{
-					if (value == null)
-					{
-						config.remove(key);
-					}
-					else
-					{
-						config.put(key, value);
-					}
-				}
-			}, outbox::add, () ->
-			{
-			}, json -> cache = json);
-			sync.group(GROUP);
-			if (cache != null)
-			{
-				sync.restoreWebhooks(cache);
-			}
-		}
-
-		void tick(Client... others)
-		{
-			sync.flush(MemberPrefs.NONE);
-			for (String payload : outbox)
-			{
-				assertTrue(GovernanceSync.isGovernance(payload));
-				for (Client o : others)
-				{
-					o.sync.receive(name, payload);
-				}
-			}
-			outbox.clear();
+			super(name, new Gson());
 		}
 
 		GroupWebhooks shared()
@@ -114,6 +58,14 @@ public class SharedWebhooksTest
 	private static Webhooks none()
 	{
 		return new Webhooks(new EnumMap<>(Webhook.class));
+	}
+
+	/** A member's own webhooks: just {@code url} in {@code webhook}'s field. */
+	private static Webhooks own(Webhook webhook, String url)
+	{
+		Map<Webhook, Webhooks.Setting> mine = new EnumMap<>(Webhook.class);
+		mine.put(webhook, new Webhooks.Setting(url, DiscordPosterName.WEBHOOK, ""));
+		return new Webhooks(mine);
 	}
 
 	/** Alex leads, Sam is an editor, Kim is a member; each has heard the others. */
@@ -239,9 +191,7 @@ public class SharedWebhooksTest
 		alex.sync.shareWebhooks("Alex", true, leaderHooks(), NOW + 2);
 		alex.tick(kim);
 
-		Map<Webhook, Webhooks.Setting> mine = new EnumMap<>(Webhook.class);
-		mine.put(Webhook.DROPS, new Webhooks.Setting(OWN_DROPS, DiscordPosterName.WEBHOOK, ""));
-		Webhooks merged = new Webhooks(mine).withGroup(kim.shared());
+		Webhooks merged = own(Webhook.DROPS, OWN_DROPS).withGroup(kim.shared());
 
 		assertEquals("own wins", OWN_DROPS, merged.url(Webhook.DROPS));
 		assertFalse(merged.fromGroup(Webhook.DROPS));
@@ -320,9 +270,8 @@ public class SharedWebhooksTest
 		assertEquals("one board for the group", 1, keepers);
 
 		// A member's own pasted Online status webhook is theirs, as before sharing existed.
-		Map<Webhook, Webhooks.Setting> mine = new EnumMap<>(Webhook.class);
-		mine.put(Webhook.ONLINE, new Webhooks.Setting(OWN_ONLINE, DiscordPosterName.WEBHOOK, ""));
-		assertTrue(StatusBoard.keeps(OnlineStatus.LIVE_BOARD, new Webhooks(mine).withGroup(c[2].shared()), false));
+		assertTrue(StatusBoard.keeps(OnlineStatus.LIVE_BOARD, own(Webhook.ONLINE, OWN_ONLINE).withGroup(c[2].shared()),
+			false));
 		assertFalse(StatusBoard.keeps(OnlineStatus.POSTS, leaderHooks(), true));
 	}
 

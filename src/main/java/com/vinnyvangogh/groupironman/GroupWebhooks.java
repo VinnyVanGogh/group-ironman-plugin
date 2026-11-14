@@ -125,19 +125,7 @@ final class GroupWebhooks
 	/** The total order every client uses to pick one document: version, then save time, then signature. */
 	boolean newerThan(GroupWebhooks other)
 	{
-		if (other == null)
-		{
-			return true;
-		}
-		if (version != other.version)
-		{
-			return version > other.version;
-		}
-		if (at != other.at)
-		{
-			return at > other.at;
-		}
-		return signature.compareTo(other.signature) > 0;
+		return other == null || GroupSettings.newer(version, at, signature, other.version, other.at, other.signature);
 	}
 
 	@Override

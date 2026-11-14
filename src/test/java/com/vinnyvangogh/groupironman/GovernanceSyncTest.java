@@ -1,9 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
@@ -19,64 +16,13 @@ public class GovernanceSyncTest
 	private static final GroupIronmanConfig DEFAULTS = new GroupIronmanConfig()
 	{
 	};
-	private final Gson gson = new Gson();
 
-	/** One client: its config, what it sent, and its sync. */
-	private final class Client
+	/** One client: its config, what it sent, and its sync ({@link GovernanceClient}). */
+	private final class Client extends GovernanceClient
 	{
-		final String name;
-		final Map<String, String> config = new HashMap<>();
-		final List<String> outbox = new ArrayList<>();
-		GovernanceSync sync;
-
 		Client(String name)
 		{
-			this.name = name;
-			start();
-		}
-
-		/** Starting the plugin: everything is read back from the config. */
-		void start()
-		{
-			sync = new GovernanceSync(gson, new GovernanceSync.Store()
-			{
-				@Override
-				public String get(String key)
-				{
-					return config.get(key);
-				}
-
-				@Override
-				public void set(String key, String value)
-				{
-					if (value == null)
-					{
-						config.remove(key);
-					}
-					else
-					{
-						config.put(key, value);
-					}
-				}
-			}, outbox::add, () ->
-			{
-			});
-			sync.group("GroupShip");
-		}
-
-		/** A game tick while connected: whatever is marked goes to {@code others}. */
-		void tick(Client... others)
-		{
-			sync.flush(MemberPrefs.NONE);
-			for (String payload : outbox)
-			{
-				assertTrue(GovernanceSync.isGovernance(payload));
-				for (Client o : others)
-				{
-					o.sync.receive(name, payload);
-				}
-			}
-			outbox.clear();
+			super(name, new Gson());
 		}
 	}
 

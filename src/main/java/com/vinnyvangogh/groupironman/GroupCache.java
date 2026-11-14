@@ -46,11 +46,17 @@ final class GroupCache
 	 */
 	static String write(Gson gson, GroupRoster roster, String webhooks)
 	{
-		JsonObject out = new JsonObject();
+		JsonObject out = json(gson, roster);
 		if (webhooks != null)
 		{
 			out.addProperty("gweb", webhooks);
 		}
+		return gson.toJson(out);
+	}
+
+	private static JsonObject json(Gson gson, GroupRoster roster)
+	{
+		JsonObject out = new JsonObject();
 		out.addProperty("v", VERSION);
 
 		JsonObject banks = new JsonObject();
@@ -134,7 +140,7 @@ final class GroupCache
 		}
 		out.add("carried", carried);
 		out.add("hiscores", hiscoresJson(roster.hiscores()));
-		return gson.toJson(out);
+		return out;
 	}
 
 	/** Each member's last hiscore lookup: {@code {"name": {"ts": 1700000000000, "l": {"Attack": 99}}}}. */
