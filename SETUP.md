@@ -371,3 +371,19 @@ Members, items, drops and the map:
 ./gradlew build     # compiles and runs the tests
 ./gradlew run       # launches a developer client with the plugin side-loaded
 ```
+
+Builds use the newest RuneLite client release and check for a new one on
+every run, so the developer client (and the Plugin Hub plugins it loads)
+always matches what players are on. Before `test` and `run`, the build prints
+which one it resolved, e.g. `RuneLite client 1.13.6 (requested latest.release)`.
+
+A RuneLite release can break the build on a day nothing here changed. To tell
+the two apart, pin one run to a known-good client:
+
+```sh
+./gradlew build -PruneLiteVersion=1.13.6
+./gradlew build --offline    # reuses the last client downloaded
+```
+
+This only affects building here: the Plugin Hub replaces `build.gradle` at
+submission and builds against its own client.

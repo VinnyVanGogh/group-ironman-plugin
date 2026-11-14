@@ -1,0 +1,17 @@
+{
+  "name": "Member login and logout, with and without the plugin",
+  "description": "GroupOtt (no plugin) logs in and out: this client posts both, the offline after the 2 minute grace. GroupIan (has the plugin) does the same: this client posts nothing, his own client does. Headless only: the live plugin reads the Group channel from the client.",
+  "steps": [
+    {"kind": "groupChannel", "roster": ["GroupShip", "GroupOtt", "GroupIan"], "plugin": ["GroupShip", "GroupIan"], "online": {"GroupShip": 303}, "note": "baseline: posts nothing"},
+    {"kind": "groupChannel", "roster": ["GroupShip", "GroupOtt", "GroupIan"], "plugin": ["GroupShip", "GroupIan"], "online": {"GroupShip": 303, "GroupOtt": 615, "GroupIan": 420}, "wait": 60000, "note": "both log in"},
+    {"kind": "groupChannel", "roster": ["GroupShip", "GroupOtt", "GroupIan"], "plugin": ["GroupShip", "GroupIan"], "online": {"GroupShip": 303}, "wait": 1200000, "note": "both log out"},
+    {"kind": "tick", "wait": 60000, "note": "inside the grace: nothing yet"},
+    {"kind": "tick", "wait": 61000, "note": "grace over: GroupOtt's offline"}
+  ],
+  "expect": [
+    {"probe": "discord", "count": 2},
+    {"probe": "overlay", "contains": "GroupOtt: is online on world 615"},
+    {"probe": "discord", "contains": "Offline"},
+    {"probe": "overlay", "absent": "GroupIan"}
+  ]
+}
