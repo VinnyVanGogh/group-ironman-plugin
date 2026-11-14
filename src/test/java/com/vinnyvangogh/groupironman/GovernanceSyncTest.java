@@ -140,7 +140,7 @@ public class GovernanceSyncTest
 	}
 
 	@Test
-	public void nothingSentCarriesAWebhookOrThePrivateKey()
+	public void nothingSentCarriesAWebhookUnlessTheLeaderSharesNorEverThePrivateKey()
 	{
 		Client alex = new Client("Alex");
 		alex.sync.claim("Alex", NOW);
@@ -153,6 +153,23 @@ public class GovernanceSyncTest
 			assertFalse(payload.toLowerCase(java.util.Locale.ROOT).contains("webhook"));
 		}
 		assertEquals("announce, roles, settings", 3, alex.outbox.size());
+		alex.outbox.clear();
+
+		// Turning sharing off without ever having shared sends nothing either.
+		assertTrue(alex.sync.shareWebhooks("Alex", false, Webhooks.of(DEFAULTS), NOW + 2));
+		alex.sync.flush(MemberPrefs.NONE);
+		assertTrue(alex.outbox.isEmpty());
+
+		// The leader's "Share webhooks with the group": now, and only now, one document carries them.
+		java.util.Map<Webhook, Webhooks.Setting> hooks = new java.util.EnumMap<>(Webhook.class);
+		hooks.put(Webhook.MAIN, new Webhooks.Setting("https://discord.com/api/webhooks/1/SHAREDTOKEN",
+			DiscordPosterName.WEBHOOK, ""));
+		assertTrue(alex.sync.shareWebhooks("Alex", true, new Webhooks(hooks), NOW + 3));
+		alex.sync.flush(MemberPrefs.NONE);
+		assertEquals(1, alex.outbox.size());
+		assertTrue(alex.outbox.get(0).contains("SHAREDTOKEN"));
+		assertFalse(alex.outbox.get(0).contains(privateHalf));
+		assertFalse("never in the leader's config either", alex.config.values().toString().contains("SHAREDTOKEN"));
 	}
 
 	@Test

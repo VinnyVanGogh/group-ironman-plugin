@@ -195,6 +195,12 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public boolean shareWebhooks(boolean share)
+			{
+				return group.shareWebhooks(share);
+			}
+
+			@Override
 			public void forgetLeader()
 			{
 				group.forgetLeader();
@@ -355,8 +361,10 @@ public class GroupIronmanPlugin extends Plugin
 				heard.add(m);
 			}
 		}
+		// Who shares webhooks, never the URLs: the tab has no way to show one.
+		GroupWebhooks shared = g.sharedWebhooks();
 		return new GroupSettingsTab.View(g.myRole(self), g.roles(), g.settings(), g.unclaimed(), group.syncing(),
-			members, self, current, MemberPrefs.of(config), g.prefs(), heard);
+			members, self, current, MemberPrefs.of(config), g.prefs(), heard, shared == null ? null : shared.by);
 	}
 
 	/** Markers only add points to the world map; they never open it (that stays the player's click). */

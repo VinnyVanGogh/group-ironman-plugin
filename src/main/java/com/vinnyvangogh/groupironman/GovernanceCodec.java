@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -19,6 +20,8 @@ import java.util.TreeMap;
  * <li>{@code gset}: {@link GroupSettings}, signed by the leader or an editor.
  * Holds the shared settings only; a webhook URL has no field here.</li>
  * <li>{@code member}: a member's public key and their posting opt-outs.</li>
+ * <li>{@code gweb}: {@link GroupWebhooks}, signed by the leader only, and only ever sent once the leader has
+ * turned on "Share webhooks with the group". The one kind that carries webhook URLs.</li>
  * </ul>
  *
  * <p>The same JSON is what {@link GroupService} keeps in the config between
@@ -30,6 +33,9 @@ final class GovernanceCodec
 	static final String ROLES = "roles";
 	static final String SETTINGS = "gset";
 	static final String MEMBER = "member";
+	static final String WEBHOOKS = "gweb";
+	/** A little over {@link GroupWebhooks#MAX_URL}: a longer field cannot be one the leader signed. */
+	private static final int MAX_URL = GroupWebhooks.MAX_URL + 1;
 	/** Longer than any RuneLite display name (12) and than any key in the schema. */
 	private static final int MAX_NAME = 64;
 	/** Well over the schema's size: a newer build's extra keys are read and then dropped. */
@@ -47,15 +53,46 @@ final class GovernanceCodec
 		final GroupSettings settings;
 		final String memberKey;
 		final MemberPrefs prefs;
+		final GroupWebhooks webhooks;
 
 		private Message(String kind, GroupRoles roles, GroupSettings settings, String memberKey, MemberPrefs prefs)
+		{
+			this(kind, roles, settings, memberKey, prefs, null);
+		}
+
+		private Message(String kind, GroupRoles roles, GroupSettings settings, String memberKey, MemberPrefs prefs,
+			GroupWebhooks webhooks)
 		{
 			this.kind = kind;
 			this.roles = roles;
 			this.settings = settings;
 			this.memberKey = memberKey;
 			this.prefs = prefs;
+			this.webhooks = webhooks;
 		}
+	}
+
+	static String encode(Gson gson, GroupWebhooks w)
+	{
+		JsonObject o = header(WEBHOOKS);
+		o.addProperty("g", w.group);
+		o.addProperty("ver", w.version);
+		o.addProperty("ts", w.at);
+		o.addProperty("by", w.by);
+		o.addProperty("bk", w.byKey);
+		o.addProperty("sh", w.shared);
+		JsonObject hooks = new JsonObject();
+		for (Map.Entry<Webhook, Webhooks.Setting> e : w.settings.entrySet())
+		{
+			JsonArray s = new JsonArray();
+			s.add(e.getValue().url);
+			s.add(e.getValue().mode.name());
+			s.add(e.getValue().name);
+			hooks.add(e.getKey().name(), s);
+		}
+		o.add("wh", hooks);
+		o.addProperty("sig", w.signature);
+		return gson.toJson(o);
 	}
 
 	static String encode(Gson gson, GroupRoles roles)
@@ -162,6 +199,8 @@ final class GovernanceCodec
 			case MEMBER:
 				return new Message(MEMBER, null, null, string(in, "pk"), new MemberPrefs(bool(in, "all"),
 					MemberPrefs.parse(string(in, "np")), MemberPrefs.NONE.mute));
+			case WEBHOOKS:
+				return new Message(WEBHOOKS, null, null, null, null, webhooks(in));
 			default:
 				return null;
 		}
@@ -221,6 +260,41 @@ final class GovernanceCodec
 			history, string(in, "sig"));
 	}
 
+	/** As signed: a field that is no webhook or no poster-name choice this build knows fails the signature check. */
+	private static GroupWebhooks webhooks(JsonObject in)
+	{
+		Map<Webhook, Webhooks.Setting> hooks = new EnumMap<>(Webhook.class);
+		JsonElement wh = in.get("wh");
+		if (wh != null && wh.isJsonObject())
+		{
+			for (Map.Entry<String, JsonElement> e : wh.getAsJsonObject().entrySet())
+			{
+				Webhook w = known(Webhook.values(), e.getKey());
+				JsonArray a = e.getValue().getAsJsonArray();
+				DiscordPosterName mode = known(DiscordPosterName.values(), a.get(1).getAsString());
+				String url = a.get(0).getAsString();
+				if (w != null && mode != null && url.length() <= MAX_URL)
+				{
+					hooks.put(w, new Webhooks.Setting(url, mode, cap(a.get(2).getAsString(), PosterNames.MAX * 2)));
+				}
+			}
+		}
+		return new GroupWebhooks(string(in, "g"), number(in, "ver"), number(in, "ts"), cap(string(in, "by")),
+			string(in, "bk"), bool(in, "sh"), hooks, string(in, "sig"));
+	}
+
+	private static <E extends Enum<E>> E known(E[] values, String name)
+	{
+		for (E e : values)
+		{
+			if (e.name().equals(name))
+			{
+				return e;
+			}
+		}
+		return null;
+	}
+
 	private static String string(JsonObject in, String field)
 	{
 		JsonElement e = in.get(field);
@@ -241,6 +315,11 @@ final class GovernanceCodec
 
 	private static String cap(String s)
 	{
-		return s.length() > MAX_NAME ? s.substring(0, MAX_NAME) : s;
+		return cap(s, MAX_NAME);
+	}
+
+	private static String cap(String s, int max)
+	{
+		return s.length() > max ? s.substring(0, max) : s;
 	}
 }

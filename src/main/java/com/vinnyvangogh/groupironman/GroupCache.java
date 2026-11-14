@@ -37,7 +37,20 @@ final class GroupCache
 
 	static String write(Gson gson, GroupRoster roster)
 	{
+		return write(gson, roster, null);
+	}
+
+	/**
+	 * With {@code webhooks}, the leader's signed {@link GroupWebhooks} document as the party carries it (null for
+	 * none): the one place a member keeps the shared webhooks between sessions, never their RuneLite config.
+	 */
+	static String write(Gson gson, GroupRoster roster, String webhooks)
+	{
 		JsonObject out = new JsonObject();
+		if (webhooks != null)
+		{
+			out.addProperty("gweb", webhooks);
+		}
 		out.addProperty("v", VERSION);
 
 		JsonObject banks = new JsonObject();
@@ -322,6 +335,21 @@ final class GroupCache
 			{
 				roster.putCarried(e.getKey(), d.carried);
 			}
+		}
+	}
+
+	/** The webhooks document {@link #write(Gson, GroupRoster, String)} kept, or null; its signature is checked later. */
+	static String webhooks(Gson gson, String json)
+	{
+		try
+		{
+			JsonElement root = json == null ? null : gson.fromJson(json, JsonElement.class);
+			JsonElement w = root != null && root.isJsonObject() ? root.getAsJsonObject().get("gweb") : null;
+			return w != null && w.isJsonPrimitive() ? w.getAsString() : null;
+		}
+		catch (RuntimeException e)
+		{
+			return null;
 		}
 	}
 
