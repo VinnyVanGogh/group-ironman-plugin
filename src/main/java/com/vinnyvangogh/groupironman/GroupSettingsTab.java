@@ -91,6 +91,27 @@ final class GroupSettingsTab
 			this.heard = heard;
 		}
 
+		/**
+		 * The view from this client's governance: {@code roster} is the group's names,
+		 * {@code current} each shared setting's value now. Never a webhook URL, only who shares them.
+		 */
+		static View of(GroupGovernance g, String self, Collection<String> roster, Map<String, Long> current,
+			MemberPrefs mine, boolean syncing)
+		{
+			List<String> members = gridMembers(roster, self);
+			Set<String> heard = new HashSet<>();
+			for (String m : members)
+			{
+				if (g.knownKey(m) != null)
+				{
+					heard.add(m);
+				}
+			}
+			GroupWebhooks shared = g.sharedWebhooks();
+			return new View(g.myRole(self), g.roles(), g.settings(), g.unclaimed(), syncing, members, self, current,
+				mine, g.prefs(), heard, shared == null ? null : shared.by);
+		}
+
 		boolean canEdit()
 		{
 			return role != GroupGovernance.Role.MEMBER;
