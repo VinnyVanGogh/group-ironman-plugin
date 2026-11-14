@@ -14,6 +14,11 @@
   hours hold the repost until the first update they allow.
 - Only the client that keeps the board reposts it (the leader's, on a shared
   webhook). Off: the board is only ever edited.
+### Dev builds follow the newest RuneLite
+
+- `./gradlew build`, `test` and `run` now use the newest RuneLite client
+  release, checked on every run, and print which one they resolved. Pin a run
+  with `-PruneLiteVersion=1.13.6` to compare. Plugin Hub builds are unaffected.
 
 ### Built against RuneLite 1.13.6
 

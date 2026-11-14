@@ -1,0 +1,20 @@
+{
+  "name": "Level-up streak in one skill",
+  "description": "Prayer 23 to 26 inside the streak window: one Discord post, then two edits of it. Live: only levels above your real Prayer level count, so raise the numbers on a high account.",
+  "steps": [
+    {"kind": "stat", "skill": "PRAYER", "level": 23, "xp": 6600, "note": "baseline, as at login"},
+    {"kind": "stat", "skill": "PRAYER", "level": 24, "xp": 7400, "wait": 15000},
+    {"kind": "tick"},
+    {"kind": "stat", "skill": "PRAYER", "level": 25, "xp": 8200, "wait": 15000},
+    {"kind": "tick"},
+    {"kind": "stat", "skill": "PRAYER", "level": 26, "xp": 9100, "wait": 15000},
+    {"kind": "tick"}
+  ],
+  "expect": [
+    {"probe": "discord", "count": 3},
+    {"probe": "discord", "contains": "post: "},
+    {"probe": "discord", "contains": "edit: "},
+    {"probe": "discord", "contains": "Prayer 23 → 26 (+3)"},
+    {"probe": "overlay", "count": 3}
+  ]
+}
