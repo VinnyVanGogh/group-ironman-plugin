@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Shopping: shared lists for the group, with 1 Defence pure presets
+
+- New **Shopping** tab. Anyone adds a list for one or more members; it goes
+  to the whole group over group sync and is kept across restarts.
+- **Presets** for the 1 Defence pure's quest milestones: Mithril gloves
+  (Recipe for Disaster with 5 of the 6 subquests that give no Defence
+  experience, Goblin generals, Mountain Dwarf, Evil Dave, Pirate Pete and
+  Skrach Uglogwee ticked by default, Awowogei to swap in), Ava's accumulator,
+  Ancient Magicks, Dragon scimitar (pick Attack or Strength, never Defence),
+  Dragon dagger and longsword, Climbing boots, Iban's staff, God books and
+  Waterfall Quest. Each counts the quests and prerequisites the member has
+  not done, read from the game; optional items are left out.
+- **Custom lists**: search items, set quantities, rename them later.
+- Every line: what the members need, less what the group holds (banks, group
+  storage, inventories, equipment, pouches; noted counted as the item), who
+  holds it, and where you can get the rest: shops you can be served at, with
+  the price, or the monsters that drop it. Lines tick off as items arrive.
+- Removing or renaming a list shows who did it, on the list and under
+  *Changes*.
+- New setting under *In-game*: **Shopping: shop alert**, off by default. A
+  chat line as you walk up to a shop selling something still needed.
+- Members on an older build ignore the new messages; nothing changes for them.
+
 ### Inventories look like the game's, and online members come first
 
 - A member's inventory in the Group tab now shows their real 28 slots: each

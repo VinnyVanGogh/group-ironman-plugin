@@ -1172,6 +1172,14 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "shoppingShopAlert", name = "Shopping: shop alert", description = "A chat line as you walk"
+		+ " up to a shop that sells something a list in the Shopping tab still needs, once per visit. Only shops"
+		+ " you can be served at.", section = inGameSection, position = 42)
+	default boolean shoppingShopAlert()
+	{
+		return false;
+	}
+
 	// ---- 7. Thresholds: what counts. Both Discord and the banners read these. ----
 
 	@ConfigItem(keyName = "eventDropMinValue", name = "Valuable drop (gp)", description = "Valuable drop at least"

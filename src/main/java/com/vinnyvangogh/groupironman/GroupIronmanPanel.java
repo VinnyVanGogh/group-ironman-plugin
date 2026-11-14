@@ -73,7 +73,7 @@ import net.runelite.client.ui.components.IconTextField;
 class GroupIronmanPanel extends PluginPanel
 {
 	/** What the buttons in the header, and in the Settings tab, do. */
-	interface Actions extends GroupSettingsTab.Actions
+	interface Actions extends GroupSettingsTab.Actions, ShoppingTab.Actions
 	{
 		void join();
 
@@ -119,11 +119,21 @@ class GroupIronmanPanel extends PluginPanel
 		final boolean anyOn;
 		/** What the "Turn on sharing" card reads. */
 		final SharingPrompt.Settings sharing;
+		/** The Shopping tab's view, or null before the plugin has started its lists. */
+		final ShoppingTab.View shopping;
 
 		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
 			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GamePresence presence,
 			GroupSettingsTab.View settings, boolean anyOn, SharingPrompt.Settings sharing)
 		{
+			this(sync, group, members, items, switches, regions, since, self, presence, settings, anyOn, sharing, null);
+		}
+
+		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
+			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GamePresence presence,
+			GroupSettingsTab.View settings, boolean anyOn, SharingPrompt.Settings sharing, ShoppingTab.View shopping)
+		{
+			this.shopping = shopping;
 			this.anyOn = anyOn;
 			this.sharing = sharing;
 			this.presence = presence;
@@ -159,6 +169,7 @@ class GroupIronmanPanel extends PluginPanel
 	private final Map<String, BufferedImage> orbIcons = new ConcurrentHashMap<>();
 	private final Actions actions;
 	private final GroupSettingsTab settingsTab;
+	private final ShoppingTab shoppingTab;
 
 	private final JPanel header = new Column();
 	private final CardLayout cards = new CardLayout();
@@ -196,12 +207,13 @@ class GroupIronmanPanel extends PluginPanel
 		this.skillIcons = skillIcons;
 		this.actions = actions;
 		this.settingsTab = new GroupSettingsTab(actions, this::redraw);
+		this.shoppingTab = new ShoppingTab(actions, itemManager, this::redraw);
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
 
 		JPanel top = new Column();
 		top.add(header);
-		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Settings"));
+		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Shopping", "Settings"));
 		add(top, BorderLayout.NORTH);
 
 		addTab("Group", null);
@@ -209,6 +221,7 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Storage", storageFilter);
 		addTab("Find", findQuery);
 		addTab("Log", logControls());
+		addTab("Shopping", null);
 		addTab("Settings", null);
 		add(views, BorderLayout.CENTER);
 	}
@@ -269,6 +282,9 @@ class GroupIronmanPanel extends PluginPanel
 				case "Log":
 					drawLog(tab, v, now);
 					break;
+				case "Shopping":
+					drawShopping(tab, v);
+					break;
 				case "Settings":
 					drawSettings(tab, v, now);
 					break;
@@ -292,11 +308,30 @@ class GroupIronmanPanel extends PluginPanel
 	/** The Settings tab is on screen and shows the same as before: rebuilding would lose a half-typed number. */
 	private boolean settingsUnchanged(JPanel tab, View v)
 	{
-		if (!"Settings".equals(current) || tab.getComponentCount() == 0)
+		if (tab.getComponentCount() == 0)
+		{
+			return false;
+		}
+		if ("Shopping".equals(current))
+		{
+			// The same for the Shopping tab: its form keeps a half-typed name or search.
+			return v.shopping != null && !shoppingTab.changed(v.shopping);
+		}
+		if (!"Settings".equals(current))
 		{
 			return false;
 		}
 		return v.settings == null || !settingsTab.changed(v.settings);
+	}
+
+	private void drawShopping(JPanel tab, View v)
+	{
+		if (v.shopping == null)
+		{
+			empty(tab, "Shopping lists are starting.", "Open this tab again in a moment.");
+			return;
+		}
+		shoppingTab.draw(tab, v.shopping);
 	}
 
 	private void drawSettings(JPanel tab, View v, long now)
