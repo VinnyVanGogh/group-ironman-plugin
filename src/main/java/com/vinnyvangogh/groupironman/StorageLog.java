@@ -9,9 +9,11 @@ import java.util.Map;
  * The rolling group storage change log: the newest {@link #MAX_ENTRIES}
  * visits, newest first.
  *
- * <p>Only visits by members running GIM Utilities with storage sharing on are
- * here. A member without it changes storage silently, and the next visit by
- * someone who has it sees the result as part of their own "before".
+ * <p>Members' visits are here only from members running GIM Utilities with
+ * storage sharing on. A member without it changes storage silently, and the
+ * next visit by someone who has it sees the result as part of their own
+ * "before". This player's own visits are always here; one made with sharing
+ * off is marked {@link StorageChange#shared() not shared} and was never sent.
  */
 final class StorageLog
 {
@@ -45,6 +47,19 @@ final class StorageLog
 			entries.removeLast();
 		}
 		return true;
+	}
+
+	/** True when this member's visit at {@code at} is here and was kept to this client (not shared). */
+	synchronized boolean notShared(long at, String member)
+	{
+		for (StorageChange e : entries)
+		{
+			if (e.at() == at && e.member().equalsIgnoreCase(member))
+			{
+				return !e.shared();
+			}
+		}
+		return false;
 	}
 
 	synchronized List<StorageChange> entries()
