@@ -1774,7 +1774,7 @@ class GroupService
 		return dataDirectory.call().joinSegment(CACHE_FILE);
 	}
 
-	/** Kept for the panel: is any group feature on, so the panel button should show. */
+	/** Kept for the panel: is any group feature on; false shows its "everything is off" notice. */
 	boolean anyOn()
 	{
 		return switches().any() || !lowStock.isEmpty();

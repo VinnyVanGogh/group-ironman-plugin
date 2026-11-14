@@ -146,7 +146,9 @@ holds up a death post.
 ## Quick start
 
 1. Install *GIM Utilities* from the Plugin Hub and turn on the switches you
-   want in its settings.
+   want in its settings. The panel (green badge on the sidebar) shows as soon
+   as the plugin is on; with every switch off it says so and has a button to
+   open the settings.
 2. One member opens the GIM Utilities panel, clicks **Create group key**, then
    **Copy group key**, and sends the key to the group (Discord works).
 3. Everyone else copies it and clicks **Paste group key**.

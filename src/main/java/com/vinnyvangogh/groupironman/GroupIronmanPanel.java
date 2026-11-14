@@ -87,6 +87,9 @@ class GroupIronmanPanel extends PluginPanel
 
 		/** Saves a pasted key; false when the text holds none. */
 		boolean pasteKey(String text);
+
+		/** Opens GIM Utilities' own page in RuneLite's settings. */
+		void openSettings();
 	}
 
 	/** Everything a redraw needs, captured on the client side. */
@@ -105,11 +108,14 @@ class GroupIronmanPanel extends PluginPanel
 		final GamePresence presence;
 		/** The Settings tab's view, or null before the plugin has started its group settings. */
 		final GroupSettingsTab.View settings;
+		/** Any share or sync feature on; false leads the panel with the "everything is off" notice. */
+		final boolean anyOn;
 
 		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
 			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GamePresence presence,
-			GroupSettingsTab.View settings)
+			GroupSettingsTab.View settings, boolean anyOn)
 		{
+			this.anyOn = anyOn;
 			this.presence = presence;
 			this.settings = settings;
 			this.sync = sync;
@@ -349,7 +355,11 @@ class GroupIronmanPanel extends PluginPanel
 	private void drawHeader(View v)
 	{
 		header.removeAll();
-		SyncHeader h = SyncHeader.of(v.sync, v.group.othersOnline(v.self, System.currentTimeMillis()), v.members);
+		if (SidebarButton.offNotice(v.anyOn))
+		{
+			header.add(offNotice());
+		}
+		SyncHeader h =SyncHeader.of(v.sync, v.group.othersOnline(v.self, System.currentTimeMillis()), v.members);
 		JLabel title = new JLabel(h.title);
 		title.setFont(FontManager.getRunescapeBoldFont());
 		title.setForeground(h.ok ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.BRAND_ORANGE);
@@ -376,6 +386,24 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		header.revalidate();
 		header.repaint();
+	}
+
+	/** Every switch is off: say so first, with a way to the settings, so the panel never looks broken. */
+	private JPanel offNotice()
+	{
+		JPanel box = new Column();
+		box.setBorder(new EmptyBorder(0, 0, 8, 0));
+		JLabel line = text(SidebarButton.OFF_TEXT, ColorScheme.BRAND_ORANGE);
+		line.setFont(FontManager.getRunescapeBoldFont());
+		box.add(line);
+		JButton open = new JButton(SidebarButton.OFF_BUTTON);
+		open.setFont(FontManager.getRunescapeSmallFont());
+		open.setFocusable(false);
+		open.addActionListener(e -> actions.openSettings());
+		JPanel row = new JPanel(new GridLayout(1, 1));
+		row.add(open);
+		box.add(row);
+		return box;
 	}
 
 	private JButton button(SyncHeader.Button b)

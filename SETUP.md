@@ -51,7 +51,8 @@ number box is too narrow for `1,000,000` with commas.
 **Sharing** (in *Group*), all off by default, including `::find` (in
 *In-game*). Each one works on its own, and each only shows you other members'
 data while you share the same thing yourself. With every switch off the plugin
-sends nothing, collects nothing, and its side panel button is hidden.
+sends nothing and collects nothing; its side panel stays, opening with an
+*Everything is off* notice and a button to these settings.
 
 | Setting | What it sends to your party |
 | --- | --- |
@@ -205,8 +206,10 @@ user folder), so your other plugins and settings come along.
    your character, then click **Play Now**.
 3. **Turn sharing on.** Everyone opens *GIM Utilities* in the plugin settings
    and turns on the switches they want. The GIM Utilities panel (a green badge
-   on the sidebar) appears once any switch is on. The built-in **Party**
-   plugin is not needed and can stay off.
+   on the sidebar) is there whenever the plugin is on. With every switch off
+   it opens with *Everything is off. Turn on what you want to share.* and an
+   **Open GIM Utilities settings** button that jumps to those switches. The
+   built-in **Party** plugin is not needed and can stay off.
 4. **Share a group key, once.** One member opens the GIM Utilities panel and
    clicks **Create group key**, then **Copy group key**, and sends the key to
    the group outside the game (Discord, a DM). The game chatbox takes no
