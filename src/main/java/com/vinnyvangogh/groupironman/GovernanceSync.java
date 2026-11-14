@@ -193,9 +193,30 @@ final class GovernanceSync
 		return act(() -> governance.setEditor(self, name, editor, now) != null);
 	}
 
-	boolean save(String self, Map<String, Long> values, long now)
+	/** What "Save to group" did, so the tab can say why when it did not. */
+	enum SaveResult
 	{
-		return act(() -> governance.save(self, values, now) != null);
+		SAVED,
+		/** Saved here; it goes out once this client joins group sync. */
+		SAVED_OFFLINE,
+		/** The group already holds exactly these values. */
+		UNCHANGED,
+		/** This client is not the leader or an editor (any more). */
+		NOT_EDITOR,
+		/** No player name yet: not logged in. */
+		NOT_LOGGED_IN,
+		/** Group settings have not started. */
+		NOT_STARTED
+	}
+
+	SaveResult save(String self, Map<String, Long> values, long now)
+	{
+		GroupSettings before = governance.settings();
+		if (!act(() -> governance.save(self, values, now) != null))
+		{
+			return SaveResult.NOT_EDITOR;
+		}
+		return governance.settings() == before ? SaveResult.UNCHANGED : SaveResult.SAVED;
 	}
 
 	void forgetLeader()
