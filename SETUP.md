@@ -51,7 +51,8 @@ number box is too narrow for `1,000,000` with commas.
 **Sharing** (in *Group*), all off by default, including `::find` (in
 *In-game*). Each one works on its own, and each only shows you other members'
 data while you share the same thing yourself. With every switch off the plugin
-sends nothing, collects nothing, and its side panel button is hidden.
+sends nothing and collects nothing; its side panel stays, opening with an
+*Everything is off* notice and a button to these settings.
 
 | Setting | What it sends to your party |
 | --- | --- |
@@ -203,14 +204,15 @@ user folder), so your other plugins and settings come along.
    ([RuneLite wiki: Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts)):
    click the **Jagex account** icon on the sidebar, add your account, pick
    your character, then click **Play Now**.
-3. **Share a group key, then turn sharing on in one click.** One member turns
-   on any switch in *GIM Utilities* settings so the panel (a green badge on
-   the sidebar) appears, clicks **Create group key**, then **Copy group
-   key**, and sends the key to the group outside the game (Discord, a DM). The
-   game chatbox takes no paste, and plugins never type into it. Everyone else
-   copies the key and pastes it into *Group key* in the GIM Utilities
-   settings, or clicks **Paste group key** if the panel is already open. The
-   panel appears once a key is saved, with a **Share with your group?** card:
+3. **Share a group key, then turn sharing on in one click.** The GIM Utilities
+   panel (a green badge on the sidebar) is there whenever the plugin is on;
+   with every switch off it opens with *Everything is off. Turn on what you
+   want to share.* and an **Open GIM Utilities settings** button. One member
+   clicks **Create group key**, then **Copy group key**, and sends the key to
+   the group outside the game (Discord, a DM). The game chatbox takes no
+   paste, and plugins never type into it. Everyone else copies the key and
+   clicks **Paste group key** in the panel (or pastes it into *Group key* in
+   the settings). The panel then shows a **Share with your group?** card:
    - **Turn on sharing** ticks *Sync with my group* and every *Share* switch
      (bank, group storage changes, stats, inventory and equipment, pouch /
      quiver / vault, drops and collection log, group events), and joins.
