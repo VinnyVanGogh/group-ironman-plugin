@@ -67,7 +67,13 @@ public class GovernanceSyncTest
 		/** A game tick while connected: whatever is marked goes to {@code others}. */
 		void tick(Client... others)
 		{
-			sync.flush(MemberPrefs.NONE);
+			tick(MemberPrefs.NONE, others);
+		}
+
+		/** As {@link #tick(Client...)}, with this member's own opt-outs as they are now. */
+		void tick(MemberPrefs prefs, Client... others)
+		{
+			sync.flush(prefs);
 			for (String payload : outbox)
 			{
 				assertTrue(GovernanceSync.isGovernance(payload));
@@ -96,8 +102,9 @@ public class GovernanceSyncTest
 		sam.tick(alex);
 
 		assertTrue(alex.sync.claim("Alex", NOW));
-		assertTrue(alex.sync.save("Alex", levelMin(70), NOW + 1));
-		assertFalse("Sam is not an editor", sam.sync.save("Sam", levelMin(5), NOW + 1));
+		assertEquals(GovernanceSync.SaveResult.SAVED, alex.sync.save("Alex", levelMin(70), NOW + 1));
+		assertEquals("Sam is not an editor", GovernanceSync.SaveResult.NOT_EDITOR,
+			sam.sync.save("Sam", levelMin(5), NOW + 1));
 		alex.tick(sam);
 
 		GroupSettings got = sam.sync.governance().settings();
@@ -153,6 +160,98 @@ public class GovernanceSyncTest
 			assertFalse(payload.toLowerCase(java.util.Locale.ROOT).contains("webhook"));
 		}
 		assertEquals("announce, roles, settings", 3, alex.outbox.size());
+	}
+
+	private static Map<String, Long> current(Client c)
+	{
+		GroupSettingsSchema.Resolved r = new GroupSettingsSchema.Resolved(DEFAULTS, c.sync.governance().settings());
+		Map<String, Long> out = new java.util.TreeMap<>();
+		for (GroupSettingsSchema.Setting s : GroupSettingsSchema.ALL)
+		{
+			out.put(s.key, r.value(s.key));
+		}
+		return out;
+	}
+
+	/** One redraw of {@code c}'s Settings tab. */
+	private static void redraw(SettingsDraft draft, Client c)
+	{
+		GroupGovernance g = c.sync.governance();
+		draft.update(g.myRole(c.name), g.roles(), g.settings(), current(c));
+	}
+
+	/** Board 2026-11-13: Sam had the Settings tab open and Alex's Save did not take. */
+	@Test
+	public void theLeadersSaveTakesWhileAnotherMemberHasTheTabOpen()
+	{
+		Client alex = new Client("Alex");
+		Client sam = new Client("Sam");
+		alex.tick(sam);
+		sam.tick(alex);
+		alex.sync.claim("Alex", NOW);
+		alex.sync.save("Alex", levelMin(50), NOW + 1);
+		alex.tick(sam);
+
+		SettingsDraft alexTab = new SettingsDraft();
+		SettingsDraft samTab = new SettingsDraft();
+		redraw(alexTab, alex);
+		redraw(samTab, sam);
+		alexTab.put("eventLevelMin", 70);
+
+		// Sam, on his Settings tab, turns off posting his events; his client announces it.
+		MemberPrefs out = new MemberPrefs(true, java.util.EnumSet.noneOf(GroupEvent.Type.class),
+			java.util.EnumSet.noneOf(GroupEvent.Type.class));
+		sam.sync.prefs(out);
+		sam.tick(out, alex);
+		// He rejoins the party too: everyone resends.
+		alex.sync.resendAll();
+		alex.tick(sam);
+		sam.sync.resendAll();
+		sam.tick(out, alex);
+		redraw(alexTab, alex);
+		redraw(samTab, sam);
+
+		assertEquals(GovernanceSync.SaveResult.SAVED, alex.sync.save("Alex", alexTab.values(), NOW + 2));
+		alexTab.saved();
+		alex.tick(sam);
+		redraw(alexTab, alex);
+		redraw(samTab, sam);
+
+		assertEquals(2, sam.sync.governance().settings().version);
+		assertEquals(70L, (long) sam.sync.governance().settings().values.get("eventLevelMin"));
+		assertEquals("Sam's tab shows what Alex saved", 70L, (long) samTab.values().get("eventLevelMin"));
+		assertNull(alexTab.notice());
+	}
+
+	@Test
+	public void saveSaysWhyItDidNotTake()
+	{
+		Client alex = new Client("Alex");
+		Client sam = new Client("Sam");
+		alex.tick(sam);
+		sam.tick(alex);
+		alex.sync.claim("Alex", NOW);
+		alex.sync.setEditor("Alex", "Sam", true, NOW + 1);
+		alex.tick(sam);
+		assertEquals(GovernanceSync.SaveResult.SAVED, sam.sync.save("Sam", levelMin(60), NOW + 2));
+		assertEquals(GovernanceSync.SaveResult.UNCHANGED, sam.sync.save("Sam", levelMin(60), NOW + 3));
+		sam.tick(alex);
+
+		alex.sync.setEditor("Alex", "Sam", false, NOW + 4);
+		alex.tick(sam);
+		assertEquals(GovernanceSync.SaveResult.NOT_EDITOR, sam.sync.save("Sam", levelMin(70), NOW + 5));
+		assertEquals("Not saved: you are no longer leader or editor.",
+			GroupSettingsTab.saveNote(GovernanceSync.SaveResult.NOT_EDITOR));
+	}
+
+	@Test
+	public void everySaveResultHasItsOwnNote()
+	{
+		java.util.Set<String> notes = new java.util.HashSet<>();
+		for (GovernanceSync.SaveResult r : GovernanceSync.SaveResult.values())
+		{
+			assertTrue(r + " has a note", notes.add(GroupSettingsTab.saveNote(r)));
+		}
 	}
 
 	@Test

@@ -42,7 +42,7 @@ final class GroupSettingsTab
 
 		boolean setEditor(String name, boolean editor);
 
-		boolean save(Map<String, Long> values);
+		GovernanceSync.SaveResult save(Map<String, Long> values);
 
 		void forgetLeader();
 
@@ -90,7 +90,10 @@ final class GroupSettingsTab
 			return role != GroupGovernance.Role.MEMBER;
 		}
 
-		/** Changes when anything drawn changes; the draft is not part of it. */
+		/**
+		 * Changes when anything drawn changes; the draft is not part of it. Only
+		 * decides whether to rebuild: what replaces the draft is {@link SettingsDraft#update}.
+		 */
 		String signature()
 		{
 			return String.join("|", String.valueOf(role), roles == null ? "" : roles.signature,
@@ -118,7 +121,9 @@ final class GroupSettingsTab
 	private final Runnable refresh;
 	/** Section names the player opened (or closed, for those open by default). */
 	private final Set<String> open = new HashSet<>();
-	private Map<String, Long> draft = new TreeMap<>();
+	private final SettingsDraft draft = new SettingsDraft();
+	/** The number inputs on screen: text typed into one is only in the draft once committed. */
+	private final List<JSpinner> spinners = new ArrayList<>();
 	private String drawn;
 	private String note;
 
@@ -136,11 +141,10 @@ final class GroupSettingsTab
 
 	void draw(JPanel tab, View v, long now)
 	{
-		if (changed(v))
-		{
-			// What the group has now replaces any draft: a draft built on an old version is stale.
-			draft = new TreeMap<>(v.current);
-		}
+		// A number typed but not yet committed would be lost with the old inputs.
+		commitTyped();
+		spinners.clear();
+		draft.update(v.role, v.roles, v.settings, v.current);
 		drawn = v.signature();
 		drawHeader(tab, v, now);
 		drawEditors(tab, v);
@@ -154,9 +158,7 @@ final class GroupSettingsTab
 	{
 		tab.removeAll();
 		drawn = null;
-		Map<String, Long> keep = draft;
 		draw(tab, v, System.currentTimeMillis());
-		draft = keep;
 		tab.revalidate();
 		tab.repaint();
 	}
@@ -241,15 +243,70 @@ final class GroupSettingsTab
 		{
 			tab.add(text("Nothing saved yet: these are your own settings. Save to make them the group's.", MUTED));
 		}
+		if (v.canEdit() && draft.notice() != null)
+		{
+			tab.add(text(draft.notice(), ColorScheme.BRAND_ORANGE));
+		}
 		drawInputs(tab, v);
 		if (v.canEdit())
 		{
 			JPanel buttons = new JPanel(new GridLayout(0, 2, 2, 2));
-			buttons.add(button("Save to group", "Send these to every member. They replace each member's own.", () ->
-				note = actions.save(new TreeMap<>(draft)) ? "Saved and sent to your group." : "Not saved: you are no"
-					+ " longer leader or editor."));
-			buttons.add(button("Discard changes", null, () -> draft = new TreeMap<>(v.current)));
+			buttons.add(button("Save to group", "Send these to every member. They replace each member's own.",
+				this::save));
+			buttons.add(button("Discard changes", null, () ->
+			{
+				draft.discard(v.current);
+				note = null;
+			}));
 			tab.add(buttons);
+		}
+	}
+
+	private void save()
+	{
+		commitTyped();
+		GovernanceSync.SaveResult r = actions.save(new TreeMap<>(draft.values()));
+		if (r == GovernanceSync.SaveResult.SAVED || r == GovernanceSync.SaveResult.SAVED_OFFLINE
+			|| r == GovernanceSync.SaveResult.UNCHANGED)
+		{
+			draft.saved();
+		}
+		note = saveNote(r);
+	}
+
+	/** What the tab says after "Save to group": each refusal names its reason. */
+	static String saveNote(GovernanceSync.SaveResult r)
+	{
+		switch (r)
+		{
+			case SAVED:
+				return "Saved and sent to your group.";
+			case SAVED_OFFLINE:
+				return "Saved. It goes to your group when you join group sync.";
+			case UNCHANGED:
+				return "Nothing to save: these are already your group's settings.";
+			case NOT_EDITOR:
+				return "Not saved: you are no longer leader or editor.";
+			case NOT_LOGGED_IN:
+				return "Not saved: log in on your Group Ironman first.";
+			default:
+				return "Not saved: group settings are still starting. Try again in a moment.";
+		}
+	}
+
+	/** Text typed into a number input counts once it parses; the Save button never takes focus to commit it. */
+	private void commitTyped()
+	{
+		for (JSpinner s : spinners)
+		{
+			try
+			{
+				s.commitEdit();
+			}
+			catch (java.text.ParseException e)
+			{
+				// Not a number: the input keeps its last good value.
+			}
 		}
 	}
 
@@ -274,7 +331,7 @@ final class GroupSettingsTab
 
 	private JComponent input(GroupSettingsSchema.Setting s, boolean editable)
 	{
-		long value = draft.getOrDefault(s.key, 0L);
+		long value = draft.values().getOrDefault(s.key, 0L);
 		if (s.flag)
 		{
 			JCheckBox box = new JCheckBox(s.label, value != 0);
@@ -289,6 +346,10 @@ final class GroupSettingsTab
 			Long.valueOf(s.max), Long.valueOf(1)));
 		spinner.setEnabled(editable);
 		spinner.addChangeListener(e -> draft.put(s.key, ((Number) spinner.getValue()).longValue()));
+		if (editable)
+		{
+			spinners.add(spinner);
+		}
 		row.add(spinner, BorderLayout.EAST);
 		return row;
 	}
