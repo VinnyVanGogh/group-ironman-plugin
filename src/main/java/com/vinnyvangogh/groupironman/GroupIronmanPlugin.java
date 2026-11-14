@@ -5,10 +5,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -390,19 +388,8 @@ public class GroupIronmanPlugin extends Plugin
 		{
 			current.put(s.key, values.value(s.key));
 		}
-		List<String> members = GroupSettingsTab.gridMembers(group.members().names(), self);
-		Set<String> heard = new HashSet<>();
-		for (String m : members)
-		{
-			if (g.knownKey(m) != null)
-			{
-				heard.add(m);
-			}
-		}
-		// Who shares webhooks, never the URLs: the tab has no way to show one.
-		GroupWebhooks shared = g.sharedWebhooks();
-		return new GroupSettingsTab.View(g.myRole(self), g.roles(), g.settings(), g.unclaimed(), group.syncing(),
-			members, self, current, MemberPrefs.of(config), g.prefs(), heard, shared == null ? null : shared.by);
+		return GroupSettingsTab.View.of(g, self, group.members().names(), current, MemberPrefs.of(config),
+			group.syncing());
 	}
 
 	/** Markers only add points to the world map; they never open it (that stays the player's click). */
