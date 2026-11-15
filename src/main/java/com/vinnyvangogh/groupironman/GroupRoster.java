@@ -54,6 +54,42 @@ final class GroupRoster
 	/** When this player was last seen logged in, by this client; 0 when never. */
 	private volatile long lastPlayed;
 
+	/** What each member is doing in an activity now ({@link ActivityState}), this player included. */
+	private final Map<String, ActivityState> activities = new ConcurrentHashMap<>();
+	/** A member's activity not heard of for this long is gone: their client sends one each minute while in it. */
+	static final long ACTIVITY_STALE_MS = 5 * 60_000L;
+
+	/** {@code member}'s activity now; {@link ActivityState#NONE} (or any inactive state) removes it. */
+	void putActivity(String member, ActivityState state)
+	{
+		if (state == null || !state.active())
+		{
+			activities.remove(member);
+		}
+		else
+		{
+			activities.put(member, state);
+		}
+	}
+
+	/**
+	 * Activities still current at {@code now}: each heard of in the last {@link #ACTIVITY_STALE_MS}, by its own
+	 * time or by when its member was last heard from. A client that crashed mid-run sends no clear, so it ages out.
+	 */
+	Map<String, ActivityState> activities(long now)
+	{
+		Map<String, ActivityState> out = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+		activities.forEach((member, s) ->
+		{
+			long last = Math.max(s.at, heard.getOrDefault(member, 0L));
+			if (now - last <= ACTIVITY_STALE_MS)
+			{
+				out.put(member, s);
+			}
+		});
+		return out;
+	}
+
 	/** Something arrived from {@code member} at {@code at}. Only ever moves forward. */
 	void heard(String member, long at)
 	{

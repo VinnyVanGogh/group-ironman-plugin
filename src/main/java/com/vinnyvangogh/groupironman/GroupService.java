@@ -243,6 +243,12 @@ class GroupService
 	private boolean extrasDirty;
 	private int ticksSinceExtras = EXTRAS_INTERVAL_TICKS;
 	private String lastExtrasSent;
+	/** Client thread: this player's activity as last shown, for a joiner's resend. */
+	private ActivityState lastActivity = ActivityState.NONE;
+	/** Client thread: an active state went to the party and no clear has followed it yet. */
+	private boolean activityOut;
+	/** Client thread: the name this player's live activity is filed under in the roster, null when none. */
+	private String activityName;
 	private Map<Integer, Integer> seedVault = new TreeMap<>();
 	private long seedVaultAt = -1;
 	private boolean session;
@@ -414,6 +420,44 @@ class GroupService
 		{
 			partyService.send(new VvgGroupIronmanMessage(payload));
 		}
+	}
+
+	/**
+	 * Client thread. This player's live activity: always kept in the roster, so the panel shows it (only on this
+	 * screen while sharing is off), and sent to the party only under "Share group events" ({@link GroupOutbox}).
+	 */
+	void shareActivity(ActivityState state)
+	{
+		lastActivity = state;
+		// Filed under the name of the login it started in: after a logout the local name may read differently.
+		String name = state.active() || activityName == null ? localName() : activityName;
+		activityName = state.active() ? name : null;
+		roster.putActivity(name, state);
+		String payload = GroupOutbox.activity(gson, syncing(), config.groupShareEvents(), state, activityOut);
+		if (payload != null)
+		{
+			partyService.send(new VvgGroupIronmanMessage(payload));
+			activityOut = config.groupShareEvents() && state.active();
+		}
+		onChange.run();
+	}
+
+	/** A member's activity, only taken in under "Share group events"; anything malformed is dropped. */
+	private void receiveActivity(String name, String payload)
+	{
+		if (!config.groupShareEvents())
+		{
+			return;
+		}
+		ActivityState state = ActivityCodec.decode(gson, payload);
+		if (state == null)
+		{
+			log.debug("ignored unreadable activity from {}", name);
+			return;
+		}
+		roster.putActivity(name, state);
+		roster.heard(name, System.currentTimeMillis());
+		onChange.run();
 	}
 
 	/**
@@ -1322,6 +1366,11 @@ class GroupService
 			{
 				partyService.send(new VvgGroupIronmanMessage(payload));
 			}
+			if (lastActivity.active())
+			{
+				// A joiner mid-run sees it now, not at the next wave.
+				shareActivity(lastActivity);
+			}
 		});
 	}
 
@@ -1486,6 +1535,11 @@ class GroupService
 	{
 		GovernanceSync g = governance;
 		String payload = message.getPayload();
+		if (ActivityCodec.isActivity(payload))
+		{
+			receiveActivity(name, payload);
+			return;
+		}
 		if (g != null && GovernanceSync.isGovernance(payload) && g.receive(name, payload))
 		{
 			roster.heard(name, System.currentTimeMillis());

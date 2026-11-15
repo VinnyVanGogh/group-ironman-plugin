@@ -72,6 +72,8 @@ final class GroupSettingsSchema
 	static final GroupEvent.Type OWN_DISCORD = GroupEvent.Type.ONLINE;
 	/** "Post events for members without the plugin" ({@link GroupBroadcasts}), on by default. */
 	static final String NO_PLUGIN_EVENTS = "discordNoPluginEvents";
+	/** "Post every N waves" for wave activities ({@link WaveTracker}); 0 posts the final boss waves only. */
+	static final String WAVE_EVERY = "eventWaveEvery";
 
 	private static final long GP_MAX = Integer.MAX_VALUE;
 	private static final Map<String, Setting> BY_KEY = new LinkedHashMap<>();
@@ -90,6 +92,7 @@ final class GroupSettingsSchema
 		number("eventKcEvery", "Kill count milestone every", 0, 100_000, GroupIronmanConfig::eventKcEvery);
 		number("eventGravestoneWarnMinutes", "Gravestone warning (minutes left)", 1, 14,
 			GroupIronmanConfig::eventGravestoneWarnMinutes);
+		number(WAVE_EVERY, "Post every N waves", 0, 100, GroupIronmanConfig::eventWaveEvery);
 
 		for (GroupEvent.Type t : GroupEvent.Type.values())
 		{

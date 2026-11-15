@@ -132,6 +132,24 @@ final class GroupOutbox
 		return GroupCodec.encodeEvents(gson, kept);
 	}
 
+	/**
+	 * This player's live activity ({@code "k":"activity"}): null unless synced and "Share group events" is on.
+	 * With sharing off, the one exception is {@code clearOwed}: a clear frame, carrying nothing but "not in an
+	 * activity", so members stop showing a run this player stopped sharing mid-way.
+	 */
+	static String activity(Gson gson, boolean sync, boolean share, ActivityState state, boolean clearOwed)
+	{
+		if (!sync || state == null)
+		{
+			return null;
+		}
+		if (share)
+		{
+			return ActivityCodec.encode(gson, state);
+		}
+		return clearOwed ? ActivityCodec.encode(gson, new ActivityState.Builder("", state.at).build()) : null;
+	}
+
 	/** Empty when drop sharing is off or there is nothing to send. */
 	static List<String> events(Gson gson, Switches switches, List<GroupEvent> events)
 	{
