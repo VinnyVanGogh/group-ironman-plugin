@@ -1,6 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
+import java.util.Collections;
+import java.util.List;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -30,13 +32,19 @@ final class LevelPosts
 		this.poster = poster;
 	}
 
-	/**
-	 * A level-up into its skill's streak. A new streak posts {@code firstJson} (the usual level-up post) and keeps
-	 * the message; a joined one is edited by {@link #tick} in time.
-	 */
+	/** One level-up into its member's streak; see {@link #level(String, List, long, byte[], String)}. */
 	void level(String url, GroupEvent level, long window, byte[] png, String firstJson)
 	{
-		LevelThreads.Streak fresh = threads.level(level, url, clock.getAsLong(), window, png);
+		level(url, Collections.singletonList(level), window, png, firstJson);
+	}
+
+	/**
+	 * One moment's level-ups, all of one member, into that member's streak. A new streak posts {@code firstJson}
+	 * (the usual post for the moment) and keeps the message; a joined one is edited by {@link #tick} in time.
+	 */
+	void level(String url, List<GroupEvent> levels, long window, byte[] png, String firstJson)
+	{
+		LevelThreads.Streak fresh = threads.level(levels, url, clock.getAsLong(), window, png);
 		if (fresh != null)
 		{
 			post(fresh, url, firstJson, png);

@@ -117,7 +117,7 @@ public class LevelPostsTest
 	}
 
 	@Test
-	public void aNinetyNineTotalOrCombatLevelIsNeverCombined()
+	public void aNinetyNineOrTotalLevelIsNeverCombinedButSkillsAndCombatAre()
 	{
 		assertNotNull(LevelThreads.combinable(Collections.singletonList(level("Prayer", 25))));
 		assertNull("a 99", LevelThreads.combinable(Arrays.asList(level("Prayer", 99),
@@ -126,9 +126,11 @@ public class LevelPostsTest
 			Collections.singletonList(level("Prayer", 99))));
 		assertNull("a total level", LevelThreads.combinable(Arrays.asList(level("Prayer", 50),
 			GroupEvent.of(GroupEvent.Type.TOTAL_LEVEL, 0, "Alex").number(1000).build())));
-		assertNull("a combat level", LevelThreads.combinable(Arrays.asList(level("Prayer", 50),
-			GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, 0, "Alex").number(90).build())));
-		assertNull("two skills", LevelThreads.combinable(Arrays.asList(level("Attack", 50), level("Hitpoints", 50))));
+		assertNull("nothing", LevelThreads.combinable(Collections.emptyList()));
+		assertEquals("a level with its combat level", 2, LevelThreads.combinable(Arrays.asList(level("Prayer", 50),
+			GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, 0, "Alex").number(90).build())).size());
+		assertEquals("two skills", 2, LevelThreads.combinable(Arrays.asList(level("Attack", 50),
+			level("Hitpoints", 50))).size());
 	}
 
 	@Test
@@ -501,13 +503,13 @@ public class LevelPostsTest
 		tick();
 		reply(200, "m1");
 		String saved = levels.saved();
-		assertTrue(saved.startsWith("w123456789012345678\tAlex\tPrayer\t23\t24\t"));
-		assertTrue(saved.endsWith("\tm1"));
+		assertTrue(saved.startsWith("w123456789012345678\tAlex\t"));
+		assertTrue(saved.endsWith("\tm1\tPrayer\t23\t24"));
 		assertFalse("the webhook's token stays out of the file", saved.contains("AbC-def_GHI123"));
 		assertNull("saved once", levels.saved());
 		now += 60 * SEC;
 		gain(25);
-		assertTrue("a joined level is saved", levels.saved().contains("\t25\t"));
+		assertTrue("a joined level is saved", levels.saved().endsWith("\tPrayer\t23\t25"));
 	}
 
 	// Board 2026-11-14: GroupOtt (no plugin) Thieving 45 at 7:03 PM and 46 at 7:13 PM were two posts read from the
@@ -569,13 +571,27 @@ public class LevelPostsTest
 	}
 
 	@Test
-	public void broadcastLevelsInDifferentSkillsAreSeparatePosts()
+	public void broadcastLevelsInDifferentSkillsJoinTheMembersPost()
 	{
 		hear(levels, "GroupOtt has reached Thieving level 45.");
 		tick();
 		reply(200, "m1");
 		now += 60 * SEC;
 		hear(levels, "GroupOtt has reached Agility level 30.");
+		tick();
+		assertEquals(2, sent.size());
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("Agility 29 → 30 (+1), Thieving 44 → 45 (+1) in 1 min", description(sent.get(1)));
+	}
+
+	@Test
+	public void differentMembersAreSeparatePosts()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		now += 60 * SEC;
+		hear(levels, "IronPal has reached Thieving level 45.");
 		tick();
 		assertEquals(2, sent.size());
 		assertNull(sent.get(1).edit);
@@ -603,7 +619,8 @@ public class LevelPostsTest
 		tick();
 		reply(200, "m1");
 		String saved = levels.saved();
-		assertTrue(saved.contains("\tGroupOtt\tCombat\t99\t100\t"));
+		assertTrue(saved.contains("\tGroupOtt\t"));
+		assertTrue(saved.endsWith("\tm1\tCombat\t99\t100"));
 		restart(saved);
 		now += 60 * SEC;
 		hear(levels, "GroupOtt has reached combat level 101.");
@@ -629,11 +646,11 @@ public class LevelPostsTest
 	}
 
 	@Test
-	public void onlyABroadcastsSkillOrCombatLevelJoinsAStreakAndPluginUsersAreUnchanged()
+	public void onlyABroadcastsSkillOrCombatLevelJoinsAStreak()
 	{
-		assertNull("a plugin user's own level decides as before", LevelThreads.combinableBroadcast(
+		assertNull("a plugin user's own level is decided by combinable", LevelThreads.combinableBroadcast(
 			level("Thieving", 46)));
-		assertNull("a plugin user's own combat level still posts on its own", LevelThreads.combinable(
+		assertNotNull("a plugin user's own combat level joins their post too", LevelThreads.combinable(
 			Collections.singletonList(GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, 0, "Alex").number(90).build())));
 		assertNull("a 99", LevelThreads.combinableBroadcast(GroupBroadcasts.parse(
 			"GroupOtt has reached Thieving level 99.", 0, name -> null)));
@@ -644,12 +661,156 @@ public class LevelPostsTest
 		assertNull(LevelThreads.combinableBroadcast(null));
 	}
 
+	// Board 2026-11-14: one post per member per window, not per skill: every level that member gains in the window,
+	// in any skill or their combat level, is edited into the same post, the skill that just levelled listed first.
+
+	private void gain(String skill, int n)
+	{
+		levels.level(URL, level(skill, n), WINDOW, null, "first " + skill + " " + n);
+	}
+
+	private static GroupEvent combat(int n)
+	{
+		return GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, 0, "Alex").number(n).build();
+	}
+
+	@Test
+	public void twoSkillsInsideTheWindowAreOnePostEditedToListBoth()
+	{
+		gain("Thieving", 46);
+		tick();
+		reply(200, "m1");
+		now += 5 * 60 * SEC;
+		gain("Ranged", 66);
+		tick();
+		assertEquals(2, sent.size());
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("Ranged 65 → 66 (+1), Thieving 45 → 46 (+1) in 5 min", description(sent.get(1)));
+	}
+
+	@Test
+	public void aThirdSkillJoinsTheSamePostAtTheTop()
+	{
+		gain("Thieving", 46);
+		tick();
+		reply(200, "m1");
+		now += 5 * 60 * SEC;
+		gain("Ranged", 66);
+		tick();
+		reply(200, null);
+		now += 7 * 60 * SEC;
+		levels.level(URL, combat(70), WINDOW, null, "first combat 70");
+		tick();
+		assertEquals(3, sent.size());
+		assertEquals("m1", sent.get(2).edit);
+		assertEquals("Combat 69 → 70 (+1), Ranged 65 → 66 (+1), Thieving 45 → 46 (+1) in 12 min",
+			description(sent.get(2)));
+	}
+
+	@Test
+	public void theSkillThatJustLevelledMovesToTheTop()
+	{
+		gain("Thieving", 46);
+		tick();
+		reply(200, "m1");
+		now += 60 * SEC;
+		gain("Ranged", 66);
+		tick();
+		reply(200, null);
+		now += 60 * SEC;
+		gain("Thieving", 47);
+		tick();
+		assertEquals("most recent first, not most levels first",
+			"Thieving 45 → 47 (+2), Ranged 65 → 66 (+1) in 2 min", description(sent.get(2)));
+		reply(200, null);
+		now += 60 * SEC;
+		gain("Ranged", 67);
+		tick();
+		assertEquals("Ranged 65 → 67 (+2), Thieving 45 → 47 (+2) in 3 min", description(sent.get(3)));
+	}
+
+	@Test
+	public void anotherSkillAfterTheWindowIsANewPost()
+	{
+		gain("Thieving", 46);
+		tick();
+		reply(200, "m1");
+		now += WINDOW + SEC;
+		gain("Ranged", 66);
+		tick();
+		assertEquals(2, sent.size());
+		assertNull("a new post, not an edit", sent.get(1).edit);
+		assertEquals("first Ranged 66", sent.get(1).json);
+	}
+
+	@Test
+	public void aMomentOfALevelAndItsCombatLevelStartsOnePostBothJoinLater()
+	{
+		levels.level(URL, Arrays.asList(level("Attack", 69, 70), combat(80)), WINDOW, null, "first moment");
+		tick();
+		assertEquals("first moment", sent.get(0).json);
+		reply(200, "m1");
+		now += 60 * SEC;
+		levels.level(URL, Arrays.asList(level("Strength", 70, 71), combat(81)), WINDOW, null, "second moment");
+		tick();
+		assertEquals(2, sent.size());
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("Combat 79 → 81 (+2), Strength 70 → 71 (+1), Attack 69 → 70 (+1) in 1 min",
+			description(sent.get(1)));
+	}
+
+	@Test
+	public void aRepeatedLevelChangesNothing()
+	{
+		gain("Thieving", 46);
+		tick();
+		reply(200, "m1");
+		levels.saved();
+		now += 60 * SEC;
+		gain("Thieving", 46);
+		now += LevelThreads.EDIT_GAP;
+		tick();
+		assertEquals("no edit", 1, sent.size());
+		assertNull("nothing to save", levels.saved());
+	}
+
+	@Test
+	public void aMembersSkillsSurviveARestartInTheirOrder()
+	{
+		gain("Thieving", 46);
+		tick();
+		reply(200, "m1");
+		now += 60 * SEC;
+		gain("Ranged", 66);
+		tick();
+		reply(200, null);
+		restart(levels.saved());
+		now += 60 * SEC;
+		gain("Agility", 30);
+		tick();
+		assertEquals("m1", sent.get(2).edit);
+		assertEquals("Agility 29 → 30 (+1), Ranged 65 → 66 (+1), Thieving 45 → 46 (+1) in 2 min",
+			description(sent.get(2)));
+	}
+
+	@Test
+	public void aPerSkillLineSavedBeforeTheRegroupingIsDropped()
+	{
+		levels.restore("w123456789012345678\tAlex\tPrayer\t23\t24\t" + now + "\t" + now + "\tm1", WINDOW);
+		assertEquals("the old line is dropped from the file", "", levels.saved());
+		gain(25);
+		tick();
+		assertEquals(1, sent.size());
+		assertNull(sent.get(0).edit);
+	}
+
 	@Test
 	public void aDamagedFileIsIgnored()
 	{
 		levels.restore(null, WINDOW);
-		levels.restore("w1\tAlex\tPrayer\tx\n\nnot a line\nw123456789012345678\tAlex\tPrayer\t23\t24\tz\t0\tm1",
-			WINDOW);
+		levels.restore("w1\tAlex\tPrayer\tx\n\nnot a line\nw123456789012345678\tAlex\tPrayer\t23\t24\tz\t0\tm1\n"
+			+ "w123456789012345678\tAlex\t" + now + "\t" + now + "\tm1\tPrayer\t23\n"
+			+ "w123456789012345678\tAlex\t" + now + "\t" + now + "\tm1\t\t23\t24", WINDOW);
 		gain(25);
 		tick();
 		assertEquals(1, sent.size());

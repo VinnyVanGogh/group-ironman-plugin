@@ -1,6 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -8,11 +9,14 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Level-ups in one skill, one Discord post (Board 2026-11-10): Prayer 23 → 24 → 25 is a post that says
- * "Prayer 24", then is edited in place to "Prayer 23 → 25 (+2) in 4 min", not three posts.
+ * A member's level-ups, one Discord post (Board 2026-11-10, regrouped per member 2026-11-14): Prayer 23 → 24 → 25
+ * is a post that says "Prayer 24", then is edited in place to "Prayer 23 → 25 (+2) in 4 min", not three posts. Every
+ * level the member gains within the window, in any skill or their combat level, joins that same post, the way group
+ * storage folds a visit's items into one: "Thieving 45 → 46 (+1), Ranged 65 → 66 (+1), Combat 69 → 70 (+1) in
+ * 12 min". The skill that levelled most recently is listed first.
  *
- * <p>The first level-up of a skill posts and keeps the message's id; more levels of that skill within the window
- * (counted from the first) mark the post for an edit. {@link #due} hands out at most one edit per message every
+ * <p>The first level-up of a member posts and keeps the message's id; more levels within the window (counted from
+ * the first) mark the post for an edit. {@link #due} hands out at most one edit per message every
  * {@link #EDIT_GAP}, so levels quicker than that fold into the next edit. An edit Discord refuses (the message
  * deleted, the webhook changed) is posted anew and that post is the one kept from then on. A logout ends every
  * streak, but an edit already owed still goes. Pure and clock-driven.
@@ -29,24 +33,40 @@ final class LevelThreads
 	/** Edits in a row a server or network failure may cost before the streak gives up and posts fresh. */
 	static final int MAX_EDIT_FAILURES = 3;
 	private static final int MAX_LEVEL = 99;
-	/** A combat level's streak name: "Combat 99 → 101 (+2) in 10 min". */
+	/** A combat level's name in a streak: "Combat 99 → 101 (+2) in 10 min". */
 	private static final String COMBAT = "Combat";
 	private static final String SEP = "\t";
-	private static final int SAVED_FIELDS = 8;
+	/** hook, member, first, last, message id; then skill, from, to for each skill. */
+	private static final int HEAD_FIELDS = 5;
+	private static final int SKILL_FIELDS = 3;
 
-	/** One skill's run of level-ups and its post. Read and written only under the owner's lock. */
+	/** One skill's levels in a streak: from the level before its first, to its latest. */
+	static final class Gain
+	{
+		final String skill;
+		final long from;
+		long to;
+
+		private Gain(String skill, long from, long to)
+		{
+			this.skill = skill;
+			this.from = from;
+			this.to = to;
+		}
+	}
+
+	/** One member's run of level-ups and its post. Read and written only under the owner's lock. */
 	static final class Streak
 	{
 		final String member;
-		final String skill;
 		/** The webhook it posts to ({@link LevelThreads#tag}): what a level-up must match to join. Never null. */
 		final String hook;
 		/** The latest URL it was joined through; null for a restored streak until a level-up joins it. */
 		String url;
-		final long from;
 		final long first;
-		long to;
 		long last;
+		/** The skills it holds, the most recently levelled first. */
+		final List<Gain> gains = new ArrayList<>();
 		GroupEvent latest;
 		byte[] png;
 		String messageId;
@@ -61,15 +81,10 @@ final class LevelThreads
 		private Streak(GroupEvent e, String url, long now, byte[] png)
 		{
 			this.member = e.member;
-			this.skill = skill(e);
 			this.hook = tag(url);
 			this.url = url;
-			// One action can gain several levels (low Prayer): the level before it, when the event knows it.
-			this.from = e.previous > 0 ? e.previous : e.number - 1;
 			this.first = now;
-			this.to = e.number;
 			this.last = now;
-			this.latest = e;
 			this.png = png;
 			this.busy = true;
 		}
@@ -79,24 +94,58 @@ final class LevelThreads
 		{
 			this.hook = f[0];
 			this.member = f[1];
-			this.skill = f[2];
-			this.from = Long.parseLong(f[3]);
-			this.to = Long.parseLong(f[4]);
-			this.first = Long.parseLong(f[5]);
-			this.last = Long.parseLong(f[6]);
-			this.messageId = f[7];
+			this.first = Long.parseLong(f[2]);
+			this.last = Long.parseLong(f[3]);
+			this.messageId = f[4];
+			for (int i = HEAD_FIELDS; i < f.length; i += SKILL_FIELDS)
+			{
+				if (f[i].isEmpty())
+				{
+					throw new NumberFormatException("no skill");
+				}
+				gains.add(new Gain(f[i], Long.parseLong(f[i + 1]), Long.parseLong(f[i + 2])));
+			}
 		}
 
-		private String key()
+		/**
+		 * A level into this streak: its skill moves to the top, its level raised. True when it is a level the
+		 * streak did not hold yet (a repeat or an older level changes nothing).
+		 */
+		private boolean add(GroupEvent e)
 		{
-			return LevelThreads.key(member, skill);
+			String skill = skill(e);
+			for (Iterator<Gain> i = gains.iterator(); i.hasNext(); )
+			{
+				Gain g = i.next();
+				if (g.skill.equals(skill))
+				{
+					if (e.number <= g.to)
+					{
+						return false;
+					}
+					i.remove();
+					g.to = e.number;
+					gains.add(0, g);
+					latest = e;
+					return true;
+				}
+			}
+			// One action can gain several levels (low Prayer): the level before it, when the event knows it.
+			gains.add(0, new Gain(skill, e.previous > 0 ? e.previous : e.number - 1, e.number));
+			latest = e;
+			return true;
 		}
 
-		/** hook, member, skill, from, to, first, last, message id; tab-separated. */
+		/** hook, member, first, last, message id, then skill, from, to for each skill; tab-separated. */
 		private String line()
 		{
-			return String.join(SEP, hook, member, skill, Long.toString(from), Long.toString(to),
-				Long.toString(first), Long.toString(last), messageId);
+			List<String> f = new ArrayList<>();
+			Collections.addAll(f, hook, member, Long.toString(first), Long.toString(last), messageId);
+			for (Gain g : gains)
+			{
+				Collections.addAll(f, g.skill, Long.toString(g.from), Long.toString(g.to));
+			}
+			return String.join(SEP, f);
 		}
 	}
 
@@ -116,12 +165,12 @@ final class LevelThreads
 			this.url = s.url;
 			this.messageId = s.messageId;
 			this.latest = s.latest;
-			this.text = text(s.skill, s.from, s.to, s.last - s.first);
+			this.text = text(s.gains, s.last - s.first);
 			this.png = s.png;
 		}
 	}
 
-	/** The streaks a level-up can still join, by member and skill. */
+	/** The streaks a level-up can still join, by member. */
 	private final Map<String, Streak> open = new HashMap<>();
 	/** Every streak with work left: the open ones, and closed ones still owed an edit. */
 	private final List<Streak> live = new ArrayList<>();
@@ -129,29 +178,32 @@ final class LevelThreads
 	private boolean changed;
 
 	/**
-	 * The one level-up a moment is, when it can share a post: only level-ups of one skill, below 99. Null for
-	 * anything else (a 99, a total or combat level, two skills at once): that moment posts as it always has.
+	 * The levels a plugin user's own moment is, when it can share their post: only skill level-ups below 99 and
+	 * combat levels, in any number of skills (Board 2026-11-14: grouped per member). Null for anything else (a 99, a
+	 * total level, an XP milestone in the same moment): that moment posts as it always has.
 	 */
-	static GroupEvent combinable(List<GroupEvent> events)
+	static List<GroupEvent> combinable(List<GroupEvent> events)
 	{
-		GroupEvent best = null;
+		if (events.isEmpty())
+		{
+			return null;
+		}
 		for (GroupEvent e : events)
 		{
-			if (e.type != GroupEvent.Type.LEVEL_UP || e.number >= MAX_LEVEL
-				|| best != null && !best.text.equals(e.text))
+			boolean skill = e.type == GroupEvent.Type.LEVEL_UP && e.number < MAX_LEVEL;
+			if (!skill && e.type != GroupEvent.Type.COMBAT_LEVEL)
 			{
 				return null;
 			}
-			best = best == null || e.number > best.number ? e : best;
 		}
-		return best;
+		return events;
 	}
 
 	/**
 	 * A level the game's group broadcast read for a member without the plugin ({@link GroupBroadcasts}), when it can
 	 * share a post: a skill's level below 99, or a combat level (Board 2026-11-14: "group levels should follow the
 	 * same pattern too"). Null for anything else, and for a plugin user's own event, which {@link #combinable}
-	 * decides as before. Only the client that posts the broadcast keeps the streak, so a new poster starts a new post.
+	 * decides. Only the client that posts the broadcast keeps the streak, so a new poster starts a new post.
 	 */
 	static GroupEvent combinableBroadcast(GroupEvent e)
 	{
@@ -163,36 +215,50 @@ final class LevelThreads
 		return skill || e.type == GroupEvent.Type.COMBAT_LEVEL ? e : null;
 	}
 
-	/** What a streak is of: the skill, or "Combat" for a combat level (which names no skill). */
+	/** What a level is of: the skill, or "Combat" for a combat level (which names no skill). */
 	private static String skill(GroupEvent e)
 	{
 		return e.type == GroupEvent.Type.COMBAT_LEVEL ? COMBAT : e.text;
 	}
 
-	/**
-	 * A level-up within {@code window} ms of its skill's first: joins that streak (null back; {@link #due} edits it
-	 * in time). Otherwise a new streak, returned: post it and report back to {@link #posted}.
-	 */
+	/** One level; see {@link #level(List, String, long, long, byte[])}. */
 	synchronized Streak level(GroupEvent e, String url, long now, long window, byte[] png)
 	{
-		String key = key(e.member, skill(e));
-		Streak s = open.get(key);
+		return level(Collections.singletonList(e), url, now, window, png);
+	}
+
+	/**
+	 * One moment's levels, all of one member, within {@code window} ms of that member's first: join their streak
+	 * (null back; {@link #due} edits it in time). Otherwise a new streak, returned: post it and report back to
+	 * {@link #posted}.
+	 */
+	synchronized Streak level(List<GroupEvent> events, String url, long now, long window, byte[] png)
+	{
+		String member = events.get(0).member;
+		Streak s = open.get(member);
 		if (s != null && s.hook.equals(tag(url)) && now - s.first < window)
 		{
-			if (e.number > s.to)
+			boolean grew = false;
+			for (GroupEvent e : events)
+			{
+				grew |= s.add(e);
+			}
+			if (grew)
 			{
 				s.url = url;
-				s.to = e.number;
 				s.last = now;
-				s.latest = e;
 				s.png = png == null ? s.png : png;
 				s.dirty = true;
 				changed = true;
 			}
 			return null;
 		}
-		Streak fresh = new Streak(e, url, now, png);
-		if (open.put(key, fresh) != null)
+		Streak fresh = new Streak(events.get(0), url, now, png);
+		for (GroupEvent e : events)
+		{
+			fresh.add(e);
+		}
+		if (open.put(member, fresh) != null)
 		{
 			changed = true;
 		}
@@ -223,21 +289,22 @@ final class LevelThreads
 	}
 
 	/**
-	 * Streaks {@link #saved} by an earlier run, back as open: the next level-up of the skill within {@code window}
-	 * of the first post edits that post. Lines past the window or unreadable are dropped (and the next
-	 * {@link #saved} no longer has them); a streak this run already started wins.
+	 * Streaks {@link #saved} by an earlier run, back as open: the member's next level-up within {@code window} of
+	 * the first post edits that post. Lines past the window or unreadable (a per-skill line from before the
+	 * per-member grouping among them) are dropped, and the next {@link #saved} no longer has them; a streak this
+	 * run already started wins.
 	 */
 	synchronized void restore(String text, long now, long window)
 	{
 		for (String line : text == null ? new String[0] : text.split("\n"))
 		{
 			Streak s = parse(line);
-			if (s == null || now - s.first >= window || open.containsKey(s.key()))
+			if (s == null || now - s.first >= window || open.containsKey(s.member))
 			{
 				changed |= !line.isEmpty();
 				continue;
 			}
-			open.put(s.key(), s);
+			open.put(s.member, s);
 			live.add(s);
 		}
 	}
@@ -245,7 +312,8 @@ final class LevelThreads
 	private static Streak parse(String line)
 	{
 		String[] f = line.split(SEP, -1);
-		if (f.length != SAVED_FIELDS || f[7].isEmpty())
+		if (f.length < HEAD_FIELDS + SKILL_FIELDS || (f.length - HEAD_FIELDS) % SKILL_FIELDS != 0
+			|| f[4].isEmpty())
 		{
 			return null;
 		}
@@ -257,11 +325,6 @@ final class LevelThreads
 		{
 			return null;
 		}
-	}
-
-	private static String key(String member, String skill)
-	{
-		return member + '\n' + skill;
 	}
 
 	/** The webhook a URL posts to: its id ({@link StatusBoard#hookOf}), so a thread or URL form is the same one. */
@@ -286,7 +349,7 @@ final class LevelThreads
 			changed = true;
 			return;
 		}
-		// Nothing to edit (refused, failed, or dropped by a full queue): the skill's next level-up posts anew.
+		// Nothing to edit (refused, failed, or dropped by a full queue): the member's next level-up posts anew.
 		end(s);
 	}
 
@@ -320,7 +383,7 @@ final class LevelThreads
 	 * How an edit went. Discord refusing it (404 for a deleted message, or any 4xx) gives back the post to send in
 	 * its place, its outcome to {@link #posted}. A server or network failure tries the edit again later, up to
 	 * {@link #MAX_EDIT_FAILURES} in a row; then, or when the queue dropped the edit unsent
-	 * ({@link DiscordQueue#DROPPED}), the streak ends and the skill's next level posts anew. Null when there is
+	 * ({@link DiscordQueue#DROPPED}), the streak ends and the member's next level posts anew. Null when there is
 	 * nothing more to send.
 	 */
 	synchronized Edit edited(Streak s, int status)
@@ -371,7 +434,23 @@ final class LevelThreads
 	/** "Prayer 23 → 25 (+2) in 4 min". */
 	static String text(String skill, long from, long to, long spanMs)
 	{
-		return skill + " " + from + " → " + to + " (+" + (to - from) + ") " + span(spanMs);
+		return text(Collections.singletonList(new Gain(skill, from, to)), spanMs);
+	}
+
+	/** "Thieving 45 → 46 (+1), Ranged 65 → 66 (+1) in 12 min": each skill in the order given, then the span. */
+	static String text(List<Gain> gains, long spanMs)
+	{
+		StringBuilder out = new StringBuilder();
+		for (Gain g : gains)
+		{
+			if (out.length() > 0)
+			{
+				out.append(", ");
+			}
+			out.append(g.skill).append(' ').append(g.from).append(" → ").append(g.to)
+				.append(" (+").append(g.to - g.from).append(')');
+		}
+		return out.append(' ').append(span(spanMs)).toString();
 	}
 
 	private static String span(long ms)

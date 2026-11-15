@@ -1516,13 +1516,15 @@ class GroupEventEngine
 			// Another member's moment: never merged with this player's own, never a screenshot of this screen. A
 			// level joins that member's streak post as a plugin user's own does (Board 2026-11-14).
 			List<GroupEvent> one = Collections.singletonList(event);
-			Consumer<byte[]> streak = combineLevels(url, LevelThreads.combinableBroadcast(event), one);
+			DiscordMerge.Post single = DiscordMerge.single(event, discordWords());
+			Consumer<byte[]> streak = combineLevels(url,
+				LevelThreads.combinableBroadcast(event) == null ? null : one, single, one);
 			if (streak != null)
 			{
 				streak.accept(null);
 				return;
 			}
-			post(url, DiscordMerge.single(event, discordWords()), one, false, null);
+			post(url, single, one, false, null);
 			return;
 		}
 		if (family == null)
@@ -1585,7 +1587,7 @@ class GroupEventEngine
 		{
 			return;
 		}
-		Consumer<byte[]> send = combineLevels(url, LevelThreads.combinable(moment.events), moment.events);
+		Consumer<byte[]> send = combineLevels(url, LevelThreads.combinable(moment.events), post, moment.events);
 		if (send == null)
 		{
 			send = poster(url, post, moment.events, true);
@@ -1627,29 +1629,31 @@ class GroupEventEngine
 	}
 
 	/**
-	 * A moment that is one skill's level-up ({@code level}, null when it is not) joins that skill's post when the
-	 * combine window is on: the first posts and is kept, later ones edit it ({@link LevelThreads}). Returns what
-	 * sends it, given the picture; null when the moment posts as usual.
+	 * A moment of one member's level-ups ({@code levels}: skills below 99 and combat levels, null when it is
+	 * anything else) joins that member's post when the combine window is on: the first posts {@code first} and is
+	 * kept, later ones edit it ({@link LevelThreads}). Returns what sends it, given the picture; null when the moment
+	 * posts as usual.
 	 */
-	private Consumer<byte[]> combineLevels(String url, GroupEvent level, List<GroupEvent> events)
+	private Consumer<byte[]> combineLevels(String url, List<GroupEvent> levels, DiscordMerge.Post first,
+		List<GroupEvent> events)
 	{
 		long window = TimeUnit.MINUTES.toMillis(config.discordCombineLevels());
-		if (window <= 0 || level == null)
+		if (window <= 0 || levels == null)
 		{
 			return null;
 		}
 		// The egg reads the item cache: on the client thread, as every other post's does.
 		String egg = egg(events);
-		return png -> levelUp(url, level, window, png, egg);
+		return png -> levelUp(url, levels, first, window, png, egg);
 	}
 
-	/** Any thread. A level-up into its streak, with the usual level-up post should it start a new one. */
-	private void levelUp(String url, GroupEvent level, long window, byte[] png, String egg)
+	/** Any thread. Level-ups into their member's streak, with the usual post should they start a new one. */
+	private void levelUp(String url, List<GroupEvent> levelUps, DiscordMerge.Post first, long window, byte[] png,
+		String egg)
 	{
-		String json = DiscordWebhook.payload(gson, DiscordMerge.single(level, discordWords()), discordWords(),
-			config.discordStyle(), config.discordMention(), png != null, egg,
-			posterName(Webhook.PROGRESS));
-		levels.level(url, level, window, png, json);
+		String json = DiscordWebhook.payload(gson, first, discordWords(), config.discordStyle(),
+			config.discordMention(), png != null, egg, posterName(Webhook.PROGRESS));
+		levels.level(url, levelUps, window, png, json);
 	}
 
 	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */

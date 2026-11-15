@@ -711,9 +711,9 @@ public interface GroupIronmanConfig extends Config
 	}
 
 	@ConfigItem(keyName = "discordCombineLevels", name = "Combine level-ups", description = "Minutes to"
-		+ " combine level-ups for. More levels in the same skill within this many minutes of its first post edit"
-		+ " that post ('Prayer 23 → 25 (+2)') instead of posting again. 99s, total and combat levels always post."
-		+ " 0 turns it off.",
+		+ " combine level-ups for. A member's levels in any skill, and their combat level, within this many minutes"
+		+ " of their first post edit that post ('Ranged 65 → 66 (+1), Prayer 23 → 25 (+2)') instead of posting"
+		+ " again. 99s and total levels always post. 0 turns it off.",
 		section = discordHowSection, position = 2)
 	@Range(max = 240)
 	@Units(Units.MINUTES)
