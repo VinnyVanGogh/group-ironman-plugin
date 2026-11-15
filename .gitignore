@@ -18,5 +18,8 @@ CLAUDE.md
 # conclusions in BRIEF.md and the raw data out of the published repo.
 docs/measurements/*.csv
 
+# Agent scratch space (temporary build helpers), never part of the plugin.
+.claude-tmp/
+
 # macOS Finder droppings.
 .DS_Store
