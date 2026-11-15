@@ -738,16 +738,21 @@ final class GroupCodec
 		{
 			return null;
 		}
+		return postedKeys(in.get("p"));
+	}
+
+	private static List<String> postedKeys(JsonElement p)
+	{
 		List<String> keys = new ArrayList<>();
-		JsonElement p = in.get("p");
-		if (p != null && p.isJsonArray())
+		if (p == null || !p.isJsonArray())
 		{
-			for (JsonElement item : p.getAsJsonArray())
+			return keys;
+		}
+		for (JsonElement item : p.getAsJsonArray())
+		{
+			if (keys.size() < MAX_POSTED && isPostedKey(item))
 			{
-				if (keys.size() < MAX_POSTED && isPostedKey(item))
-				{
-					keys.add(item.getAsString());
-				}
+				keys.add(item.getAsString());
 			}
 		}
 		return keys;
