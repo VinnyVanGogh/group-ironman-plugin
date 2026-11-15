@@ -15,7 +15,12 @@ import java.util.concurrent.TimeUnit;
  * (counted from the first) mark the post for an edit. {@link #due} hands out at most one edit per message every
  * {@link #EDIT_GAP}, so levels quicker than that fold into the next edit. An edit Discord refuses (the message
  * deleted, the webhook changed) is posted anew and that post is the one kept from then on. A logout ends every
- * streak, but an edit already owed still goes. Pure and clock-driven; ids live in memory only.
+ * streak, but an edit already owed still goes. Pure and clock-driven.
+ *
+ * <p>Open streaks with a message survive a client restart (Board 2026-11-14): {@link #saved} hands out one line
+ * per streak when they change, keyed by the webhook's id from its URL ({@link StatusBoard#hookOf}, never the URL
+ * or its token), and {@link #restore} takes them back, dropping any past the window. A restored streak is joined
+ * only through the same webhook; a different one, or an edit Discord refuses, posts anew as before.
  */
 final class LevelThreads
 {
@@ -24,13 +29,18 @@ final class LevelThreads
 	/** Edits in a row a server or network failure may cost before the streak gives up and posts fresh. */
 	static final int MAX_EDIT_FAILURES = 3;
 	private static final int MAX_LEVEL = 99;
+	private static final String SEP = "\t";
+	private static final int SAVED_FIELDS = 8;
 
 	/** One skill's run of level-ups and its post. Read and written only under the owner's lock. */
 	static final class Streak
 	{
 		final String member;
 		final String skill;
-		final String url;
+		/** The webhook it posts to ({@link #tag}): what a level-up must match to join. */
+		final String hook;
+		/** The latest URL it was joined through; null for a restored streak until a level-up joins it. */
+		String url;
 		final long from;
 		final long first;
 		long to;
@@ -50,6 +60,7 @@ final class LevelThreads
 		{
 			this.member = e.member;
 			this.skill = e.text;
+			this.hook = tag(url);
 			this.url = url;
 			// One action can gain several levels (low Prayer): the level before it, when the event knows it.
 			this.from = e.previous > 0 ? e.previous : e.number - 1;
@@ -59,6 +70,31 @@ final class LevelThreads
 			this.latest = e;
 			this.png = png;
 			this.busy = true;
+		}
+
+		/** A saved streak ({@link #line}) back after a restart: posted, not busy, its next level an edit. */
+		private Streak(String[] f)
+		{
+			this.hook = f[0];
+			this.member = f[1];
+			this.skill = f[2];
+			this.from = Long.parseLong(f[3]);
+			this.to = Long.parseLong(f[4]);
+			this.first = Long.parseLong(f[5]);
+			this.last = Long.parseLong(f[6]);
+			this.messageId = f[7];
+		}
+
+		private String key()
+		{
+			return LevelThreads.key(member, skill);
+		}
+
+		/** hook, member, skill, from, to, first, last, message id; tab-separated. */
+		private String line()
+		{
+			return String.join(SEP, hook, member, skill, Long.toString(from), Long.toString(to),
+				Long.toString(first), Long.toString(last), messageId);
 		}
 	}
 
@@ -87,6 +123,8 @@ final class LevelThreads
 	private final Map<String, Streak> open = new HashMap<>();
 	/** Every streak with work left: the open ones, and closed ones still owed an edit. */
 	private final List<Streak> live = new ArrayList<>();
+	/** The open streaks changed since {@link #saved} last handed them out. */
+	private boolean changed;
 
 	/**
 	 * The one level-up a moment is, when it can share a post: only level-ups of one skill, below 99. Null for
@@ -113,24 +151,100 @@ final class LevelThreads
 	 */
 	synchronized Streak level(GroupEvent e, String url, long now, long window, byte[] png)
 	{
-		String key = e.member + '\n' + e.text;
+		String key = key(e.member, e.text);
 		Streak s = open.get(key);
-		if (s != null && s.url.equals(url) && now - s.first < window)
+		if (s != null && s.hook.equals(tag(url)) && now - s.first < window)
 		{
 			if (e.number > s.to)
 			{
+				s.url = url;
 				s.to = e.number;
 				s.last = now;
 				s.latest = e;
 				s.png = png == null ? s.png : png;
 				s.dirty = true;
+				changed = true;
 			}
 			return null;
 		}
 		Streak fresh = new Streak(e, url, now, png);
-		open.put(key, fresh);
+		if (open.put(key, fresh) != null)
+		{
+			changed = true;
+		}
 		live.add(fresh);
 		return fresh;
+	}
+
+	/**
+	 * The open streaks to keep for a restart, one {@link Streak#line} each, when they changed since the last call;
+	 * null when they did not. Only streaks with a message (and a Discord webhook to match it by) are kept.
+	 */
+	synchronized String saved()
+	{
+		if (!changed)
+		{
+			return null;
+		}
+		changed = false;
+		List<String> lines = new ArrayList<>();
+		for (Streak s : open.values())
+		{
+			if (s.messageId != null && s.hook.startsWith("w"))
+			{
+				lines.add(s.line());
+			}
+		}
+		return String.join("\n", lines);
+	}
+
+	/**
+	 * Streaks {@link #saved} by an earlier run, back as open: the next level-up of the skill within {@code window}
+	 * of the first post edits that post. Lines past the window or unreadable are dropped (and the next
+	 * {@link #saved} no longer has them); a streak this run already started wins.
+	 */
+	synchronized void restore(String text, long now, long window)
+	{
+		for (String line : text == null ? new String[0] : text.split("\n"))
+		{
+			Streak s = parse(line);
+			if (s == null || now - s.first >= window || open.containsKey(s.key()))
+			{
+				changed |= !line.isEmpty();
+				continue;
+			}
+			open.put(s.key(), s);
+			live.add(s);
+		}
+	}
+
+	private static Streak parse(String line)
+	{
+		String[] f = line.split(SEP, -1);
+		if (f.length != SAVED_FIELDS || f[7].isEmpty())
+		{
+			return null;
+		}
+		try
+		{
+			return new Streak(f);
+		}
+		catch (NumberFormatException e)
+		{
+			return null;
+		}
+	}
+
+	private static String key(String member, String skill)
+	{
+		return member + '\n' + skill;
+	}
+
+	/** The webhook a URL posts to: its id ({@link StatusBoard#hookOf}), so a thread or URL form is the same one. */
+	private static String tag(String url)
+	{
+		String hook = StatusBoard.hookOf(url);
+		return hook != null ? hook : url;
 	}
 
 	/** How a streak's new post went: on success its message is the one edited from now on. */
@@ -141,6 +255,7 @@ final class LevelThreads
 		{
 			s.messageId = messageId;
 			s.sentAt = now;
+			changed = true;
 			return;
 		}
 		// Nothing to edit (refused, failed, or dropped by a full queue): the skill's next level-up posts anew.
@@ -208,12 +323,13 @@ final class LevelThreads
 	private void end(Streak s)
 	{
 		s.dirty = false;
-		open.values().remove(s);
+		changed |= open.values().remove(s);
 	}
 
-	/** A logout: no more joining, but an edit already owed still goes. */
+	/** A logout: no more joining, but an edit already owed still goes. Saved streaks end too. */
 	synchronized void close()
 	{
+		changed |= !open.isEmpty();
 		open.clear();
 	}
 
