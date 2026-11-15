@@ -229,6 +229,20 @@ final class GimPanelFixture
 			calls.add("claimRequest:" + id + ":" + itemId + "=" + claimed);
 			return true;
 		}
+
+		@Override
+		public String pathTo(ItemPaths.Target why, ItemPaths.Stop to)
+		{
+			calls.add("pathTo:" + why.kind + ":" + why.id + ":" + why.itemId + "=" + to.name);
+			return to.label() + ".";
+		}
+
+		@Override
+		public String clearPath()
+		{
+			calls.add("clearPath");
+			return "Path cleared.";
+		}
 	}
 
 	/** Everything the panel draws from; change a field, then {@link #show}. */

@@ -64,6 +64,12 @@ final class ShoppingTab
 
 		/** "I'll get it", or taking it back. */
 		boolean claimRequest(String id, int itemId, boolean claimed);
+
+		/** Hands {@code to} to Shortest Path for {@code why}; the line to show. */
+		String pathTo(ItemPaths.Target why, ItemPaths.Stop to);
+
+		/** Clears the path; the line to show, empty when there was none. */
+		String clearPath();
 	}
 
 	static final int MAX_HITS = 10;
@@ -108,10 +114,14 @@ final class ShoppingTab
 		final List<RequestBoard.Card> requests;
 		/** This player, for "mine" and "I'll get it"; empty when logged out. */
 		final String self;
+		/** Where "Path to" leads; null draws no path buttons. */
+		final ItemPaths.Planner paths;
+		/** The stop being pathed to; empty for none. */
+		final String pathing;
 
 		View(List<ShoppingBoard.Card> cards, List<ShopPresets.Preset> presets, List<String> roster,
 			List<ShoppingSync.Change> history, boolean loggedIn, boolean syncing, List<RequestBoard.Card> requests,
-			String self)
+			String self, ItemPaths.Planner paths, String pathing)
 		{
 			this.cards = cards;
 			this.presets = presets;
@@ -121,28 +131,38 @@ final class ShoppingTab
 			this.syncing = syncing;
 			this.requests = requests;
 			this.self = self;
+			this.paths = paths;
+			this.pathing = pathing;
 		}
 
 		/** Changes when anything drawn changes. */
 		String signature()
 		{
 			StringBuilder s = new StringBuilder();
-			s.append(roster).append(loggedIn).append(syncing).append(history.size())
-				.append(RequestCards.signature(requests, self));
+			s.append(roster).append(loggedIn).append(syncing).append(history.size()).append(pathing)
+				.append(RequestCards.signature(requests, self, paths));
 			for (ShoppingSync.Change c : history)
 			{
 				s.append(c.at).append(c.text);
 			}
 			for (ShoppingBoard.Card c : cards)
 			{
-				s.append('|').append(c.list.id).append(c.list.rev).append(c.progressUnknown).append(c.itemsUnknown);
+				s.append('|').append(c.list.id).append(c.list.rev).append(c.progressUnknown).append(c.itemsUnknown)
+					.append(paths == null ? "" : first(paths.next(c)));
 				for (ShoppingBoard.Row r : c.rows)
 				{
-					s.append(rowText(r)).append(heldText(r.line)).append(sourceText(r.sources));
+					s.append(rowText(r)).append(heldText(r.line)).append(sourceText(r.sources))
+						.append(paths == null ? "" : first(paths.shopping(r)));
 				}
 			}
 			return s.toString();
 		}
+	}
+
+	/** The first stop's name, for signatures; empty for none. */
+	static String first(List<ItemPaths.Stop> stops)
+	{
+		return stops.isEmpty() ? "" : stops.get(0).name;
 	}
 
 	private final Actions actions;
@@ -175,7 +195,14 @@ final class ShoppingTab
 			tab.add(GroupIronmanPanel.text(note, Color.WHITE));
 			note = null;
 		}
-		requestCards.draw(tab, v.requests, v.self);
+		if (!v.pathing.isEmpty())
+		{
+			tab.add(GroupIronmanPanel.text("Pathing to " + v.pathing + " with Shortest Path.", MUTED));
+			JPanel stop = new JPanel(new GridLayout(1, 1));
+			stop.add(button("Stop path", () -> say(actions.clearPath())));
+			tab.add(stop);
+		}
+		requestCards.draw(tab, v.requests, v.self, v.paths);
 		if (v.cards.isEmpty() && v.requests.isEmpty())
 		{
 			tab.add(GroupIronmanPanel.heading("No shopping lists yet"));
@@ -185,7 +212,7 @@ final class ShoppingTab
 		}
 		for (ShoppingBoard.Card c : v.cards)
 		{
-			tab.add(card(c));
+			tab.add(card(c, v.paths));
 		}
 		if (!v.syncing)
 		{
@@ -211,7 +238,7 @@ final class ShoppingTab
 
 	// ---- A list ----
 
-	private JPanel card(ShoppingBoard.Card c)
+	private JPanel card(ShoppingBoard.Card c, ItemPaths.Planner paths)
 	{
 		JPanel box = new GroupIronmanPanel.Column();
 		box.setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -222,6 +249,11 @@ final class ShoppingTab
 		box.add(title);
 		box.add(GroupIronmanPanel.text(byline(c.list, System.currentTimeMillis()), MUTED));
 		box.add(buttons(c.list));
+		List<ItemPaths.Stop> tour = paths == null ? Collections.emptyList() : paths.next(c);
+		if (!tour.isEmpty())
+		{
+			box.add(pathButton(nextLabel(tour), tour.get(0), ItemPaths.Target.next(c.list.id)));
+		}
 		for (String line : warnings(c))
 		{
 			box.add(GroupIronmanPanel.text(line, ColorScheme.BRAND_ORANGE));
@@ -232,9 +264,31 @@ final class ShoppingTab
 		rows.sort((a, b) -> Boolean.compare(a.line.done(), b.line.done()));
 		for (ShoppingBoard.Row r : rows)
 		{
-			box.add(row(r));
+			box.add(row(c.list.id, r, paths));
 		}
 		return box;
+	}
+
+	/** "Path to next: Harry's Fishing Shop (1 of 3 stops)". */
+	static String nextLabel(List<ItemPaths.Stop> tour)
+	{
+		return "Path to next: " + tour.get(0).name + (tour.size() > 1 ? " (1 of " + tour.size() + " stops)" : "");
+	}
+
+	private JPanel pathButton(String label, ItemPaths.Stop to, ItemPaths.Target why)
+	{
+		return pathButton(label, () -> say(actions.pathTo(why, to)));
+	}
+
+	/** A full-width "Path to" button; the whole label is also its tooltip, for long shop names. */
+	static JPanel pathButton(String label, Runnable action)
+	{
+		JPanel wrap = new JPanel(new GridLayout(1, 1));
+		wrap.setOpaque(false);
+		JButton b = button(label, action);
+		b.setToolTipText(label);
+		wrap.add(b);
+		return wrap;
 	}
 
 	/** "For Alice, Bob. Added by Bob, 5 min ago." or "... Renamed by Alice, ...". */
@@ -274,7 +328,7 @@ final class ShoppingTab
 		return out;
 	}
 
-	private JPanel row(ShoppingBoard.Row r)
+	private JPanel row(String listId, ShoppingBoard.Row r, ItemPaths.Planner paths)
 	{
 		JPanel line = new JPanel(new BorderLayout(4, 0));
 		line.setOpaque(false);
@@ -296,6 +350,11 @@ final class ShoppingTab
 		if (!r.line.done())
 		{
 			words.add(label(sourceText(r.sources), MUTED));
+		}
+		List<ItemPaths.Stop> stops = paths == null ? Collections.emptyList() : paths.shopping(r);
+		if (!stops.isEmpty())
+		{
+			words.add(pathButton(stops.get(0).label(), stops.get(0), ItemPaths.Target.listItem(listId, r.line.itemId)));
 		}
 		line.add(words, BorderLayout.CENTER);
 		return line;
@@ -398,7 +457,7 @@ final class ShoppingTab
 
 	private void say(String text)
 	{
-		note = text;
+		note = text == null || text.isEmpty() ? null : text;
 		refresh.run();
 	}
 
