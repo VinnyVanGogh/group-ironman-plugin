@@ -447,7 +447,8 @@ public class GroupIronmanPlugin extends Plugin
 	{
 		// The plugin's own once-per-version bookkeeping changes nothing the features read.
 		if (!GroupIronmanConfig.GROUP.equals(event.getGroup())
-			|| GroupIronmanConfig.KEY_LAST_SEEN_VERSION.equals(event.getKey()))
+			|| GroupIronmanConfig.KEY_LAST_SEEN_VERSION.equals(event.getKey())
+			|| GroupIronmanConfig.KEY_BOUND_GROUP.equals(event.getKey()))
 		{
 			return;
 		}

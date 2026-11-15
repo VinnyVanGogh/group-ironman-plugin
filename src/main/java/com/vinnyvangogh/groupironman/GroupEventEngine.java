@@ -793,7 +793,7 @@ class GroupEventEngine
 	@Subscribe
 	public void onNpcLootReceived(NpcLootReceived event)
 	{
-		if (event.getNpc() == null)
+		if (event.getNpc() == null || !group.member())
 		{
 			return;
 		}
@@ -859,6 +859,11 @@ class GroupEventEngine
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
+		if (!group.member())
+		{
+			// Board 2026-11-15: an account not in the group posts nothing, its own or its group's broadcasts.
+			return;
+		}
 		long now = System.currentTimeMillis();
 		String message = event.getMessage();
 		if (event.getType() == ChatMessageType.FRIENDSCHATNOTIFICATION)
@@ -1008,7 +1013,7 @@ class GroupEventEngine
 	public void onActorDeath(ActorDeath event)
 	{
 		Player me = client.getLocalPlayer();
-		if (me == null || event.getActor() != me)
+		if (me == null || event.getActor() != me || !group.member())
 		{
 			return;
 		}
@@ -1065,7 +1070,7 @@ class GroupEventEngine
 	@Subscribe
 	public void onStatChanged(StatChanged event)
 	{
-		if (event.getSkill() == Skill.OVERALL)
+		if (event.getSkill() == Skill.OVERALL || !group.member())
 		{
 			return;
 		}
@@ -1088,6 +1093,10 @@ class GroupEventEngine
 		if (event.getVarpId() == VarPlayerID.QP)
 		{
 			checkAccount(System.currentTimeMillis());
+			if (!group.member())
+			{
+				return;
+			}
 			GroupEvent e = progress.questPoints(client.getVarpValue(VarPlayerID.QP), System.currentTimeMillis(),
 				group.localPlayer());
 			if (e != null && wanted(e.type))
@@ -1100,6 +1109,10 @@ class GroupEventEngine
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event)
 	{
+		if (!group.member())
+		{
+			return;
+		}
 		if (event.getGroupId() == InterfaceID.QUESTSCROLL)
 		{
 			// The title is filled in by a script after the load; read it next tick.
@@ -1266,6 +1279,12 @@ class GroupEventEngine
 			return;
 		}
 		checkAccount(now);
+		if (!group.member())
+		{
+			// Board 2026-11-15: an account not in the group (or not known to be yet) is never logged in here: no
+			// presence, board, activity or event. Its login runs once its roster says it is a member.
+			return;
+		}
 		if (loginPending)
 		{
 			loginPending = false;

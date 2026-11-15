@@ -41,6 +41,11 @@ public interface GroupIronmanConfig extends Config
 
 	/** Frozen. Written by the plugin once per version (UpdateNotes). */
 	String KEY_LAST_SEEN_VERSION = "lastSeenVersion";
+	/**
+	 * Frozen. Written by the plugin, never shown: the group ({@link GroupMembers#key} of its name) this client's
+	 * group key belongs to, so an account in another group is told apart from a member ({@link GroupBinding}).
+	 */
+	String KEY_BOUND_GROUP = "boundGroup";
 	/** 'Combine level-ups': frozen key; its default moved 30 → 60 for new installs only (GroupEventEngine). */
 	String KEY_COMBINE_LEVELS = "discordCombineLevels";
 
