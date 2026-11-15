@@ -20,6 +20,59 @@
 - Level-ups are unchanged and keep *Combine level-ups*.
 - Grouped messages survive a client restart inside the window, as
   level-ups do. Discord does not move an edited message to the bottom.
+### Fix: switching accounts no longer posts old achievements
+
+- Logging into another account (or hopping, reconnecting, or changing
+  profile) used to be able to post that account's long-done diaries and
+  levels to Discord as if new. Every login now starts fresh: for its first
+  few seconds skills, total, combat level, quest points and diaries are only
+  recorded, never posted.
+- Safety net: a login's first minute of achievements (and of game
+  broadcasts posted for members without the plugin) is held. Up to three
+  post as usual once the minute is over; more than that is treated as a
+  backlog and nothing is posted.
+
+### Fix: an account that isn't in your group does nothing
+
+- Logging into an account that is not in the group this client is set up
+  for (an account in another group, or not on a Group Ironman at all) used
+  to post its achievements to your group's Discord, put them in the Log and
+  share its data. Now nothing runs for it: no Discord posts, no group
+  events, no Log entries, no live board or online posts, nothing sent to or
+  taken from the group, and its group storage and bank are not recorded. A
+  chat line says so once per login. Switching back to a member picks up as
+  usual, without posting anything old.
+- The client remembers which group it is for the first time a member logs
+  in (or, for a client set up before this update, from the group's saved
+  leader roles or the members it already has data for). Setting a new group
+  key ties it to the next member's group.
+- A group key shared in another group's chat no longer replaces yours.
+
+### Live activities: Fight Caves, Inferno and Fortis Colosseum waves
+
+- The group sees who is in the **Fight Caves** (63 waves), the **Inferno**
+  (69) or the **Fortis Colosseum** (12, Sol Heredit), on which wave, solo or
+  with whom, and for how long. Colosseum runs also show glory and the
+  modifiers already chosen, with their tier.
+- Shown on the member's card in the **Group** tab ("Fight Caves - wave
+  37/63 - solo"), in a new **Activities** tab (live cards, then recent
+  completions and deaths, filtered All / Bossing / Minigames), under the
+  member in the in-game **Group box**, and on the Discord **live board**
+  ("in Fight Caves, wave 35": it moves every 5 waves, so the message is not
+  edited every wave).
+- Four new Discord posts and banners, each its own switch, all off by
+  default: **Activity started**, **Activity wave milestone** (every N waves,
+  new *Thresholds* setting **Post every N waves**, default 10, plus Jad,
+  Triple Jads, Zuk and Sol Heredit), **Activity completed** (with the kill
+  count and time, or an early Colosseum loot claim) and **Activity death**
+  (with the wave; posted instead of 'Died' for that death).
+- A logout mid-run resumes on the next wave with the time kept.
+- Shared only with *Share group events* on; your own run always shows on your
+  own screen. "Don't post my events" and per-kind opt-outs keep a member off
+  Discord and off the live board. Members on an older build ignore the new
+  messages and kinds; nothing changes for them.
+- Only where-and-how-far: no boss attack, prayer, spawn or hazard is ever
+  read or shown.
 
 ### Shopping: "Path to" with Shortest Path
 
@@ -55,6 +108,17 @@
 - New setting under *In-game*: **Shopping: shop alert**, off by default. A
   chat line as you walk up to a shop selling something still needed.
 - Members on an older build ignore the new messages; nothing changes for them.
+- Lists and requests start **folded**: the name, "3 of 39 done" with a bar,
+  and the first few items still needed. Open one and it stays open for that
+  character. Open lists show still-needed items first; finished ones fold into
+  "N done".
+- Each item is one short line, "Air rune  12 / 30" with a bar and "Need 18
+  more". Click it for who holds it, where to get it and whether it can be
+  traded. A member who shares no items is named instead of "not judged".
+- Text no longer runs past the panel's right edge.
+- Common drops that no quest names (Dragon warhammer, Abyssal whip, the
+  Dagannoth rings, god wars items and more) now say which monster drops them,
+  from the OSRS Wiki.
 ### Discord posts for members without the plugin
 
 - Members who are online without GIM Utilities still get their level-ups,

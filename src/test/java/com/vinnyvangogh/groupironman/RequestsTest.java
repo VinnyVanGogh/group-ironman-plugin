@@ -409,7 +409,8 @@ public class RequestsTest
 		claims.add(new RequestClaim(r.id, SHARK, "Cat", true, 2001));
 		RequestBoard.Card c = RequestBoard.card(r, claims, holdings("Bob", SHARK, 300, 150),
 			id -> id == SHARK ? "Shark" : "Prayer potion(4)");
-		assertEquals("Shark: want 500, group has 450, 50 to go", RequestCards.rowText(row(c, SHARK)));
+		assertEquals("Shark  450 / 500", RequestCards.summary(row(c, SHARK)));
+		assertEquals("Need 50 more", RequestCards.needText(row(c, SHARK)));
 		assertEquals("Bob and Cat will get it", RequestCards.claimText(row(c, SHARK)));
 		assertEquals("", RequestCards.claimText(row(c, PRAYER)));
 		assertTrue(RequestCards.claimedBy(row(c, SHARK), "cat"));

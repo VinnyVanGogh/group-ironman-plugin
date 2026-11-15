@@ -136,7 +136,8 @@ final class ShoppingBoard
 		List<Row> rows = new ArrayList<>();
 		for (ShopAllocation.Line line : ShopAllocation.of(needs, in.holdings, in.tradeable))
 		{
-			rows.add(new Row(line, ShopSources.forViewer(in.data.item(line.itemId), in.viewer, in.data)));
+			rows.add(new Row(line, ShopSources.forViewer(line.itemId, in.data.item(line.itemId), in.viewer, in.data,
+				ItemDrops.bundled())));
 		}
 		return new Card(list, preset, rows, progressUnknown, itemsUnknown);
 	}

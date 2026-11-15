@@ -507,6 +507,59 @@ final class StatusBoard
 	static String lines(GroupMembers roster, Map<String, Long> heard, Map<String, LastSeen> seen,
 		Map<String, MemberStats> stats, Self self, GamePresence game, long now)
 	{
+		return lines(roster, heard, seen, stats, self, game, Collections.emptyMap(), now);
+	}
+
+	/**
+	 * As above, with {@code activities}: each online member's coarse activity clause by {@link GroupMembers#key}
+	 * ({@link #activitySuffixes}), " - in Fight Caves, wave 35", appended to their online line only.
+	 */
+	static String lines(GroupMembers roster, Map<String, Long> heard, Map<String, LastSeen> seen,
+		Map<String, MemberStats> stats, Self self, GamePresence game, Map<String, String> activities, long now)
+	{
+		List<String> base = baseLines(roster, heard, seen, stats, self, game, now);
+		// The same names, in the same order, as baseLines' lines.
+		List<String> names = new ArrayList<>(names(roster, heard, seen.keySet(), self, game));
+		for (int i = 0; i < names.size() && i < base.size(); i++)
+		{
+			String suffix = activities.get(GroupMembers.key(names.get(i)));
+			if (suffix != null && base.get(i).startsWith(ONLINE))
+			{
+				base.set(i, base.get(i) + suffix);
+			}
+		}
+		return String.join("\n", base);
+	}
+
+	/**
+	 * Board clauses for members in an activity: " - in Fight Caves, wave 35", the activity's coarse
+	 * {@link ActivityState#board} (no percentages, so the message is not edited every few ticks). A member who opted
+	 * out of activity posts ("Don't post my events", or "Activity started" not posted) is left off, and this player
+	 * too unless they share group events: the board is Discord, and their choice covers it.
+	 */
+	static Map<String, String> activitySuffixes(Map<String, ActivityState> activities, Map<String, MemberPrefs> prefs,
+		String self, MemberPrefs mine, boolean shareMine)
+	{
+		Map<String, MemberPrefs> prefsBy = new HashMap<>();
+		prefs.forEach((name, p) -> prefsBy.put(GroupMembers.key(name), p));
+		String selfKey = GroupMembers.key(self == null ? "" : self);
+		Map<String, String> out = new HashMap<>();
+		activities.forEach((name, s) ->
+		{
+			String key = GroupMembers.key(name);
+			boolean you = key.equals(selfKey);
+			MemberPrefs p = you ? mine : prefsBy.getOrDefault(key, MemberPrefs.NONE);
+			if (s.active() && !s.board.isEmpty() && p.posts(GroupEvent.Type.ACTIVITY_START) && (!you || shareMine))
+			{
+				out.put(key, " - " + s.board);
+			}
+		});
+		return out;
+	}
+
+	private static List<String> baseLines(GroupMembers roster, Map<String, Long> heard, Map<String, LastSeen> seen,
+		Map<String, MemberStats> stats, Self self, GamePresence game, long now)
+	{
 		Map<String, Long> heardBy = new HashMap<>();
 		heard.forEach((name, at) -> heardBy.merge(GroupMembers.key(name), at, Math::max));
 		Map<String, LastSeen> seenBy = new HashMap<>();
@@ -530,7 +583,7 @@ final class StatusBoard
 		{
 			out.add(stale(heardBy, seenBy, self));
 		}
-		return String.join("\n", out);
+		return out;
 	}
 
 	/** Another member's line: the game first, then their client, else unknown with when they were last seen. */

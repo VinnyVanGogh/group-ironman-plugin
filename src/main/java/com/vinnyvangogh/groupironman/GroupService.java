@@ -109,6 +109,8 @@ class GroupService
 	static final int MAX_EVENT_LINES = 50;
 	/** How often the group roster is re-read from the game's clan data. */
 	static final int ROSTER_INTERVAL_TICKS = 10;
+	/** Roster reads with no group before a login is told it is not in the group: 5 reads, about 30 s. */
+	static final int NOT_MEMBER_WAITS = 5;
 	/** How often this player's quest progress is re-read for the Shopping tab (about half a minute). */
 	static final int QUEST_INTERVAL_TICKS = 50;
 	static final int SHOP_ALERT_INTERVAL_TICKS = 3;
@@ -218,6 +220,18 @@ class GroupService
 	private volatile LowStock lowStock = LowStock.parse("");
 	private volatile GroupMembers members = GroupMembers.UNKNOWN;
 	private volatile GamePresence presence = GamePresence.UNKNOWN;
+	/**
+	 * {@link GroupMembers#key} of the account last found a member of this client's group ({@link GroupBinding}),
+	 * "" when the account logged in is not one (or is not known yet). See {@link #member()}.
+	 */
+	private volatile String memberName = "";
+	/** Client thread: this login was already told it is not in the group, or roster reads that found no group. */
+	private boolean toldNotMember;
+	private int rosterWaits;
+	/** The group key the binding was made under; a different key clears it ({@link #reloadConfig}). */
+	private String keySeen;
+	/** The key changed this run: the next member binds the group whatever the old group's roles and cache say. */
+	private volatile boolean rebind;
 
 	// Client thread only.
 	private final StorageSession storage = new StorageSession();
@@ -245,6 +259,12 @@ class GroupService
 	private boolean extrasDirty;
 	private int ticksSinceExtras = EXTRAS_INTERVAL_TICKS;
 	private String lastExtrasSent;
+	/** Client thread: this player's activity as last shown, for a joiner's resend. */
+	private ActivityState lastActivity = ActivityState.NONE;
+	/** Client thread: an active state went to the party and no clear has followed it yet. */
+	private boolean activityOut;
+	/** Client thread: the name this player's live activity is filed under in the roster, null when none. */
+	private String activityName;
 	private Map<Integer, Integer> seedVault = new TreeMap<>();
 	private long seedVaultAt = -1;
 	private boolean session;
@@ -419,6 +439,49 @@ class GroupService
 	}
 
 	/**
+	 * Client thread. This player's live activity: always kept in the roster, so the panel shows it (only on this
+	 * screen while sharing is off), and sent to the party only under "Share group events" ({@link GroupOutbox}).
+	 */
+	void shareActivity(ActivityState state)
+	{
+		if (state.active() && !member())
+		{
+			// An account not in the group has no run on the group's cards; a member's run still clears.
+			return;
+		}
+		lastActivity = state;
+		// Filed under the name of the login it started in: after a logout the local name may read differently.
+		String name = state.active() || activityName == null ? localName() : activityName;
+		activityName = state.active() ? name : null;
+		roster.putActivity(name, state);
+		String payload = GroupOutbox.activity(gson, syncing(), config.groupShareEvents(), state, activityOut);
+		if (payload != null)
+		{
+			partyService.send(new VvgGroupIronmanMessage(payload));
+			activityOut = config.groupShareEvents() && state.active();
+		}
+		onChange.run();
+	}
+
+	/** A member's activity, only taken in under "Share group events"; anything malformed is dropped. */
+	private void receiveActivity(String name, String payload)
+	{
+		if (!config.groupShareEvents())
+		{
+			return;
+		}
+		ActivityState state = ActivityCodec.decode(gson, payload);
+		if (state == null)
+		{
+			log.debug("ignored unreadable activity from {}", name);
+			return;
+		}
+		roster.putActivity(name, state);
+		roster.heard(name, System.currentTimeMillis());
+		onChange.run();
+	}
+
+	/**
 	 * Client thread. A game broadcast this client just posted ({@link GroupBroadcasts}), so another plugin user's
 	 * client that also thinks it posts skips it. Carries no data of this player's own: every member's game showed
 	 * the same line.
@@ -475,10 +538,32 @@ class GroupService
 		return sync == null ? GroupSync.State.OFF : sync.state(config.groupSync(), members.group(), config.groupKey());
 	}
 
-	/** True only in this group's own party: nothing is sent to, or taken from, any other party. */
+	/**
+	 * True only in this group's own party, logged in as one of its members: nothing is sent to, or taken from,
+	 * any other party, and nothing goes out for an account that is not in the group (Board 2026-11-15).
+	 */
 	boolean syncing()
 	{
-		return syncState() == GroupSync.State.CONNECTED;
+		return member() && syncState() == GroupSync.State.CONNECTED;
+	}
+
+	/**
+	 * Board 2026-11-15: whether the account logged in is a member of the group this client is set up for
+	 * ({@link GroupBinding}). False for an account in another group or none, and until the roster is read: then
+	 * nothing is posted, logged, shown on the board or shared for it. Logged out it stays what the last account
+	 * was, so that account's own logout (a run ending, its presence) still goes out; a different account logging
+	 * in is not a member before its own roster is read, whichever subscriber's tick runs first.
+	 */
+	boolean member()
+	{
+		String verdictFor = memberName;
+		if (verdictFor.isEmpty())
+		{
+			return false;
+		}
+		Player player = client.getLocalPlayer();
+		String name = player == null ? null : player.getName();
+		return name == null || GroupMembers.key(name).equals(verdictFor);
 	}
 
 	/**
@@ -489,7 +574,7 @@ class GroupService
 	 */
 	void joinGroup()
 	{
-		if (sync.join(config.groupSync(), members.group(), config.groupKey()))
+		if (member() && sync.join(config.groupSync(), members.group(), config.groupKey()))
 		{
 			onChange.run();
 		}
@@ -498,7 +583,7 @@ class GroupService
 	/** The "Switch to group sync" button, shown only while in a party the player joined themselves. */
 	void switchToGroup()
 	{
-		if (sync.switchParty(config.groupSync(), members.group(), config.groupKey()))
+		if (member() && sync.switchParty(config.groupSync(), members.group(), config.groupKey()))
 		{
 			onChange.run();
 		}
@@ -685,6 +770,16 @@ class GroupService
 			sync.leaveOwn();
 		}
 		lowStock = LowStock.parse(config.groupLowStock());
+		String key = GroupKey.normalize(config.groupKey());
+		if (keySeen != null && !keySeen.equals(key) && !key.isEmpty())
+		{
+			// A new group key is a new group: the next member's roster binds it (GroupBinding).
+			configManager.unsetConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_BOUND_GROUP);
+			memberName = "";
+			rebind = true;
+			ticksSinceRoster = ROSTER_INTERVAL_TICKS;
+		}
+		keySeen = key;
 		GovernanceSync g = governance;
 		if (g != null)
 		{
@@ -792,6 +887,10 @@ class GroupService
 			containers.loggedOut();
 			hiscoresOnLogin = true;
 			refreshPresence();
+			// The next login may be another account: its roster is read on its first tick, before anything runs.
+			ticksSinceRoster = ROSTER_INTERVAL_TICKS;
+			toldNotMember = false;
+			rosterWaits = 0;
 		}
 	}
 
@@ -852,6 +951,12 @@ class GroupService
 	{
 		if (!config.groupSync())
 		{
+			return;
+		}
+		String bound = configManager.getConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_BOUND_GROUP);
+		if (!member() && bound != null && !bound.isEmpty())
+		{
+			// Another group's chat: its key is not this client's group's, and would tie the client to it.
 			return;
 		}
 		boolean mine = GroupMembers.key(sender).equals(GroupMembers.key(localName()));
@@ -943,7 +1048,7 @@ class GroupService
 	/** Client thread. Logs one of this player's own events and tells the party. */
 	private void recordEvent(GroupEvent event)
 	{
-		if (!roster.events().add(event))
+		if (!member() || !roster.events().add(event))
 		{
 			return;
 		}
@@ -992,6 +1097,12 @@ class GroupService
 		}
 		here = position();
 		long now = System.currentTimeMillis();
+		refreshRoster();
+		if (!member())
+		{
+			// Board 2026-11-15: an account not in the group gets nothing recorded, saved or sent.
+			return;
+		}
 		watchStorageSave(now);
 		if (!session)
 		{
@@ -1013,7 +1124,6 @@ class GroupService
 			roster.markPlayed(now);
 		}
 		recordSeen(now);
-		refreshRoster();
 		pollQuests();
 		shopAlert();
 		sealRequests();
@@ -1054,12 +1164,17 @@ class GroupService
 		boolean first = !members.known() && now.known();
 		boolean changed = !now.names().equals(members.names()) || !now.group().equals(members.group());
 		members = now;
+		boolean wasMember = member();
+		checkMember(now);
+		boolean isMember = member();
+		changed |= wasMember != isMember;
 		GovernanceSync g = governance;
-		if (g != null && now.known())
+		if (g != null && now.known() && isMember)
 		{
 			g.group(now.group());
 		}
-		if (first && syncing())
+		// Anything members sent while this account was not one was dropped: ask again.
+		if ((first || isMember && !wasMember) && syncing())
 		{
 			partyService.send(new UserSync());
 		}
@@ -1068,7 +1183,70 @@ class GroupService
 			onChange.run();
 		}
 		refreshPresence();
-		hiscoresAfterRoster();
+		if (isMember)
+		{
+			// Another group's roster is not looked up: its levels would land in this group's cache.
+			hiscoresAfterRoster();
+		}
+	}
+
+	/**
+	 * Client thread, with each roster read: whether the account logged in is in this client's group
+	 * ({@link GroupBinding}), binding the group on the first member's login. Says so once per login when it is not.
+	 */
+	private void checkMember(GroupMembers roster)
+	{
+		Player player = client.getLocalPlayer();
+		String name = player == null || player.getName() == null ? "" : player.getName();
+		String bound = configManager.getConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_BOUND_GROUP);
+		boolean unbound = bound == null || bound.isEmpty();
+		if (unbound && !cacheLoaded && !rebind)
+		{
+			// The members this client has heard from decide the first binding: not before the cache is read.
+			memberName = "";
+			return;
+		}
+		GroupBinding.Result r = rebind
+			? GroupBinding.check(bound, roster, name, "", Collections.emptyList())
+			: GroupBinding.check(bound, roster, name, savedRolesGroup(), heardNames());
+		if (r.bind != null)
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_BOUND_GROUP, r.bind);
+			rebind = false;
+		}
+		memberName = r.member() ? GroupMembers.key(name) : "";
+		if (r.member())
+		{
+			rosterWaits = 0;
+			return;
+		}
+		rosterWaits++;
+		// A roster that is still loading waits quietly; one that never comes (no group) is said after ~30 s.
+		boolean say = r.verdict == GroupBinding.Verdict.NOT_MEMBER || rosterWaits >= NOT_MEMBER_WAITS;
+		if (say && !toldNotMember && !name.isEmpty())
+		{
+			toldNotMember = true;
+			log.info("logged-in account is not in this client's group: nothing is posted, logged or shared for it");
+			tell(name + (r.verdict == GroupBinding.Verdict.NOT_MEMBER
+				? " isn't in the group this client is set up for" : " isn't on a Group Ironman group")
+				+ ": nothing is posted to Discord, logged or shared for this account.");
+		}
+	}
+
+	/** The group the saved signed roles are for ({@link GovernanceSync#KEY_ROLES}), "" when none are saved. */
+	private String savedRolesGroup()
+	{
+		GovernanceCodec.Message m = GovernanceCodec.decode(gson,
+			configManager.getConfiguration(GroupIronmanConfig.GROUP, GovernanceSync.KEY_ROLES));
+		return m == null || m.roles == null || m.roles.group == null ? "" : m.roles.group;
+	}
+
+	/** Every member this client holds data for, from the group cache. */
+	private Set<String> heardNames()
+	{
+		Set<String> out = new HashSet<>(roster.lastHeard().keySet());
+		out.addAll(roster.allStats().keySet());
+		return out;
 	}
 
 	/** Client thread. Once per login, every roster member, seen online or not; otherwise only failed lookups' retries. */
@@ -1181,7 +1359,8 @@ class GroupService
 	/** Client thread. Re-reads {@link #presence} and, when it changed, tells the panel and the event engine. */
 	private void refreshPresence()
 	{
-		GamePresence now = client.getGameState() == GameState.LOGGED_IN
+		// Another group's channel is not this group's: an account not in it shows, and posts, nobody online.
+		GamePresence now = client.getGameState() == GameState.LOGGED_IN && member()
 			? GamePresence.read(members, readChannel(), readFriends()) : GamePresence.UNKNOWN;
 		if (now.equals(presence))
 		{
@@ -1325,6 +1504,11 @@ class GroupService
 			for (String payload : GroupOutbox.events(gson, switches(), mine))
 			{
 				partyService.send(new VvgGroupIronmanMessage(payload));
+			}
+			if (lastActivity.active())
+			{
+				// A joiner mid-run sees it now, not at the next wave.
+				shareActivity(lastActivity);
 			}
 		});
 	}
@@ -1490,6 +1674,11 @@ class GroupService
 	{
 		GovernanceSync g = governance;
 		String payload = message.getPayload();
+		if (ActivityCodec.isActivity(payload))
+		{
+			receiveActivity(name, payload);
+			return;
+		}
 		if (g != null && GovernanceSync.isGovernance(payload) && g.receive(name, payload))
 		{
 			roster.heard(name, System.currentTimeMillis());
@@ -1609,7 +1798,8 @@ class GroupService
 	 */
 	private void commitStorage(StorageChange change)
 	{
-		if (change == null)
+		// Another group's storage is not this group's: not logged, not checked, not sent.
+		if (change == null || !member())
 		{
 			return;
 		}
@@ -1639,7 +1829,7 @@ class GroupService
 	private void closeBank()
 	{
 		GroupOutbox.Switches s = switches();
-		if (!s.bank)
+		if (!s.bank || !member())
 		{
 			return;
 		}

@@ -99,9 +99,10 @@ public class PluginIdentityTest
 		// and posts the game's own Group broadcasts the group already sees in its chat. "Shopping: shop alert"
 		// (In-game, Board 2026-11-14) adds one more, off: a chat line near a shop selling something a list still
 		// needs. Shopping requests (Board 2026-11-14) are one more kind, so two more switches, both off.
+		// Live activities Slice A adds four kinds (start, wave, completion, death): eight more switches, all off.
 		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1
 			+ 1 + 1 + 1, switches);
-		assertEquals(98, switches);
+		assertEquals(106, switches);
 		List<String> expectedOn = Arrays.asList("discordNoPluginEvents", "discordRepostBoard", "groupSync",
 			"showUpdateNotes");
 		Collections.sort(on);

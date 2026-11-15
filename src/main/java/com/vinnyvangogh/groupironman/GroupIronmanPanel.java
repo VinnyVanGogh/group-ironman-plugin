@@ -193,6 +193,10 @@ class GroupIronmanPanel extends PluginPanel
 	/** Bank cards folded in the Banks tab, kept apart from the Group tab's. */
 	private final BankFolds bankFolds = new BankFolds();
 	private String current = "Group";
+	/** The Activities tab's All / Bossing / Minigames pill. */
+	private ActivityRows.Filter activityFilter = ActivityRows.Filter.ALL;
+	/** A live activity's line on its member's card, in the soft gold the plugin uses for live status. */
+	private static final Color ACTIVITY = new Color(0xE0, 0xB0, 0x40);
 	/** What the last Copy/Paste key press did, shown under the buttons for a while. */
 	private String keyNote;
 	private long keyNoteAt;
@@ -227,7 +231,7 @@ class GroupIronmanPanel extends PluginPanel
 
 		JPanel top = new Column();
 		top.add(header);
-		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Shopping", "Settings"));
+		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Activities", "Shopping", "Settings"));
 		add(top, BorderLayout.NORTH);
 
 		addTab("Group", null);
@@ -235,6 +239,7 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Storage", storageFilter);
 		addTab("Find", findQuery);
 		addTab("Log", logControls());
+		addTab("Activities", activityFilters());
 		addTab("Shopping", null);
 		addTab("Settings", null);
 		add(views, BorderLayout.CENTER);
@@ -310,6 +315,9 @@ class GroupIronmanPanel extends PluginPanel
 				break;
 			case "Log":
 				drawLog(tab, v, now);
+				break;
+			case "Activities":
+				drawActivities(tab, v, now);
 				break;
 			case "Shopping":
 				drawShopping(tab, v);
@@ -604,10 +612,11 @@ class GroupIronmanPanel extends PluginPanel
 			return;
 		}
 		boolean anyOffline = false;
+		Map<String, ActivityState> activities = v.group.activities(now);
 		for (PanelModel.MemberCard c : cardsList)
 		{
 			anyOffline |= !c.online && !c.you;
-			tab.add(memberCard(c));
+			tab.add(memberCard(c, activities.get(c.name)));
 		}
 		if (anyOffline)
 		{
@@ -615,7 +624,8 @@ class GroupIronmanPanel extends PluginPanel
 		}
 	}
 
-	private JComponent memberCard(PanelModel.MemberCard c)
+	/** A member's card; {@code activity} is what they are doing in a tracked activity now, or null. */
+	private JComponent memberCard(PanelModel.MemberCard c, ActivityState activity)
 	{
 		JPanel card = section();
 		JPanel body = new Column();
@@ -631,6 +641,7 @@ class GroupIronmanPanel extends PluginPanel
 			}
 		}));
 		card.add(text(c.status, c.online ? ColorScheme.PROGRESS_COMPLETE_COLOR : MUTED));
+		addActivity(card, activity);
 
 		addStats(body, c);
 		// Worn then inventory, small and side by side, in the game's own layouts.
@@ -670,6 +681,15 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		card.add(body);
 		return card;
+	}
+
+	/** "Fight Caves - wave 37/63 - solo" under the card's status, when the member is in an activity. */
+	private static void addActivity(JPanel card, ActivityState activity)
+	{
+		if (activity != null)
+		{
+			card.add(text(activity.cardLine(), ACTIVITY));
+		}
 	}
 
 	/** A card's clickable title with its fold arrow; {@code toggle} flips the card, then the tab redraws. */
@@ -1161,6 +1181,64 @@ class GroupIronmanPanel extends PluginPanel
 		Object member = logMember.getSelectedIndex() > 0 ? logMember.getSelectedItem() : null;
 		return new ActivityLog.Filter(logQuery.getText(), logCategories, member == null ? "" : member.toString(),
 			(ActivityLog.Range) logRange.getSelectedItem());
+	}
+
+	// Activities tab: who is in a boss or minigame now, then recent completions and deaths.
+
+	/** The All / Bossing / Minigames pills, above the tab so a redraw never moves them. */
+	private JComponent activityFilters()
+	{
+		JPanel pills = new JPanel(new GridLayout(1, ActivityRows.Filter.values().length, 2, 0));
+		pills.setBorder(new EmptyBorder(0, 0, 4, 0));
+		ButtonGroup group = new ButtonGroup();
+		for (ActivityRows.Filter f : ActivityRows.Filter.values())
+		{
+			JToggleButton b = new JToggleButton(f.label, f == activityFilter);
+			b.setFont(FontManager.getRunescapeSmallFont());
+			b.setFocusable(false);
+			b.setMargin(new java.awt.Insets(2, 0, 2, 0));
+			b.addActionListener(e ->
+			{
+				activityFilter = f;
+				redraw();
+			});
+			group.add(b);
+			pills.add(b);
+		}
+		return pills;
+	}
+
+	private void drawActivities(JPanel tab, View v, long now)
+	{
+		tab.add(heading("Live now"));
+		List<ActivityRows.Card> live = ActivityRows.live(v.group.activities(now), activityFilter, v.self, now);
+		if (live.isEmpty())
+		{
+			tab.add(text("No group members in a boss or minigame right now.", MUTED));
+		}
+		for (ActivityRows.Card c : live)
+		{
+			JPanel card = section();
+			JLabel title = new JLabel(c.title);
+			title.setFont(FontManager.getRunescapeBoldFont());
+			title.setForeground(Color.WHITE);
+			card.add(title);
+			c.lines.forEach(line -> card.add(text(line, ACTIVITY)));
+			tab.add(card);
+		}
+		if (v.sharing != null && !v.sharing.allSharing)
+		{
+			tab.add(text("Your own activity shows here either way; members see it only with 'Share group events'"
+				+ " on.", MUTED));
+		}
+		tab.add(heading("Recent runs"));
+		List<String> recent = ActivityRows.recent(v.group.feed().entries(), activityFilter, v.items, now);
+		if (recent.isEmpty())
+		{
+			tab.add(text("Completions and deaths in the Fight Caves, the Inferno and the Colosseum appear here.",
+				MUTED));
+		}
+		recent.forEach(line -> tab.add(text(line, Color.WHITE)));
 	}
 
 	private void drawLog(JPanel tab, View v, long now)

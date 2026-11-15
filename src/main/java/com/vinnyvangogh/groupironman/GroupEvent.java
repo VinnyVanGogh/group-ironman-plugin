@@ -90,7 +90,15 @@ final class GroupEvent
 		FARMING("fr", Category.ACTIVITIES, Need.TEXT, false),
 		BIRDHOUSE("bh", Category.ACTIVITIES, Need.TEXT, false),
 		/** A Shopping tab request made, claimed or done: {@link RequestBoard}. */
-		REQUEST("rq", Category.GROUP, Need.TEXT, false);
+		REQUEST("rq", Category.GROUP, Need.TEXT, false),
+		/**
+		 * A wave activity run ({@link WaveTracker}): {@link #text} the activity, {@link #number} the wave (start,
+		 * milestone, death) or the kill count (completion, 0 for an early Colosseum claim), {@link #detail} the rest.
+		 */
+		ACTIVITY_START("as", Category.ACTIVITIES, Need.TEXT, false),
+		ACTIVITY_WAVE("aw", Category.ACTIVITIES, Need.TEXT, false),
+		ACTIVITY_COMPLETE("ac", Category.ACTIVITIES, Need.TEXT, false),
+		ACTIVITY_DEATH("ad", Category.DEATHS, Need.TEXT, false);
 
 		private static final Map<String, Type> BY_CODE = new HashMap<>();
 
