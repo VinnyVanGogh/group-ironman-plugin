@@ -149,16 +149,16 @@ public class LevelShotTest
 			.build();
 		GroupEvent four = GroupEvent.of(GroupEvent.Type.LEVEL_UP, NOW + 1_000, "Me").text("Smithing").number(4)
 			.previous(3).build();
-		List<LevelThreads.Streak> fresh = new ArrayList<>();
+		List<LevelThreads.Edit> fresh = new ArrayList<>();
 		long window = 600_000;
 		shot.hold("Smithing", 3, NOW, png -> fresh.add(threads.level(three, "url", NOW + 1_700, window, png)));
 		shot.hold("Smithing", 4, NOW + 1_000, png -> assertNull(threads.level(four, "url", NOW + 1_700, window, png)));
 		shot.chat(CONGRATS + "4.", NOW + 1_700);
 		shoot(NOW + 1_700);
-		threads.posted(fresh.get(0), 200, "msg", NOW + 2_000);
+		threads.posted(fresh.get(0).streak, 200, "msg", NOW + 2_000);
 		List<LevelThreads.Edit> edits = threads.due(NOW + 2_000 + LevelThreads.EDIT_GAP);
 		assertEquals(1, edits.size());
 		assertEquals(17, edits.get(0).png[0]);
-		assertEquals(17, fresh.get(0).png[0]);
+		assertEquals(17, fresh.get(0).streak.png[0]);
 	}
 }

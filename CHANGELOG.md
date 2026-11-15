@@ -36,15 +36,19 @@
 - The same event switches, "Post every N levels", the valuable drop minimum
   and quiet hours apply. The footer says "from the game's group broadcast".
 - Their level-ups group like a plugin user's: with "Combine level-ups" on,
-  one post per member, edited in place, and kept across a restart. If the
-  poster changes mid-streak (the leader logs out), the new poster starts a
-  new post.
-- Level-ups now group per member, not per skill, for everyone: within
-  *Combine level-ups*, every level a member gains, in any skill or their
-  combat level, is edited into the same post, the skill that just levelled
-  listed first: "Ranged 65 → 66 (+1), Thieving 45 → 46 (+1) in 12 min".
-  A streak saved by an earlier build in the old per-skill form starts a new
-  post.
+  one message per member, edited in place, and kept across a restart. If
+  the poster changes mid-streak (the leader logs out), the new poster starts
+  a new message.
+- Level-ups now group per member for everyone: within *Combine level-ups*,
+  a member's levels go into one Discord message holding a card per skill
+  (combat level gets its own card). Each card is edited as its skill levels
+  ("Thieving 44 → 46 (+2) in 10 min"), a new skill adds a card, and the
+  skill that levelled most recently is on top. Past 10 skills (Discord's
+  limit) a new message starts. The screenshot, when on, is the latest
+  level-up's, on the top card.
+- *Combine level-ups* now defaults to 60 minutes for new installs. An
+  existing install keeps 30 unless you changed it yourself.
+- A streak saved by an earlier build starts a new message.
 - New group setting "Post events for members without the plugin" (on). A
   group's leader or editors can turn it off for everyone.
 

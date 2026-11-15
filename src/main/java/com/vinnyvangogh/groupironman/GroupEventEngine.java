@@ -118,6 +118,8 @@ class GroupEventEngine
 	static final String LEVEL_FILE = "level-streaks.txt";
 	/** Config key: set once 'Online status' has been chosen for this install, so an upgrade keeps its old choice. */
 	static final String ONLINE_STATUS_CHOSEN_KEY = "onlineStatusChosen";
+	/** Config key: set once 'Combine level-ups' has been settled for this install ({@link #keepCombineWindow}). */
+	static final String COMBINE_CHOSEN_KEY = "combineLevelsChosen";
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
 		GroupEvent.Type.WILDERNESS, GroupEvent.Type.HC_LIFE_LOST);
 
@@ -167,7 +169,7 @@ class GroupEventEngine
 		this::toDigest, this::toLog);
 	/** Client thread: Discord events waiting for the rest of their moment. */
 	private final DiscordBatch batch = new DiscordBatch();
-	/** Level-ups of one skill as one post, edited in place. Any thread; open streaks kept in {@link #LEVEL_FILE}. */
+	/** A member's level-ups as one message, a card per skill, edited in place. Any thread; kept in {@link #LEVEL_FILE}. */
 	private LevelPosts levels;
 	/** Whether this run has read {@link #LEVEL_FILE}: nothing is written over it before. Timer and shutdown. */
 	private volatile boolean levelsLoaded;
@@ -221,8 +223,9 @@ class GroupEventEngine
 		group.events(this);
 		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient, gson), System::currentTimeMillis,
 			() -> LocalTime.now().getHour());
-		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords,
+		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle,
 			() -> posterName(Webhook.PROGRESS));
+		keepCombineWindow();
 		chooseOnlineStatus();
 		reloadConfig();
 		restorePresence();
@@ -508,6 +511,28 @@ class GroupEventEngine
 		{
 			log.debug("could not write the saved level streaks", e);
 		}
+	}
+
+	/**
+	 * Once per install, before {@link #chooseOnlineStatus} marks it as run: an install that had the plugin keeps
+	 * 'Combine level-ups' at its old 30 min default; only new installs get 60 ({@link LevelPosts#windowToKeep}).
+	 */
+	private void keepCombineWindow()
+	{
+		if (configManager.getConfiguration(GroupIronmanConfig.GROUP, COMBINE_CHOSEN_KEY) != null)
+		{
+			return;
+		}
+		// Every earlier build that ran set this marker at its first start.
+		boolean upgrading = configManager.getConfiguration(GroupIronmanConfig.GROUP,
+			ONLINE_STATUS_CHOSEN_KEY) != null;
+		Integer kept = LevelPosts.windowToKeep(upgrading,
+			configManager.getConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_COMBINE_LEVELS));
+		if (kept != null)
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_COMBINE_LEVELS, kept);
+		}
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, COMBINE_CHOSEN_KEY, "1");
 	}
 
 	/** Once per install: an upgrade keeps what its old "Online and offline" switch did ({@link OnlineStatus#upgrading}). */

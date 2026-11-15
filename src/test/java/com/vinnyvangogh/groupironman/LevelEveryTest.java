@@ -111,13 +111,14 @@ public class LevelEveryTest
 		assertEquals(2, posted.size());
 		LevelThreads threads = new LevelThreads();
 		long window = 30 * 60_000L;
-		LevelThreads.Streak streak = threads.level(posted.get(0), "u", NOW, window, null);
-		assertNotNull("60 starts the post", streak);
+		LevelThreads.Edit first = threads.level(posted.get(0), "u", NOW, window, null);
+		assertNotNull("60 starts the post", first);
 		assertNull("65 joins it", threads.level(posted.get(1), "u", NOW + 60_000, window, null));
-		assertEquals(1, streak.gains.size());
-		assertEquals(59, streak.gains.get(0).from);
-		assertEquals(65, streak.gains.get(0).to);
-		assertEquals("Attack 59 → 65 (+6) in 1 min", LevelThreads.text(streak.gains, 60_000));
+		LevelThreads.Streak streak = first.streak;
+		assertEquals(1, streak.cards.size());
+		assertEquals(59, streak.cards.get(0).from);
+		assertEquals(65, streak.cards.get(0).to);
+		assertEquals("Attack 59 → 65 (+6) in 1 min", streak.cards.get(0).text());
 	}
 
 	@Test
