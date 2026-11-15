@@ -14,14 +14,13 @@ import java.util.function.Supplier;
  * moment's usual post, kept by its message id), its owed edits, and the new post that replaces a message Discord no
  * longer has. Any thread.
  */
-final class EventPosts
+final class EventPosts extends EditedPosts
 {
 	private static final String VISIT = "group storage:";
 
 	private final EventThreads threads;
 	private final DiscordSender sender;
 	private final Gson gson;
-	private final LongSupplier clock;
 	private final Supplier<DiscordStyle> style;
 	/** Names and prices, amounts read the Discord way: a storage card's net lines and value. */
 	private final Supplier<ItemLookup> words;
@@ -29,10 +28,16 @@ final class EventPosts
 	EventPosts(DiscordSender sender, Gson gson, LongSupplier clock, Supplier<DiscordStyle> style,
 		Supplier<ItemLookup> words)
 	{
-		this.threads = new EventThreads(gson);
+		this(new EventThreads(gson), sender, gson, clock, style, words);
+	}
+
+	private EventPosts(EventThreads threads, DiscordSender sender, Gson gson, LongSupplier clock,
+		Supplier<DiscordStyle> style, Supplier<ItemLookup> words)
+	{
+		super(threads, clock);
+		this.threads = threads;
 		this.sender = sender;
 		this.gson = gson;
-		this.clock = clock;
 		this.style = style;
 		this.words = words;
 	}
@@ -87,23 +92,6 @@ final class EventPosts
 			String json = DiscordWebhook.asEdit(gson, o, edit.png != null);
 			sender.edit(edit.url, edit.messageId, json, edit.png, (status, id) -> refused(edit, status));
 		}
-	}
-
-	/** The open messages to keep for a restart when they changed since the last call, else null. */
-	String saved()
-	{
-		return threads.saved();
-	}
-
-	/** Messages an earlier run {@link #saved}, back as open while inside {@code window} of their first post. */
-	void restore(String text, long window)
-	{
-		threads.restore(text, clock.getAsLong(), window);
-	}
-
-	void clear()
-	{
-		threads.clear();
 	}
 
 	private void refused(EventThreads.Edit edit, int status)

@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -44,13 +43,9 @@ public class EventPostsTest
 
 	private final Gson gson = new Gson();
 	private long now = 1_000_000;
-	private final List<DiscordQueue.Post> sent = new ArrayList<>();
-	private final List<DiscordSender.Done> pending = new ArrayList<>();
-	private final DiscordSender sender = new DiscordSender((post, done) ->
-	{
-		sent.add(post);
-		pending.add(done);
-	}, () -> now, () -> 12);
+	private final FakeTransport fake = new FakeTransport(() -> now);
+	private final List<DiscordQueue.Post> sent = fake.sent;
+	private final DiscordSender sender = fake.sender;
 	private DiscordStyle style = DiscordStyle.EMBED;
 	private EventPosts posts = client();
 
@@ -104,7 +99,18 @@ public class EventPostsTest
 
 	private void reply(int status, String messageId)
 	{
-		pending.remove(0).done(status, null, messageId);
+		fake.reply(status, messageId);
+	}
+
+	/** Easy Varrock posted as m1, then Easy Falador 15 s later, its edit sent and not yet answered. */
+	private void twoDiaries()
+	{
+		add(diary("Alex", "Easy Varrock"), "first");
+		tick();
+		reply(200, "m1");
+		now += 15 * SEC;
+		add(diary("Alex", "Easy Falador"), "second");
+		tick();
 	}
 
 	private static JsonArray embeds(DiscordQueue.Post post)
@@ -328,12 +334,7 @@ public class EventPostsTest
 	@Test
 	public void anEditDiscordRefusesIsPostedAnewWithEveryCard()
 	{
-		add(diary("Alex", "Easy Varrock"), "first");
-		tick();
-		reply(200, "m1");
-		now += 15 * SEC;
-		add(diary("Alex", "Easy Falador"), "second");
-		tick();
+		twoDiaries();
 		reply(404, null);
 		sender.pump();
 		DiscordQueue.Post again = sent.get(2);
@@ -346,12 +347,7 @@ public class EventPostsTest
 	public void plainStyleIsOneLinePerCardNewestFirst()
 	{
 		style = DiscordStyle.PLAIN;
-		add(diary("Alex", "Easy Varrock"), "first");
-		tick();
-		reply(200, "m1");
-		now += 15 * SEC;
-		add(diary("Alex", "Easy Falador"), "second");
-		tick();
+		twoDiaries();
 		String content = new Gson().fromJson(sent.get(1).json, JsonObject.class).get("content").getAsString();
 		String[] lines = content.split("\n");
 		assertEquals(2, lines.length);
