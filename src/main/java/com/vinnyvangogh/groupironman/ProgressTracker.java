@@ -66,35 +66,44 @@ final class ProgressTracker
 		List<GroupEvent> out = new ArrayList<>();
 		Integer before = levels.put(skill, level);
 		Long xpBefore = xp.put(skill, experience);
+		levelUp(skill, level, before, at, member, out);
+		milestones(skill, experience, xpBefore, at, member, out);
+		// The total is kept while quiet too, so the first level after the login is judged against it.
+		totals(at, member, out);
 		if (!counting)
 		{
-			// Still keeps the total, so the first level after the login is judged against it.
-			totals(at, member, out);
 			out.clear();
-			return out;
 		}
-		if (before != null && level > before)
-		{
-			out.add(GroupEvent.of(GroupEvent.Type.LEVEL_UP, at, member).text(skill).number(level).previous(before)
-				.build());
-			if (level >= MAX_LEVEL && before < MAX_LEVEL)
-			{
-				out.add(GroupEvent.of(GroupEvent.Type.MAXED, at, member).text(skill).number(MAX_LEVEL).build());
-			}
-		}
-		if (xpBefore != null)
-		{
-			for (long milestone : XP_MILESTONES)
-			{
-				if (xpBefore < milestone && experience >= milestone)
-				{
-					out.add(GroupEvent.of(GroupEvent.Type.XP_MILESTONE, at, member).text(skill).number(milestone)
-						.build());
-				}
-			}
-		}
-		totals(at, member, out);
 		return out;
+	}
+
+	private static void levelUp(String skill, int level, Integer before, long at, String member, List<GroupEvent> out)
+	{
+		if (before == null || level <= before)
+		{
+			return;
+		}
+		out.add(GroupEvent.of(GroupEvent.Type.LEVEL_UP, at, member).text(skill).number(level).previous(before).build());
+		if (level >= MAX_LEVEL && before < MAX_LEVEL)
+		{
+			out.add(GroupEvent.of(GroupEvent.Type.MAXED, at, member).text(skill).number(MAX_LEVEL).build());
+		}
+	}
+
+	private static void milestones(String skill, long experience, Long xpBefore, long at, String member,
+		List<GroupEvent> out)
+	{
+		if (xpBefore == null)
+		{
+			return;
+		}
+		for (long milestone : XP_MILESTONES)
+		{
+			if (xpBefore < milestone && experience >= milestone)
+			{
+				out.add(GroupEvent.of(GroupEvent.Type.XP_MILESTONE, at, member).text(skill).number(milestone).build());
+			}
+		}
 	}
 
 	private void totals(long at, String member, List<GroupEvent> out)
