@@ -2,11 +2,9 @@ package com.vinnyvangogh.groupironman;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -16,26 +14,11 @@ import java.util.concurrent.TimeUnit;
  * skill adds a card; combat level is a card of its own. Cards are ordered by the most recent level-up first. A
  * message holds at most {@link #MAX_CARDS} cards (Discord's limit on embeds); a skill past that starts a new message.
  *
- * <p>The first level-up of a member posts and keeps the message's id; more levels within the window (counted from
- * the message's first post) mark it for an edit. {@link #due} hands out at most one edit per message every
- * {@link #EDIT_GAP}, so levels quicker than that fold into the next edit. An edit Discord refuses (the message
- * deleted, the webhook changed) is posted anew and that post is the one kept from then on. A logout ends every
- * streak, but an edit already owed still goes. Pure and clock-driven.
- *
- * <p>Open streaks with a message survive a client restart (Board 2026-11-14): {@link #saved} hands out one line
- * per streak when they change, keyed by the webhook's id from its URL ({@link StatusBoard#hookOf}, never the URL
- * or its token), with every card's state, and {@link #restore} takes them back, dropping any past the window. A
- * restored streak is joined only through the same webhook; a different one, or an edit Discord refuses, posts
- * anew as before.
+ * <p>How the message is posted, edited, refused, ended at a logout and kept across a restart is
+ * {@link EditedThreads}'; this class says what a level adds to it. A saved line has every card's state.
  */
-final class LevelThreads
+final class LevelThreads extends EditedThreads<LevelThreads.Streak, LevelThreads.Edit>
 {
-	/** At most one edit per message this often. */
-	static final long EDIT_GAP = TimeUnit.SECONDS.toMillis(10);
-	/** Edits in a row a server or network failure may cost before the streak gives up and posts fresh. */
-	static final int MAX_EDIT_FAILURES = 3;
-	/** Cards in one message: Discord takes at most 10 embeds in a message. */
-	static final int MAX_CARDS = 10;
 	private static final int MAX_LEVEL = 99;
 	/** A combat level's card name: "Combat 99 → 101 (+2) in 10 min". */
 	static final String COMBAT = "Combat";
@@ -117,47 +100,20 @@ final class LevelThreads
 	}
 
 	/** One member's message and its cards. Read and written only under the owner's lock. */
-	static final class Streak
+	static final class Streak extends EditedThreads.Message
 	{
-		final String member;
-		/** The webhook it posts to ({@link LevelThreads#tag}): what a level-up must match to join. Never null. */
-		final String hook;
-		/** The latest URL it was joined through; null for a restored streak until a level-up joins it. */
-		String url;
-		final long first;
-		long last;
 		/** Its cards, the most recently levelled first. */
 		final List<Card> cards = new ArrayList<>();
-		/** The message's one picture: the latest level-up's. */
-		byte[] png;
-		String messageId;
-		/** A post or edit of it is with the sender. */
-		boolean busy;
-		/** Holds a level the message does not show yet. */
-		boolean dirty;
-		long sentAt;
-		/** Edits in a row lost to a server or network failure. */
-		int failures;
 
 		private Streak(String member, String url, long now, byte[] png)
 		{
-			this.member = member;
-			this.hook = tag(url);
-			this.url = url;
-			this.first = now;
-			this.last = now;
-			this.png = png;
-			this.busy = true;
+			super(member, url, now, png);
 		}
 
 		/** A saved streak ({@link #line}) back after a restart: posted, not busy, its next level an edit. */
 		private Streak(String[] f)
 		{
-			this.hook = f[1];
-			this.member = f[2];
-			this.first = Long.parseLong(f[3]);
-			this.last = Long.parseLong(f[4]);
-			this.messageId = f[5];
+			super(f[1], f[2], Long.parseLong(f[3]), Long.parseLong(f[4]), f[5]);
 			for (int i = HEAD_FIELDS; i < f.length; i += CARD_FIELDS)
 			{
 				cards.add(new Card(f, i));
@@ -167,7 +123,7 @@ final class LevelThreads
 		/** Whether a moment joins this message: same webhook, inside the window, and room for its cards. */
 		private boolean joins(List<GroupEvent> events, String url, long now, long window)
 		{
-			return hook.equals(tag(url)) && now - first < window && fits(events);
+			return open(url, now, window) && fits(events);
 		}
 
 		/** A moment's levels into this message; true when any was new, and the message is then owed an edit. */
@@ -180,10 +136,7 @@ final class LevelThreads
 			}
 			if (grew)
 			{
-				this.url = url;
-				last = now;
-				png = picture == null ? png : picture;
-				dirty = true;
+				grew(url, now, picture);
 			}
 			return grew;
 		}
@@ -232,18 +185,6 @@ final class LevelThreads
 			cards.add(0, new Card(skill, e.previous > 0 ? e.previous : e.number - 1, e.number, now, e.broadcast));
 			return true;
 		}
-
-		/** version, hook, member, first, last, message id, then each card; tab-separated. */
-		private String line()
-		{
-			List<String> f = new ArrayList<>();
-			Collections.addAll(f, VERSION, hook, member, Long.toString(first), Long.toString(last), messageId);
-			for (Card c : cards)
-			{
-				c.fields(f);
-			}
-			return String.join(SEP, f);
-		}
 	}
 
 	/** What one post or edit of a message says, frozen when it is handed out: safe to read off the lock. */
@@ -273,13 +214,6 @@ final class LevelThreads
 		}
 	}
 
-	/** The streaks a level-up can still join, by member. */
-	private final Map<String, Streak> open = new HashMap<>();
-	/** Every streak with work left: the open ones, and closed ones still owed an edit. */
-	private final List<Streak> live = new ArrayList<>();
-	/** The open streaks changed since {@link #saved} last handed them out. */
-	private boolean changed;
-
 	/**
 	 * The levels a plugin user's own moment is, when it can share their message: only skill level-ups below 99 and
 	 * combat levels, in any number of skills (Board 2026-11-14: grouped per member). Null for anything else (a 99, a
@@ -293,8 +227,7 @@ final class LevelThreads
 		}
 		for (GroupEvent e : events)
 		{
-			boolean skill = e.type == GroupEvent.Type.LEVEL_UP && e.number < MAX_LEVEL;
-			if (!skill && e.type != GroupEvent.Type.COMBAT_LEVEL)
+			if (!levelCard(e))
 			{
 				return null;
 			}
@@ -310,12 +243,13 @@ final class LevelThreads
 	 */
 	static GroupEvent combinableBroadcast(GroupEvent e)
 	{
-		if (e == null || !e.broadcast)
-		{
-			return null;
-		}
-		boolean skill = e.type == GroupEvent.Type.LEVEL_UP && e.number < MAX_LEVEL;
-		return skill || e.type == GroupEvent.Type.COMBAT_LEVEL ? e : null;
+		return e != null && e.broadcast && levelCard(e) ? e : null;
+	}
+
+	/** A skill's level below 99, or a combat level: what a card is made of. */
+	private static boolean levelCard(GroupEvent e)
+	{
+		return e.type == GroupEvent.Type.LEVEL_UP && e.number < MAX_LEVEL || e.type == GroupEvent.Type.COMBAT_LEVEL;
 	}
 
 	/** What a level is of: the skill, or "Combat" for a combat level (which names no skill). */
@@ -349,58 +283,36 @@ final class LevelThreads
 		{
 			fresh.add(e, now);
 		}
-		if (open.put(member, fresh) != null)
-		{
-			changed = true;
-		}
-		live.add(fresh);
-		return new Edit(fresh);
+		return start(fresh);
 	}
 
-	/**
-	 * The open streaks to keep for a restart, one {@link Streak#line} each, when they changed since the last call;
-	 * null when they did not. Only streaks with a message (and a Discord webhook to match it by) are kept.
-	 */
-	synchronized String saved()
+	@Override
+	String key(Streak s)
 	{
-		if (!changed)
-		{
-			return null;
-		}
-		changed = false;
-		List<String> lines = new ArrayList<>();
-		for (Streak s : open.values())
-		{
-			if (s.messageId != null && s.hook.startsWith("w"))
-			{
-				lines.add(s.line());
-			}
-		}
-		return String.join("\n", lines);
+		return s.member;
 	}
 
-	/**
-	 * Streaks {@link #saved} by an earlier run, back as open: the member's next level-up within {@code window} of
-	 * the first post edits that message. Lines past the window or unreadable (any line from a build before the
-	 * cards among them) are dropped, and the next {@link #saved} no longer has them; a streak this run already
-	 * started wins.
-	 */
-	synchronized void restore(String text, long now, long window)
+	@Override
+	Edit snapshot(Streak s)
 	{
-		for (String line : text == null ? new String[0] : text.split("\n"))
-		{
-			Streak s = parse(line);
-			if (s == null || now - s.first >= window || open.containsKey(s.member))
-			{
-				changed |= !line.isEmpty();
-				continue;
-			}
-			open.put(s.member, s);
-			live.add(s);
-		}
+		return new Edit(s);
 	}
 
-	private static Streak parse(String line)
+	/** version, hook, member, first, last, message id, then each card; tab-separated. */
+	@Override
+	String line(Streak s)
+	{
+		List<String> f = new ArrayList<>();
+		Collections.addAll(f, VERSION, s.hook, s.member, Long.toString(s.first), Long.toString(s.last), s.messageId);
+		for (Card c : s.cards)
+		{
+			c.fields(f);
+		}
+		return String.join(SEP, f);
+	}
+
+	@Override
+	Streak parse(String line)
 	{
 		String[] f = line.split(SEP, -1);
 		int cards = (f.length - HEAD_FIELDS) / CARD_FIELDS;
@@ -419,110 +331,6 @@ final class LevelThreads
 		}
 	}
 
-	/** The webhook a URL posts to: its id ({@link StatusBoard#hookOf}), so a thread or URL form is the same one. */
-	private static String tag(String url)
-	{
-		String hook = StatusBoard.hookOf(url);
-		if (hook != null)
-		{
-			return hook;
-		}
-		return url == null ? "" : url;
-	}
-
-	/** How a streak's new post went: on success its message is the one edited from now on. */
-	synchronized void posted(Streak s, int status, String messageId, long now)
-	{
-		s.busy = false;
-		if (ok(status) && messageId != null)
-		{
-			s.messageId = messageId;
-			s.sentAt = now;
-			changed = true;
-			return;
-		}
-		// Nothing to edit (refused, failed, or dropped by a full queue): the member's next level-up posts anew.
-		end(s);
-	}
-
-	/** The edits to send now: posted streaks with a newer level, each at most once per {@link #EDIT_GAP}. */
-	synchronized List<Edit> due(long now)
-	{
-		List<Edit> out = new ArrayList<>();
-		for (Iterator<Streak> i = live.iterator(); i.hasNext(); )
-		{
-			Streak s = i.next();
-			if (s.busy)
-			{
-				continue;
-			}
-			if (s.dirty && s.messageId != null && now - s.sentAt >= EDIT_GAP)
-			{
-				s.dirty = false;
-				s.busy = true;
-				s.sentAt = now;
-				out.add(new Edit(s));
-			}
-			else if (!s.dirty && !open.containsValue(s))
-			{
-				i.remove();
-			}
-		}
-		return out;
-	}
-
-	/**
-	 * How an edit went. Discord refusing it (404 for a deleted message, or any 4xx) gives back the post to send in
-	 * its place, its outcome to {@link #posted}. A server or network failure tries the edit again later, up to
-	 * {@link #MAX_EDIT_FAILURES} in a row; then, or when the queue dropped the edit unsent
-	 * ({@link DiscordQueue#DROPPED}), the streak ends and the member's next level posts anew. Null when there is
-	 * nothing more to send.
-	 */
-	synchronized Edit edited(Streak s, int status)
-	{
-		s.busy = false;
-		if (ok(status))
-		{
-			s.failures = 0;
-			return null;
-		}
-		if (status >= 400 && status < 500)
-		{
-			s.messageId = null;
-			s.dirty = false;
-			s.busy = true;
-			return new Edit(s);
-		}
-		if (status == DiscordQueue.DROPPED || ++s.failures >= MAX_EDIT_FAILURES)
-		{
-			end(s);
-			return null;
-		}
-		s.dirty = true;
-		return null;
-	}
-
-	/** Holding the lock: no more edits or joining; {@link #due} forgets it. */
-	private void end(Streak s)
-	{
-		s.dirty = false;
-		changed |= open.values().remove(s);
-	}
-
-	/** A logout: no more joining, but an edit already owed still goes. Saved streaks end too. */
-	synchronized void close()
-	{
-		changed |= !open.isEmpty();
-		open.clear();
-	}
-
-	/** Shutdown: everything forgotten. */
-	synchronized void clear()
-	{
-		open.clear();
-		live.clear();
-	}
-
 	/** "Prayer 23 → 25 (+2) in 4 min". */
 	static String text(String skill, long from, long to, long spanMs)
 	{
@@ -537,10 +345,5 @@ final class LevelThreads
 			return "in under a minute";
 		}
 		return minutes < 60 ? "in " + minutes + " min" : "in " + minutes / 60 + " h " + minutes % 60 + " min";
-	}
-
-	private static boolean ok(int status)
-	{
-		return status >= 200 && status < 300;
 	}
 }

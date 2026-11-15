@@ -733,6 +733,20 @@ public interface GroupIronmanConfig extends Config
 		return 60;
 	}
 
+	@ConfigItem(keyName = "discordGroupPosts", name = "Group posts (minutes)", description = "Minutes to group a"
+		+ " member's other posts for. Their events of one kind (group storage, drops, deaths, quests and diaries,"
+		+ " activities, slayer, group) within this many minutes of the first post go into that one message, edited in"
+		+ " place: a card each, newest first, up to 10. Group storage adds up instead: took 2 then deposited 10 Rope"
+		+ " reads 'deposited 8 x Rope', with each visit listed. A post that pings your mention starts a new message."
+		+ " Level-ups use 'Combine level-ups'. 0 turns it off.",
+		section = discordHowSection, position = 15)
+	@Range(max = 240)
+	@Units(Units.MINUTES)
+	default int discordGroupPosts()
+	{
+		return 30;
+	}
+
 	@ConfigItem(keyName = "discordStyle", name = "Message style", description = "Rich embeds with item icons and a"
 		+ " colour per category, or plain text.", section = discordHowSection, position = 3)
 	default DiscordStyle discordStyle()

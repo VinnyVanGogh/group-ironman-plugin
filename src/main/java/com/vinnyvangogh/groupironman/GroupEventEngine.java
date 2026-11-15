@@ -116,6 +116,8 @@ class GroupEventEngine
 	 * Written the moment it changes, as {@link #BOARD_FILE} is: a client killed between level-ups still has it.
 	 */
 	static final String LEVEL_FILE = "level-streaks.txt";
+	/** Plugin data file: each open grouped post of every other kind ({@link EventThreads}), kept as {@link #LEVEL_FILE}. */
+	static final String GROUPED_FILE = "grouped-posts.txt";
 	/** Config key: set once 'Online status' has been chosen for this install, so an upgrade keeps its old choice. */
 	static final String ONLINE_STATUS_CHOSEN_KEY = "onlineStatusChosen";
 	/** Config key: set once 'Combine level-ups' has been settled for this install ({@link #keepCombineWindow}). */
@@ -173,6 +175,10 @@ class GroupEventEngine
 	private LevelPosts levels;
 	/** Whether this run has read {@link #LEVEL_FILE}: nothing is written over it before. Timer and shutdown. */
 	private volatile boolean levelsLoaded;
+	/** A member's other posts of one kind as one message, edited in place. Any thread; kept in {@link #GROUPED_FILE}. */
+	private EventPosts grouped;
+	/** Whether this run has read {@link #GROUPED_FILE}. Timer and shutdown. */
+	private volatile boolean groupedLoaded;
 	private volatile EventSettings settings = EventSettings.OFF;
 	/**
 	 * {@link #settings} without this member's own opt-outs: what posts for members without the plugin, who cannot
@@ -225,6 +231,7 @@ class GroupEventEngine
 			() -> LocalTime.now().getHour());
 		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle,
 			() -> posterName(Webhook.PROGRESS));
+		grouped = new EventPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords);
 		keepCombineWindow();
 		chooseOnlineStatus();
 		reloadConfig();
@@ -280,6 +287,12 @@ class GroupEventEngine
 			saveLevels();
 			levelsLoaded = false;
 			levels.clear();
+		}
+		if (grouped != null)
+		{
+			saveGrouped();
+			groupedLoaded = false;
+			grouped.clear();
 		}
 		toasts.clear();
 		progress.reset();
@@ -351,6 +364,9 @@ class GroupEventEngine
 			loadLevels();
 			levels.tick();
 			saveLevels();
+			loadGrouped();
+			grouped.tick();
+			saveGrouped();
 			sender.pump();
 			GroupEvent offline;
 			List<GroupEvent> others;
@@ -482,34 +498,61 @@ class GroupEventEngine
 		{
 			return;
 		}
-		String text = null;
-		try
-		{
-			text = PluginFiles.read(group.dataFile(LEVEL_FILE));
-		}
-		catch (Exception e)
-		{
-			log.debug("could not read the saved level streaks", e);
-		}
-		levels.restore(text, TimeUnit.MINUTES.toMillis(config.discordCombineLevels()));
+		levels.restore(readData(LEVEL_FILE), TimeUnit.MINUTES.toMillis(config.discordCombineLevels()));
 		levelsLoaded = true;
 	}
 
 	/** Timer, and shutdown: the open level streaks, written to the plugin's file when they changed. */
 	private void saveLevels()
 	{
-		String text = levelsLoaded ? levels.saved() : null;
+		writeData(LEVEL_FILE, levelsLoaded ? levels.saved() : null, "level-streaks");
+	}
+
+	/** Timer, once a run: the grouped posts a restart left open, while still inside 'Group posts'. */
+	private void loadGrouped()
+	{
+		if (groupedLoaded)
+		{
+			return;
+		}
+		grouped.restore(readData(GROUPED_FILE), TimeUnit.MINUTES.toMillis(config.discordGroupPosts()));
+		groupedLoaded = true;
+	}
+
+	/** Timer, and shutdown: the open grouped posts, written to the plugin's file when they changed. */
+	private void saveGrouped()
+	{
+		writeData(GROUPED_FILE, groupedLoaded ? grouped.saved() : null, "grouped-posts");
+	}
+
+	/** A plugin data file's text; null when it is missing or unreadable. */
+	private String readData(String file)
+	{
+		try
+		{
+			return PluginFiles.read(group.dataFile(file));
+		}
+		catch (Exception e)
+		{
+			log.debug("could not read {}", file, e);
+			return null;
+		}
+	}
+
+	/** {@code text} into a plugin data file; nothing when null. {@code what} names it in the file's temp copy. */
+	private void writeData(String file, String text, String what)
+	{
 		if (text == null)
 		{
 			return;
 		}
 		try
 		{
-			PluginFiles.write(group.dataFile(LEVEL_FILE), text, "level-streaks");
+			PluginFiles.write(group.dataFile(file), text, what);
 		}
 		catch (Exception e)
 		{
-			log.debug("could not write the saved level streaks", e);
+			log.debug("could not write {}", file, e);
 		}
 	}
 
@@ -1725,15 +1768,30 @@ class GroupEventEngine
 		nextFrame(send);
 	}
 
-	/** Client thread. What sends a post, given its picture (dropped when none is wanted); null for nothing to say. */
+	/**
+	 * Client thread. What sends a post, given its picture (dropped when none is wanted); null for nothing to say.
+	 * Within 'Group posts', a kind that groups ({@link EventThreads#family}) joins its member's message for that kind
+	 * (Board 2026-11-15); its first post is this usual one.
+	 */
 	private Consumer<byte[]> poster(String url, DiscordMerge.Post post, List<GroupEvent> events, boolean picture)
 	{
 		boolean picked = picture && config.discordScreenshot();
-		String json = DiscordWebhook.payload(gson, post, discordWords(), config.discordStyle(),
-			config.discordMention(), picked, egg(events), posterName(Webhook.of(post.lead.type)));
+		ItemLookup words = discordWords();
+		String egg = egg(events);
+		String mention = config.discordMention();
+		String username = posterName(Webhook.of(post.lead.type));
+		String json = DiscordWebhook.payload(gson, post, words, config.discordStyle(), mention, picked, egg, username);
 		if (json == null)
 		{
 			return null;
+		}
+		long window = TimeUnit.MINUTES.toMillis(config.discordGroupPosts());
+		boolean pings = post.big && mention != null && !mention.trim().isEmpty();
+		EventThreads.Moment moment = window <= 0 ? null
+			: EventPosts.moment(gson, url, post, words, egg, username, pings);
+		if (moment != null)
+		{
+			return png -> grouped.add(moment, json, picked ? png : null, window);
 		}
 		return png -> sender.post(url, json, picked ? png : null);
 	}

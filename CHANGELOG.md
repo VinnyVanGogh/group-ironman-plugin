@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Discord: every kind of post groups per member, like level-ups
+
+- A member's posts of one kind within **Group posts (minutes)** (new
+  setting under *Discord: how to post*, default 30, 0 turns it off) of
+  the first go into that one message, edited in place, instead of a new
+  post each time. Kinds: group storage, drops, deaths, quests and diaries
+  (and the rest of progress), activities, slayer, group.
+- Group storage adds up: took 2 Rope, then deposited 10 Rope, reads
+  "deposited 8 x Rope", with the value of what moved overall and each
+  visit listed under it.
+- Every other kind adds a card per event, newest first; past 10 cards a
+  new message starts. The picture is the newest event's.
+- A post that pings your mention (a pet, a 99) still starts its own
+  message, so the ping goes. Online and offline, gravestone warnings and
+  the weekly recap post on their own as before.
+- Level-ups are unchanged and keep *Combine level-ups*.
+- Grouped messages survive a client restart inside the window, as
+  level-ups do. Discord does not move an edited message to the bottom.
+
 ### Shopping: "Path to" with Shortest Path
 
 - Each line still to get, and each requested item, has a **Path to** button
