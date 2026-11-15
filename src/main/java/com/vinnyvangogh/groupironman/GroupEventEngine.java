@@ -55,6 +55,7 @@ import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
+import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
 import net.runelite.client.ui.DrawManager;
@@ -86,8 +87,6 @@ class GroupEventEngine
 	static final String BARROWS_KEY = "barrowsPieces";
 	/** How long, at most, a login waits for "last played" to load before "back after" is skipped. */
 	static final int BACK_WAIT_TICKS = 100;
-	/** Ticks after a login before variables are read: the login's burst of values has settled by then. */
-	static final int VAR_WAIT_TICKS = 5;
 	/** The digest and recap schedule is checked this often, not every tick. */
 	static final int SCHEDULE_EVERY_TICKS = 100;
 	// RuneLite profile keys for saved progress. Not settings: never shown, read only here.
@@ -190,6 +189,12 @@ class GroupEventEngine
 	/** The shared settings the event settings were built from: quiet hours, grace and Easter eggs read these. */
 	private volatile GroupSettingsSchema.Resolved values;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
+	/** A login's first minute of this player's achievements, held; a burst of them is never posted. */
+	private final LoginBurst ownBurst = new LoginBurst(LoginBurst.ACHIEVEMENTS::contains);
+	/** The same for the Discord posts of members without the plugin, every kind. */
+	private final LoginBurst broadcastBurst = new LoginBurst(t -> true);
+	/** Whose values the baselines hold, and when they count. Client thread. */
+	private final LoginGate gate = new LoginGate(progress, watchers, ownBurst, broadcastBurst);
 	/** Client thread: this player's Fight Caves, Inferno or Colosseum run (docs/plans/activities.md Slice A). */
 	private final WaveTracker waves = new WaveTracker(this::own, this::teamMode);
 	/** Client thread: when this player's activity last went to the roster and the party. */
@@ -202,7 +207,6 @@ class GroupEventEngine
 	private DryStreak dry = DryStreak.parse("");
 	private Digest.Week week = Digest.Week.parse("");
 	private FarmRuns farm = new FarmRuns(this::own, this::wanted);
-	private int varWait = -1;
 	private int scheduleTicks;
 	private DiscordSender sender;
 	private final StatusBoard board = new StatusBoard();
@@ -290,7 +294,10 @@ class GroupEventEngine
 			levels.clear();
 		}
 		toasts.clear();
-		progress.reset();
+		// Held login events are dropped with the rest of the unsent posts.
+		gate.startOver();
+		ownBurst.end();
+		broadcastBurst.end();
 		settings = EventSettings.OFF;
 		broadcastSettings = EventSettings.OFF;
 	}
@@ -623,8 +630,12 @@ class GroupEventEngine
 		router.route(event, false, settings, group.lookup);
 		if (action == GroupBroadcasts.Action.POST)
 		{
+			// Claimed at once either way: a login's burst held here is never posted by another client either.
 			group.sharePosted(GroupBroadcasts.key(event));
-			router.post(event, broadcastSettings, group.lookup);
+			if (!broadcastBurst.hold(event, now))
+			{
+				router.post(event, broadcastSettings, group.lookup);
+			}
 		}
 	}
 
@@ -745,7 +756,10 @@ class GroupEventEngine
 		own(event);
 	}
 
-	/** Client thread. Routes one of this player's events and, when shared, sends it to the party. */
+	/**
+	 * Client thread. Routes one of this player's events and, when shared, sends it to the party. An achievement in a
+	 * login's first minute waits in {@link #ownBurst} first.
+	 */
 	private void own(GroupEvent event)
 	{
 		if (event == null || !event.isValid())
@@ -753,6 +767,14 @@ class GroupEventEngine
 			// A drop with no untradeable in it, for one: nothing to show, nothing to send.
 			return;
 		}
+		if (!ownBurst.hold(event, System.currentTimeMillis()))
+		{
+			ownNow(event);
+		}
+	}
+
+	private void ownNow(GroupEvent event)
+	{
 		group.resolveItems(event.items.keySet());
 		router.route(event, true, settings, group.lookup);
 		if (settings.share && event.type.travels() && !event.type.logged())
@@ -771,7 +793,7 @@ class GroupEventEngine
 	@Subscribe
 	public void onNpcLootReceived(NpcLootReceived event)
 	{
-		if (event.getNpc() == null)
+		if (event.getNpc() == null || !group.member())
 		{
 			return;
 		}
@@ -837,6 +859,11 @@ class GroupEventEngine
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
+		if (!group.member())
+		{
+			// Board 2026-11-15: an account not in the group posts nothing, its own or its group's broadcasts.
+			return;
+		}
 		long now = System.currentTimeMillis();
 		String message = event.getMessage();
 		if (event.getType() == ChatMessageType.FRIENDSCHATNOTIFICATION)
@@ -986,7 +1013,7 @@ class GroupEventEngine
 	public void onActorDeath(ActorDeath event)
 	{
 		Player me = client.getLocalPlayer();
-		if (me == null || event.getActor() != me)
+		if (me == null || event.getActor() != me || !group.member())
 		{
 			return;
 		}
@@ -1043,10 +1070,12 @@ class GroupEventEngine
 	@Subscribe
 	public void onStatChanged(StatChanged event)
 	{
-		if (event.getSkill() == Skill.OVERALL)
+		if (event.getSkill() == Skill.OVERALL || !group.member())
 		{
 			return;
 		}
+		// Before the value is judged: another account's levels are never the baseline for this one's.
+		checkAccount(System.currentTimeMillis());
 		List<GroupEvent> out = progress.skill(event.getSkill().getName(), event.getLevel(), event.getXp(),
 			System.currentTimeMillis(), group.localPlayer());
 		for (GroupEvent e : out)
@@ -1063,6 +1092,11 @@ class GroupEventEngine
 	{
 		if (event.getVarpId() == VarPlayerID.QP)
 		{
+			checkAccount(System.currentTimeMillis());
+			if (!group.member())
+			{
+				return;
+			}
 			GroupEvent e = progress.questPoints(client.getVarpValue(VarPlayerID.QP), System.currentTimeMillis(),
 				group.localPlayer());
 			if (e != null && wanted(e.type))
@@ -1075,6 +1109,10 @@ class GroupEventEngine
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event)
 	{
+		if (!group.member())
+		{
+			return;
+		}
 		if (event.getGroupId() == InterfaceID.QUESTSCROLL)
 		{
 			// The title is filled in by a script after the load; read it next tick.
@@ -1107,6 +1145,14 @@ class GroupEventEngine
 	public void onGameStateChanged(GameStateChanged event)
 	{
 		GameState state = event.getGameState();
+		if (LoginGate.endsSession(state))
+		{
+			// First, so nothing below that throws can skip it: whatever logs in next starts every baseline over
+			// (Board 2026-11-15: an account switch posted the other account's old diaries and levels). A login's
+			// held minute ends here; a handful still posts, a burst does not.
+			gate.startOver();
+			endBursts();
+		}
 		if (state == GameState.LOGGED_IN)
 		{
 			loginPending = true;
@@ -1147,12 +1193,77 @@ class GroupEventEngine
 			waves.reset();
 			waves.takeChanged();
 			group.shareActivity(waves.state(now));
-			// Another account may log in next: start every baseline over.
-			progress.reset();
+			// Another account may log in next: what this one was in the middle of (a grave, a raid) goes too.
 			watchers.reset();
 			graveShot.free();
 			backWait = -1;
-			varWait = -1;
+		}
+	}
+
+	/**
+	 * The RuneLite profile changed (an account's own settings loaded). Logged in, the values the baselines hold may
+	 * be the last profile's: start over as a new login does.
+	 */
+	@Subscribe
+	public void onRuneScapeProfileChanged(RuneScapeProfileChanged event)
+	{
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+		long now = System.currentTimeMillis();
+		gate.rebaseline(now);
+		seedProgress(now);
+	}
+
+	/** Client thread: a different account than the baselines hold starts them over (no logout came between). */
+	private void checkAccount(long now)
+	{
+		if (gate.account(client.getAccountHash(), now))
+		{
+			log.debug("account changed without a logout: every baseline starts over");
+			seedProgress(now);
+		}
+	}
+
+	/**
+	 * The client's skills and quest points now, recorded as the baseline (the tracker is quiet after a reset), so a
+	 * skill that changes nothing until later still has its value and the total is judged.
+	 */
+	private void seedProgress(long now)
+	{
+		String me = group.localPlayer();
+		for (Skill skill : Skill.values())
+		{
+			if (skill != Skill.OVERALL)
+			{
+				progress.skill(skill.getName(), client.getRealSkillLevel(skill), client.getSkillExperience(skill), now,
+					me);
+			}
+		}
+		progress.questPoints(client.getVarpValue(VarPlayerID.QP), now, me);
+	}
+
+	/** Client thread, each tick and at a session's end: a login's held minute, posted or dropped as a burst. */
+	private void releaseBursts(long now)
+	{
+		postHeld(ownBurst.due(now), broadcastBurst.due(now));
+	}
+
+	private void endBursts()
+	{
+		postHeld(ownBurst.end(), broadcastBurst.end());
+	}
+
+	private void postHeld(List<GroupEvent> mine, List<GroupEvent> broadcasts)
+	{
+		mine.forEach(this::ownNow);
+		broadcasts.forEach(e -> router.post(e, broadcastSettings, group.lookup));
+		int own = ownBurst.takeDropped();
+		int members = broadcastBurst.takeDropped();
+		if (own + members > 0)
+		{
+			log.info("login burst held and not posted: {} own events, {} member broadcasts", own, members);
 		}
 	}
 
@@ -1167,6 +1278,13 @@ class GroupEventEngine
 		{
 			return;
 		}
+		checkAccount(now);
+		if (!group.member())
+		{
+			// Board 2026-11-15: an account not in the group (or not known to be yet) is never logged in here: no
+			// presence, board, activity or event. Its login runs once its roster says it is a member.
+			return;
+		}
 		if (loginPending)
 		{
 			loginPending = false;
@@ -1174,6 +1292,7 @@ class GroupEventEngine
 			// A run this account left mid-way: paused until the player is back in its arena.
 			waves.restore(profile(WAVE_RUN_KEY));
 		}
+		releaseBursts(now);
 		activityTick(now, me);
 		checkBack(now);
 		StatusBoard.Self was = boardSelf;
@@ -1269,12 +1388,7 @@ class GroupEventEngine
 	/** Each tick, once a login has settled: variables, death, the gravestone and the schedule. */
 	private void watch(long now, Player me)
 	{
-		if (varWait > 0)
-		{
-			varWait--;
-			return;
-		}
-		if (varWait < 0)
+		if (!gate.tick())
 		{
 			return;
 		}
@@ -1409,9 +1523,10 @@ class GroupEventEngine
 		digest = Digest.parse(profile(DIGEST_KEY));
 		farm = FarmRuns.parse(profile(FARM_KEY), this::own, this::wanted);
 		warnBadWebhooks();
-		if (varWait < 0)
+		gate.login(now);
+		if (!gate.settled())
 		{
-			varWait = VAR_WAIT_TICKS;
+			seedProgress(now);
 		}
 		boardSelf = new StatusBoard.Self(name, true, client.getWorld(), 0);
 		if (boardLoginAt == 0)

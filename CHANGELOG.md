@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Fix: switching accounts no longer posts old achievements
+
+- Logging into another account (or hopping, reconnecting, or changing
+  profile) used to be able to post that account's long-done diaries and
+  levels to Discord as if new. Every login now starts fresh: for its first
+  few seconds skills, total, combat level, quest points and diaries are only
+  recorded, never posted.
+- Safety net: a login's first minute of achievements (and of game
+  broadcasts posted for members without the plugin) is held. Up to three
+  post as usual once the minute is over; more than that is treated as a
+  backlog and nothing is posted.
+
+### Fix: an account that isn't in your group does nothing
+
+- Logging into an account that is not in the group this client is set up
+  for (an account in another group, or not on a Group Ironman at all) used
+  to post its achievements to your group's Discord, put them in the Log and
+  share its data. Now nothing runs for it: no Discord posts, no group
+  events, no Log entries, no live board or online posts, nothing sent to or
+  taken from the group, and its group storage and bank are not recorded. A
+  chat line says so once per login. Switching back to a member picks up as
+  usual, without posting anything old.
+- The client remembers which group it is for the first time a member logs
+  in (or, for a client set up before this update, from the group's saved
+  leader roles or the members it already has data for). Setting a new group
+  key ties it to the next member's group.
+- A group key shared in another group's chat no longer replaces yours.
+
 ### Live activities: Fight Caves, Inferno and Fortis Colosseum waves
 
 - The group sees who is in the **Fight Caves** (63 waves), the **Inferno**
@@ -27,6 +55,7 @@
   messages and kinds; nothing changes for them.
 - Only where-and-how-far: no boss attack, prayer, spawn or hazard is ever
   read or shown.
+
 ### Shopping: "Path to" with Shortest Path
 
 - Each line still to get, and each requested item, has a **Path to** button

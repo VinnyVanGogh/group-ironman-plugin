@@ -28,6 +28,8 @@ final class ProgressTracker
 	private int total = -1;
 	private int combat = -1;
 	private int qp = -1;
+	/** False while a login settles ({@link LoginGate}): every value only records. A new tracker counts. */
+	private boolean counting = true;
 
 	/** {@code skills}: how many skills there are, OVERALL not counted. */
 	ProgressTracker(int skills)
@@ -35,6 +37,7 @@ final class ProgressTracker
 		this.skills = skills;
 	}
 
+	/** Another account may log in next: forget every value, and count nothing until {@link #settle}. */
 	void reset()
 	{
 		levels.clear();
@@ -42,6 +45,19 @@ final class ProgressTracker
 		total = -1;
 		combat = -1;
 		qp = -1;
+		counting = false;
+	}
+
+	/** A login is settling: values only record until {@link #settle}. */
+	void quiet()
+	{
+		counting = false;
+	}
+
+	/** The login has settled: a value that goes up from here on is progress. */
+	void settle()
+	{
+		counting = true;
 	}
 
 	/** A skill's real level and XP now. */
@@ -50,28 +66,44 @@ final class ProgressTracker
 		List<GroupEvent> out = new ArrayList<>();
 		Integer before = levels.put(skill, level);
 		Long xpBefore = xp.put(skill, experience);
-		if (before != null && level > before)
-		{
-			out.add(GroupEvent.of(GroupEvent.Type.LEVEL_UP, at, member).text(skill).number(level).previous(before)
-				.build());
-			if (level >= MAX_LEVEL && before < MAX_LEVEL)
-			{
-				out.add(GroupEvent.of(GroupEvent.Type.MAXED, at, member).text(skill).number(MAX_LEVEL).build());
-			}
-		}
-		if (xpBefore != null)
-		{
-			for (long milestone : XP_MILESTONES)
-			{
-				if (xpBefore < milestone && experience >= milestone)
-				{
-					out.add(GroupEvent.of(GroupEvent.Type.XP_MILESTONE, at, member).text(skill).number(milestone)
-						.build());
-				}
-			}
-		}
+		levelUp(skill, level, before, at, member, out);
+		milestones(skill, experience, xpBefore, at, member, out);
+		// The total is kept while quiet too, so the first level after the login is judged against it.
 		totals(at, member, out);
+		if (!counting)
+		{
+			out.clear();
+		}
 		return out;
+	}
+
+	private static void levelUp(String skill, int level, Integer before, long at, String member, List<GroupEvent> out)
+	{
+		if (before == null || level <= before)
+		{
+			return;
+		}
+		out.add(GroupEvent.of(GroupEvent.Type.LEVEL_UP, at, member).text(skill).number(level).previous(before).build());
+		if (level >= MAX_LEVEL && before < MAX_LEVEL)
+		{
+			out.add(GroupEvent.of(GroupEvent.Type.MAXED, at, member).text(skill).number(MAX_LEVEL).build());
+		}
+	}
+
+	private static void milestones(String skill, long experience, Long xpBefore, long at, String member,
+		List<GroupEvent> out)
+	{
+		if (xpBefore == null)
+		{
+			return;
+		}
+		for (long milestone : XP_MILESTONES)
+		{
+			if (xpBefore < milestone && experience >= milestone)
+			{
+				out.add(GroupEvent.of(GroupEvent.Type.XP_MILESTONE, at, member).text(skill).number(milestone).build());
+			}
+		}
 	}
 
 	private void totals(long at, String member, List<GroupEvent> out)
@@ -108,7 +140,7 @@ final class ProgressTracker
 	{
 		int before = combat;
 		combat = level;
-		return before > 0 && level > before
+		return counting && before > 0 && level > before
 			? GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, at, member).number(level).build() : null;
 	}
 
@@ -117,7 +149,7 @@ final class ProgressTracker
 	{
 		int before = qp;
 		qp = points;
-		return before >= 0 && points / QP_STEP > before / QP_STEP
+		return counting && before >= 0 && points / QP_STEP > before / QP_STEP
 			? GroupEvent.of(GroupEvent.Type.QUEST_POINTS, at, member).number(points / QP_STEP * QP_STEP).build()
 			: null;
 	}
