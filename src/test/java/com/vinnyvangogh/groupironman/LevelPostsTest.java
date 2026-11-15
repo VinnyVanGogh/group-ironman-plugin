@@ -32,8 +32,13 @@ public class LevelPostsTest
 	}, () -> now, () -> 12);
 	/** The Progress poster name the replacement post is sent under. */
 	private String poster = "Iron Pals";
-	private final LevelPosts levels = new LevelPosts(sender, gson, () -> now, () -> DiscordStyle.EMBED,
-		FakeItems::new, () -> poster);
+	private LevelPosts levels = client();
+
+	/** A client's level posts; a second one is the same client after a restart. */
+	private LevelPosts client()
+	{
+		return new LevelPosts(sender, gson, () -> now, () -> DiscordStyle.EMBED, FakeItems::new, () -> poster);
+	}
 
 	private static GroupEvent level(String skill, int n)
 	{
@@ -384,5 +389,136 @@ public class LevelPostsTest
 		assertNull(DiscordSender.messageId(gson, "not json"));
 		assertEquals(URL + "/messages/7",
 			DiscordSender.target(new DiscordQueue.Post(URL + "/", "{}", null, "7", null)));
+	}
+
+	// Board 2026-11-14: Strength 36 and 37, sixteen minutes apart inside a 30 min window, were two posts because
+	// the client was restarted between them. The open streaks now survive a restart.
+
+	/** The same client after a restart: new level posts, restored from what the old ones saved. */
+	private void restart(String saved)
+	{
+		levels = client();
+		levels.restore(saved, WINDOW);
+	}
+
+	/** Prayer 24 posted as m1; what the client saved for it. */
+	private String postAndSave()
+	{
+		gain(24);
+		tick();
+		reply(200, "m1");
+		return levels.saved();
+	}
+
+	@Test
+	public void theNextLevelAfterARestartEditsTheSamePost()
+	{
+		restart(postAndSave());
+		now += 16 * 60 * SEC;
+		gain(25);
+		tick();
+		assertEquals(2, sent.size());
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("Prayer 23 → 25 (+2) in 16 min", description(sent.get(1)));
+		assertEquals(URL + "/messages/m1", DiscordSender.target(sent.get(1)));
+	}
+
+	@Test
+	public void aLevelOutsideTheWindowAfterARestartIsANewPost()
+	{
+		restart(postAndSave());
+		now += WINDOW + SEC;
+		gain(25);
+		tick();
+		assertEquals(2, sent.size());
+		assertNull("a new post, not an edit", sent.get(1).edit);
+		assertEquals("first 25", sent.get(1).json);
+	}
+
+	@Test
+	public void aDifferentWebhookAfterARestartIsANewPost()
+	{
+		restart(postAndSave());
+		now += 60 * SEC;
+		levels.level("https://discord.com/api/webhooks/987654321098765432/ZyX-wvu_TSR987", level("Prayer", 25),
+			WINDOW, null, "first 25");
+		tick();
+		assertEquals(2, sent.size());
+		assertNull(sent.get(1).edit);
+		assertEquals("first 25", sent.get(1).json);
+	}
+
+	@Test
+	public void aRestoredPostDiscordNoLongerHasIsPostedAnew()
+	{
+		restart(postAndSave());
+		now += 60 * SEC;
+		gain(25);
+		tick();
+		reply(404, null);
+		tick();
+		assertEquals(3, sent.size());
+		assertNull("posted anew", sent.get(2).edit);
+		reply(200, "m2");
+		now += LevelThreads.EDIT_GAP;
+		gain(26);
+		tick();
+		assertEquals("m2", sent.get(3).edit);
+	}
+
+	@Test
+	public void savedStreaksPastTheWindowExpire()
+	{
+		String saved = postAndSave();
+		now += WINDOW;
+		restart(saved);
+		assertEquals("the expired streak is dropped from the file", "", levels.saved());
+		gain(25);
+		tick();
+		assertNull(sent.get(1).edit);
+	}
+
+	@Test
+	public void aLogoutEndsTheStreakAcrossARestartToo()
+	{
+		postAndSave();
+		levels.close();
+		String saved = levels.saved();
+		assertEquals("", saved);
+		restart(saved);
+		now += 60 * SEC;
+		gain(25);
+		tick();
+		assertNull(sent.get(1).edit);
+	}
+
+	@Test
+	public void onlyAChangeIsSavedAndNeverTheWebhookToken()
+	{
+		assertNull("nothing changed yet", levels.saved());
+		gain(24);
+		assertNull("no message id yet: nothing to keep", levels.saved());
+		tick();
+		reply(200, "m1");
+		String saved = levels.saved();
+		assertTrue(saved.startsWith("w123456789012345678\tAlex\tPrayer\t23\t24\t"));
+		assertTrue(saved.endsWith("\tm1"));
+		assertFalse("the webhook's token stays out of the file", saved.contains("AbC-def_GHI123"));
+		assertNull("saved once", levels.saved());
+		now += 60 * SEC;
+		gain(25);
+		assertTrue("a joined level is saved", levels.saved().contains("\t25\t"));
+	}
+
+	@Test
+	public void aDamagedFileIsIgnored()
+	{
+		levels.restore(null, WINDOW);
+		levels.restore("w1\tAlex\tPrayer\tx\n\nnot a line\nw123456789012345678\tAlex\tPrayer\t23\t24\tz\t0\tm1",
+			WINDOW);
+		gain(25);
+		tick();
+		assertEquals(1, sent.size());
+		assertNull(sent.get(0).edit);
 	}
 }

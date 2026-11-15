@@ -60,6 +60,18 @@ final class LevelPosts
 		threads.close();
 	}
 
+	/** The open streaks to keep for a restart when they changed since the last call, else null ({@link LevelThreads#saved}). */
+	String saved()
+	{
+		return threads.saved();
+	}
+
+	/** Streaks an earlier run {@link #saved}, back as open while inside {@code window} of their first post. */
+	void restore(String text, long window)
+	{
+		threads.restore(text, clock.getAsLong(), window);
+	}
+
 	void clear()
 	{
 		threads.clear();

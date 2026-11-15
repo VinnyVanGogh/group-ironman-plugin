@@ -111,6 +111,11 @@ class GroupEventEngine
 	static final String BOARD_KEY = "statusBoardMessage";
 	/** Plugin data file: each webhook's live board ids ({@link StatusBoard#merge}), written on every change. */
 	static final String BOARD_FILE = "status-board.txt";
+	/**
+	 * Plugin data file: each open level streak's post ({@link LevelThreads#saved}), so a restart keeps grouping.
+	 * Written the moment it changes, as {@link #BOARD_FILE} is: a client killed between level-ups still has it.
+	 */
+	static final String LEVEL_FILE = "level-streaks.txt";
 	/** Config key: set once 'Online status' has been chosen for this install, so an upgrade keeps its old choice. */
 	static final String ONLINE_STATUS_CHOSEN_KEY = "onlineStatusChosen";
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
@@ -162,8 +167,10 @@ class GroupEventEngine
 		this::toDigest, this::toLog);
 	/** Client thread: Discord events waiting for the rest of their moment. */
 	private final DiscordBatch batch = new DiscordBatch();
-	/** Level-ups of one skill as one post, edited in place. Any thread; message ids in memory only. */
+	/** Level-ups of one skill as one post, edited in place. Any thread; open streaks kept in {@link #LEVEL_FILE}. */
 	private LevelPosts levels;
+	/** Whether this run has read {@link #LEVEL_FILE}: nothing is written over it before. Timer and shutdown. */
+	private volatile boolean levelsLoaded;
 	private volatile EventSettings settings = EventSettings.OFF;
 	/**
 	 * {@link #settings} without this member's own opt-outs: what posts for members without the plugin, who cannot
@@ -266,6 +273,9 @@ class GroupEventEngine
 		levelShot.clear();
 		if (levels != null)
 		{
+			// A level posted since the last tick is kept for the next start.
+			saveLevels();
+			levelsLoaded = false;
 			levels.clear();
 		}
 		toasts.clear();
@@ -335,7 +345,9 @@ class GroupEventEngine
 	{
 		try
 		{
+			loadLevels();
 			levels.tick();
+			saveLevels();
 			sender.pump();
 			GroupEvent offline;
 			List<GroupEvent> others;
@@ -457,6 +469,44 @@ class GroupEventEngine
 		{
 			log.debug("could not write the saved boards", e);
 			configManager.setConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY, text);
+		}
+	}
+
+	/** Timer, once a run: the level streaks a restart left open, while still inside 'Combine level-ups'. */
+	private void loadLevels()
+	{
+		if (levelsLoaded)
+		{
+			return;
+		}
+		String text = null;
+		try
+		{
+			text = PluginFiles.read(group.dataFile(LEVEL_FILE));
+		}
+		catch (Exception e)
+		{
+			log.debug("could not read the saved level streaks", e);
+		}
+		levels.restore(text, TimeUnit.MINUTES.toMillis(config.discordCombineLevels()));
+		levelsLoaded = true;
+	}
+
+	/** Timer, and shutdown: the open level streaks, written to the plugin's file when they changed. */
+	private void saveLevels()
+	{
+		String text = levelsLoaded ? levels.saved() : null;
+		if (text == null)
+		{
+			return;
+		}
+		try
+		{
+			PluginFiles.write(group.dataFile(LEVEL_FILE), text, "level-streaks");
+		}
+		catch (Exception e)
+		{
+			log.debug("could not write the saved level streaks", e);
 		}
 	}
 
