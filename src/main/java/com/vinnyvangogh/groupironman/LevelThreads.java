@@ -164,6 +164,30 @@ final class LevelThreads
 			}
 		}
 
+		/** Whether a moment joins this message: same webhook, inside the window, and room for its cards. */
+		private boolean joins(List<GroupEvent> events, String url, long now, long window)
+		{
+			return hook.equals(tag(url)) && now - first < window && fits(events);
+		}
+
+		/** A moment's levels into this message; true when any was new, and the message is then owed an edit. */
+		private boolean join(List<GroupEvent> events, String url, long now, byte[] picture)
+		{
+			boolean grew = false;
+			for (GroupEvent e : events)
+			{
+				grew |= add(e, now);
+			}
+			if (grew)
+			{
+				this.url = url;
+				last = now;
+				png = picture == null ? png : picture;
+				dirty = true;
+			}
+			return grew;
+		}
+
 		/** Whether {@code events} fit: the cards they would add stay within {@link #MAX_CARDS}. */
 		private boolean fits(List<GroupEvent> events)
 		{
@@ -315,21 +339,9 @@ final class LevelThreads
 	{
 		String member = events.get(0).member;
 		Streak s = open.get(member);
-		if (s != null && s.hook.equals(tag(url)) && now - s.first < window && s.fits(events))
+		if (s != null && s.joins(events, url, now, window))
 		{
-			boolean grew = false;
-			for (GroupEvent e : events)
-			{
-				grew |= s.add(e, now);
-			}
-			if (grew)
-			{
-				s.url = url;
-				s.last = now;
-				s.png = png == null ? s.png : png;
-				s.dirty = true;
-				changed = true;
-			}
+			changed |= s.join(events, url, now, png);
 			return null;
 		}
 		Streak fresh = new Streak(member, url, now, png);
