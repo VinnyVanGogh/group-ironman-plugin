@@ -157,6 +157,6 @@ final class EventPosts extends EditedPosts
 		extras.addAll(m.extras);
 		GroupEvent lead = m.lead.event();
 		return new DiscordMerge.Post(lead, DiscordMerge.visitTitle(!put.isEmpty(), !took.isEmpty()), text.toString(),
-			all, extras, false);
+			all, extras, false, put, took);
 	}
 }

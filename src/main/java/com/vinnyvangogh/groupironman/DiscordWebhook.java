@@ -404,10 +404,10 @@ final class DiscordWebhook
 	{
 		GroupEvent e = post.lead;
 		JsonArray fields = new JsonArray();
-		long value = EventText.value(post.items, lookup);
-		if (value > 0)
+		String value = DiscordMerge.valueText(post, lookup);
+		if (!value.isEmpty())
 		{
-			fields.add(field("Value", lookup.amount(value) + " gp", true));
+			fields.add(field("Value", value, true));
 		}
 		if (e.world > 0)
 		{
