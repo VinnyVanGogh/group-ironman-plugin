@@ -99,12 +99,21 @@ final class PanelModel
 		/** Stack value in gp. */
 		final long value;
 
+		/** What a log basket, fish barrel or coal bag holds, drawn on its slot; -1 when unknown or not one. */
+		final int inside;
+
 		ItemCell(int id, String name, long quantity, long value)
+		{
+			this(id, name, quantity, value, -1);
+		}
+
+		ItemCell(int id, String name, long quantity, long value, int inside)
 		{
 			this.id = id;
 			this.name = name;
 			this.quantity = quantity;
 			this.value = value;
+			this.inside = inside;
 		}
 
 		/** An empty inventory slot, kept so the items after it stay in their own slots. */
@@ -115,10 +124,11 @@ final class PanelModel
 			return id <= 0;
 		}
 
-		/** "450,001 x Coins": the exact amount, which the icon's own stack text shortens. */
+		/** "450,001 x Coins": the exact amount, which the icon's own stack text shortens; "Log basket (19 inside)". */
 		String tooltip()
 		{
-			return quantity > 1 ? Amounts.EXACT.of(quantity) + " x " + name : name;
+			String base = quantity > 1 ? Amounts.EXACT.of(quantity) + " x " + name : name;
+			return inside >= 0 ? base + " (" + Amounts.EXACT.of(inside) + " inside)" : base;
 		}
 	}
 
@@ -468,7 +478,7 @@ final class PanelModel
 			}
 			else
 			{
-				out.add(new ItemGroup("Inventory", slotCells(c.slots, items)));
+				out.add(new ItemGroup("Inventory", slotCells(c, items)));
 			}
 		}
 		if (x != null)
@@ -488,13 +498,20 @@ final class PanelModel
 	}
 
 	/** One cell per slot in the game's order, {@link ItemCell#EMPTY} for an empty one; noted ids stay noted. */
-	static List<ItemCell> slotCells(List<GroupCodec.Slot> slots, ItemLookup items)
+	/** A known container's contents go on its slot (Board 2026-11-14); unknown draws no number. */
+	static List<ItemCell> slotCells(GroupCodec.Carried c, ItemLookup items)
 	{
 		List<ItemCell> out = new ArrayList<>();
-		for (GroupCodec.Slot s : slots)
+		for (GroupCodec.Slot s : c.slots)
 		{
-			out.add(s.empty() ? ItemCell.EMPTY
-				: new ItemCell(s.id, items.name(s.id), s.quantity, items.price(s.id) * s.quantity));
+			if (s.empty())
+			{
+				out.add(ItemCell.EMPTY);
+				continue;
+			}
+			String name = items.name(s.id);
+			out.add(new ItemCell(s.id, name, s.quantity, items.price(s.id) * s.quantity,
+				c.inside(SkillingContainer.fromItemName(name))));
 		}
 		return out;
 	}

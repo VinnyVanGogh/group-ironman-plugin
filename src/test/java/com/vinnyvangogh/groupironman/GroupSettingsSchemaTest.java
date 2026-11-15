@@ -95,7 +95,7 @@ public class GroupSettingsSchemaTest
 		for (String key : new String[]{"eventDropMinValue", "eventStorageMinValue", "eventLevelMin", "eventLevelEvery",
 			"eventBackAfterDays", "eventClueMinValue", "eventKcEvery", "eventGravestoneWarnMinutes", "discordDigestHour",
 			"discordQuietStart", "discordQuietEnd", "discordOfflineGrace", "discordEasterEggs", "discordLegendAt",
-			"discordFreeloaderAt"})
+			"discordFreeloaderAt", "discordNoPluginEvents"})
 		{
 			assertNotNull(key, GroupSettingsSchema.get(key));
 		}

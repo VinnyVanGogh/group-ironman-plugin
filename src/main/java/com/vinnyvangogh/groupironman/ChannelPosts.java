@@ -91,6 +91,31 @@ final class ChannelPosts
 	}
 
 	/**
+	 * The group's leader posts while their client is online and in the party (Board 2026-11-14); otherwise
+	 * {@link #leads(String, boolean, Collection)} picks the first by name. Every client knows the same signed leader,
+	 * so they still agree; one that does not ({@code leader} empty) falls back to the name rule.
+	 */
+	static boolean leads(String self, boolean syncing, Collection<String> othersOnline, String leader)
+	{
+		String boss = GroupMembers.key(leader == null ? "" : leader);
+		if (syncing && !boss.isEmpty())
+		{
+			if (boss.equals(GroupMembers.key(self)))
+			{
+				return true;
+			}
+			for (String other : othersOnline)
+			{
+				if (boss.equals(GroupMembers.key(other)))
+				{
+					return false;
+				}
+			}
+		}
+		return leads(self, syncing, othersOnline);
+	}
+
+	/**
 	 * {@link #leads(String, Collection)} for a client that may not be in the party: one that is not syncing is
 	 * not heard by the others, who may post without it, so it posts only when it hears no one either.
 	 */

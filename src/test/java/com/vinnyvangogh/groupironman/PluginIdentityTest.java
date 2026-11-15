@@ -94,13 +94,16 @@ public class PluginIdentityTest
 		// on by default (Board 2026-11-11): it only writes the welcome or what's new in the game chat, once per
 		// version, and sends nothing anywhere. Group settings add "Don't post my events", off: a member's own
 		// opt-out, never something the group turns on for them. "Repost board daily" (Discord) is the third
-		// switch on by default (Board 2026-11-14): it only acts when the live board is already on. "Shopping: shop
-		// alert" (In-game, Board 2026-11-14) adds one more, off: a chat line near a shop selling something a list
-		// still needs.
+		// switch on by default (Board 2026-11-14): it only acts when the live board is already on. "Members without
+		// the plugin" (Discord) is the fourth (Board 2026-11-14, "default on"): it only acts when posting is on,
+		// and posts the game's own Group broadcasts the group already sees in its chat. "Shopping: shop alert"
+		// (In-game, Board 2026-11-14) adds one more, off: a chat line near a shop selling something a list still
+		// needs.
 		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1
-			+ 1 + 1, switches);
-		assertEquals(95, switches);
-		List<String> expectedOn = Arrays.asList("discordRepostBoard", "groupSync", "showUpdateNotes");
+			+ 1 + 1 + 1, switches);
+		assertEquals(96, switches);
+		List<String> expectedOn = Arrays.asList("discordNoPluginEvents", "discordRepostBoard", "groupSync",
+			"showUpdateNotes");
 		Collections.sort(on);
 		assertEquals(expectedOn, on);
 		assertEquals("", DEFAULTS.groupLowStock());

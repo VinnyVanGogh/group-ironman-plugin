@@ -19,6 +19,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -91,6 +92,8 @@ class GroupEventEngine
 	static final int SCHEDULE_EVERY_TICKS = 100;
 	// RuneLite profile keys for saved progress. Not settings: never shown, read only here.
 	static final String DRY_KEY = "dryStreaks";
+	/** Profile key: the game broadcasts posted in the last day ({@link GroupBroadcasts.Seen}). Not a setting. */
+	static final String BROADCASTS_KEY = "broadcastsPosted";
 	static final String WEEK_KEY = "weekTally";
 	static final String DIGEST_KEY = "digestLines";
 	static final String DIGEST_LAST_KEY = "digestLastAt";
@@ -101,8 +104,13 @@ class GroupEventEngine
 	 * client closed in it can post the offline on the next start. Not a setting: never shown.
 	 */
 	static final String PRESENCE_KEY = "presencePending";
-	/** Config key: the live board's message id, with a hash of its webhook. Not a setting; never sent to the party. */
+	/**
+	 * Config key: where the live board's message id was kept before {@link #BOARD_FILE}; read once to carry it
+	 * over, then unset. Also the fallback when the file cannot be written. Not a setting; never sent to the party.
+	 */
 	static final String BOARD_KEY = "statusBoardMessage";
+	/** Plugin data file: each webhook's live board ids ({@link StatusBoard#merge}), written on every change. */
+	static final String BOARD_FILE = "status-board.txt";
 	/** Config key: set once 'Online status' has been chosen for this install, so an upgrade keeps its old choice. */
 	static final String ONLINE_STATUS_CHOSEN_KEY = "onlineStatusChosen";
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
@@ -157,6 +165,15 @@ class GroupEventEngine
 	/** Level-ups of one skill as one post, edited in place. Any thread; message ids in memory only. */
 	private LevelPosts levels;
 	private volatile EventSettings settings = EventSettings.OFF;
+	/**
+	 * {@link #settings} without this member's own opt-outs: what posts for members without the plugin, who cannot
+	 * opt out in-game (Board 2026-11-14). The poster's "don't post my events" is about their own.
+	 */
+	private volatile EventSettings broadcastSettings = EventSettings.OFF;
+	/** Guards {@link #seen}: the client thread reads broadcasts, the party thread hears claims. */
+	private final Object seenLock = new Object();
+	/** Game broadcasts posted by this client or claimed by another, per RS profile; loaded at login. */
+	private GroupBroadcasts.Seen seen = new GroupBroadcasts.Seen();
 	/** The shared settings the event settings were built from: quiet hours, grace and Easter eggs read these. */
 	private volatile GroupSettingsSchema.Resolved values;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
@@ -174,6 +191,10 @@ class GroupEventEngine
 	private final StatusBoard board = new StatusBoard();
 	/** This player for the live board: set on the client thread, read by the timer. Null before a login. */
 	private volatile StatusBoard.Self boardSelf;
+	/** The saved boards as {@link #BOARD_FILE} holds them; null until read this run. */
+	private volatile String boardSaved;
+	/** This run's first login, 0 before one: the board waits {@link StatusBoard#SETTLE_MS} after it. */
+	private volatile long boardLoginAt;
 	private ScheduledFuture<?> pump;
 	private EventToastOverlay toastOverlay;
 	private GroupBoxOverlay boxOverlay;
@@ -198,8 +219,8 @@ class GroupEventEngine
 		chooseOnlineStatus();
 		reloadConfig();
 		restorePresence();
-		toastOverlay = new EventToastOverlay(toasts, config, group.lookup);
-		boxOverlay = new GroupBoxOverlay(toasts, config, group);
+		toastOverlay = new EventToastOverlay(toasts, config, group.lookup, this::eggSettings);
+		boxOverlay = new GroupBoxOverlay(toasts, config, group, this::eggSettings);
 		overlayManager.add(toastOverlay);
 		overlayManager.add(boxOverlay);
 		pump = executor.scheduleWithFixedDelay(this::tick, 1, 1, TimeUnit.SECONDS);
@@ -234,8 +255,12 @@ class GroupEventEngine
 		{
 			sender.clear();
 		}
-		// The queue's board request is gone with it: forget it was out, so a restart sends again.
+		// The queue's board request is gone with it: forget it was out, so a restart sends again. A board
+		// answered since the last tick is saved first.
+		saveBoard();
 		board.target(null, () -> null);
+		boardSaved = null;
+		boardLoginAt = 0;
 		// Unsent posts are dropped at shutdown, as the sender's queue is.
 		batch.drain();
 		levelShot.clear();
@@ -246,6 +271,7 @@ class GroupEventEngine
 		toasts.clear();
 		progress.reset();
 		settings = EventSettings.OFF;
+		broadcastSettings = EventSettings.OFF;
 	}
 
 	/** A config change, or new group settings (they are kept in the config, so both arrive here). */
@@ -255,6 +281,7 @@ class GroupEventEngine
 			: group.groupValues();
 		values = v;
 		settings = EventSettings.from(config, v, MemberPrefs.of(config));
+		broadcastSettings = EventSettings.from(config, v, MemberPrefs.NONE);
 		if (sender != null)
 		{
 			sender.quietHours(v.intValue("discordQuietStart"), v.intValue("discordQuietEnd"));
@@ -341,39 +368,95 @@ class GroupEventEngine
 	 */
 	private void boardTick(long now)
 	{
+		loadBoards();
+		// What Discord answered since the last tick is saved before the webhook can change.
+		saveBoard();
 		String url = webhookFor(Webhook.ONLINE);
 		if (!StatusBoard.keeps(config.discordOnlineStatus(), webhooks(), group.isLeader()))
 		{
 			url = null;
 		}
-		board.target(url, () -> configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY));
+		// Board 2026-11-14: nothing goes out until the leader's role, the shared webhooks and the saved boards are in.
+		board.settle(StatusBoard.settled(boardLoginAt, now, boardSaved != null && group.cacheLoaded()));
+		board.target(url, () -> boardSaved);
 		if (url != null)
 		{
-			// Logged out too: the last plugin user's client marks the board as no longer kept current.
-			String lines = StatusBoard.lines(group.members(), group.roster().lastHeard(), group.roster().lastSeen(),
-				group.roster().allStats(), boardSelf, group.presence(), now);
-			if (!lines.isEmpty())
+			sendBoard(now);
+		}
+		saveBoard();
+	}
+
+	/** Timer: the board's lines now, and its next request when one is due. */
+	private void sendBoard(long now)
+	{
+		// Logged out too: the last plugin user's client marks the board as no longer kept current.
+		String lines = StatusBoard.lines(group.members(), group.roster().lastHeard(), group.roster().lastSeen(),
+			group.roster().allStats(), boardSelf, group.presence(), now);
+		if (!lines.isEmpty())
+		{
+			board.show(lines, now);
+		}
+		GroupSettingsSchema.Resolved v = resolved();
+		boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), v.intValue("discordQuietStart"),
+			v.intValue("discordQuietEnd"));
+		StatusBoard.Send send = board.next(now, quiet, LocalDate.now().toEpochDay(), config.discordRepostBoard());
+		if (send != null)
+		{
+			board.send(sender, send, StatusBoard.payload(gson, send, config.discordStyle(),
+				posterName(Webhook.ONLINE)), System::currentTimeMillis);
+		}
+	}
+
+	/** Timer: the saved boards, read once a run: the plugin's file, else the line the config kept before it. */
+	private void loadBoards()
+	{
+		if (boardSaved != null)
+		{
+			return;
+		}
+		String text = null;
+		try
+		{
+			text = PluginFiles.read(group.dataFile(BOARD_FILE));
+		}
+		catch (Exception e)
+		{
+			log.debug("could not read the saved boards", e);
+		}
+		if (text == null)
+		{
+			text = configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY);
+		}
+		boardSaved = text == null ? "" : text;
+	}
+
+	/**
+	 * Timer, and shutdown: a changed board id, written to the plugin's file at once. Not the RuneLite config:
+	 * ConfigManager keeps a change in memory and writes it every five minutes or at a clean shutdown, so a client
+	 * killed sooner (a dev client stopped from Gradle) lost the id and the next start posted a new board.
+	 */
+	private void saveBoard()
+	{
+		String before = boardSaved;
+		String line = before == null ? null : board.takeSaved();
+		if (line == null)
+		{
+			return;
+		}
+		String text = StatusBoard.merge(before, line);
+		boardSaved = text;
+		try
+		{
+			PluginFiles.write(group.dataFile(BOARD_FILE), text, "status-board");
+			if (configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY) != null)
 			{
-				board.show(lines, now);
-			}
-			GroupSettingsSchema.Resolved v = resolved();
-			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), v.intValue("discordQuietStart"),
-				v.intValue("discordQuietEnd"));
-			StatusBoard.Send send = board.next(now, quiet, LocalDate.now().toEpochDay(), config.discordRepostBoard());
-			if (send != null)
-			{
-				board.send(sender, send, StatusBoard.payload(gson, send, config.discordStyle(),
-					posterName(Webhook.ONLINE)), System::currentTimeMillis);
+				configManager.unsetConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY);
 			}
 		}
-		String saved = board.takeSaved();
-		if (saved != null && saved.isEmpty())
+		catch (Exception e)
 		{
-			configManager.unsetConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY);
-		}
-		else if (saved != null)
-		{
-			configManager.setConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY, saved);
+			log.debug("could not write the saved boards", e);
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY, text);
 		}
 	}
 
@@ -400,18 +483,84 @@ class GroupEventEngine
 	 */
 	void gamePresence(GamePresence game)
 	{
+		Predicate<String> plugin = pluginUser();
+		List<GroupEvent> posts;
+		synchronized (presenceLock)
+		{
+			posts = channelPosts.update(game, plugin, System.currentTimeMillis(), offlineGrace());
+		}
+		routeChannelPosts(posts);
+	}
+
+	/**
+	 * Client thread. Who posts their own events: this player, and every member whose client was ever heard from over
+	 * the group sync (the board's "(no plugin)" rule). Everyone else is read from the game's Group channel.
+	 */
+	private Predicate<String> pluginUser()
+	{
 		Player me = client.getLocalPlayer();
 		String self = me == null || me.getName() == null ? "" : GroupMembers.key(me.getName());
 		Set<String> plugin = new HashSet<>();
 		group.roster().lastHeard().keySet().forEach(n -> plugin.add(GroupMembers.key(n)));
 		group.roster().allStats().keySet().forEach(n -> plugin.add(GroupMembers.key(n)));
-		List<GroupEvent> posts;
-		synchronized (presenceLock)
+		return n -> plugin.contains(GroupMembers.key(n)) || GroupMembers.key(n).equals(self);
+	}
+
+	/**
+	 * Client thread. A line of the game's Group channel broadcast ({@link GroupBroadcasts}): a member without the
+	 * plugin's level, quest, drop and so on. Every plugin user shows it; one posts it and tells the others.
+	 */
+	private void groupBroadcast(String message, long now)
+	{
+		GroupEvent event = GroupBroadcasts.parse(message, now, this::itemId);
+		if (event == null)
 		{
-			posts = channelPosts.update(game, n -> plugin.contains(GroupMembers.key(n)) || GroupMembers.key(n)
-				.equals(self), System.currentTimeMillis(), offlineGrace());
+			return;
 		}
-		routeChannelPosts(posts);
+		boolean posts = resolved().on(GroupSettingsSchema.NO_PLUGIN_EVENTS) && leadsChannelPosts(now);
+		GroupBroadcasts.Action action;
+		synchronized (seenLock)
+		{
+			action = GroupBroadcasts.decide(event, pluginUser(), posts, seen, now);
+			if (action == GroupBroadcasts.Action.POST)
+			{
+				saveProfile(BROADCASTS_KEY, seen.save());
+			}
+		}
+		if (action == GroupBroadcasts.Action.SKIP)
+		{
+			return;
+		}
+		group.resolveItems(event.items.keySet());
+		router.route(event, false, settings, group.lookup);
+		if (action == GroupBroadcasts.Action.POST)
+		{
+			group.sharePosted(GroupBroadcasts.key(event));
+			router.post(event, broadcastSettings, group.lookup);
+		}
+	}
+
+	/** Any thread. Game broadcasts another plugin user's client posted: never posted here as well. */
+	void claimed(List<String> keys)
+	{
+		long now = System.currentTimeMillis();
+		synchronized (seenLock)
+		{
+			keys.forEach(k -> seen.add(k, now));
+		}
+	}
+
+	/** A broadcast drop's item by its exact name (tradeables: the only drops worth a broadcast), or null. */
+	private Integer itemId(String name)
+	{
+		for (var item : itemManager.search(name))
+		{
+			if (item.getName().equalsIgnoreCase(name))
+			{
+				return itemManager.canonicalize(item.getId());
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -446,7 +595,7 @@ class GroupEventEngine
 				others.add(member);
 			}
 		});
-		return ChannelPosts.leads(name, group.syncing(), others);
+		return ChannelPosts.leads(name, group.syncing(), others, group.leaderName());
 	}
 
 	/** A member's event from the party, already filed under their name. */
@@ -600,6 +749,11 @@ class GroupEventEngine
 		{
 			// Chambers announces its loot here.
 			watchChat(message, now);
+			return;
+		}
+		if (event.getType() == ChatMessageType.CLAN_GIM_MESSAGE)
+		{
+			groupBroadcast(message, now);
 			return;
 		}
 		if (event.getType() != ChatMessageType.GAMEMESSAGE && event.getType() != ChatMessageType.SPAM)
@@ -1085,6 +1239,10 @@ class GroupEventEngine
 
 	private void login(long now, String name)
 	{
+		synchronized (seenLock)
+		{
+			seen = GroupBroadcasts.Seen.load(profile(BROADCASTS_KEY), now);
+		}
 		dry = DryStreak.parse(profile(DRY_KEY));
 		week = Digest.Week.parse(profile(WEEK_KEY));
 		digest = Digest.parse(profile(DIGEST_KEY));
@@ -1095,6 +1253,11 @@ class GroupEventEngine
 			varWait = VAR_WAIT_TICKS;
 		}
 		boardSelf = new StatusBoard.Self(name, true, client.getWorld(), 0);
+		if (boardLoginAt == 0)
+		{
+			// A hop logs in again too; only the run's first login starts the board's wait.
+			boardLoginAt = now;
+		}
 		List<GroupEvent> posts;
 		synchronized (presenceLock)
 		{
@@ -1298,6 +1461,12 @@ class GroupEventEngine
 			return;
 		}
 		DiscordMerge.Family family = DiscordMerge.family(event.type);
+		if (event.broadcast)
+		{
+			// Another member's moment: never merged with this player's own, never a screenshot of this screen.
+			post(url, DiscordMerge.single(event, discordWords()), Collections.singletonList(event), false, null);
+			return;
+		}
 		if (family == null)
 		{
 			GraveShot.Choice shot = picture(event);
@@ -1429,7 +1598,13 @@ class GroupEventEngine
 	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
 	private String egg(List<GroupEvent> events)
 	{
-		return EasterEggs.line(events, group.lookup, EasterEggs.Settings.of(resolved()));
+		return EasterEggs.line(events, group.lookup, eggSettings());
+	}
+
+	/** The Easter egg settings now: the group's when it has them. Also read by the overlays for the 67/69 tag. */
+	private EasterEggs.Settings eggSettings()
+	{
+		return EasterEggs.Settings.of(resolved());
 	}
 
 	/**

@@ -6,6 +6,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +55,10 @@ final class GroupCodec
 	/** The game's inventory: 28 slots. */
 	static final int INVENTORY_SLOTS = 28;
 	static final int MAX_SKILLS = 40;
+	/** The fullest container tracked holds 36 (a coal bag with a Smithing cape); the rest is headroom. */
+	static final int MAX_HELD = 100;
+	/** Kinds of item one container can report; a basket of every log is under 20. */
+	static final int MAX_HELD_KINDS = 30;
 
 	/** Room for the header fields of a bank part, generously. */
 	private static final int BANK_HEADER_CHARS = 120;
@@ -82,6 +87,15 @@ final class GroupCodec
 	{
 		BANK, CARRIED, STORAGE, STATS, EXTRAS, EVENTS
 	}
+
+	/**
+	 * The {@code k} of a "posted" claim ({@link #encodePosted}): not a {@link Kind}, as it is no member data;
+	 * {@link #decode} reads it as unknown, like every older build does, and {@link #posted} reads it.
+	 */
+	static final String POSTED = "posted";
+	/** Most broadcast keys one claim carries, and the longest key kept. */
+	static final int MAX_POSTED = 20;
+	static final int MAX_POSTED_CHARS = 200;
 
 	/** One part of a split bank snapshot. */
 	static final class BankPart
@@ -130,6 +144,22 @@ final class GroupCodec
 		}
 	}
 
+	/**
+	 * What a carried log basket, fish barrel or coal bag holds, as its sender knows it: the count, and the
+	 * items by canonical id when every one is known (empty otherwise, never a guess).
+	 */
+	static final class Held
+	{
+		final int count;
+		final Map<Integer, Integer> items;
+
+		Held(int count, Map<Integer, Integer> items)
+		{
+			this.count = count;
+			this.items = ItemCounts.sorted(items);
+		}
+	}
+
 	static final class Carried
 	{
 		/** Canonical counts (noted counted as the item): what Find, ::find and totals read. */
@@ -140,6 +170,8 @@ final class GroupCodec
 		 * shares only counts. Only the Group tab's inventory grid reads these.
 		 */
 		final List<Slot> slots;
+		/** Known contents of carried containers; a container missing here is unknown. */
+		final Map<SkillingContainer, Held> contents;
 
 		Carried(Map<Integer, Integer> inventory, Map<Integer, Integer> worn)
 		{
@@ -148,9 +180,35 @@ final class GroupCodec
 
 		Carried(Map<Integer, Integer> inventory, Map<Integer, Integer> worn, List<Slot> slots)
 		{
+			this(inventory, worn, slots, Collections.emptyMap());
+		}
+
+		Carried(Map<Integer, Integer> inventory, Map<Integer, Integer> worn, List<Slot> slots,
+			Map<SkillingContainer, Held> contents)
+		{
 			this.inventory = ItemCounts.sorted(inventory);
 			this.worn = ItemCounts.sorted(worn);
 			this.slots = inventorySlots(slots);
+			this.contents = contents.isEmpty() ? Collections.emptyMap()
+				: Collections.unmodifiableMap(new EnumMap<>(contents));
+		}
+
+		/** The ids known inside containers, for name lookups (Find). */
+		Set<Integer> heldIds()
+		{
+			Set<Integer> out = new TreeSet<>();
+			for (Held h : contents.values())
+			{
+				out.addAll(h.items.keySet());
+			}
+			return out;
+		}
+
+		/** What {@code container} holds, or -1 when the sender does not know. */
+		int inside(SkillingContainer container)
+		{
+			Held h = container == null ? null : contents.get(container);
+			return h == null ? -1 : h.count;
 		}
 
 		/** The ids drawn in {@link #slots}, for name lookups. */
@@ -297,6 +355,38 @@ final class GroupCodec
 	static String encodeCarried(Gson gson, Map<Integer, Integer> inventory, Map<Integer, Integer> worn,
 		List<Slot> slots)
 	{
+		return encodeCarried(gson, new Carried(inventory, worn, slots));
+	}
+
+	/**
+	 * As above, plus {@code cc}: what each carried container is known to hold, as
+	 * {@code {"LOG_BASKET":{"n":19,"i":[id, qty, ...]}}}, {@code i} only when every item is known. A build
+	 * from before contents ignores {@code cc} as an unknown field and draws no number.
+	 */
+	static String encodeCarried(Gson gson, Carried carried)
+	{
+		JsonObject o = carriedJson(carried.inventory, carried.worn, carried.slots);
+		if (!carried.contents.isEmpty())
+		{
+			JsonObject cc = new JsonObject();
+			for (Map.Entry<SkillingContainer, Held> e : carried.contents.entrySet())
+			{
+				JsonObject held = new JsonObject();
+				held.addProperty("n", e.getValue().count);
+				if (!e.getValue().items.isEmpty())
+				{
+					held.add("i", ItemCounts.toJson(e.getValue().items));
+				}
+				cc.add(e.getKey().name(), held);
+			}
+			o.add("cc", cc);
+		}
+		return gson.toJson(o);
+	}
+
+	private static JsonObject carriedJson(Map<Integer, Integer> inventory, Map<Integer, Integer> worn,
+		List<Slot> slots)
+	{
 		JsonObject o = header(Kind.CARRIED);
 		o.add("inv", ItemCounts.toJson(inventory));
 		o.add("eq", ItemCounts.toJson(worn));
@@ -311,7 +401,7 @@ final class GroupCodec
 			}
 			o.add("is", is);
 		}
-		return gson.toJson(o);
+		return o;
 	}
 
 	static String encodeStorage(Gson gson, StorageChange change)
@@ -484,25 +574,11 @@ final class GroupCodec
 	/** The decoded message, or null when it is not one this build can read. */
 	static Decoded decode(Gson gson, String json)
 	{
-		if (json == null || json.isEmpty() || json.length() > MAX_PAYLOAD_CHARS * 4)
+		JsonObject in = object(gson, json, MAX_PAYLOAD_CHARS * 4);
+		if (in == null)
 		{
 			return null;
 		}
-		JsonObject in;
-		try
-		{
-			JsonElement root = gson.fromJson(json, JsonElement.class);
-			if (root == null || !root.isJsonObject())
-			{
-				return null;
-			}
-			in = root.getAsJsonObject();
-		}
-		catch (RuntimeException e)
-		{
-			return null;
-		}
-
 		Long v = ItemCounts.longValue(in.get("v"));
 		if (v == null || v < 1)
 		{
@@ -521,7 +597,8 @@ final class GroupCodec
 				return Decoded.of(new Carried(
 					ItemCounts.fromJson(in.get("inv"), MAX_CARRIED_ITEMS),
 					ItemCounts.fromJson(in.get("eq"), MAX_CARRIED_ITEMS),
-					slotsFrom(in.get("is"))));
+					slotsFrom(in.get("is")),
+					contentsFrom(in.get("cc"))));
 			case "storage":
 				return Decoded.of(new StorageChange(
 					longOr(in.get("ts"), 0),
@@ -576,6 +653,34 @@ final class GroupCodec
 		return out;
 	}
 
+	/**
+	 * Containers from a newer build, and counts that cannot be a container's (negative, or past
+	 * {@link #MAX_HELD}), are skipped one at a time; a missing {@code cc} is no container known.
+	 */
+	private static Map<SkillingContainer, Held> contentsFrom(JsonElement e)
+	{
+		Map<SkillingContainer, Held> out = new EnumMap<>(SkillingContainer.class);
+		if (e == null || !e.isJsonObject())
+		{
+			return out;
+		}
+		for (Map.Entry<String, JsonElement> entry : e.getAsJsonObject().entrySet())
+		{
+			SkillingContainer kind = SkillingContainer.fromKey(entry.getKey());
+			if (kind == null || !entry.getValue().isJsonObject())
+			{
+				continue;
+			}
+			JsonObject held = entry.getValue().getAsJsonObject();
+			long n = longOr(held.get("n"), -1);
+			if (n >= 0 && n <= MAX_HELD)
+			{
+				out.put(kind, new Held((int) n, ItemCounts.fromJson(held.get("i"), MAX_HELD_KINDS)));
+			}
+		}
+		return out;
+	}
+
 	/** Bad events are skipped one at a time, like bad item pairs. */
 	private static Decoded decodeEvents(JsonObject in)
 	{
@@ -601,6 +706,84 @@ final class GroupCodec
 			}
 		}
 		return Decoded.of(events);
+	}
+
+	/** {@code {"v":1,"k":"posted","p":[key, ...]}}: the game broadcasts this client just posted. */
+	static String encodePosted(Gson gson, List<String> keys)
+	{
+		JsonObject o = new JsonObject();
+		o.addProperty("v", PROTOCOL);
+		o.addProperty("k", POSTED);
+		JsonArray p = new JsonArray();
+		for (String key : keys)
+		{
+			if (p.size() < MAX_POSTED && key != null && !key.isEmpty() && key.length() <= MAX_POSTED_CHARS)
+			{
+				p.add(key);
+			}
+		}
+		o.add("p", p);
+		return gson.toJson(o);
+	}
+
+	/**
+	 * The keys of a "posted" claim: strings only, each within {@link #MAX_POSTED_CHARS}, at most {@link #MAX_POSTED}.
+	 * Null for any other payload.
+	 */
+	static List<String> posted(Gson gson, String json)
+	{
+		JsonObject in = object(gson, json, MAX_PAYLOAD_CHARS);
+		JsonElement k = in == null ? null : in.get("k");
+		if (k == null || !k.isJsonPrimitive() || !POSTED.equals(k.getAsString()))
+		{
+			return null;
+		}
+		return postedKeys(in.get("p"));
+	}
+
+	private static List<String> postedKeys(JsonElement p)
+	{
+		List<String> keys = new ArrayList<>();
+		if (p == null || !p.isJsonArray())
+		{
+			return keys;
+		}
+		for (JsonElement item : p.getAsJsonArray())
+		{
+			if (keys.size() < MAX_POSTED && isPostedKey(item))
+			{
+				keys.add(item.getAsString());
+			}
+		}
+		return keys;
+	}
+
+	private static boolean isPostedKey(JsonElement item)
+	{
+		if (!item.isJsonPrimitive() || !item.getAsJsonPrimitive().isString())
+		{
+			return false;
+		}
+		String key = item.getAsString();
+		return !key.isEmpty() && key.length() <= MAX_POSTED_CHARS;
+	}
+
+	/** The payload's JSON object; null when it is empty, longer than {@code maxChars}, or not an object. */
+	private static JsonObject object(Gson gson, String json, int maxChars)
+	{
+		if (json == null || json.isEmpty() || json.length() > maxChars)
+		{
+			return null;
+		}
+		try
+		{
+			JsonElement root = gson.fromJson(json, JsonElement.class);
+			return root != null && root.isJsonObject() ? root.getAsJsonObject() : null;
+		}
+		catch (RuntimeException e)
+		{
+			return null;
+		}
 	}
 
 	private static Decoded decodeStats(JsonObject in)

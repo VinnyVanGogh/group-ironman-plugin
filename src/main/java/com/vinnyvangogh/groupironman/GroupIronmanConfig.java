@@ -771,7 +771,8 @@ public interface GroupIronmanConfig extends Config
 	}
 
 	@ConfigItem(keyName = "discordEasterEggs", name = "Easter eggs", description = "Add one short funny line under"
-		+ " some posts: a 0 gp death, a pet, a famous drop, a big storage visit. The facts stay as they are.",
+		+ " some posts: a 0 gp death, a pet, a famous drop, a big storage visit, a level 67 or 69 (also tagged in"
+		+ " the group box and banners). The facts stay as they are.",
 		section = discordHowSection, position = 9)
 	default boolean discordEasterEggs()
 	{
@@ -794,6 +795,16 @@ public interface GroupIronmanConfig extends Config
 	default int discordFreeloaderAt()
 	{
 		return 1_000_000;
+	}
+
+	@ConfigItem(keyName = "discordNoPluginEvents", name = "Members without the plugin", description = "Post the"
+		+ " game's own Group channel broadcasts (level-ups, quests, drops, collection log, pets, deaths, ...) for"
+		+ " members who do not run this plugin, under the same event switches. One plugin user posts each (the"
+		+ " leader when online), marked 'from the game's group broadcast'. A group setting: the leader's choice"
+		+ " wins.", section = discordHowSection, position = 14)
+	default boolean discordNoPluginEvents()
+	{
+		return true;
 	}
 
 	/** Replaced by {@link #discordOnlineStatus}; still read once, so an older install keeps its choice. */

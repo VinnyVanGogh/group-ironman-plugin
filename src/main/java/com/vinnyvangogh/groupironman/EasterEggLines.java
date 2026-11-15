@@ -44,6 +44,20 @@ final class EasterEggLines
 		"92: halfway to 99.",
 		"Halfway to 99. Only the other half to go.",
 	};
+	// The 67 and 69 lines also show in the in-game group box and banners, where the game font has no emoji: any
+	// emoji goes last, after a space, so the in-game tag is the line with its emoji cut off (EasterEggs.overlayTag).
+	/** A level up to 67 in any skill, or combat level 67: the "six seven" meme. */
+	static final String[] LEVEL_67 = {
+		"SIX SEVEN! 🤲", // U+1F932 palms up together
+		"Six... seven. 🤷", // U+1F937 shrug
+		"67. You know what it is.",
+		"Hands up for SIX SEVEN.",
+	};
+	/** A level up to 69 in any skill, or combat level 69. Kept to one word on purpose. */
+	static final String[] LEVEL_69 = {
+		"Nice.",
+		"Nice. 👌", // U+1F44C OK hand
+	};
 	/** A 99 in one skill. */
 	static final String[] SKILL_99 = {
 		"Cape on, emote out.",
@@ -161,7 +175,7 @@ final class EasterEggLines
 	{
 		List<String> out = new ArrayList<>();
 		for (String[] lines : Arrays.asList(FREE_TRIP, CLUE_HUNTERS, PET, BONES_ONLY, LEGEND, FREELOADER, LEVEL_73,
-			LEVEL_92, SKILL_99, MAXED_TOTAL, COMBAT_126, TOTAL_2000, XP_200M, COOKS_ASSISTANT, DRAGON_SLAYER,
+			LEVEL_92, LEVEL_67, LEVEL_69, SKILL_99, MAXED_TOTAL, COMBAT_126, TOTAL_2000, XP_200M, COOKS_ASSISTANT, DRAGON_SLAYER,
 			RECIPE_FOR_DISASTER, JAD, SIT, BUYING_GF))
 		{
 			out.addAll(Arrays.asList(lines));

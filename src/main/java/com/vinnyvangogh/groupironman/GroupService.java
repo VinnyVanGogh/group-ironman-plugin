@@ -2,10 +2,6 @@ package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -179,6 +175,10 @@ class GroupService
 	@Inject
 	private HiscoreClient hiscoreClient;
 
+	/** Log basket, fish barrel and coal bag contents, from the game's own lines. Client thread. */
+	@Inject
+	private CarriedContainers containers;
+
 	private final GroupRoster roster = new GroupRoster();
 	private final BankAssembler assembler = new BankAssembler();
 	private final Map<Integer, String> names = new ConcurrentHashMap<>();
@@ -235,6 +235,8 @@ class GroupService
 	private int lastPlane;
 	private String lastStatsSent;
 	private String lastCarriedSent;
+	/** This player's carried items as last put on their own card, sent or not. */
+	private String lastCarriedLocal;
 	private boolean extrasDirty;
 	private int ticksSinceExtras = EXTRAS_INTERVAL_TICKS;
 	private String lastExtrasSent;
@@ -371,6 +373,8 @@ class GroupService
 		lastBank = null;
 		lastStatsSent = null;
 		lastCarriedSent = null;
+		lastCarriedLocal = null;
+		containers.loggedOut();
 		onChange = () -> { };
 	}
 
@@ -407,6 +411,28 @@ class GroupService
 		{
 			partyService.send(new VvgGroupIronmanMessage(payload));
 		}
+	}
+
+	/**
+	 * Client thread. A game broadcast this client just posted ({@link GroupBroadcasts}), so another plugin user's
+	 * client that also thinks it posts skips it. Carries no data of this player's own: every member's game showed
+	 * the same line.
+	 */
+	void sharePosted(String key)
+	{
+		if (syncing())
+		{
+			partyService.send(new VvgGroupIronmanMessage(GroupCodec.encodePosted(gson,
+				Collections.singletonList(key))));
+		}
+	}
+
+	/** The group's signed leader, empty when this client has no roles yet. */
+	String leaderName()
+	{
+		GroupGovernance g = governance();
+		GroupRoles roles = g == null ? null : g.roles();
+		return roles == null ? "" : roles.leader;
 	}
 
 	GroupOutbox.Switches switches()
@@ -678,6 +704,8 @@ class GroupService
 		{
 			lastStatsSent = null;
 			lastCarriedSent = null;
+			// Turning sharing off cleared every card's items, this player's own too: put it back.
+			lastCarriedLocal = null;
 			lastExtrasSent = null;
 			statsDirty = true;
 			carriedDirty = true;
@@ -701,6 +729,8 @@ class GroupService
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
+		// Fill / Empty on a log basket, barrel or coal bag: read only, the click goes through untouched.
+		containers.clicked(event.getMenuOption(), event.getMenuTarget());
 		if (storage.isOpen() && event.getParam1() == InterfaceID.SharedBank.SAVE_BUTTON)
 		{
 			commitStorage(storage.save(System.currentTimeMillis(), localName()));
@@ -718,6 +748,7 @@ class GroupService
 		}
 		else if (id == InventoryID.INV || id == InventoryID.WORN)
 		{
+			containers.itemsChanged();
 			carriedDirty = true;
 		}
 		else if (id == InventoryID.SEED_VAULT)
@@ -752,6 +783,8 @@ class GroupService
 		}
 		if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
+			// Another account may log in next: its own counts are restored from its profile.
+			containers.loggedOut();
 			hiscoresOnLogin = true;
 			refreshPresence();
 		}
@@ -789,6 +822,10 @@ class GroupService
 		{
 			receiveKey(event.getName(), key);
 			return;
+		}
+		if (event.getType() == ChatMessageType.GAMEMESSAGE || event.getType() == ChatMessageType.SPAM)
+		{
+			carriedDirty |= containers.chat(event.getMessage());
 		}
 		if (event.getType() != ChatMessageType.GAMEMESSAGE || !switches().drops)
 		{
@@ -972,22 +1009,18 @@ class GroupService
 		refreshRoster();
 		pollQuests();
 		shopAlert();
+		carriedDirty |= containers.tick();
+		GroupOutbox.Switches s = switches();
+		updateCarried(s);
 		if (!syncing())
 		{
 			return;
 		}
 		flushGovernance();
-		GroupOutbox.Switches s = switches();
 
 		if (s.stats)
 		{
 			pollStats(s);
-		}
-
-		if (s.carried && carriedDirty && ticksSinceCarried >= CARRIED_INTERVAL_TICKS)
-		{
-			carriedDirty = false;
-			sendCarried(s);
 		}
 
 		if (s.extras && extrasDirty && ticksSinceExtras >= EXTRAS_INTERVAL_TICKS)
@@ -1384,6 +1417,7 @@ class GroupService
 				resolve(decoded.carried.inventory.keySet());
 				resolve(decoded.carried.worn.keySet());
 				resolve(decoded.carried.slotIds());
+				resolve(decoded.carried.heldIds());
 				break;
 			case STORAGE:
 				if (!s.storage)
@@ -1440,7 +1474,10 @@ class GroupService
 		onChange.run();
 	}
 
-	/** A payload {@link GroupCodec} does not read: roles, group settings or an announce, or one from a newer build. */
+	/**
+	 * A payload {@link GroupCodec#decode} does not read: roles, group settings or an announce, a "posted" claim, or
+	 * one from a newer build.
+	 */
 	private void notData(String name, VvgGroupIronmanMessage message)
 	{
 		GovernanceSync g = governance;
@@ -1455,6 +1492,13 @@ class GroupService
 		{
 			roster.heard(name, System.currentTimeMillis());
 			resolve(shoppingItemIds());
+			return;
+		}
+		List<String> posted = GroupCodec.posted(gson, payload);
+		if (posted != null)
+		{
+			receivePosted(posted);
+			roster.heard(name, System.currentTimeMillis());
 			return;
 		}
 		log.debug("ignored unreadable group payload from {}", message.getMemberId());
@@ -1510,6 +1554,16 @@ class GroupService
 			saveCache();
 		}
 		return true;
+	}
+
+	/** A member's client posted these game broadcasts: this one never posts them too. */
+	private void receivePosted(List<String> keys)
+	{
+		GroupEventEngine engine = events;
+		if (engine != null)
+		{
+			engine.claimed(keys);
+		}
 	}
 
 	private void memberStorage(StorageChange change)
@@ -1683,25 +1737,39 @@ class GroupService
 		return out;
 	}
 
-	/** Client thread. */
-	private void sendCarried(GroupOutbox.Switches s)
+	/**
+	 * Client thread. This player's own inventory, worn items and container contents onto their own card, joined
+	 * or not (Board 2026-11-14: the card shows them while 'Not connected'); sent to the party only when syncing
+	 * and shared.
+	 */
+	private void updateCarried(GroupOutbox.Switches s)
 	{
-		ItemContainer inv = client.getItemContainer(InventoryID.INV);
-		GroupCodec.Carried carried = new GroupCodec.Carried(counts(inv),
-			counts(client.getItemContainer(InventoryID.WORN)), inventorySlots(inv));
-		String payload = GroupOutbox.carried(gson, s, carried);
-		if (payload == null || Objects.equals(payload, lastCarriedSent))
+		if (!carriedDirty || ticksSinceCarried < CARRIED_INTERVAL_TICKS)
 		{
 			return;
 		}
-		partyService.send(new VvgGroupIronmanMessage(payload));
-		lastCarriedSent = payload;
+		carriedDirty = false;
 		ticksSinceCarried = 0;
-		resolveNow(carried.inventory.keySet());
-		resolveNow(carried.worn.keySet());
-		resolveNow(carried.slotIds());
-		roster.putCarried(localName(), carried);
-		onChange.run();
+		ItemContainer inv = client.getItemContainer(InventoryID.INV);
+		GroupCodec.Carried carried = new GroupCodec.Carried(counts(inv),
+			counts(client.getItemContainer(InventoryID.WORN)), inventorySlots(inv), containers.held());
+		String local = GroupCodec.encodeCarried(gson, carried);
+		if (!local.equals(lastCarriedLocal))
+		{
+			lastCarriedLocal = local;
+			resolveNow(carried.inventory.keySet());
+			resolveNow(carried.worn.keySet());
+			resolveNow(carried.slotIds());
+			resolveNow(carried.heldIds());
+			roster.putCarried(localName(), carried);
+			onChange.run();
+		}
+		String payload = syncing() ? GroupOutbox.carried(gson, s, carried) : null;
+		if (payload != null && !Objects.equals(payload, lastCarriedSent))
+		{
+			partyService.send(new VvgGroupIronmanMessage(payload));
+			lastCarriedSent = payload;
+		}
 	}
 
 	/** Client thread. The inventory's slots in order with raw ids, so a noted stack draws noted; none without one. */
@@ -1872,15 +1940,10 @@ class GroupService
 	{
 		try
 		{
-			Filepath file = cacheFile();
-			if (!file.isFile())
+			String json = PluginFiles.read(cacheFile());
+			if (json == null)
 			{
 				return false;
-			}
-			String json;
-			try (InputStream in = file.openInputStream())
-			{
-				json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
 			}
 			if (!GroupCache.read(gson, json, roster))
 			{
@@ -1931,23 +1994,7 @@ class GroupService
 		{
 			try
 			{
-				Filepath file = cacheFile();
-				Filepath dir = file.getParent();
-				dir.createDirectories();
-				// Write a temp file beside the cache, then move it over, so a crash never leaves half a file.
-				Filepath tmp = dir.createTempFile("group-cache", ".tmp");
-				try
-				{
-					try (OutputStream out = tmp.openOutputStream())
-					{
-						out.write(json.getBytes(StandardCharsets.UTF_8));
-					}
-					tmp.moveTo(file, StandardCopyOption.REPLACE_EXISTING);
-				}
-				finally
-				{
-					tmp.deleteIfExists();
-				}
+				PluginFiles.write(cacheFile(), json, "group-cache");
 			}
 			catch (Exception e)
 			{
@@ -1959,7 +2006,19 @@ class GroupService
 	/** Executor thread. The cache inside the plugin's data directory (.runelite/plugin-data/gim-utilities). */
 	private Filepath cacheFile() throws Exception
 	{
-		return dataDirectory.call().joinSegment(CACHE_FILE);
+		return dataFile(CACHE_FILE);
+	}
+
+	/** Executor thread. {@code name} inside the plugin's data directory. */
+	Filepath dataFile(String name) throws Exception
+	{
+		return dataDirectory.call().joinSegment(name);
+	}
+
+	/** True once the group cache (roster, the leader's shared webhooks) has been read at startup. */
+	boolean cacheLoaded()
+	{
+		return cacheLoaded;
 	}
 
 	// ---- The Shopping tab ----

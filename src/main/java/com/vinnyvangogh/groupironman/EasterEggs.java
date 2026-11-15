@@ -3,6 +3,7 @@ package com.vinnyvangogh.groupironman;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -55,6 +56,22 @@ final class EasterEggs
 	/** Event types that carry the item only as its name. */
 	private static final Set<GroupEvent.Type> NAMED = Collections.unmodifiableSet(EnumSet.of(
 		GroupEvent.Type.RAID_UNIQUE, GroupEvent.Type.CLOG));
+	/** Event types whose number is a level a {@link #LEVEL_NUMBERS} egg reads: one skill's, or the combat level. */
+	private static final Set<GroupEvent.Type> LEVELS = Collections.unmodifiableSet(EnumSet.of(
+		GroupEvent.Type.LEVEL_UP, GroupEvent.Type.COMBAT_LEVEL));
+	/**
+	 * Levels with an egg in any skill and on the combat level, also tagged in game ({@link #overlayTag}). Total
+	 * level has none: it posts only at multiples of {@link ProgressTracker#TOTAL_STEP}, so it never ends in 67.
+	 */
+	private static final Map<Long, String[]> LEVEL_NUMBERS;
+
+	static
+	{
+		Map<Long, String[]> levels = new HashMap<>();
+		levels.put(67L, EasterEggLines.LEVEL_67);
+		levels.put(69L, EasterEggLines.LEVEL_69);
+		LEVEL_NUMBERS = Collections.unmodifiableMap(levels);
+	}
 
 	/**
 	 * Checked in order; the first that applies wins. Deaths are first so a spade outranks a free trip. The memes
@@ -67,6 +84,7 @@ final class EasterEggs
 		(e, l, s) -> e.type == GroupEvent.Type.PET ? EasterEggLines.PET : null,
 		at(GroupEvent.Type.LEVEL_UP, 73, EasterEggLines.LEVEL_73),
 		at(GroupEvent.Type.LEVEL_UP, 92, EasterEggLines.LEVEL_92),
+		(e, l, s) -> levelNumber(e),
 		named(GroupEvent.Type.MAXED, "total", EasterEggLines.MAXED_TOTAL),
 		(e, l, s) -> e.type == GroupEvent.Type.MAXED ? EasterEggLines.SKILL_99 : null,
 		at(GroupEvent.Type.COMBAT_LEVEL, 126, EasterEggLines.COMBAT_126),
@@ -134,6 +152,35 @@ final class EasterEggs
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * The tag for this event's line in the group box and banners, or null: only the level-number eggs (67, 69) show
+	 * in game. The same phrasing as the Discord post, picked from the same seed, with any emoji cut off: the game
+	 * font has none.
+	 */
+	static String overlayTag(GroupEvent e, Settings settings)
+	{
+		String[] lines = settings.on ? levelNumber(e) : null;
+		if (lines == null)
+		{
+			return null;
+		}
+		String line = lines[pick(seed(e), lines.length)];
+		int[] plain = line.codePoints().filter(c -> !Character.isSupplementaryCodePoint(c)).toArray();
+		return new String(plain, 0, plain.length).trim();
+	}
+
+	/** An in-game line with this event's {@link #overlayTag} after it, or the line as it was. */
+	static String tagged(String text, GroupEvent e, Settings settings)
+	{
+		String tag = overlayTag(e, settings);
+		return tag == null ? text : text + " " + tag;
+	}
+
+	private static String[] levelNumber(GroupEvent e)
+	{
+		return LEVELS.contains(e.type) ? LEVEL_NUMBERS.get(e.number) : null;
 	}
 
 	/**

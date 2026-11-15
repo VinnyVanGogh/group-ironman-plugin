@@ -203,6 +203,110 @@ public class EasterEggsTest
 		}
 	}
 
+	// ---- 67 ("six seven") and 69 ("nice") ----
+
+	@Test
+	public void aSixtySevenInAnySkillIsTheSixSevenMeme()
+	{
+		for (String skill : Arrays.asList("Woodcutting", "Attack", "Runecraft"))
+		{
+			GroupEvent e = GroupEvent.of(GroupEvent.Type.LEVEL_UP, NOW, "Alex").text(skill).number(67).build();
+			assertTrue(skill, Arrays.asList(EasterEggLines.LEVEL_67).contains(EasterEggs.line(e, lookup, ON)));
+		}
+	}
+
+	@Test
+	public void aSixtyNineInAnySkillIsNice()
+	{
+		for (String skill : Arrays.asList("Woodcutting", "Attack", "Runecraft"))
+		{
+			GroupEvent e = GroupEvent.of(GroupEvent.Type.LEVEL_UP, NOW, "Alex").text(skill).number(69).build();
+			assertTrue(skill, Arrays.asList(EasterEggLines.LEVEL_69).contains(EasterEggs.line(e, lookup, ON)));
+		}
+	}
+
+	@Test
+	public void combatLevelSixtySevenAndSixtyNineGetTheSameLines()
+	{
+		assertTrue(Arrays.asList(EasterEggLines.LEVEL_67).contains(EasterEggs.line(combat(67), lookup, ON)));
+		assertTrue(Arrays.asList(EasterEggLines.LEVEL_69).contains(EasterEggs.line(combat(69), lookup, ON)));
+	}
+
+	@Test
+	public void sixtySevenAndSixtyNineSayNothingWithEasterEggsOff()
+	{
+		for (GroupEvent e : Arrays.asList(level(67), level(69), combat(67), combat(69)))
+		{
+			assertNull(e.type + " " + e.number, EasterEggs.line(e, lookup, OFF));
+			assertNull(e.type + " " + e.number, EasterEggs.overlayTag(e, OFF));
+			assertEquals("the in-game line is untouched", "text", EasterEggs.tagged("text", e, OFF));
+		}
+	}
+
+	@Test
+	public void theLevelsAroundSixtySevenAndSixtyNineAreUnchanged()
+	{
+		for (int n : new int[]{66, 68, 70, 76, 96, 167})
+		{
+			assertNull("level " + n, EasterEggs.line(level(n), lookup, ON));
+			assertNull("combat " + n, EasterEggs.line(combat(n), lookup, ON));
+			assertNull("level " + n, EasterEggs.overlayTag(level(n), ON));
+		}
+		assertNull("total level only posts at multiples of 100", EasterEggs.line(
+			GroupEvent.of(GroupEvent.Type.TOTAL_LEVEL, NOW, "Alex").number(1_267).build(), lookup, ON));
+		assertNull("an XP milestone is not a level", EasterEggs.line(GroupEvent.of(GroupEvent.Type.XP_MILESTONE,
+			NOW, "Alex").text("Attack").number(67).build(), lookup, ON));
+		assertNull("a quest with 67 in it is not a level", EasterEggs.overlayTag(quest("67"), ON));
+	}
+
+	@Test
+	public void sixtySevenAndSixtyNineRotateStablyWithAFixedSeed()
+	{
+		assertRotates(level(67), EasterEggLines.LEVEL_67);
+		assertRotates(level(69), EasterEggLines.LEVEL_69);
+		assertTrue("a handful of 67 lines", EasterEggLines.LEVEL_67.length >= 3);
+		assertEquals("a pinned seed picks a pinned line", EasterEggLines.LEVEL_67[EasterEggs.pick(7L,
+			EasterEggLines.LEVEL_67.length)], EasterEggs.line(level(67), lookup, ON, 7L));
+	}
+
+	@Test
+	public void theInGameTagIsTheDiscordLineWithoutEmoji()
+	{
+		for (GroupEvent e : Arrays.asList(level(67), level(69), combat(67), combat(69)))
+		{
+			String discord = EasterEggs.line(e, lookup, ON);
+			String tag = EasterEggs.overlayTag(e, ON);
+			assertNotNull(tag);
+			assertTrue("the game font has no emoji: " + tag, tag.codePoints()
+				.noneMatch(Character::isSupplementaryCodePoint));
+			assertFalse(tag.isEmpty());
+			assertTrue(tag + " is the start of " + discord, discord.startsWith(tag));
+			assertEquals("reached 67 Woodcutting " + tag, EasterEggs.tagged("reached 67 Woodcutting", e, ON));
+		}
+		assertTrue("some 67 line carries an emoji for Discord", Arrays.stream(EasterEggLines.LEVEL_67)
+			.anyMatch(l -> l.codePoints().anyMatch(Character::isSupplementaryCodePoint)));
+	}
+
+	@Test
+	public void theInGameTagOnlyCoversTheLevelNumberEggs()
+	{
+		assertNull("a pet keeps its Discord-only egg", EasterEggs.overlayTag(pet(), ON));
+		assertNull("73 keeps its Discord-only egg", EasterEggs.overlayTag(level(73), ON));
+		assertEquals("text", EasterEggs.tagged("text", pet(), ON));
+	}
+
+	@Test
+	public void theSixSevenLineGoesUnderTheLevelPostNotInPlaceOfIt()
+	{
+		GroupEvent wc = GroupEvent.of(GroupEvent.Type.LEVEL_UP, NOW, "Alex").text("Woodcutting").number(67).build();
+		String egg = EasterEggs.line(wc, lookup, ON);
+		String plain = new JsonParser().parse(DiscordWebhook.payload(gson, wc, lookup, DiscordStyle.PLAIN, "",
+			false, egg)).getAsJsonObject().get("content").getAsString();
+		String without = new JsonParser().parse(DiscordWebhook.payload(gson, wc, lookup, DiscordStyle.PLAIN, "",
+			false, null)).getAsJsonObject().get("content").getAsString();
+		assertEquals(without + "\n" + egg, plain);
+	}
+
 	@Test
 	public void aMergedNinetyNineTakesTheSkillCapeLine()
 	{
@@ -226,6 +330,10 @@ public class EasterEggsTest
 		Map<GroupEvent, String[]> m = new java.util.LinkedHashMap<>();
 		m.put(level(73), EasterEggLines.LEVEL_73);
 		m.put(level(92), EasterEggLines.LEVEL_92);
+		m.put(level(67), EasterEggLines.LEVEL_67);
+		m.put(level(69), EasterEggLines.LEVEL_69);
+		m.put(combat(67), EasterEggLines.LEVEL_67);
+		m.put(combat(69), EasterEggLines.LEVEL_69);
 		m.put(GroupEvent.of(GroupEvent.Type.MAXED, NOW, "Alex").text("Cooking").number(99).build(),
 			EasterEggLines.SKILL_99);
 		m.put(GroupEvent.of(GroupEvent.Type.MAXED, NOW, "Alex").text("total").number(2277).build(),
@@ -253,6 +361,11 @@ public class EasterEggsTest
 	private static GroupEvent level(int level)
 	{
 		return GroupEvent.of(GroupEvent.Type.LEVEL_UP, NOW, "Alex").text("Attack").number(level).build();
+	}
+
+	private static GroupEvent combat(int level)
+	{
+		return GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, NOW, "Alex").number(level).build();
 	}
 
 	private static GroupEvent quest(String name)
