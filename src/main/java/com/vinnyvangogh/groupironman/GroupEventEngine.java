@@ -1510,23 +1510,12 @@ class GroupEventEngine
 		{
 			return;
 		}
-		DiscordMerge.Family family = DiscordMerge.family(event.type);
 		if (event.broadcast)
 		{
-			// Another member's moment: never merged with this player's own, never a screenshot of this screen. A
-			// level joins that member's streak post as a plugin user's own does (Board 2026-11-14).
-			List<GroupEvent> one = Collections.singletonList(event);
-			DiscordMerge.Post single = DiscordMerge.single(event, discordWords());
-			Consumer<byte[]> streak = combineLevels(url,
-				LevelThreads.combinableBroadcast(event) == null ? null : one, single, one);
-			if (streak != null)
-			{
-				streak.accept(null);
-				return;
-			}
-			post(url, single, one, false, null);
+			broadcastToDiscord(url, event);
 			return;
 		}
+		DiscordMerge.Family family = DiscordMerge.family(event.type);
 		if (family == null)
 		{
 			GraveShot.Choice shot = picture(event);
@@ -1550,6 +1539,24 @@ class GroupEventEngine
 			}));
 		}
 		done.forEach(this::flush);
+	}
+
+	/**
+	 * Another member's moment: never merged with this player's own, never a screenshot of this screen. A level
+	 * joins that member's streak post as a plugin user's own does (Board 2026-11-14).
+	 */
+	private void broadcastToDiscord(String url, GroupEvent event)
+	{
+		List<GroupEvent> one = Collections.singletonList(event);
+		DiscordMerge.Post single = DiscordMerge.single(event, discordWords());
+		Consumer<byte[]> streak = combineLevels(url,
+			LevelThreads.combinableBroadcast(event) == null ? null : one, single, one);
+		if (streak != null)
+		{
+			streak.accept(null);
+			return;
+		}
+		post(url, single, one, false, null);
 	}
 
 	/**

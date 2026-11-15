@@ -669,6 +669,17 @@ public class LevelPostsTest
 		levels.level(URL, level(skill, n), WINDOW, null, "first " + skill + " " + n);
 	}
 
+	/** Thieving 46 posts as m1, then Ranged 66 a gap later and is sent. */
+	private void thievingThenRanged(long gap)
+	{
+		gain("Thieving", 46);
+		tick();
+		reply(200, "m1");
+		now += gap;
+		gain("Ranged", 66);
+		tick();
+	}
+
 	private static GroupEvent combat(int n)
 	{
 		return GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, 0, "Alex").number(n).build();
@@ -677,12 +688,7 @@ public class LevelPostsTest
 	@Test
 	public void twoSkillsInsideTheWindowAreOnePostEditedToListBoth()
 	{
-		gain("Thieving", 46);
-		tick();
-		reply(200, "m1");
-		now += 5 * 60 * SEC;
-		gain("Ranged", 66);
-		tick();
+		thievingThenRanged(5 * 60 * SEC);
 		assertEquals(2, sent.size());
 		assertEquals("m1", sent.get(1).edit);
 		assertEquals("Ranged 65 → 66 (+1), Thieving 45 → 46 (+1) in 5 min", description(sent.get(1)));
@@ -691,12 +697,7 @@ public class LevelPostsTest
 	@Test
 	public void aThirdSkillJoinsTheSamePostAtTheTop()
 	{
-		gain("Thieving", 46);
-		tick();
-		reply(200, "m1");
-		now += 5 * 60 * SEC;
-		gain("Ranged", 66);
-		tick();
+		thievingThenRanged(5 * 60 * SEC);
 		reply(200, null);
 		now += 7 * 60 * SEC;
 		levels.level(URL, combat(70), WINDOW, null, "first combat 70");
@@ -710,12 +711,7 @@ public class LevelPostsTest
 	@Test
 	public void theSkillThatJustLevelledMovesToTheTop()
 	{
-		gain("Thieving", 46);
-		tick();
-		reply(200, "m1");
-		now += 60 * SEC;
-		gain("Ranged", 66);
-		tick();
+		thievingThenRanged(60 * SEC);
 		reply(200, null);
 		now += 60 * SEC;
 		gain("Thieving", 47);
@@ -777,12 +773,7 @@ public class LevelPostsTest
 	@Test
 	public void aMembersSkillsSurviveARestartInTheirOrder()
 	{
-		gain("Thieving", 46);
-		tick();
-		reply(200, "m1");
-		now += 60 * SEC;
-		gain("Ranged", 66);
-		tick();
+		thievingThenRanged(60 * SEC);
 		reply(200, null);
 		restart(levels.saved());
 		now += 60 * SEC;
