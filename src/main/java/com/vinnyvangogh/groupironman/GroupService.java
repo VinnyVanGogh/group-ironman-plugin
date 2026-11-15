@@ -388,6 +388,28 @@ class GroupService
 		}
 	}
 
+	/**
+	 * Client thread. A game broadcast this client just posted ({@link GroupBroadcasts}), so another plugin user's
+	 * client that also thinks it posts skips it. Carries no data of this player's own: every member's game showed
+	 * the same line.
+	 */
+	void sharePosted(String key)
+	{
+		if (syncing())
+		{
+			partyService.send(new VvgGroupIronmanMessage(GroupCodec.encodePosted(gson,
+				Collections.singletonList(key))));
+		}
+	}
+
+	/** The group's signed leader, empty when this client has no roles yet. */
+	String leaderName()
+	{
+		GroupGovernance g = governance();
+		GroupRoles roles = g == null ? null : g.roles();
+		return roles == null ? "" : roles.leader;
+	}
+
 	GroupOutbox.Switches switches()
 	{
 		return new GroupOutbox.Switches(config.groupShareBank(), config.groupShareStorage(),
@@ -1423,13 +1445,23 @@ class GroupService
 		onChange.run();
 	}
 
-	/** A payload {@link GroupCodec} does not read: roles, group settings or an announce, or one from a newer build. */
+	/**
+	 * A payload {@link GroupCodec#decode} does not read: roles, group settings or an announce, a "posted" claim, or
+	 * one from a newer build.
+	 */
 	private void notData(String name, VvgGroupIronmanMessage message)
 	{
 		GovernanceSync g = governance;
 		String payload = message.getPayload();
 		if (g != null && GovernanceSync.isGovernance(payload) && g.receive(name, payload))
 		{
+			roster.heard(name, System.currentTimeMillis());
+			return;
+		}
+		List<String> posted = GroupCodec.posted(gson, payload);
+		if (posted != null)
+		{
+			receivePosted(posted);
 			roster.heard(name, System.currentTimeMillis());
 			return;
 		}
@@ -1481,6 +1513,16 @@ class GroupService
 			saveCache();
 		}
 		return true;
+	}
+
+	/** A member's client posted these game broadcasts: this one never posts them too. */
+	private void receivePosted(List<String> keys)
+	{
+		GroupEventEngine engine = events;
+		if (engine != null)
+		{
+			engine.claimed(keys);
+		}
 	}
 
 	private void memberStorage(StorageChange change)

@@ -19,6 +19,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -91,6 +92,8 @@ class GroupEventEngine
 	static final int SCHEDULE_EVERY_TICKS = 100;
 	// RuneLite profile keys for saved progress. Not settings: never shown, read only here.
 	static final String DRY_KEY = "dryStreaks";
+	/** Profile key: the game broadcasts posted in the last day ({@link GroupBroadcasts.Seen}). Not a setting. */
+	static final String BROADCASTS_KEY = "broadcastsPosted";
 	static final String WEEK_KEY = "weekTally";
 	static final String DIGEST_KEY = "digestLines";
 	static final String DIGEST_LAST_KEY = "digestLastAt";
@@ -162,6 +165,15 @@ class GroupEventEngine
 	/** Level-ups of one skill as one post, edited in place. Any thread; message ids in memory only. */
 	private LevelPosts levels;
 	private volatile EventSettings settings = EventSettings.OFF;
+	/**
+	 * {@link #settings} without this member's own opt-outs: what posts for members without the plugin, who cannot
+	 * opt out in-game (Board 2026-11-14). The poster's "don't post my events" is about their own.
+	 */
+	private volatile EventSettings broadcastSettings = EventSettings.OFF;
+	/** Guards {@link #seen}: the client thread reads broadcasts, the party thread hears claims. */
+	private final Object seenLock = new Object();
+	/** Game broadcasts posted by this client or claimed by another, per RS profile; loaded at login. */
+	private GroupBroadcasts.Seen seen = new GroupBroadcasts.Seen();
 	/** The shared settings the event settings were built from: quiet hours, grace and Easter eggs read these. */
 	private volatile GroupSettingsSchema.Resolved values;
 	private final EventWatchers watchers = new EventWatchers(this::own, this::wanted);
@@ -259,6 +271,7 @@ class GroupEventEngine
 		toasts.clear();
 		progress.reset();
 		settings = EventSettings.OFF;
+		broadcastSettings = EventSettings.OFF;
 	}
 
 	/** A config change, or new group settings (they are kept in the config, so both arrive here). */
@@ -268,6 +281,7 @@ class GroupEventEngine
 			: group.groupValues();
 		values = v;
 		settings = EventSettings.from(config, v, MemberPrefs.of(config));
+		broadcastSettings = EventSettings.from(config, v, MemberPrefs.NONE);
 		if (sender != null)
 		{
 			sender.quietHours(v.intValue("discordQuietStart"), v.intValue("discordQuietEnd"));
@@ -469,18 +483,84 @@ class GroupEventEngine
 	 */
 	void gamePresence(GamePresence game)
 	{
+		Predicate<String> plugin = pluginUser();
+		List<GroupEvent> posts;
+		synchronized (presenceLock)
+		{
+			posts = channelPosts.update(game, plugin, System.currentTimeMillis(), offlineGrace());
+		}
+		routeChannelPosts(posts);
+	}
+
+	/**
+	 * Client thread. Who posts their own events: this player, and every member whose client was ever heard from over
+	 * the group sync (the board's "(no plugin)" rule). Everyone else is read from the game's Group channel.
+	 */
+	private Predicate<String> pluginUser()
+	{
 		Player me = client.getLocalPlayer();
 		String self = me == null || me.getName() == null ? "" : GroupMembers.key(me.getName());
 		Set<String> plugin = new HashSet<>();
 		group.roster().lastHeard().keySet().forEach(n -> plugin.add(GroupMembers.key(n)));
 		group.roster().allStats().keySet().forEach(n -> plugin.add(GroupMembers.key(n)));
-		List<GroupEvent> posts;
-		synchronized (presenceLock)
+		return n -> plugin.contains(GroupMembers.key(n)) || GroupMembers.key(n).equals(self);
+	}
+
+	/**
+	 * Client thread. A line of the game's Group channel broadcast ({@link GroupBroadcasts}): a member without the
+	 * plugin's level, quest, drop and so on. Every plugin user shows it; one posts it and tells the others.
+	 */
+	private void groupBroadcast(String message, long now)
+	{
+		GroupEvent event = GroupBroadcasts.parse(message, now, this::itemId);
+		if (event == null)
 		{
-			posts = channelPosts.update(game, n -> plugin.contains(GroupMembers.key(n)) || GroupMembers.key(n)
-				.equals(self), System.currentTimeMillis(), offlineGrace());
+			return;
 		}
-		routeChannelPosts(posts);
+		boolean posts = resolved().on(GroupSettingsSchema.NO_PLUGIN_EVENTS) && leadsChannelPosts(now);
+		GroupBroadcasts.Action action;
+		synchronized (seenLock)
+		{
+			action = GroupBroadcasts.decide(event, pluginUser(), posts, seen, now);
+			if (action == GroupBroadcasts.Action.POST)
+			{
+				saveProfile(BROADCASTS_KEY, seen.save());
+			}
+		}
+		if (action == GroupBroadcasts.Action.SKIP)
+		{
+			return;
+		}
+		group.resolveItems(event.items.keySet());
+		router.route(event, false, settings, group.lookup);
+		if (action == GroupBroadcasts.Action.POST)
+		{
+			group.sharePosted(GroupBroadcasts.key(event));
+			router.post(event, broadcastSettings, group.lookup);
+		}
+	}
+
+	/** Any thread. Game broadcasts another plugin user's client posted: never posted here as well. */
+	void claimed(List<String> keys)
+	{
+		long now = System.currentTimeMillis();
+		synchronized (seenLock)
+		{
+			keys.forEach(k -> seen.add(k, now));
+		}
+	}
+
+	/** A broadcast drop's item by its exact name (tradeables: the only drops worth a broadcast), or null. */
+	private Integer itemId(String name)
+	{
+		for (var item : itemManager.search(name))
+		{
+			if (item.getName().equalsIgnoreCase(name))
+			{
+				return itemManager.canonicalize(item.getId());
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -515,7 +595,7 @@ class GroupEventEngine
 				others.add(member);
 			}
 		});
-		return ChannelPosts.leads(name, group.syncing(), others);
+		return ChannelPosts.leads(name, group.syncing(), others, group.leaderName());
 	}
 
 	/** A member's event from the party, already filed under their name. */
@@ -669,6 +749,11 @@ class GroupEventEngine
 		{
 			// Chambers announces its loot here.
 			watchChat(message, now);
+			return;
+		}
+		if (event.getType() == ChatMessageType.CLAN_GIM_MESSAGE)
+		{
+			groupBroadcast(message, now);
 			return;
 		}
 		if (event.getType() != ChatMessageType.GAMEMESSAGE && event.getType() != ChatMessageType.SPAM)
@@ -1154,6 +1239,10 @@ class GroupEventEngine
 
 	private void login(long now, String name)
 	{
+		synchronized (seenLock)
+		{
+			seen = GroupBroadcasts.Seen.load(profile(BROADCASTS_KEY), now);
+		}
 		dry = DryStreak.parse(profile(DRY_KEY));
 		week = Digest.Week.parse(profile(WEEK_KEY));
 		digest = Digest.parse(profile(DIGEST_KEY));
@@ -1372,6 +1461,12 @@ class GroupEventEngine
 			return;
 		}
 		DiscordMerge.Family family = DiscordMerge.family(event.type);
+		if (event.broadcast)
+		{
+			// Another member's moment: never merged with this player's own, never a screenshot of this screen.
+			post(url, DiscordMerge.single(event, discordWords()), Collections.singletonList(event), false, null);
+			return;
+		}
 		if (family == null)
 		{
 			GraveShot.Choice shot = picture(event);

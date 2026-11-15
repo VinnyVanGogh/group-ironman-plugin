@@ -43,8 +43,8 @@ final class EventText
 	static
 	{
 		// Kept word for word from 1.0.0's log line; the value goes in the embed's own field.
-		line(GroupEvent.Type.DROP, "Valuable drop", (e, l) -> e.text + " dropped " + StorageLog.describe(e.items, l)
-			+ kc(e));
+		line(GroupEvent.Type.DROP, "Valuable drop", (e, l) -> (e.text.isEmpty() ? "received a drop: "
+			: e.text + " dropped ") + StorageLog.describe(e.items, l) + kc(e));
 		line(GroupEvent.Type.CLOG, "New collection log slot", (e, l) -> "new collection log slot, " + e.text);
 		line(GroupEvent.Type.PET, "Pet", (e, l) -> "a pet!" + (e.text.isEmpty() ? "" : " (" + e.text + ")"));
 		line(GroupEvent.Type.UNIQUE, "Untradeable unique", (e, l) -> "untradeable from " + e.text + ": "

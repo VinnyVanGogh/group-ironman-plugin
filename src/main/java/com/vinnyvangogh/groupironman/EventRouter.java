@@ -67,11 +67,32 @@ final class EventRouter
 		{
 			overlay.accept(kept);
 		}
-		if (own && settings.discord.contains(kept.type))
+		if (own)
+		{
+			send(kept, settings);
+		}
+	}
+
+	/**
+	 * Discord and the digest only, under {@code settings}, for an event {@link #route} already showed under this
+	 * member's own: a game broadcast for a member without the plugin, posted without the poster's own opt-outs.
+	 */
+	void post(GroupEvent event, EventSettings settings, ItemLookup lookup)
+	{
+		GroupEvent kept = threshold(event, settings, lookup);
+		if (kept != null && kept.isValid() && !kept.member.isEmpty())
+		{
+			send(kept, settings);
+		}
+	}
+
+	private void send(GroupEvent kept, EventSettings settings)
+	{
+		if (settings.discord.contains(kept.type))
 		{
 			discord.accept(kept);
 		}
-		if (own && settings.digests(kept.type))
+		if (settings.digests(kept.type))
 		{
 			digest.accept(kept);
 		}

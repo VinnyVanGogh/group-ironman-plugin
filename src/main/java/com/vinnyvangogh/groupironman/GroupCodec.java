@@ -88,6 +88,15 @@ final class GroupCodec
 		BANK, CARRIED, STORAGE, STATS, EXTRAS, EVENTS
 	}
 
+	/**
+	 * The {@code k} of a "posted" claim ({@link #encodePosted}): not a {@link Kind}, as it is no member data;
+	 * {@link #decode} reads it as unknown, like every older build does, and {@link #posted} reads it.
+	 */
+	static final String POSTED = "posted";
+	/** Most broadcast keys one claim carries, and the longest key kept. */
+	static final int MAX_POSTED = 20;
+	static final int MAX_POSTED_CHARS = 200;
+
 	/** One part of a split bank snapshot. */
 	static final class BankPart
 	{
@@ -565,25 +574,11 @@ final class GroupCodec
 	/** The decoded message, or null when it is not one this build can read. */
 	static Decoded decode(Gson gson, String json)
 	{
-		if (json == null || json.isEmpty() || json.length() > MAX_PAYLOAD_CHARS * 4)
+		JsonObject in = object(gson, json, MAX_PAYLOAD_CHARS * 4);
+		if (in == null)
 		{
 			return null;
 		}
-		JsonObject in;
-		try
-		{
-			JsonElement root = gson.fromJson(json, JsonElement.class);
-			if (root == null || !root.isJsonObject())
-			{
-				return null;
-			}
-			in = root.getAsJsonObject();
-		}
-		catch (RuntimeException e)
-		{
-			return null;
-		}
-
 		Long v = ItemCounts.longValue(in.get("v"));
 		if (v == null || v < 1)
 		{
@@ -711,6 +706,84 @@ final class GroupCodec
 			}
 		}
 		return Decoded.of(events);
+	}
+
+	/** {@code {"v":1,"k":"posted","p":[key, ...]}}: the game broadcasts this client just posted. */
+	static String encodePosted(Gson gson, List<String> keys)
+	{
+		JsonObject o = new JsonObject();
+		o.addProperty("v", PROTOCOL);
+		o.addProperty("k", POSTED);
+		JsonArray p = new JsonArray();
+		for (String key : keys)
+		{
+			if (p.size() < MAX_POSTED && key != null && !key.isEmpty() && key.length() <= MAX_POSTED_CHARS)
+			{
+				p.add(key);
+			}
+		}
+		o.add("p", p);
+		return gson.toJson(o);
+	}
+
+	/**
+	 * The keys of a "posted" claim: strings only, each within {@link #MAX_POSTED_CHARS}, at most {@link #MAX_POSTED}.
+	 * Null for any other payload.
+	 */
+	static List<String> posted(Gson gson, String json)
+	{
+		JsonObject in = object(gson, json, MAX_PAYLOAD_CHARS);
+		JsonElement k = in == null ? null : in.get("k");
+		if (k == null || !k.isJsonPrimitive() || !POSTED.equals(k.getAsString()))
+		{
+			return null;
+		}
+		return postedKeys(in.get("p"));
+	}
+
+	private static List<String> postedKeys(JsonElement p)
+	{
+		List<String> keys = new ArrayList<>();
+		if (p == null || !p.isJsonArray())
+		{
+			return keys;
+		}
+		for (JsonElement item : p.getAsJsonArray())
+		{
+			if (keys.size() < MAX_POSTED && isPostedKey(item))
+			{
+				keys.add(item.getAsString());
+			}
+		}
+		return keys;
+	}
+
+	private static boolean isPostedKey(JsonElement item)
+	{
+		if (!item.isJsonPrimitive() || !item.getAsJsonPrimitive().isString())
+		{
+			return false;
+		}
+		String key = item.getAsString();
+		return !key.isEmpty() && key.length() <= MAX_POSTED_CHARS;
+	}
+
+	/** The payload's JSON object; null when it is empty, longer than {@code maxChars}, or not an object. */
+	private static JsonObject object(Gson gson, String json, int maxChars)
+	{
+		if (json == null || json.isEmpty() || json.length() > maxChars)
+		{
+			return null;
+		}
+		try
+		{
+			JsonElement root = gson.fromJson(json, JsonElement.class);
+			return root != null && root.isJsonObject() ? root.getAsJsonObject() : null;
+		}
+		catch (RuntimeException e)
+		{
+			return null;
+		}
 	}
 
 	private static Decoded decodeStats(JsonObject in)

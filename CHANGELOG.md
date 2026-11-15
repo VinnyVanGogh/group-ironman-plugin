@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Discord posts for members without the plugin
+
+- Members who are online without GIM Utilities still get their level-ups,
+  quests, drops, collection log slots, pets, deaths, 99s, XP milestones,
+  combat tasks, diaries and personal bests posted: they are read from the
+  game's own Group channel broadcast.
+- One plugin user posts each one: the group leader while online, otherwise
+  the first by name. Members who run the plugin are never posted twice, and
+  a restart never posts a line again.
+- The same event switches, "Post every N levels", the valuable drop minimum
+  and quiet hours apply. The footer says "from the game's group broadcast".
+- New group setting "Post events for members without the plugin" (on). A
+  group's leader or editors can turn it off for everyone.
+
 ### Log basket counts and the worn-equipment slot icons
 
 - A carried log basket, fish barrel or coal bag shows how many items are
