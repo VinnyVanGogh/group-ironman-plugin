@@ -97,6 +97,7 @@ final class EventText
 		line(GroupEvent.Type.SLAYER, "Slayer", (e, l) -> slayer(e));
 		line(GroupEvent.Type.FARMING, "Farming run", (e, l) -> ready(e));
 		line(GroupEvent.Type.BIRDHOUSE, "Bird houses and Hespori", (e, l) -> ready(e));
+		line(GroupEvent.Type.REQUEST, "Request", (e, l) -> RequestBoard.describe(e));
 	}
 
 	private static boolean isOffline(GroupEvent e)

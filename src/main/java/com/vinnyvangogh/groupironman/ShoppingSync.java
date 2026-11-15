@@ -59,6 +59,8 @@ final class ShoppingSync
 	/** By {@link GroupMembers#key}. */
 	private final Map<String, QuestProgress> progress = new TreeMap<>();
 	private final Set<String> dirty = new LinkedHashSet<>();
+	/** Members' requests and claims: the same messages, tick and cache entry as the lists. */
+	private final RequestBook requests = new RequestBook();
 	private boolean progressDirty;
 
 	ShoppingSync(Gson gson, Consumer<String> send, Runnable onChange)
@@ -123,6 +125,108 @@ final class ShoppingSync
 		return ok;
 	}
 
+	// ---- This player's requests ----
+
+	/** A new request of this player's own; false with no items or a full book. */
+	boolean addRequest(RequestList r)
+	{
+		if (r.items.isEmpty() || r.removed)
+		{
+			return false;
+		}
+		boolean ok;
+		synchronized (this)
+		{
+			ok = takeRequest(r, true);
+		}
+		return changed(ok);
+	}
+
+	boolean renameRequest(String id, String name, String self, long now)
+	{
+		String clean = ShoppingList.cap(name, ShoppingList.MAX_NAME);
+		return editRequest(id, self, r -> !clean.isEmpty() && !clean.equals(r.name) ? r.renamed(clean, now)
+			: null) != null;
+	}
+
+	boolean removeRequest(String id, String self, long now)
+	{
+		return editRequest(id, self, r -> r.removedBy(now)) != null;
+	}
+
+	/** The owner closes the whole list, done or not. */
+	boolean closeRequest(String id, String self, long now)
+	{
+		return editRequest(id, self, r -> r.closed ? null : r.closedBy(now)) != null;
+	}
+
+	/**
+	 * The owner closes these items (by hand, or because the group holds them); the list closes with its last.
+	 * Returns the new revision, or null when nothing changed or this player is not the owner.
+	 */
+	RequestList closeItems(String id, Set<Integer> items, String self, long now)
+	{
+		return editRequest(id, self, r ->
+		{
+			Set<Integer> fresh = new LinkedHashSet<>(items);
+			fresh.retainAll(r.items.keySet());
+			fresh.removeAll(r.closedItems);
+			return r.closed || fresh.isEmpty() ? null : r.withClosedItems(fresh, now);
+		});
+	}
+
+	/** "I'll get it", or taking it back. Anyone may, on an open request's open item. */
+	boolean claim(String id, int itemId, String self, boolean claimed, long now)
+	{
+		boolean ok;
+		synchronized (this)
+		{
+			RequestList r = requests.get(id);
+			ok = r != null && r.open() && r.items.containsKey(itemId) && !self.isEmpty()
+				&& !(claimed && r.closedItems.contains(itemId))
+				&& requests.accept(new RequestClaim(id, itemId, self, claimed, now), true);
+		}
+		return changed(ok);
+	}
+
+	/** The owner's edit of a live request; null when it is not theirs, not live, or the edit changes nothing. */
+	private RequestList editRequest(String id, String self, java.util.function.Function<RequestList, RequestList> edit)
+	{
+		RequestList next;
+		synchronized (this)
+		{
+			RequestList current = requests.get(id);
+			next = current == null || current.removed || !current.ownedBy(self) ? null : edit.apply(current);
+			if (next != null && !takeRequest(next, true))
+			{
+				next = null;
+			}
+		}
+		changed(next != null);
+		return next;
+	}
+
+	/** Holds the lock. */
+	private boolean takeRequest(RequestList r, boolean own)
+	{
+		String text = requests.accept(r, own);
+		if (text == null)
+		{
+			return false;
+		}
+		note(r.at, text);
+		return true;
+	}
+
+	private boolean changed(boolean ok)
+	{
+		if (ok)
+		{
+			onChange.run();
+		}
+		return ok;
+	}
+
 	/** This player's quest progress as the game shows it; sent when it changed and some list is for them. */
 	void ownProgress(String self, QuestProgress now)
 	{
@@ -154,6 +258,14 @@ final class ShoppingSync
 			{
 				accept(m.list, false);
 			}
+			else if (m.request != null)
+			{
+				takeRequest(m.request, false);
+			}
+			else if (m.claim != null)
+			{
+				requests.accept(m.claim, false);
+			}
 			else
 			{
 				progress.put(GroupMembers.key(member), m.quests);
@@ -167,6 +279,7 @@ final class ShoppingSync
 	synchronized void resendAll()
 	{
 		dirty.addAll(lists.keySet());
+		requests.resendAll();
 		progressDirty = true;
 	}
 
@@ -185,6 +298,7 @@ final class ShoppingSync
 				}
 			}
 			dirty.clear();
+			requests.drain(gson, out);
 			QuestProgress mine = progress.get(GroupMembers.key(self));
 			if (progressDirty && mine != null && isFor(self))
 			{
@@ -244,34 +358,52 @@ final class ShoppingSync
 	/** Room for one more list, forgetting the oldest removed one if that makes room. */
 	private boolean roomFor()
 	{
-		if (lists.size() < MAX_LISTS)
+		return makeRoom(lists, MAX_LISTS, l -> l.removed, l -> l.at);
+	}
+
+	/**
+	 * True when {@code book} has room for one more entry under {@code max}, forgetting the oldest {@code spare}
+	 * one if that makes room. Lists and requests both use it.
+	 */
+	static <T> boolean makeRoom(Map<String, T> book, int max, java.util.function.Predicate<T> spare,
+		java.util.function.ToLongFunction<T> at)
+	{
+		if (book.size() < max)
 		{
 			return true;
 		}
-		ShoppingList oldest = null;
-		for (ShoppingList l : lists.values())
+		String oldest = null;
+		long oldestAt = Long.MAX_VALUE;
+		for (Map.Entry<String, T> e : book.entrySet())
 		{
-			if (l.removed && (oldest == null || l.at < oldest.at))
+			long when = at.applyAsLong(e.getValue());
+			if (spare.test(e.getValue()) && (oldest == null || when < oldestAt))
 			{
-				oldest = l;
+				oldest = e.getKey();
+				oldestAt = when;
 			}
 		}
 		if (oldest == null)
 		{
 			return false;
 		}
-		lists.remove(oldest.id);
+		book.remove(oldest);
 		return true;
 	}
 
 	private void record(ShoppingList before, ShoppingList after)
 	{
-		String text = describe(before, after);
+		note(after.at, describe(before, after));
+	}
+
+	/** One line of history, newest first; an empty line is not kept. Holds the lock. */
+	private void note(long at, String text)
+	{
 		if (text.isEmpty())
 		{
 			return;
 		}
-		history.addFirst(new Change(after.at, text));
+		history.addFirst(new Change(at, text));
 		while (history.size() > MAX_HISTORY)
 		{
 			history.removeLast();
@@ -324,6 +456,24 @@ final class ShoppingSync
 		return new ArrayList<>(history);
 	}
 
+	/** Members' requests not removed, oldest first, closed ones included. */
+	synchronized List<RequestList> requests()
+	{
+		return requests.live();
+	}
+
+	/** Any held revision, removed included; null when none. */
+	synchronized RequestList request(String id)
+	{
+		return requests.get(id);
+	}
+
+	/** Standing claims on one request. */
+	synchronized List<RequestClaim> claims(String id)
+	{
+		return requests.claims(id);
+	}
+
 	/** {@link QuestProgress#UNKNOWN} for a member whose client never said. */
 	synchronized QuestProgress progress(String member)
 	{
@@ -340,6 +490,8 @@ final class ShoppingSync
 		JsonArray ls = new JsonArray();
 		lists.values().forEach(l -> ls.add(ShoppingCodec.encode(gson, l)));
 		out.add("lists", ls);
+		out.add("reqs", requests.requestsToCache(gson));
+		out.add("claims", requests.claimsToCache(gson));
 		JsonArray hist = new JsonArray();
 		for (Change c : history)
 		{
@@ -365,9 +517,18 @@ final class ShoppingSync
 		JsonObject in = e.getAsJsonObject();
 		synchronized (this)
 		{
-			for (String payload : strings(in.get("lists")))
+			for (String payload : strings(in.get("lists"), MAX_LISTS))
 			{
 				readList(payload, now);
+			}
+			// Requests before claims: a claim is kept only on a request held.
+			for (String payload : strings(in.get("reqs"), RequestBook.MAX_REQUESTS))
+			{
+				requests.fromCache(ShoppingCodec.decode(gson, payload), now, TOMBSTONE_MS);
+			}
+			for (String payload : strings(in.get("claims"), RequestBook.MAX_CLAIMS))
+			{
+				requests.fromCache(ShoppingCodec.decode(gson, payload), now, TOMBSTONE_MS);
 			}
 			readHistory(in.get("hist"));
 			readProgress(in.get("qp"));
@@ -436,7 +597,7 @@ final class ShoppingSync
 		}
 	}
 
-	private static List<String> strings(JsonElement e)
+	private static List<String> strings(JsonElement e, int max)
 	{
 		if (e == null || !e.isJsonArray())
 		{
@@ -445,7 +606,7 @@ final class ShoppingSync
 		List<String> out = new ArrayList<>();
 		for (JsonElement s : e.getAsJsonArray())
 		{
-			if (s.isJsonPrimitive() && out.size() < MAX_LISTS)
+			if (s.isJsonPrimitive() && out.size() < max)
 			{
 				out.add(s.getAsString());
 			}

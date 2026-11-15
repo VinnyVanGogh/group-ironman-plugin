@@ -2,7 +2,6 @@ package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -19,32 +18,30 @@ public class ShoppingSyncTest
 {
 	private final Gson gson = new Gson();
 
-	/** One simulated client: its book, and what it sent. */
+	/** One simulated client ({@link ShoppingClient}), named. */
 	private final class Client
 	{
+		final ShoppingClient c;
 		final String name;
-		final List<String> sent = new ArrayList<>();
-		final ShoppingSync sync = new ShoppingSync(gson, sent::add, () ->
-		{
-		});
+		final List<String> sent;
+		final ShoppingSync sync;
 
 		Client(String name)
 		{
+			this.c = new ShoppingClient(gson, name);
 			this.name = name;
+			this.sent = c.sent;
+			this.sync = c.sync;
 		}
 
-		/** A game tick while connected: whatever it sends reaches {@code to}. */
 		void tick(Client... to)
 		{
-			sync.flush(name);
-			for (String payload : sent)
+			ShoppingClient[] out = new ShoppingClient[to.length];
+			for (int i = 0; i < to.length; i++)
 			{
-				for (Client c : to)
-				{
-					assertTrue(c.sync.receive(name, payload));
-				}
+				out[i] = to[i].c;
 			}
-			sent.clear();
+			c.tick(out);
 		}
 	}
 

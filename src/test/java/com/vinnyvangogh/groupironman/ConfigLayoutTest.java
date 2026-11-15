@@ -53,7 +53,7 @@ public class ConfigLayoutTest
 		"discordFarming", "discordBirdhouse", "overlayRaidUnique", "overlayClue", "overlayDryStreak",
 		"overlayDeathValue", "overlayGravestone", "overlayHardcoreLife", "overlayWilderness", "overlayDiary",
 		"overlayCombatTask", "overlayKcMilestone", "overlayPersonalBest", "overlayWeeklyRecap", "overlaySlayer",
-		"overlayFarming", "overlayBirdhouse", "discordDigestHour", "digestDrops", "digestDeaths", "digestStorage",
+		"overlayFarming", "overlayBirdhouse", "discordRequest", "overlayRequest", "discordDigestHour", "digestDrops", "digestDeaths", "digestStorage",
 		"digestProgress", "digestGroup", "digestActivities", "showUpdateNotes", "lastSeenVersion"));
 
 	private static final List<String> SECTION_ORDER = Arrays.asList("Group", "Discord: connection",

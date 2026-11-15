@@ -68,6 +68,7 @@ final class EventSettings
 		both(GroupEvent.Type.SLAYER, GroupIronmanConfig::discordSlayer, GroupIronmanConfig::overlaySlayer);
 		both(GroupEvent.Type.FARMING, GroupIronmanConfig::discordFarming, GroupIronmanConfig::overlayFarming);
 		both(GroupEvent.Type.BIRDHOUSE, GroupIronmanConfig::discordBirdhouse, GroupIronmanConfig::overlayBirdhouse);
+		both(GroupEvent.Type.REQUEST, GroupIronmanConfig::discordRequest, GroupIronmanConfig::overlayRequest);
 
 		DIGEST.put(GroupEvent.Category.DROPS, GroupIronmanConfig::digestDrops);
 		DIGEST.put(GroupEvent.Category.DEATHS, GroupIronmanConfig::digestDeaths);

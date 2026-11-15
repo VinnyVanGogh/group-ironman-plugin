@@ -166,6 +166,17 @@ final class ShopAllocation
 			return m == null ? 0 : m.getOrDefault(itemId, 0L);
 		}
 
+		/** What the whole group holds of {@code itemId}: every member who shares counts, and group storage. */
+		long total(int itemId)
+		{
+			long sum = storage.getOrDefault(itemId, 0L);
+			for (Map<Integer, Long> m : members.values())
+			{
+				sum += m.getOrDefault(itemId, 0L);
+			}
+			return sum;
+		}
+
 		boolean known(String member)
 		{
 			return members.containsKey(GroupMembers.key(member));

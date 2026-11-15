@@ -50,12 +50,29 @@ final class ShoppingTab
 
 		/** Tradeable items matching {@code query}; {@code done} may be called on another thread. */
 		void searchItems(String query, Consumer<List<Hit>> done);
+
+		/** This player's own request; a blank name becomes "Name's requests". */
+		boolean addRequest(String name, Map<Integer, Integer> items);
+
+		boolean renameRequest(String id, String name);
+
+		boolean removeRequest(String id);
+
+		boolean closeRequest(String id);
+
+		boolean closeRequestItem(String id, int itemId);
+
+		/** "I'll get it", or taking it back. */
+		boolean claimRequest(String id, int itemId, boolean claimed);
 	}
 
 	static final int MAX_HITS = 10;
 	private static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR.darker();
 	private static final Color DONE = ColorScheme.PROGRESS_COMPLETE_COLOR;
 	private static final String CUSTOM = "Custom list";
+	private static final String REQUEST = "Request: ask the group";
+	/** Entries before the presets in the kind box: custom, then request. */
+	private static final int FIXED_KINDS = 2;
 	/** Sources named per line; the rest are a count. */
 	private static final int SOURCES_SHOWN = 2;
 
@@ -87,9 +104,14 @@ final class ShoppingTab
 		final List<ShoppingSync.Change> history;
 		final boolean loggedIn;
 		final boolean syncing;
+		/** Members' requests, oldest first. */
+		final List<RequestBoard.Card> requests;
+		/** This player, for "mine" and "I'll get it"; empty when logged out. */
+		final String self;
 
 		View(List<ShoppingBoard.Card> cards, List<ShopPresets.Preset> presets, List<String> roster,
-			List<ShoppingSync.Change> history, boolean loggedIn, boolean syncing)
+			List<ShoppingSync.Change> history, boolean loggedIn, boolean syncing, List<RequestBoard.Card> requests,
+			String self)
 		{
 			this.cards = cards;
 			this.presets = presets;
@@ -97,13 +119,16 @@ final class ShoppingTab
 			this.history = history;
 			this.loggedIn = loggedIn;
 			this.syncing = syncing;
+			this.requests = requests;
+			this.self = self;
 		}
 
 		/** Changes when anything drawn changes. */
 		String signature()
 		{
 			StringBuilder s = new StringBuilder();
-			s.append(roster).append(loggedIn).append(syncing).append(history.size());
+			s.append(roster).append(loggedIn).append(syncing).append(history.size())
+				.append(RequestCards.signature(requests, self));
 			for (ShoppingSync.Change c : history)
 			{
 				s.append(c.at).append(c.text);
@@ -124,6 +149,7 @@ final class ShoppingTab
 	private final ItemManager items;
 	private final Runnable refresh;
 	private final Form form = new Form();
+	private final RequestCards requestCards;
 	private String drawn;
 	private String note;
 
@@ -132,6 +158,7 @@ final class ShoppingTab
 		this.actions = actions;
 		this.items = items;
 		this.refresh = refresh;
+		this.requestCards = new RequestCards(actions, items, this::say);
 	}
 
 	/** Whether {@code v} would draw differently from what is on screen. */
@@ -148,11 +175,13 @@ final class ShoppingTab
 			tab.add(GroupIronmanPanel.text(note, Color.WHITE));
 			note = null;
 		}
-		if (v.cards.isEmpty())
+		requestCards.draw(tab, v.requests, v.self);
+		if (v.cards.isEmpty() && v.requests.isEmpty())
 		{
 			tab.add(GroupIronmanPanel.heading("No shopping lists yet"));
 			tab.add(GroupIronmanPanel.text("Add one below: a build milestone, like Mithril gloves for a 1 Defence"
-				+ " pure, or your own items. Every member running GIM Utilities sees it.", MUTED));
+				+ " pure, your own items, or a request the group fills for you. Every member running GIM Utilities"
+				+ " sees it.", MUTED));
 		}
 		for (ShoppingBoard.Card c : v.cards)
 		{
@@ -272,7 +301,7 @@ final class ShoppingTab
 		return line;
 	}
 
-	private static JLabel label(String text, Color color)
+	static JLabel label(String text, Color color)
 	{
 		JLabel l = new JLabel("<html><body style='width:130px'>" + GroupIronmanPanel.escape(text) + "</body></html>");
 		l.setFont(FontManager.getRunescapeSmallFont());
@@ -373,7 +402,7 @@ final class ShoppingTab
 		refresh.run();
 	}
 
-	private static JButton button(String text, Runnable action)
+	static JButton button(String text, Runnable action)
 	{
 		JButton b = new JButton(text);
 		b.setFont(FontManager.getRunescapeSmallFont());
@@ -397,6 +426,8 @@ final class ShoppingTab
 		private final JPanel staged = new GroupIronmanPanel.Column();
 		private final JPanel custom = new GroupIronmanPanel.Column();
 		private final JPanel members = new GroupIronmanPanel.Column();
+		private final JLabel forLabel = GroupIronmanPanel.text("For:", MUTED);
+		private final JLabel nameLabel = GroupIronmanPanel.text("Name", MUTED);
 		private final Map<Integer, Integer> stagedItems = new LinkedHashMap<>();
 		private final Map<Integer, String> stagedNames = new LinkedHashMap<>();
 		private final List<JCheckBox> pickBoxes = new ArrayList<>();
@@ -412,7 +443,7 @@ final class ShoppingTab
 			panel.add(picks);
 			buildCustom();
 			panel.add(custom);
-			panel.add(GroupIronmanPanel.text("For:", MUTED));
+			panel.add(forLabel);
 			panel.add(members);
 			JPanel add = new JPanel(new GridLayout(1, 1));
 			add.add(button("Add list", this::submit));
@@ -421,7 +452,7 @@ final class ShoppingTab
 
 		private void buildCustom()
 		{
-			custom.add(GroupIronmanPanel.text("Name", MUTED));
+			custom.add(nameLabel);
 			custom.add(name);
 			custom.add(GroupIronmanPanel.text("Item (tradeable items)", MUTED));
 			JPanel search = new JPanel(new BorderLayout(2, 0));
@@ -443,6 +474,7 @@ final class ShoppingTab
 				presets = v.presets;
 				kind.removeAllItems();
 				kind.addItem(CUSTOM);
+				kind.addItem(REQUEST);
 				presets.forEach(p -> kind.addItem(presetLabel(p)));
 			}
 			if (!v.roster.equals(roster))
@@ -467,14 +499,23 @@ final class ShoppingTab
 
 		private ShopPresets.Preset selected()
 		{
-			int i = kind.getSelectedIndex() - 1;
+			int i = kind.getSelectedIndex() - FIXED_KINDS;
 			return i >= 0 && i < presets.size() ? presets.get(i) : null;
+		}
+
+		/** A request is always this player's own: no members to tick, and the name may be left blank. */
+		private boolean request()
+		{
+			return REQUEST.equals(kind.getSelectedItem());
 		}
 
 		private void showKind()
 		{
 			ShopPresets.Preset p = selected();
 			custom.setVisible(p == null);
+			forLabel.setVisible(!request());
+			members.setVisible(!request());
+			nameLabel.setText(request() ? "Name (blank: your name's requests)" : "Name");
 			picks.removeAll();
 			pickBoxes.clear();
 			ShopPresets.Choice choice = p == null ? null : p.choice();
@@ -547,6 +588,11 @@ final class ShoppingTab
 
 		private void submit()
 		{
+			if (request())
+			{
+				submitRequest();
+				return;
+			}
 			ShopPresets.Preset p = selected();
 			String problem = problem(p);
 			if (problem != null)
@@ -565,6 +611,24 @@ final class ShoppingTab
 			}
 			say(ok ? null : "Not added: log in first (the group holds at most " + ShoppingSync.MAX_LISTS
 				+ " lists).");
+		}
+
+		private void submitRequest()
+		{
+			if (stagedItems.isEmpty())
+			{
+				say("Add at least one item.");
+				return;
+			}
+			boolean ok = actions.addRequest(name.getText(), stagedItems);
+			if (ok)
+			{
+				name.setText("");
+				stagedItems.clear();
+				redrawStaged();
+			}
+			say(ok ? null : "Not added: log in first (the group holds at most " + RequestBook.MAX_REQUESTS
+				+ " requests).");
 		}
 
 		/** Why the form cannot be sent as it is, or null. */

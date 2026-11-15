@@ -268,6 +268,42 @@ public class GroupIronmanPlugin extends Plugin
 			{
 				group.searchItems(query, done);
 			}
+
+			@Override
+			public boolean addRequest(String name, Map<Integer, Integer> items)
+			{
+				return group.addRequest(name, items);
+			}
+
+			@Override
+			public boolean renameRequest(String id, String name)
+			{
+				return group.renameRequest(id, name);
+			}
+
+			@Override
+			public boolean removeRequest(String id)
+			{
+				return group.removeRequest(id);
+			}
+
+			@Override
+			public boolean closeRequest(String id)
+			{
+				return group.closeRequest(id);
+			}
+
+			@Override
+			public boolean closeRequestItem(String id, int itemId)
+			{
+				return group.closeRequestItem(id, itemId);
+			}
+
+			@Override
+			public boolean claimRequest(String id, int itemId, boolean claimed)
+			{
+				return group.claimRequest(id, itemId, claimed);
+			}
 		});
 		navButton = NavigationButton.builder()
 			.tooltip(NAME)
@@ -415,7 +451,7 @@ public class GroupIronmanPlugin extends Plugin
 			roster.add(group.self());
 		}
 		return new ShoppingTab.View(ShoppingBoard.of(lists, group.shoppingInputs()), group.presets().presets(),
-			roster, shop.history(), !group.self().isEmpty(), group.syncing());
+			roster, shop.history(), !group.self().isEmpty(), group.syncing(), group.requestCards(), group.self());
 	}
 
 	/** The Settings tab's view, or null before group settings have started. */

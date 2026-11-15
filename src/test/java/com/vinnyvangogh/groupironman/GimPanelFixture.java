@@ -187,6 +187,48 @@ final class GimPanelFixture
 			calls.add("searchItems:" + query);
 			done.accept(Collections.singletonList(new ShoppingTab.Hit(954, "Rope")));
 		}
+
+		@Override
+		public boolean addRequest(String name, Map<Integer, Integer> items)
+		{
+			calls.add("addRequest:" + name + ":" + items);
+			return true;
+		}
+
+		@Override
+		public boolean renameRequest(String id, String name)
+		{
+			calls.add("renameRequest:" + id + "=" + name);
+			return true;
+		}
+
+		@Override
+		public boolean removeRequest(String id)
+		{
+			calls.add("removeRequest:" + id);
+			return true;
+		}
+
+		@Override
+		public boolean closeRequest(String id)
+		{
+			calls.add("closeRequest:" + id);
+			return true;
+		}
+
+		@Override
+		public boolean closeRequestItem(String id, int itemId)
+		{
+			calls.add("closeRequestItem:" + id + ":" + itemId);
+			return true;
+		}
+
+		@Override
+		public boolean claimRequest(String id, int itemId, boolean claimed)
+		{
+			calls.add("claimRequest:" + id + ":" + itemId + "=" + claimed);
+			return true;
+		}
 	}
 
 	/** Everything the panel draws from; change a field, then {@link #show}. */

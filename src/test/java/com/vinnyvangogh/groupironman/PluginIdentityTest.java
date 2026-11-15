@@ -98,10 +98,10 @@ public class PluginIdentityTest
 		// the plugin" (Discord) is the fourth (Board 2026-11-14, "default on"): it only acts when posting is on,
 		// and posts the game's own Group broadcasts the group already sees in its chat. "Shopping: shop alert"
 		// (In-game, Board 2026-11-14) adds one more, off: a chat line near a shop selling something a list still
-		// needs.
+		// needs. Shopping requests (Board 2026-11-14) are one more kind, so two more switches, both off.
 		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1
 			+ 1 + 1 + 1, switches);
-		assertEquals(96, switches);
+		assertEquals(98, switches);
 		List<String> expectedOn = Arrays.asList("discordNoPluginEvents", "discordRepostBoard", "groupSync",
 			"showUpdateNotes");
 		Collections.sort(on);
