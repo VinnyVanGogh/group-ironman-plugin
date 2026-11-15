@@ -725,9 +725,7 @@ final class StatusBoard
 		{
 			o.addProperty("username", username);
 		}
-		JsonObject allowed = new JsonObject();
-		allowed.add("parse", new JsonArray());
-		o.add("allowed_mentions", allowed);
+		DiscordWebhook.allowMentions(o, false);
 		JsonArray embeds = new JsonArray();
 		if (style == DiscordStyle.PLAIN)
 		{
