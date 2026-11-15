@@ -158,6 +158,35 @@ final class GimPanelFixture
 		{
 			calls.add("optOutAll=" + out);
 		}
+
+		@Override
+		public boolean addList(String name, String preset, List<String> picks, List<String> members,
+			Map<Integer, Integer> items)
+		{
+			calls.add("addList:" + (preset.isEmpty() ? name : preset) + ":" + picks.size() + ":" + members);
+			return true;
+		}
+
+		@Override
+		public boolean renameList(String id, String name)
+		{
+			calls.add("renameList:" + id + "=" + name);
+			return true;
+		}
+
+		@Override
+		public boolean removeList(String id)
+		{
+			calls.add("removeList:" + id);
+			return true;
+		}
+
+		@Override
+		public void searchItems(String query, java.util.function.Consumer<List<ShoppingTab.Hit>> done)
+		{
+			calls.add("searchItems:" + query);
+			done.accept(Collections.singletonList(new ShoppingTab.Hit(954, "Rope")));
+		}
 	}
 
 	/** Everything the panel draws from; change a field, then {@link #show}. */

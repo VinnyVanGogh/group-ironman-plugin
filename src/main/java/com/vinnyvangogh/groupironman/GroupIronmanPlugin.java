@@ -5,9 +5,11 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
@@ -241,6 +243,31 @@ public class GroupIronmanPlugin extends Plugin
 			{
 				group.optOutAll(out);
 			}
+
+			@Override
+			public boolean addList(String name, String preset, List<String> picks, List<String> members,
+				Map<Integer, Integer> items)
+			{
+				return group.addShoppingList(name, preset, picks, members, items);
+			}
+
+			@Override
+			public boolean renameList(String id, String name)
+			{
+				return group.renameShoppingList(id, name);
+			}
+
+			@Override
+			public boolean removeList(String id)
+			{
+				return group.removeShoppingList(id);
+			}
+
+			@Override
+			public void searchItems(String query, Consumer<List<ShoppingTab.Hit>> done)
+			{
+				group.searchItems(query, done);
+			}
 		});
 		navButton = NavigationButton.builder()
 			.tooltip(NAME)
@@ -368,9 +395,27 @@ public class GroupIronmanPlugin extends Plugin
 		}
 		GroupIronmanPanel.View view = new GroupIronmanPanel.View(group.syncState(), group.roster(), group.members(),
 			group.lookup, group.switches(), group.regions(), group.since(), group.self(),
-			group.presence(), settingsView(), group.anyOn(), group.sharingSettings());
+			group.presence(), settingsView(), group.anyOn(), group.sharingSettings(), shoppingView());
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
+	}
+
+	/** The Shopping tab's view, or null before the lists have started. */
+	private ShoppingTab.View shoppingView()
+	{
+		ShoppingSync shop = group.shopping();
+		if (shop == null)
+		{
+			return null;
+		}
+		List<ShoppingList> lists = shop.active();
+		List<String> roster = new ArrayList<>(group.members().names());
+		if (roster.isEmpty() && !group.self().isEmpty())
+		{
+			roster.add(group.self());
+		}
+		return new ShoppingTab.View(ShoppingBoard.of(lists, group.shoppingInputs()), group.presets().presets(),
+			roster, shop.history(), !group.self().isEmpty(), group.syncing());
 	}
 
 	/** The Settings tab's view, or null before group settings have started. */

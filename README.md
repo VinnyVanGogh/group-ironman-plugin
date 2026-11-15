@@ -55,6 +55,30 @@ to share, and only sees other members' data for what they share themselves.
   ![Log tab showing group storage changes and activity since last played](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/storage-log.png)
   *Log tab: storage deposits/withdrawals and group activity since your last session.*
 
+- **Shopping:** shared shopping lists for the whole group. Anyone adds a list
+  for one or more members, and every member running GIM Utilities sees it:
+  - **Build presets**, starting with the 1 Defence pure: Mithril gloves
+    (Recipe for Disaster: pick 5 of the 6 subquests that give no Defence
+    experience), Ava's accumulator, Ancient Magicks, Dragon scimitar, Dragon
+    dagger and longsword, Climbing boots, Iban's staff, God books and
+    Waterfall Quest. A preset's list is the items for those quests and every
+    prerequisite the member has not done yet, read from the game. Optional
+    items are left out.
+  - **Custom lists:** your own name, items and quantities.
+
+  Each line reads *need, have, get*: what the members on the list need, less
+  what the group already holds (banks, group storage, inventories and
+  equipment; noted counts as the item), with who holds it and where to get
+  the rest: a shop you can be served at, with its price, or a monster that
+  drops it. A line ticks off as the items arrive. Remove a list, or rename a
+  custom one; every change says who made it. Optional: *Shopping: shop alert*
+  (under *In-game*, off by default) says in chat when you walk up to a shop
+  that sells something a list still needs.
+
+  Item data, shops and prerequisites come from
+  [Quest Path](https://github.com/VinnyVanGogh/questpath-plugin)'s bundled
+  quest data, copied in at build time (see `scripts/gen-quest-items.py`).
+
 - **Group settings tab:** one set of thresholds and switches for the whole
   group, saved by the leader or an editor and read-only for everyone else, with
   the leader's editor list and a grid of who posts what.
