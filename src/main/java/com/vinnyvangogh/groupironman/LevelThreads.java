@@ -37,7 +37,7 @@ final class LevelThreads
 	{
 		final String member;
 		final String skill;
-		/** The webhook it posts to ({@link #tag}): what a level-up must match to join. */
+		/** The webhook it posts to ({@link LevelThreads#tag}): what a level-up must match to join. Never null. */
 		final String hook;
 		/** The latest URL it was joined through; null for a restored streak until a level-up joins it. */
 		String url;
@@ -244,7 +244,11 @@ final class LevelThreads
 	private static String tag(String url)
 	{
 		String hook = StatusBoard.hookOf(url);
-		return hook != null ? hook : url;
+		if (hook != null)
+		{
+			return hook;
+		}
+		return url == null ? "" : url;
 	}
 
 	/** How a streak's new post went: on success its message is the one edited from now on. */
