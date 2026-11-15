@@ -24,6 +24,8 @@ final class FakeItems implements ItemLookup
 	static final int LOG_BASKET = 28140;
 	static final int OPEN_LOG_BASKET = 28142;
 	static final int YEW_LOGS = 1515;
+	/** The game's noted yew logs (ItemID.YEW_LOGS + 1); the sender's counts canonicalise it to {@link #YEW_LOGS}. */
+	static final int NOTED_YEW_LOGS = 1516;
 	static final int LOGS = 1511;
 
 	private final Map<Integer, String> names = new HashMap<>();
@@ -48,6 +50,7 @@ final class FakeItems implements ItemLookup
 		add(LOG_BASKET, "Log basket", 0);
 		add(OPEN_LOG_BASKET, "Open log basket", 0);
 		add(YEW_LOGS, "Yew logs", 300);
+		add(NOTED_YEW_LOGS, "Yew logs", 300);
 		add(LOGS, "Logs", 50);
 	}
 
