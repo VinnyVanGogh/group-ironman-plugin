@@ -104,9 +104,21 @@ final class DiscordMerge
 		final List<String[]> extras;
 		/** Worth the configured mention. */
 		final boolean big;
+		/**
+		 * Group storage only: what went in and what came out, so the Value is the net (Board 2026-11-15: took 180,
+		 * deposited 9,300 is 9,120, not 9,480). Null for every other post, whose Value sums {@link #items}.
+		 */
+		final Map<Integer, Integer> deposited;
+		final Map<Integer, Integer> taken;
 
 		Post(GroupEvent lead, String title, String description, Map<Integer, Integer> items, List<String[]> extras,
 			boolean big)
+		{
+			this(lead, title, description, items, extras, big, null, null);
+		}
+
+		Post(GroupEvent lead, String title, String description, Map<Integer, Integer> items, List<String[]> extras,
+			boolean big, Map<Integer, Integer> deposited, Map<Integer, Integer> taken)
 		{
 			this.lead = lead;
 			this.title = title;
@@ -114,7 +126,39 @@ final class DiscordMerge
 			this.items = items;
 			this.extras = extras;
 			this.big = big;
+			this.deposited = deposited;
+			this.taken = taken;
 		}
+	}
+
+	/**
+	 * The Value field's text: the summed worth for most posts; for group storage the net, deposited minus taken,
+	 * with both sides when both moved ("9,120 gp (deposited 9,300, took 180)"). Empty when there is nothing to show.
+	 */
+	static String valueText(Post post, ItemLookup lookup)
+	{
+		if (post.deposited == null || post.taken == null)
+		{
+			long value = EventText.value(post.items, lookup);
+			return value > 0 ? lookup.amount(value) + " gp" : "";
+		}
+		long in = EventText.value(post.deposited, lookup);
+		long out = EventText.value(post.taken, lookup);
+		if (in <= 0 && out <= 0)
+		{
+			return "";
+		}
+		if (out <= 0)
+		{
+			return lookup.amount(in) + " gp";
+		}
+		if (in <= 0)
+		{
+			return lookup.amount(out) + " gp taken";
+		}
+		long net = in - out;
+		return (net < 0 ? "-" : "") + lookup.amount(Math.abs(net)) + " gp (deposited " + lookup.amount(in)
+			+ ", took " + lookup.amount(out) + ")";
 	}
 
 	/** {@code lookup} words amounts the Discord way ({@link Amounts#BOTH}); the title says "Offline" for a logout. */
@@ -176,7 +220,7 @@ final class DiscordMerge
 		Map<Integer, Integer> all = new TreeMap<>(summary.taken);
 		summary.items.forEach((id, n) -> all.merge(id, n, Integer::sum));
 		return new Post(summary, visitTitle(deposit, withdrawal), text.toString(), all,
-			extras(folded(events), lookup), anyBig(events));
+			extras(folded(events), lookup), anyBig(events), summary.items, summary.taken);
 	}
 
 	static String visitTitle(boolean deposit, boolean withdrawal)

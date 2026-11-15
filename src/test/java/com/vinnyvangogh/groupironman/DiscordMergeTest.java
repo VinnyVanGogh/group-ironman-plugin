@@ -131,7 +131,8 @@ public class DiscordMergeTest
 		assertTrue(post.description, post.description.contains("deposited 5 x Lobster"));
 		assertFalse("a small move is not marked", post.description.contains("Lobster (big"));
 		assertTrue(fieldNames(embed(post)).contains("Value"));
-		assertEquals("the visit's total", "40.5K (40,500) gp", embed(post).getAsJsonArray("fields").get(0).getAsJsonObject()
+		// Net: 500 in, 40,000 out (Board 2026-11-15: the two sides are subtracted, never added).
+		assertEquals("the visit's net", "-39.5K (39,500) gp (deposited 500, took 40K (40,000))", embed(post).getAsJsonArray("fields").get(0).getAsJsonObject()
 			.get("value").getAsString());
 	}
 
