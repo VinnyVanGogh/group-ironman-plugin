@@ -5,11 +5,12 @@ import java.awt.Color;
 import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
-import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -32,7 +33,14 @@ import net.runelite.client.ui.FontManager;
  * (a build preset or custom items) for one or more members, and who changed
  * what.
  *
- * <p>Rebuilt only when what it shows changed ({@link View#signature}), so a
+ * <p>Every list and request starts folded to a header with a preview: its
+ * progress and the first still-needed items' icons (Board 2026-11-14: a 39-item
+ * preset was too much). What the player opens is saved for the character
+ * ({@link ShopFolds}). An open list shows still-needed items first, one compact
+ * line each with the details behind a click, and its finished items folded into
+ * "N done".
+ *
+ * <p>Rebuilt only when what it shows changed ({@link View#signature}) or a fold flipped, so a
  * half-typed list name or item search survives the many redraws member stats
  * cause. The form itself is built once and kept.
  */
@@ -64,17 +72,23 @@ final class ShoppingTab
 
 		/** "I'll get it", or taking it back. */
 		boolean claimRequest(String id, int itemId, boolean claimed);
+
+		/** What this player opened on the tab ({@link ShopFolds}), saved for this character; null when nothing is. */
+		String openLists();
+
+		/** Saves what is open for this character only; null clears it. Never sent to the group. */
+		void saveOpenLists(String keys);
 	}
 
 	static final int MAX_HITS = 10;
-	private static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR.darker();
-	private static final Color DONE = ColorScheme.PROGRESS_COMPLETE_COLOR;
+	private static final Color MUTED = ShopCards.MUTED;
+	private static final Color DONE = ShopCards.DONE;
 	private static final String CUSTOM = "Custom list";
 	private static final String REQUEST = "Request: ask the group";
 	/** Entries before the presets in the kind box: custom, then request. */
 	private static final int FIXED_KINDS = 2;
-	/** Sources named per line; the rest are a count. */
-	private static final int SOURCES_SHOWN = 2;
+	/** Sources named in an item's details; the rest are a count. */
+	private static final int SOURCES_SHOWN = 4;
 
 	/** One item search result. */
 	static final class Hit
@@ -138,7 +152,7 @@ final class ShoppingTab
 				s.append('|').append(c.list.id).append(c.list.rev).append(c.progressUnknown).append(c.itemsUnknown);
 				for (ShoppingBoard.Row r : c.rows)
 				{
-					s.append(rowText(r)).append(heldText(r.line)).append(sourceText(r.sources));
+					s.append(summary(r.line)).append(needText(r.line)).append(details(r));
 				}
 			}
 			return s.toString();
@@ -150,38 +164,63 @@ final class ShoppingTab
 	private final Runnable refresh;
 	private final Form form = new Form();
 	private final RequestCards requestCards;
+	private final ShopFolds folds;
+	/** Every fold key the last draw showed: a toggle keeps only these, so the saved set never outgrows the tab. */
+	private final Set<String> live = new HashSet<>();
 	private String drawn;
 	private String note;
+	/** A fold flipped: redraw even though the view did not change. */
+	private boolean refold;
 
 	ShoppingTab(Actions actions, ItemManager items, Runnable refresh)
 	{
 		this.actions = actions;
 		this.items = items;
 		this.refresh = refresh;
-		this.requestCards = new RequestCards(actions, items, this::say);
+		this.folds = new ShopFolds(new ShopFolds.Store()
+		{
+			@Override
+			public String load()
+			{
+				return actions.openLists();
+			}
+
+			@Override
+			public void save(String value)
+			{
+				actions.saveOpenLists(value);
+			}
+		});
+		this.requestCards = new RequestCards(actions, items, this::say, this);
 	}
 
 	/** Whether {@code v} would draw differently from what is on screen. */
 	boolean changed(View v)
 	{
-		return !v.signature().equals(drawn) || note != null;
+		return !v.signature().equals(drawn) || note != null || refold;
 	}
 
 	void draw(JPanel tab, View v)
 	{
 		drawn = v.signature();
+		refold = false;
+		live.clear();
 		if (note != null)
 		{
-			tab.add(GroupIronmanPanel.text(note, Color.WHITE));
+			tab.add(ShopCards.tabText(note, Color.WHITE));
 			note = null;
 		}
 		requestCards.draw(tab, v.requests, v.self);
 		if (v.cards.isEmpty() && v.requests.isEmpty())
 		{
 			tab.add(GroupIronmanPanel.heading("No shopping lists yet"));
-			tab.add(GroupIronmanPanel.text("Add one below: a build milestone, like Mithril gloves for a 1 Defence"
+			tab.add(ShopCards.tabText("Add one below: a build milestone, like Mithril gloves for a 1 Defence"
 				+ " pure, your own items, or a request the group fills for you. Every member running GIM Utilities"
 				+ " sees it.", MUTED));
+		}
+		if (!v.cards.isEmpty())
+		{
+			tab.add(GroupIronmanPanel.heading("Lists"));
 		}
 		for (ShoppingBoard.Card c : v.cards)
 		{
@@ -189,7 +228,7 @@ final class ShoppingTab
 		}
 		if (!v.syncing)
 		{
-			tab.add(GroupIronmanPanel.text("Not in group sync: lists stay on this client until you join.", MUTED));
+			tab.add(ShopCards.tabText("Not in group sync: lists stay on this client until you join.", MUTED));
 		}
 		tab.add(form.panel(v));
 		drawHistory(tab, v.history);
@@ -205,36 +244,80 @@ final class ShoppingTab
 		long now = System.currentTimeMillis();
 		for (ShoppingSync.Change c : history)
 		{
-			tab.add(GroupIronmanPanel.text(c.text + " (" + BoostText.ago(now, c.at) + ")", MUTED));
+			tab.add(ShopCards.tabText(c.text + " (" + BoostText.ago(now, c.at) + ")", MUTED));
 		}
+	}
+
+	/** Whether {@code key} is drawn open; it joins the keys this draw shows. */
+	boolean isOpen(String key)
+	{
+		live.add(key);
+		return folds.open(key);
+	}
+
+	/** Flips {@code key} (a header, "N done" or an item was clicked) and redraws. */
+	void fold(String key)
+	{
+		live.add(key);
+		folds.toggle(key, live);
+		refold = true;
+		refresh.run();
 	}
 
 	// ---- A list ----
 
+	/** Folded: the header and its preview. Open: who it is for, its buttons, still-needed items, then "N done". */
 	private JPanel card(ShoppingBoard.Card c)
 	{
-		JPanel box = new GroupIronmanPanel.Column();
-		box.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		box.setBorder(BorderFactory.createCompoundBorder(new EmptyBorder(0, 0, 6, 0), new EmptyBorder(6, 6, 6, 6)));
-		JLabel title = new JLabel(GroupIronmanPanel.escape(c.list.name));
-		title.setFont(FontManager.getRunescapeBoldFont());
-		title.setForeground(c.done() == c.rows.size() && !c.empty() ? DONE : Color.WHITE);
-		box.add(title);
-		box.add(GroupIronmanPanel.text(byline(c.list, System.currentTimeMillis()), MUTED));
+		String key = ShopFolds.list(c.list.id);
+		boolean open = isOpen(key);
+		List<ShoppingBoard.Row> needed = new ArrayList<>();
+		List<ShoppingBoard.Row> done = new ArrayList<>();
+		for (ShoppingBoard.Row r : c.rows)
+		{
+			(r.line.done() ? done : needed).add(r);
+		}
+		List<Integer> preview = new ArrayList<>();
+		needed.forEach(r -> preview.add(r.line.itemId));
+		JPanel box = ShopCards.box();
+		ShopCards.header(box, c.list.name, open, c.done(), c.rows.size(), preview, items, () -> fold(key));
+		if (!open)
+		{
+			return box;
+		}
+		box.add(new ShopCards.Wrap(byline(c.list, System.currentTimeMillis()), MUTED, ShopCards.CARD_TEXT));
 		box.add(buttons(c.list));
 		for (String line : warnings(c))
 		{
-			box.add(GroupIronmanPanel.text(line, ColorScheme.BRAND_ORANGE));
+			box.add(new ShopCards.Wrap(line, ColorScheme.BRAND_ORANGE, ShopCards.CARD_TEXT));
 		}
-		box.add(GroupIronmanPanel.text(c.empty() ? "Nothing to get: every quest is done, or the list is empty."
-			: c.done() + " of " + c.rows.size() + " items done", MUTED));
-		List<ShoppingBoard.Row> rows = new ArrayList<>(c.rows);
-		rows.sort((a, b) -> Boolean.compare(a.line.done(), b.line.done()));
-		for (ShoppingBoard.Row r : rows)
+		if (c.empty())
 		{
-			box.add(row(r));
+			box.add(new ShopCards.Wrap("Nothing to get: every quest is done, or the list is empty.", MUTED,
+				ShopCards.CARD_TEXT));
 		}
+		for (ShoppingBoard.Row r : needed)
+		{
+			box.add(row(key, r));
+		}
+		addDone(box, key, done.size(), () -> done.forEach(r -> box.add(row(key, r))));
 		return box;
+	}
+
+	/** "▸ N done", and the finished items under it once opened; nothing when none is finished. */
+	void addDone(JPanel box, String cardKey, int count, Runnable drawRows)
+	{
+		if (count == 0)
+		{
+			return;
+		}
+		String key = ShopFolds.done(cardKey);
+		boolean open = isOpen(key);
+		box.add(ShopCards.doneToggle(count, open, () -> fold(key)));
+		if (open)
+		{
+			drawRows.run();
+		}
 	}
 
 	/** "For Alice, Bob. Added by Bob, 5 min ago." or "... Renamed by Alice, ...". */
@@ -274,68 +357,119 @@ final class ShoppingTab
 		return out;
 	}
 
-	private JPanel row(ShoppingBoard.Row r)
+	/**
+	 * One item, one compact line: its icon, "Air rune  12 / 30", a bar and "Need 18 more". A click (or the
+	 * tooltip) shows the details: who holds it, where to get it, whether it can be traded.
+	 */
+	private JPanel row(String cardKey, ShoppingBoard.Row r)
+	{
+		ShopAllocation.Line l = r.line;
+		String key = ShopFolds.item(cardKey, l.itemId);
+		boolean open = isOpen(key);
+		List<String> details = details(r);
+		JPanel words = new GroupIronmanPanel.Column();
+		words.add(new ShopCards.Wrap(summary(l), l.done() ? DONE : Color.WHITE, ShopCards.ROW_TEXT));
+		words.add(new ShopCards.Bar(l.have(), l.totalNeeded(), ShopCards.ROW_TEXT));
+		ShopCards.Wrap need = new ShopCards.Wrap(needText(l), l.done() ? DONE : MUTED, ShopCards.ROW_TEXT);
+		if (!details.isEmpty())
+		{
+			need.setIcon(new GroupIronmanPanel.Arrow(open));
+			need.setIconTextGap(4);
+		}
+		words.add(need);
+		if (open)
+		{
+			details.forEach(d -> words.add(new ShopCards.Wrap(d, MUTED, ShopCards.ROW_TEXT)));
+		}
+		JPanel line = itemLine(l.itemId, words);
+		if (!details.isEmpty())
+		{
+			line.setToolTipText("<html>" + GroupIronmanPanel.escape(String.join("\n", details)).replace("\n", "<br>")
+				+ "</html>");
+			ShopCards.clickable(line, () -> fold(key));
+		}
+		return line;
+	}
+
+	/** An item's icon on the left, {@code words} beside it. */
+	JPanel itemLine(int itemId, JPanel words)
 	{
 		JPanel line = new JPanel(new BorderLayout(4, 0));
 		line.setOpaque(false);
 		line.setBorder(new EmptyBorder(3, 0, 3, 0));
 		JLabel icon = new JLabel();
+		icon.setVerticalAlignment(JLabel.TOP);
 		if (items != null)
 		{
-			items.getImage(r.line.itemId).addTo(icon);
+			items.getImage(itemId).addTo(icon);
 		}
 		line.add(icon, BorderLayout.WEST);
-		JPanel words = new GroupIronmanPanel.Column();
 		words.setOpaque(false);
-		words.add(label(rowText(r), r.line.done() ? DONE : Color.WHITE));
-		String held = heldText(r.line);
-		if (!held.isEmpty())
-		{
-			words.add(label(held, MUTED));
-		}
-		if (!r.line.done())
-		{
-			words.add(label(sourceText(r.sources), MUTED));
-		}
 		line.add(words, BorderLayout.CENTER);
 		return line;
 	}
 
-	static JLabel label(String text, Color color)
+	/** "Air rune  12 / 30": what the group holds towards it of everything needed, "30+" when the wiki gave no count. */
+	static String summary(ShopAllocation.Line l)
 	{
-		JLabel l = new JLabel("<html><body style='width:130px'>" + GroupIronmanPanel.escape(text) + "</body></html>");
-		l.setFont(FontManager.getRunescapeSmallFont());
-		l.setForeground(color);
-		return l;
+		return l.name + "  " + Amounts.GAME.of(l.have()) + " / " + Amounts.GAME.of(l.totalNeeded()) + (l.stated ? ""
+			: "+");
 	}
 
-	/** "Bucket: need 3, have 1, get 2" / "Bucket: done (3)", with "at least" when the wiki gave no count. */
-	static String rowText(ShoppingBoard.Row r)
+	/**
+	 * "Need 18 more", "Done", or what a member who shares no items means for the count: "Need 18 more, plus 5 for
+	 * Tin (shares no items, may already have them)". Their need is never in "more": it may be in their bank.
+	 */
+	static String needText(ShopAllocation.Line l)
 	{
-		ShopAllocation.Line l = r.line;
-		String need = (l.stated ? "" : "at least ") + Amounts.GAME.of(l.totalNeeded());
 		if (l.done())
 		{
-			return l.name + ": done (" + need + ")";
+			return "Done";
 		}
-		StringBuilder s = new StringBuilder(l.name).append(": need ").append(need).append(", have ")
-			.append(Amounts.GAME.of(l.have()));
-		if (l.stillNeeded() > 0)
+		List<String> unseen = new ArrayList<>();
+		for (ShopAllocation.Share s : l.shares)
 		{
-			s.append(", get ").append(Amounts.GAME.of(l.stillNeeded()));
+			if (s.unknown && s.need > 0)
+			{
+				unseen.add(s.member);
+			}
 		}
-		if (l.unknownNeed() > 0)
+		String still = l.stillNeeded() > 0 ? "Need " + Amounts.GAME.of(l.stillNeeded()) + " more" : "";
+		if (unseen.isEmpty())
 		{
-			s.append(", ").append(Amounts.GAME.of(l.unknownNeed())).append(" not judged");
+			return still;
+		}
+		String unknown = Amounts.GAME.of(l.unknownNeed()) + " for " + String.join(", ", unseen) + " ("
+			+ (unseen.size() == 1 ? "shares" : "share") + " no items, may already have them)";
+		return still.isEmpty() ? "Need " + unknown : still + ", plus " + unknown;
+	}
+
+	/** Behind the click: who holds it, whether it can be traded, a quest pickup, and where to get more. */
+	static List<String> details(ShoppingBoard.Row r)
+	{
+		ShopAllocation.Line l = r.line;
+		List<String> out = new ArrayList<>();
+		String held = heldText(l);
+		if (!held.isEmpty())
+		{
+			out.add(held);
+		}
+		if (!l.tradeable)
+		{
+			out.add("Can't be traded: each member's own copy counts only for them.");
 		}
 		if (l.obtainable)
 		{
-			s.append(". Can be picked up in the quest");
+			out.add("Can also be picked up during the quest.");
 		}
-		return s.toString();
+		if (!l.done())
+		{
+			out.add(sourceText(r.sources));
+		}
+		return out;
 	}
 
-	/** "Held: Alice 2, Bob 1, group storage 4"; empty when nobody holds any. */
+	/** "Held by Alice 2, Bob 1, group storage 4"; empty when nobody holds any. */
 	static String heldText(ShopAllocation.Line l)
 	{
 		Map<String, Long> all = new LinkedHashMap<>(l.holders);
@@ -349,7 +483,7 @@ final class ShoppingTab
 		}
 		List<String> parts = new ArrayList<>();
 		all.forEach((who, n) -> parts.add(who + " " + Amounts.GAME.of(n)));
-		return "Held: " + String.join(", ", parts) + (l.tradeable ? "" : " (can't be traded: only your own counts)");
+		return "Held by " + String.join(", ", parts);
 	}
 
 	/** "Get: Shop: Tynan's Fishing Supplies (2 gp); Drop: Goblin (Always)" or why there is nowhere. */
@@ -359,7 +493,7 @@ final class ShoppingTab
 		{
 			return o.unreachableShops > 0
 				? "No shop you can use: " + o.unreachableShops + " need levels or quests you lack."
-				: "No known shop or drop.";
+				: "Not sold in any shop, and no drop on file: check the wiki.";
 		}
 		List<String> parts = new ArrayList<>();
 		for (ShopSources.Source s : o.sources.subList(0, Math.min(SOURCES_SHOWN, o.sources.size())))
@@ -426,8 +560,8 @@ final class ShoppingTab
 		private final JPanel staged = new GroupIronmanPanel.Column();
 		private final JPanel custom = new GroupIronmanPanel.Column();
 		private final JPanel members = new GroupIronmanPanel.Column();
-		private final JLabel forLabel = GroupIronmanPanel.text("For:", MUTED);
-		private final JLabel nameLabel = GroupIronmanPanel.text("Name", MUTED);
+		private final JLabel forLabel = ShopCards.tabText("For:", MUTED);
+		private final JLabel nameLabel = ShopCards.tabText("Name", MUTED);
 		private final Map<Integer, Integer> stagedItems = new LinkedHashMap<>();
 		private final Map<Integer, String> stagedNames = new LinkedHashMap<>();
 		private final List<JCheckBox> pickBoxes = new ArrayList<>();
@@ -454,7 +588,7 @@ final class ShoppingTab
 		{
 			custom.add(nameLabel);
 			custom.add(name);
-			custom.add(GroupIronmanPanel.text("Item (tradeable items)", MUTED));
+			custom.add(ShopCards.tabText("Item (tradeable items)", MUTED));
 			JPanel search = new JPanel(new BorderLayout(2, 0));
 			search.add(query, BorderLayout.CENTER);
 			search.add(button("Search", this::search), BorderLayout.EAST);
@@ -515,13 +649,13 @@ final class ShoppingTab
 			custom.setVisible(p == null);
 			forLabel.setVisible(!request());
 			members.setVisible(!request());
-			nameLabel.setText(request() ? "Name (blank: your name's requests)" : "Name");
+			nameLabel.setText("<html>" + (request() ? "Name (blank: your name's requests)" : "Name") + "</html>");
 			picks.removeAll();
 			pickBoxes.clear();
 			ShopPresets.Choice choice = p == null ? null : p.choice();
 			if (choice != null)
 			{
-				picks.add(GroupIronmanPanel.text("Pick " + choice.count() + ":", MUTED));
+				picks.add(ShopCards.tabText("Pick " + choice.count() + ":", MUTED));
 				for (String option : choice.from())
 				{
 					JCheckBox box = new JCheckBox(option, choice.defaults().contains(option));
@@ -565,8 +699,8 @@ final class ShoppingTab
 			for (Map.Entry<Integer, Integer> e : stagedItems.entrySet())
 			{
 				JPanel line = new JPanel(new BorderLayout(2, 0));
-				line.add(GroupIronmanPanel.text(Amounts.GAME.of(e.getValue()) + " x " + stagedNames.get(e.getKey()),
-					Color.WHITE), BorderLayout.CENTER);
+				line.add(new ShopCards.Wrap(Amounts.GAME.of(e.getValue()) + " x " + stagedNames.get(e.getKey()),
+					Color.WHITE, ShopCards.TAB_TEXT - 40), BorderLayout.CENTER);
 				int id = e.getKey();
 				line.add(button("x", () ->
 				{

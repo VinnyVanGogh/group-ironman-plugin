@@ -25,6 +25,7 @@ final class FakeItems implements ItemLookup
 	static final int OPEN_LOG_BASKET = 28142;
 	static final int YEW_LOGS = 1515;
 	static final int LOGS = 1511;
+	static final int DRAGON_WARHAMMER = 13576;
 
 	private final Map<Integer, String> names = new HashMap<>();
 	private final Map<Integer, Long> prices = new HashMap<>();
@@ -49,6 +50,7 @@ final class FakeItems implements ItemLookup
 		add(OPEN_LOG_BASKET, "Open log basket", 0);
 		add(YEW_LOGS, "Yew logs", 300);
 		add(LOGS, "Logs", 50);
+		add(DRAGON_WARHAMMER, "Dragon warhammer", 0);
 	}
 
 	private void add(int id, String name, long price)

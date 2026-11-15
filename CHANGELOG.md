@@ -24,6 +24,17 @@
 - New setting under *In-game*: **Shopping: shop alert**, off by default. A
   chat line as you walk up to a shop selling something still needed.
 - Members on an older build ignore the new messages; nothing changes for them.
+- Lists and requests start **folded**: the name, "3 of 39 done" with a bar,
+  and the first few items still needed. Open one and it stays open for that
+  character. Open lists show still-needed items first; finished ones fold into
+  "N done".
+- Each item is one short line, "Air rune  12 / 30" with a bar and "Need 18
+  more". Click it for who holds it, where to get it and whether it can be
+  traded. A member who shares no items is named instead of "not judged".
+- Text no longer runs past the panel's right edge.
+- Common drops that no quest names (Dragon warhammer, Abyssal whip, the
+  Dagannoth rings, god wars items and more) now say which monster drops them,
+  from the OSRS Wiki.
 ### Discord posts for members without the plugin
 
 - Members who are online without GIM Utilities still get their level-ups,

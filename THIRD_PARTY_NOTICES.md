@@ -63,6 +63,16 @@ Copyright (c) 2018, NotFoxtrot <https://github.com/NotFoxtrot>
 All rights reserved.
 ```
 
+## Old School RuneScape Wiki: item drops
+
+`src/main/resources/com/vinnyvangogh/groupironman/item-drops.txt` lists which
+monsters drop some items and at what rate, read from the Old School RuneScape
+Wiki (<https://oldschool.runescape.wiki>, its `dropsline` and `infobox_item`
+data, 2026-11-14). Wiki content is under the Creative Commons
+Attribution-NonCommercial-ShareAlike 3.0 license
+(<https://creativecommons.org/licenses/by-nc-sa/3.0/>); the table is a small
+adaptation of it, shared under the same license.
+
 ## Group Ironmen Tracker
 
 The group features match features of Group Ironmen Tracker
