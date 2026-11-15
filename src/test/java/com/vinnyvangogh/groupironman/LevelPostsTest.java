@@ -510,6 +510,140 @@ public class LevelPostsTest
 		assertTrue("a joined level is saved", levels.saved().contains("\t25\t"));
 	}
 
+	// Board 2026-11-14: GroupOtt (no plugin) Thieving 45 at 7:03 PM and 46 at 7:13 PM were two posts read from the
+	// game's group broadcast. A broadcast level now joins that member's streak as a plugin user's own does.
+
+	/** A level the game's group broadcast read, as GroupEventEngine hands the poster's client one. */
+	private static GroupEvent heard(String line)
+	{
+		GroupEvent e = LevelThreads.combinableBroadcast(GroupBroadcasts.parse(line, 0, name -> null));
+		assertNotNull(line, e);
+		return e;
+	}
+
+	/** The broadcast's level into its streak on {@code on}, its first post the usual one for it. */
+	private void hear(LevelPosts on, String line)
+	{
+		GroupEvent e = heard(line);
+		on.level(URL, e, WINDOW, null, DiscordWebhook.payload(gson, e, new FakeItems(), DiscordStyle.EMBED, null,
+			false));
+	}
+
+	private static String footer(DiscordQueue.Post post)
+	{
+		JsonObject o = new Gson().fromJson(post.json, JsonObject.class);
+		return o.getAsJsonArray("embeds").get(0).getAsJsonObject().getAsJsonObject("footer").get("text")
+			.getAsString();
+	}
+
+	@Test
+	public void twoBroadcastLevelsInOneSkillInsideTheWindowAreOnePostThenOneEdit()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		now += 10 * 60 * SEC;
+		hear(levels, "GroupOtt has reached Thieving level 46.");
+		tick();
+
+		assertEquals(2, sent.size());
+		assertNull(sent.get(0).edit);
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("read one below the first, as a member's level is", "Thieving 44 → 46 (+2) in 10 min",
+			description(sent.get(1)));
+		assertTrue("the edit keeps the broadcast footer", footer(sent.get(1)).endsWith(GroupBroadcasts.SOURCE));
+		assertTrue(footer(sent.get(0)).endsWith(GroupBroadcasts.SOURCE));
+	}
+
+	@Test
+	public void aBroadcastLevelOutsideTheWindowIsANewPost()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		now += WINDOW + SEC;
+		hear(levels, "GroupOtt has reached Thieving level 46.");
+		tick();
+		assertEquals(2, sent.size());
+		assertNull("a new post, not an edit", sent.get(1).edit);
+	}
+
+	@Test
+	public void broadcastLevelsInDifferentSkillsAreSeparatePosts()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		now += 60 * SEC;
+		hear(levels, "GroupOtt has reached Agility level 30.");
+		tick();
+		assertEquals(2, sent.size());
+		assertNull(sent.get(1).edit);
+	}
+
+	@Test
+	public void aBroadcastStreakSurvivesARestart()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		restart(levels.saved());
+		now += 16 * 60 * SEC;
+		hear(levels, "GroupOtt has reached Thieving level 46.");
+		tick();
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("Thieving 44 → 46 (+2) in 16 min", description(sent.get(1)));
+		assertTrue(footer(sent.get(1)).endsWith(GroupBroadcasts.SOURCE));
+	}
+
+	@Test
+	public void broadcastCombatLevelsGroupTooAcrossARestart()
+	{
+		hear(levels, "GroupOtt has reached combat level 100.");
+		tick();
+		reply(200, "m1");
+		String saved = levels.saved();
+		assertTrue(saved.contains("\tGroupOtt\tCombat\t99\t100\t"));
+		restart(saved);
+		now += 60 * SEC;
+		hear(levels, "GroupOtt has reached combat level 101.");
+		tick();
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("Combat 99 → 101 (+2) in 1 min", description(sent.get(1)));
+	}
+
+	@Test
+	public void aNewPosterMidStreakStartsANewPost()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		// The leader logged out: the backup's client, with no streak of its own, hears the next one.
+		LevelPosts backup = client();
+		now += 60 * SEC;
+		hear(backup, "GroupOtt has reached Thieving level 46.");
+		backup.tick();
+		sender.pump();
+		assertEquals(2, sent.size());
+		assertNull("the backup posts anew", sent.get(1).edit);
+	}
+
+	@Test
+	public void onlyABroadcastsSkillOrCombatLevelJoinsAStreakAndPluginUsersAreUnchanged()
+	{
+		assertNull("a plugin user's own level decides as before", LevelThreads.combinableBroadcast(
+			level("Thieving", 46)));
+		assertNull("a plugin user's own combat level still posts on its own", LevelThreads.combinable(
+			Collections.singletonList(GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, 0, "Alex").number(90).build())));
+		assertNull("a 99", LevelThreads.combinableBroadcast(GroupBroadcasts.parse(
+			"GroupOtt has reached Thieving level 99.", 0, name -> null)));
+		assertNull("a total level", LevelThreads.combinableBroadcast(GroupBroadcasts.parse(
+			"GroupOtt has reached a total level of 1,000.", 0, name -> null)));
+		assertNull("a quest", LevelThreads.combinableBroadcast(GroupBroadcasts.parse(
+			"GroupOtt has completed a quest: Black Knights' Fortress.", 0, name -> null)));
+		assertNull(LevelThreads.combinableBroadcast(null));
+	}
+
 	@Test
 	public void aDamagedFileIsIgnored()
 	{

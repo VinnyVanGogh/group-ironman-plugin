@@ -29,6 +29,8 @@ final class LevelThreads
 	/** Edits in a row a server or network failure may cost before the streak gives up and posts fresh. */
 	static final int MAX_EDIT_FAILURES = 3;
 	private static final int MAX_LEVEL = 99;
+	/** A combat level's streak name: "Combat 99 → 101 (+2) in 10 min". */
+	private static final String COMBAT = "Combat";
 	private static final String SEP = "\t";
 	private static final int SAVED_FIELDS = 8;
 
@@ -59,7 +61,7 @@ final class LevelThreads
 		private Streak(GroupEvent e, String url, long now, byte[] png)
 		{
 			this.member = e.member;
-			this.skill = e.text;
+			this.skill = skill(e);
 			this.hook = tag(url);
 			this.url = url;
 			// One action can gain several levels (low Prayer): the level before it, when the event knows it.
@@ -146,12 +148,34 @@ final class LevelThreads
 	}
 
 	/**
+	 * A level the game's group broadcast read for a member without the plugin ({@link GroupBroadcasts}), when it can
+	 * share a post: a skill's level below 99, or a combat level (Board 2026-11-14: "group levels should follow the
+	 * same pattern too"). Null for anything else, and for a plugin user's own event, which {@link #combinable}
+	 * decides as before. Only the client that posts the broadcast keeps the streak, so a new poster starts a new post.
+	 */
+	static GroupEvent combinableBroadcast(GroupEvent e)
+	{
+		if (e == null || !e.broadcast)
+		{
+			return null;
+		}
+		boolean skill = e.type == GroupEvent.Type.LEVEL_UP && e.number < MAX_LEVEL;
+		return skill || e.type == GroupEvent.Type.COMBAT_LEVEL ? e : null;
+	}
+
+	/** What a streak is of: the skill, or "Combat" for a combat level (which names no skill). */
+	private static String skill(GroupEvent e)
+	{
+		return e.type == GroupEvent.Type.COMBAT_LEVEL ? COMBAT : e.text;
+	}
+
+	/**
 	 * A level-up within {@code window} ms of its skill's first: joins that streak (null back; {@link #due} edits it
 	 * in time). Otherwise a new streak, returned: post it and report back to {@link #posted}.
 	 */
 	synchronized Streak level(GroupEvent e, String url, long now, long window, byte[] png)
 	{
-		String key = key(e.member, e.text);
+		String key = key(e.member, skill(e));
 		Streak s = open.get(key);
 		if (s != null && s.hook.equals(tag(url)) && now - s.first < window)
 		{

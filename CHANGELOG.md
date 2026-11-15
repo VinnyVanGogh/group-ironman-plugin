@@ -35,6 +35,11 @@
   a restart never posts a line again.
 - The same event switches, "Post every N levels", the valuable drop minimum
   and quiet hours apply. The footer says "from the game's group broadcast".
+- Their level-ups group like a plugin user's: with "Combine level-ups" on,
+  one post per member and skill (or combat level), edited in place
+  ("Thieving 44 → 46 (+2) in 10 min"), and kept across a restart. If the
+  poster changes mid-streak (the leader logs out), the new poster starts a
+  new post.
 - New group setting "Post events for members without the plugin" (on). A
   group's leader or editors can turn it off for everyone.
 

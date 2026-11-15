@@ -1513,8 +1513,16 @@ class GroupEventEngine
 		DiscordMerge.Family family = DiscordMerge.family(event.type);
 		if (event.broadcast)
 		{
-			// Another member's moment: never merged with this player's own, never a screenshot of this screen.
-			post(url, DiscordMerge.single(event, discordWords()), Collections.singletonList(event), false, null);
+			// Another member's moment: never merged with this player's own, never a screenshot of this screen. A
+			// level joins that member's streak post as a plugin user's own does (Board 2026-11-14).
+			List<GroupEvent> one = Collections.singletonList(event);
+			Consumer<byte[]> streak = combineLevels(url, LevelThreads.combinableBroadcast(event), one);
+			if (streak != null)
+			{
+				streak.accept(null);
+				return;
+			}
+			post(url, DiscordMerge.single(event, discordWords()), one, false, null);
 			return;
 		}
 		if (family == null)
@@ -1577,7 +1585,7 @@ class GroupEventEngine
 		{
 			return;
 		}
-		Consumer<byte[]> send = combineLevels(url, moment);
+		Consumer<byte[]> send = combineLevels(url, LevelThreads.combinable(moment.events), moment.events);
 		if (send == null)
 		{
 			send = poster(url, post, moment.events, true);
@@ -1619,20 +1627,19 @@ class GroupEventEngine
 	}
 
 	/**
-	 * A moment that is one skill's level-up joins that skill's post when the combine window is on: the first
-	 * posts and is kept, later ones edit it ({@link LevelThreads}). Returns what sends it, given the picture; null
-	 * when the moment posts as usual.
+	 * A moment that is one skill's level-up ({@code level}, null when it is not) joins that skill's post when the
+	 * combine window is on: the first posts and is kept, later ones edit it ({@link LevelThreads}). Returns what
+	 * sends it, given the picture; null when the moment posts as usual.
 	 */
-	private Consumer<byte[]> combineLevels(String url, DiscordBatch.Pending moment)
+	private Consumer<byte[]> combineLevels(String url, GroupEvent level, List<GroupEvent> events)
 	{
 		long window = TimeUnit.MINUTES.toMillis(config.discordCombineLevels());
-		GroupEvent level = window > 0 ? LevelThreads.combinable(moment.events) : null;
-		if (level == null)
+		if (window <= 0 || level == null)
 		{
 			return null;
 		}
 		// The egg reads the item cache: on the client thread, as every other post's does.
-		String egg = egg(moment.events);
+		String egg = egg(events);
 		return png -> levelUp(url, level, window, png, egg);
 	}
 
