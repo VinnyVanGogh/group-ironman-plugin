@@ -5,16 +5,20 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The live online board (Board 2026-11-10): one message in the Group channel, one line per member, edited on
@@ -26,8 +30,11 @@ import java.util.function.Supplier;
  * the same token". It takes {@code content}, {@code embeds} and {@code allowed_mentions}, not {@code username}.
  *
  * <ul>
- * <li>The first send for a webhook posts the board and keeps its id ({@link #takeSaved}, this client's config
- * only, never the party). Every later send edits it; an edit Discord answers 404 (deleted) posts a new one.</li>
+ * <li>The first send for a webhook posts the board and keeps its id ({@link #takeSaved}, this client's own file
+ * only, never the party), keyed by the webhook's id from its URL. Every later send edits it, after a restart
+ * too; an edit Discord answers 404 (deleted) posts a new one. Any new board deletes the ones before it.</li>
+ * <li>Nothing is sent until the keeper says its inputs have settled ({@link #settle}), so a restart never posts
+ * to the webhook the board is on for a moment before the leader's role and shared webhooks load.</li>
  * <li>Once a day (Board 2026-11-14, 'Repost board daily'), the first send after the keeper's midnight posts a
  * new board, then deletes the old one (Delete Webhook Message, {@code DELETE .../messages/{message.id}}) once
  * the new id is saved, so the board is back at the bottom of the channel and the channel still holds one.</li>
@@ -128,14 +135,28 @@ final class StatusBoard
 
 	/** The day of a board saved before daily reposts, or posted without them: the next repost brings it down. */
 	private static final long UNKNOWN_DAY = Long.MIN_VALUE;
+	/** The most earlier boards kept to delete; an older one past this is left. */
+	static final int MAX_OLD = 5;
+	/**
+	 * How long after the session's first login before the board may send (Board 2026-11-14, reposted 3x): the
+	 * leader's role, the shared webhooks and the group cache are in by then, so the first send goes to the webhook
+	 * the board settles on, not the Main fallback a moment before.
+	 */
+	static final long SETTLE_MS = TimeUnit.SECONDS.toMillis(20);
+	/** Webhook URL path: {@code /api/webhooks/{id}/{token}}. The id names the webhook in every URL form. */
+	private static final Pattern HOOK = Pattern.compile("/webhooks/(\\d{1,20})/");
+	private static final String DIGITS = "\\d{1,20}";
 
 	private String url;
+	/** The webhook the board lives on, as saved: "w" and its id from the URL; null with no webhook. */
+	private String hook;
 	private String messageId;
 	/** The keeper's day the board was posted on. */
 	private long postedDay = UNKNOWN_DAY;
-	/** Yesterday's board, to delete now that the new one's id is saved; null when none. */
-	private String oldId;
+	/** Earlier boards on this webhook, oldest first, to delete now that the newest one's id is saved. */
+	private final List<String> oldIds = new ArrayList<>();
 	private boolean idChanged;
+	private boolean settled = true;
 	private String lines;
 	private long changedAt;
 	private String sentLines;
@@ -144,22 +165,64 @@ final class StatusBoard
 	private Send inFlight;
 
 	/**
-	 * The webhook the board lives on, null when there is none (Discord off, another mode). {@code saved} is
-	 * {@link #takeSaved}'s line, read only when the webhook changes; a different webhook starts a new board.
+	 * The webhook the board lives on, null when there is none (Discord off, another mode). {@code saved} is the
+	 * saved boards ({@link #merge} of {@link #takeSaved}'s lines), read only when the webhook changes; a different
+	 * webhook starts a new board. The same webhook in another URL form ({@code thread_id}, a trailing slash,
+	 * discordapp.com) is the same board.
 	 */
 	synchronized void target(String url, Supplier<String> saved)
 	{
-		if (url == null ? this.url == null : url.equals(this.url))
+		String hook = hookOf(url);
+		if (Objects.equals(hook, this.hook))
 		{
+			this.url = hook == null ? null : url;
 			return;
 		}
-		this.url = url;
-		String[] f = url == null ? null : savedLine(url, saved.get());
-		messageId = f == null ? null : f[1];
-		postedDay = f == null || f.length < 3 ? UNKNOWN_DAY : Long.parseLong(f[2]);
-		oldId = f == null || f.length < 4 ? null : f[3];
+		this.url = hook == null ? null : url;
+		this.hook = hook;
+		restore(hook == null ? null : savedLine(url, hook, saved.get()));
 		sentLines = null;
 		inFlight = null;
+	}
+
+	/** Holding the lock: the saved fields ({@link #savedLine}) for the webhook just targeted; null for none. */
+	private void restore(String[] f)
+	{
+		String[] g = f == null ? new String[]{hook} : f;
+		messageId = g.length < 2 || g[1].isEmpty() ? null : g[1];
+		postedDay = g.length < 3 || g[2].isEmpty() ? UNKNOWN_DAY : Long.parseLong(g[2]);
+		oldIds.clear();
+		if (g.length == 4 && !g[3].isEmpty())
+		{
+			oldIds.addAll(Arrays.asList(g[3].split(",")));
+		}
+		// A line saved under the old URL-hash tag is saved again under the webhook's id.
+		idChanged = !Objects.equals(g[0], hook);
+	}
+
+	/**
+	 * Whether the board may send yet: false holds every request (Board 2026-11-14). Set by the keeper each tick
+	 * from {@link #settled(long, long, boolean)}; true until then, so a board without a keeper's say sends.
+	 */
+	synchronized void settle(boolean settled)
+	{
+		this.settled = settled;
+	}
+
+	/**
+	 * True once the inputs that decide the board's webhook have settled: the session's first login was
+	 * {@link #SETTLE_MS} ago ({@code loginAt}, 0 before one) and the saved boards and group cache are read.
+	 */
+	static boolean settled(long loginAt, long now, boolean loaded)
+	{
+		return loaded && loginAt > 0 && now - loginAt >= SETTLE_MS;
+	}
+
+	/** The saved tag for {@code url}'s webhook: "w" and the id in its path; null when it is not a webhook URL. */
+	static String hookOf(String url)
+	{
+		Matcher m = url == null ? null : HOOK.matcher(url);
+		return m != null && m.find() ? "w" + m.group(1) : null;
 	}
 
 	/** The board's lines now; the edit time moves only when they change. */
@@ -191,10 +254,10 @@ final class StatusBoard
 		{
 			return null;
 		}
-		if (oldId != null && !idChanged)
+		if (!oldIds.isEmpty() && !idChanged)
 		{
 			// Deleting makes no noise in the channel, so neither quiet hours nor the gap hold it.
-			return send(now, new Send(url, oldId, null, 0, null, day, true));
+			return send(now, new Send(url, oldIds.get(0), null, 0, null, day, true));
 		}
 		String replaces = repost ? reposting(day) : null;
 		if (!due(replaces) || quiet || now - lastTry < MIN_GAP_MS)
@@ -204,10 +267,10 @@ final class StatusBoard
 		return send(now, new Send(url, replaces == null ? messageId : null, lines, changedAt, replaces, day, false));
 	}
 
-	/** Holding the lock: no webhook, a request already out, or a Retry-After still running. */
+	/** Holding the lock: no webhook, not settled yet, a request already out, or a Retry-After still running. */
 	private boolean held(long now)
 	{
-		return url == null || inFlight != null || now < notBefore;
+		return url == null || !settled || inFlight != null || now < notBefore;
 	}
 
 	/** Holding the lock: the board a post on {@code day} replaces, when one was posted on an earlier day. */
@@ -241,7 +304,7 @@ final class StatusBoard
 		inFlight = null;
 		if (send.delete)
 		{
-			deleted(status, retryAfterMs, now);
+			deleted(send, status, retryAfterMs, now);
 		}
 		else if (status >= 200 && status < 300)
 		{
@@ -276,8 +339,9 @@ final class StatusBoard
 	}
 
 	/**
-	 * Holding the lock: Discord took {@code send}; a post's answer carries the board's id. A repost whose id is
-	 * unreadable keeps editing the old board, which is then not deleted.
+	 * Holding the lock: Discord took {@code send}; a post's answer carries the board's id. Every new board, for
+	 * whatever reason it was posted, puts the one it follows on the list to delete (Board 2026-11-14: one board
+	 * per webhook). A repost whose id is unreadable keeps editing the old board, which is then not deleted.
 	 */
 	private void sent(Send send, String newId)
 	{
@@ -289,17 +353,31 @@ final class StatusBoard
 		postedDay = send.day;
 		if (newId != null)
 		{
-			oldId = send.replaces;
+			addOld(messageId);
 			messageId = newId;
 			idChanged = true;
 		}
 	}
 
+	/** Holding the lock: {@code id} joins the boards to delete, the oldest dropped past {@link #MAX_OLD}. */
+	private void addOld(String id)
+	{
+		if (id == null || oldIds.contains(id))
+		{
+			return;
+		}
+		oldIds.add(id);
+		while (oldIds.size() > MAX_OLD)
+		{
+			oldIds.remove(0);
+		}
+	}
+
 	/**
-	 * Holding the lock: how deleting yesterday's board went. A 429 or a dropped request tries again; anything
+	 * Holding the lock: how deleting an earlier board went. A 429 or a dropped request tries again; anything
 	 * else, a 404 (already gone) too, is the end of it: a board that cannot be deleted is left.
 	 */
-	private void deleted(int status, long retryAfterMs, long now)
+	private void deleted(Send send, int status, long retryAfterMs, long now)
 	{
 		if (status == 429)
 		{
@@ -307,7 +385,7 @@ final class StatusBoard
 		}
 		else if (status != DiscordQueue.DROPPED)
 		{
-			oldId = null;
+			oldIds.remove(send.messageId);
 			idChanged = true;
 		}
 	}
@@ -319,50 +397,83 @@ final class StatusBoard
 	}
 
 	/**
-	 * The line to save when the board changed since the last call, "" to forget it, else null: the webhook's tag
-	 * and the id, then the day it was posted and the board still to delete, when there are.
+	 * This webhook's line to {@link #merge} into the saved boards when it changed since the last call, else null:
+	 * the webhook's tag ({@link #hookOf}: its id, never the token), the board's id, the day it was posted, and the
+	 * earlier boards still to delete, comma-separated. Empty fields at the end are left off; the tag alone
+	 * forgets the webhook's board.
 	 */
 	synchronized String takeSaved()
 	{
-		if (!idChanged)
+		if (!idChanged || hook == null)
 		{
 			return null;
 		}
 		idChanged = false;
-		if (messageId == null || url == null)
+		String id = messageId == null ? "" : messageId;
+		String day = messageId == null || postedDay == UNKNOWN_DAY ? "" : Long.toString(postedDay);
+		String line = hook + SEP + id + SEP + day + SEP + String.join(",", oldIds);
+		while (line.endsWith(SEP))
 		{
-			return "";
-		}
-		String line = tag(url) + SEP + messageId;
-		if (postedDay != UNKNOWN_DAY)
-		{
-			line += SEP + postedDay + (oldId == null ? "" : SEP + oldId);
+			line = line.substring(0, line.length() - SEP.length());
 		}
 		return line;
 	}
 
-	/** The webhook is kept only as a hash, so the saved line can tell a changed webhook without holding it. */
-	private static String tag(String url)
+	/**
+	 * The saved boards with {@code line} ({@link #takeSaved}) in place of its webhook's old one: one line per
+	 * webhook. Lines under the old URL-hash tag go, since a target reads them only once.
+	 */
+	static String merge(String saved, String line)
+	{
+		String hook = line.split(SEP, -1)[0];
+		List<String> out = new ArrayList<>();
+		for (String l : saved == null ? new String[0] : saved.split("\n"))
+		{
+			String tag = l.split(SEP, -1)[0];
+			if (tag.startsWith("w") && !tag.equals(hook))
+			{
+				out.add(l);
+			}
+		}
+		if (!line.equals(hook))
+		{
+			out.add(line);
+		}
+		return String.join("\n", out);
+	}
+
+	/** The tag lines were saved under before webhook ids: a hash of the whole URL, so any URL change lost it. */
+	private static String legacyTag(String url)
 	{
 		return Integer.toHexString(url.hashCode());
 	}
 
-	/** The saved line's fields when it is this webhook's: tag, id, and maybe the day and the board to delete. */
-	private static String[] savedLine(String url, String saved)
+	/** This webhook's saved fields, else null: tag, id, and maybe the day and the boards to delete. */
+	private static String[] savedLine(String url, String hook, String saved)
 	{
-		String[] f = saved == null ? new String[0] : saved.split(SEP, -1);
-		if (f.length < 2 || f.length > 4 || !f[0].equals(tag(url)))
+		String[] legacy = null;
+		for (String line : saved == null ? new String[0] : saved.split("\n"))
 		{
-			return null;
-		}
-		for (int i = 1; i < f.length; i++)
-		{
-			if (!f[i].matches("\\d{1,18}"))
+			String[] f = line.split(SEP, -1);
+			if (f[0].equals(hook) && wellFormed(f))
 			{
-				return null;
+				return f;
 			}
+			legacy = f[0].equals(legacyTag(url)) && wellFormed(f) ? f : legacy;
 		}
-		return f;
+		return legacy;
+	}
+
+	private static boolean wellFormed(String[] f)
+	{
+		if (f.length < 2 || f.length > 4)
+		{
+			return false;
+		}
+		boolean ok = f[1].isEmpty() || f[1].matches(DIGITS);
+		// The day is parsed as a long, so it is held to 18 digits; ids stay text.
+		ok &= f.length < 3 || f[2].isEmpty() || f[2].matches("\\d{1,18}");
+		return ok && (f.length < 4 || f[3].isEmpty() || f[3].matches(DIGITS + "(," + DIGITS + ")*"));
 	}
 
 	// ---- What it says ----

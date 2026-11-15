@@ -2,10 +2,6 @@ package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -1860,15 +1856,10 @@ class GroupService
 	{
 		try
 		{
-			Filepath file = cacheFile();
-			if (!file.isFile())
+			String json = PluginFiles.read(cacheFile());
+			if (json == null)
 			{
 				return false;
-			}
-			String json;
-			try (InputStream in = file.openInputStream())
-			{
-				json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
 			}
 			if (!GroupCache.read(gson, json, roster))
 			{
@@ -1913,23 +1904,7 @@ class GroupService
 		{
 			try
 			{
-				Filepath file = cacheFile();
-				Filepath dir = file.getParent();
-				dir.createDirectories();
-				// Write a temp file beside the cache, then move it over, so a crash never leaves half a file.
-				Filepath tmp = dir.createTempFile("group-cache", ".tmp");
-				try
-				{
-					try (OutputStream out = tmp.openOutputStream())
-					{
-						out.write(json.getBytes(StandardCharsets.UTF_8));
-					}
-					tmp.moveTo(file, StandardCopyOption.REPLACE_EXISTING);
-				}
-				finally
-				{
-					tmp.deleteIfExists();
-				}
+				PluginFiles.write(cacheFile(), json, "group-cache");
 			}
 			catch (Exception e)
 			{
@@ -1941,7 +1916,19 @@ class GroupService
 	/** Executor thread. The cache inside the plugin's data directory (.runelite/plugin-data/gim-utilities). */
 	private Filepath cacheFile() throws Exception
 	{
-		return dataDirectory.call().joinSegment(CACHE_FILE);
+		return dataFile(CACHE_FILE);
+	}
+
+	/** Executor thread. {@code name} inside the plugin's data directory. */
+	Filepath dataFile(String name) throws Exception
+	{
+		return dataDirectory.call().joinSegment(name);
+	}
+
+	/** True once the group cache (roster, the leader's shared webhooks) has been read at startup. */
+	boolean cacheLoaded()
+	{
+		return cacheLoaded;
 	}
 
 	/** Kept for the panel: is any group feature on; false shows its "everything is off" notice. */

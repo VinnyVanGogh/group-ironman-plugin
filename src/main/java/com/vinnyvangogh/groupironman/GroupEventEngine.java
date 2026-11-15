@@ -101,8 +101,13 @@ class GroupEventEngine
 	 * client closed in it can post the offline on the next start. Not a setting: never shown.
 	 */
 	static final String PRESENCE_KEY = "presencePending";
-	/** Config key: the live board's message id, with a hash of its webhook. Not a setting; never sent to the party. */
+	/**
+	 * Config key: where the live board's message id was kept before {@link #BOARD_FILE}; read once to carry it
+	 * over, then unset. Also the fallback when the file cannot be written. Not a setting; never sent to the party.
+	 */
 	static final String BOARD_KEY = "statusBoardMessage";
+	/** Plugin data file: each webhook's live board ids ({@link StatusBoard#merge}), written on every change. */
+	static final String BOARD_FILE = "status-board.txt";
 	/** Config key: set once 'Online status' has been chosen for this install, so an upgrade keeps its old choice. */
 	static final String ONLINE_STATUS_CHOSEN_KEY = "onlineStatusChosen";
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
@@ -174,6 +179,10 @@ class GroupEventEngine
 	private final StatusBoard board = new StatusBoard();
 	/** This player for the live board: set on the client thread, read by the timer. Null before a login. */
 	private volatile StatusBoard.Self boardSelf;
+	/** The saved boards as {@link #BOARD_FILE} holds them; null until read this run. */
+	private volatile String boardSaved;
+	/** This run's first login, 0 before one: the board waits {@link StatusBoard#SETTLE_MS} after it. */
+	private volatile long boardLoginAt;
 	private ScheduledFuture<?> pump;
 	private EventToastOverlay toastOverlay;
 	private GroupBoxOverlay boxOverlay;
@@ -234,8 +243,12 @@ class GroupEventEngine
 		{
 			sender.clear();
 		}
-		// The queue's board request is gone with it: forget it was out, so a restart sends again.
+		// The queue's board request is gone with it: forget it was out, so a restart sends again. A board
+		// answered since the last tick is saved first.
+		saveBoard();
 		board.target(null, () -> null);
+		boardSaved = null;
+		boardLoginAt = 0;
 		// Unsent posts are dropped at shutdown, as the sender's queue is.
 		batch.drain();
 		levelShot.clear();
@@ -341,39 +354,95 @@ class GroupEventEngine
 	 */
 	private void boardTick(long now)
 	{
+		loadBoards();
+		// What Discord answered since the last tick is saved before the webhook can change.
+		saveBoard();
 		String url = webhookFor(Webhook.ONLINE);
 		if (!StatusBoard.keeps(config.discordOnlineStatus(), webhooks(), group.isLeader()))
 		{
 			url = null;
 		}
-		board.target(url, () -> configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY));
+		// Board 2026-11-14: nothing goes out until the leader's role, the shared webhooks and the saved boards are in.
+		board.settle(StatusBoard.settled(boardLoginAt, now, boardSaved != null && group.cacheLoaded()));
+		board.target(url, () -> boardSaved);
 		if (url != null)
 		{
-			// Logged out too: the last plugin user's client marks the board as no longer kept current.
-			String lines = StatusBoard.lines(group.members(), group.roster().lastHeard(), group.roster().lastSeen(),
-				group.roster().allStats(), boardSelf, group.presence(), now);
-			if (!lines.isEmpty())
+			sendBoard(now);
+		}
+		saveBoard();
+	}
+
+	/** Timer: the board's lines now, and its next request when one is due. */
+	private void sendBoard(long now)
+	{
+		// Logged out too: the last plugin user's client marks the board as no longer kept current.
+		String lines = StatusBoard.lines(group.members(), group.roster().lastHeard(), group.roster().lastSeen(),
+			group.roster().allStats(), boardSelf, group.presence(), now);
+		if (!lines.isEmpty())
+		{
+			board.show(lines, now);
+		}
+		GroupSettingsSchema.Resolved v = resolved();
+		boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), v.intValue("discordQuietStart"),
+			v.intValue("discordQuietEnd"));
+		StatusBoard.Send send = board.next(now, quiet, LocalDate.now().toEpochDay(), config.discordRepostBoard());
+		if (send != null)
+		{
+			board.send(sender, send, StatusBoard.payload(gson, send, config.discordStyle(),
+				posterName(Webhook.ONLINE)), System::currentTimeMillis);
+		}
+	}
+
+	/** Timer: the saved boards, read once a run: the plugin's file, else the line the config kept before it. */
+	private void loadBoards()
+	{
+		if (boardSaved != null)
+		{
+			return;
+		}
+		String text = null;
+		try
+		{
+			text = PluginFiles.read(group.dataFile(BOARD_FILE));
+		}
+		catch (Exception e)
+		{
+			log.debug("could not read the saved boards", e);
+		}
+		if (text == null)
+		{
+			text = configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY);
+		}
+		boardSaved = text == null ? "" : text;
+	}
+
+	/**
+	 * Timer, and shutdown: a changed board id, written to the plugin's file at once. Not the RuneLite config:
+	 * ConfigManager keeps a change in memory and writes it every five minutes or at a clean shutdown, so a client
+	 * killed sooner (a dev client stopped from Gradle) lost the id and the next start posted a new board.
+	 */
+	private void saveBoard()
+	{
+		String before = boardSaved;
+		String line = before == null ? null : board.takeSaved();
+		if (line == null)
+		{
+			return;
+		}
+		String text = StatusBoard.merge(before, line);
+		boardSaved = text;
+		try
+		{
+			PluginFiles.write(group.dataFile(BOARD_FILE), text, "status-board");
+			if (configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY) != null)
 			{
-				board.show(lines, now);
-			}
-			GroupSettingsSchema.Resolved v = resolved();
-			boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), v.intValue("discordQuietStart"),
-				v.intValue("discordQuietEnd"));
-			StatusBoard.Send send = board.next(now, quiet, LocalDate.now().toEpochDay(), config.discordRepostBoard());
-			if (send != null)
-			{
-				board.send(sender, send, StatusBoard.payload(gson, send, config.discordStyle(),
-					posterName(Webhook.ONLINE)), System::currentTimeMillis);
+				configManager.unsetConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY);
 			}
 		}
-		String saved = board.takeSaved();
-		if (saved != null && saved.isEmpty())
+		catch (Exception e)
 		{
-			configManager.unsetConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY);
-		}
-		else if (saved != null)
-		{
-			configManager.setConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY, saved);
+			log.debug("could not write the saved boards", e);
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY, text);
 		}
 	}
 
@@ -1095,6 +1164,11 @@ class GroupEventEngine
 			varWait = VAR_WAIT_TICKS;
 		}
 		boardSelf = new StatusBoard.Self(name, true, client.getWorld(), 0);
+		if (boardLoginAt == 0)
+		{
+			// A hop logs in again too; only the run's first login starts the board's wait.
+			boardLoginAt = now;
+		}
 		List<GroupEvent> posts;
 		synchronized (presenceLock)
 		{
