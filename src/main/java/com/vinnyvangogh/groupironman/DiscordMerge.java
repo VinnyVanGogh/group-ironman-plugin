@@ -179,7 +179,7 @@ final class DiscordMerge
 			extras(folded(events), lookup), anyBig(events));
 	}
 
-	private static String visitTitle(boolean deposit, boolean withdrawal)
+	static String visitTitle(boolean deposit, boolean withdrawal)
 	{
 		if (deposit && withdrawal)
 		{
@@ -212,7 +212,7 @@ final class DiscordMerge
 	 * stack's amount is in {@code lookup}'s words; the big value is the game's short form, as
 	 * {@link EventText#items} keeps it, so parentheses never nest.
 	 */
-	private static void moved(StringBuilder text, String verb, Map<Integer, Integer> items, long min,
+	static void moved(StringBuilder text, String verb, Map<Integer, Integer> items, long min,
 		ItemLookup lookup)
 	{
 		if (items.isEmpty())

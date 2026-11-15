@@ -25,13 +25,10 @@ public class LevelPostsTest
 
 	private final Gson gson = new Gson();
 	private long now = 1_000_000;
-	private final List<DiscordQueue.Post> sent = new ArrayList<>();
-	private final List<DiscordSender.Done> pending = new ArrayList<>();
-	private final DiscordSender sender = new DiscordSender((post, done) ->
-	{
-		sent.add(post);
-		pending.add(done);
-	}, () -> now, () -> 12);
+	private final FakeTransport fake = new FakeTransport(() -> now);
+	private final List<DiscordQueue.Post> sent = fake.sent;
+	private final List<DiscordSender.Done> pending = fake.pending;
+	private final DiscordSender sender = fake.sender;
 	/** The Progress poster name the replacement post is sent under. */
 	private String poster = "Iron Pals";
 	private DiscordStyle style = DiscordStyle.EMBED;
@@ -68,7 +65,7 @@ public class LevelPostsTest
 
 	private void reply(int status, String messageId)
 	{
-		pending.remove(0).done(status, null, messageId);
+		fake.reply(status, messageId);
 	}
 
 	/** The top card's words. */
