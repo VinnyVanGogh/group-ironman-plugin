@@ -69,6 +69,14 @@ final class EventSettings
 		both(GroupEvent.Type.FARMING, GroupIronmanConfig::discordFarming, GroupIronmanConfig::overlayFarming);
 		both(GroupEvent.Type.BIRDHOUSE, GroupIronmanConfig::discordBirdhouse, GroupIronmanConfig::overlayBirdhouse);
 		both(GroupEvent.Type.REQUEST, GroupIronmanConfig::discordRequest, GroupIronmanConfig::overlayRequest);
+		both(GroupEvent.Type.ACTIVITY_START, GroupIronmanConfig::discordActivityStart,
+			GroupIronmanConfig::overlayActivityStart);
+		both(GroupEvent.Type.ACTIVITY_WAVE, GroupIronmanConfig::discordActivityWave,
+			GroupIronmanConfig::overlayActivityWave);
+		both(GroupEvent.Type.ACTIVITY_COMPLETE, GroupIronmanConfig::discordActivityComplete,
+			GroupIronmanConfig::overlayActivityComplete);
+		both(GroupEvent.Type.ACTIVITY_DEATH, GroupIronmanConfig::discordActivityDeath,
+			GroupIronmanConfig::overlayActivityDeath);
 
 		DIGEST.put(GroupEvent.Category.DROPS, GroupIronmanConfig::digestDrops);
 		DIGEST.put(GroupEvent.Category.DEATHS, GroupIronmanConfig::digestDeaths);

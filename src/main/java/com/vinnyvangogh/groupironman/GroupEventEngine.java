@@ -119,6 +119,10 @@ class GroupEventEngine
 	static final String ONLINE_STATUS_CHOSEN_KEY = "onlineStatusChosen";
 	/** Config key: set once 'Combine level-ups' has been settled for this install ({@link #keepCombineWindow}). */
 	static final String COMBINE_CHOSEN_KEY = "combineLevelsChosen";
+	/** Profile key: this player's wave run ({@link WaveTracker#save}), so a logout mid-run resumes. Not a setting. */
+	static final String WAVE_RUN_KEY = "activityRun";
+	/** An activity is sent again this often while it lasts, so members can tell a crashed client's run apart. */
+	static final long ACTIVITY_KEEPALIVE_MS = 60_000;
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
 		GroupEvent.Type.WILDERNESS, GroupEvent.Type.HC_LIFE_LOST);
 
@@ -191,6 +195,10 @@ class GroupEventEngine
 	private final LoginBurst broadcastBurst = new LoginBurst(t -> true);
 	/** Whose values the baselines hold, and when they count. Client thread. */
 	private final LoginGate gate = new LoginGate(progress, watchers, ownBurst, broadcastBurst);
+	/** Client thread: this player's Fight Caves, Inferno or Colosseum run (docs/plans/activities.md Slice A). */
+	private final WaveTracker waves = new WaveTracker(this::own, this::teamMode);
+	/** Client thread: when this player's activity last went to the roster and the party. */
+	private long activitySentAt;
 	/** The death's frame for the gravestone warning; memory only, so a restart loses it. */
 	private final GraveShot graveShot = new GraveShot();
 	/** Level-up pictures, taken once the chat shows the level. Client thread. */
@@ -412,8 +420,13 @@ class GroupEventEngine
 	private void sendBoard(long now)
 	{
 		// Logged out too: the last plugin user's client marks the board as no longer kept current.
+		StatusBoard.Self self = boardSelf;
+		GroupGovernance g = group.governance();
+		Map<String, String> activities = StatusBoard.activitySuffixes(group.roster().activities(now),
+			g == null ? Collections.<String, MemberPrefs>emptyMap() : g.prefs(), self == null ? "" : self.name, MemberPrefs.of(config),
+			config.groupShareEvents());
 		String lines = StatusBoard.lines(group.members(), group.roster().lastHeard(), group.roster().lastSeen(),
-			group.roster().allStats(), boardSelf, group.presence(), now);
+			group.roster().allStats(), self, group.presence(), activities, now);
 		if (!lines.isEmpty())
 		{
 			board.show(lines, now);
@@ -863,6 +876,11 @@ class GroupEventEngine
 		{
 			return;
 		}
+		if (event.getType() == ChatMessageType.GAMEMESSAGE)
+		{
+			// Waves, a Colosseum wave cleared, a defeat, and the kill count and duration that complete a run.
+			waves.chat(message, now, group.localPlayer());
+		}
 		EventText.Count count = EventText.killCount(message);
 		if (count != null)
 		{
@@ -982,8 +1000,8 @@ class GroupEventEngine
 
 	private String whereIs(Player me)
 	{
-		WorldPoint at = me.getLocalLocation() == null ? null : WorldPoint.fromLocalInstance(client, me.getLocalLocation());
-		return at == null ? null : group.regions().describe(at.getRegionID());
+		int region = templateRegion(me);
+		return region < 0 ? null : group.regions().describe(region);
 	}
 
 	@Subscribe
@@ -1002,7 +1020,7 @@ class GroupEventEngine
 			watchers.died(items, where == null ? "" : where, client.getWorld());
 		}
 		int grave = graveShot.died();
-		if (wanted(GroupEvent.Type.DEATH))
+		if (postsPlainDeath())
 		{
 			deathPost(me, where);
 		}
@@ -1011,6 +1029,17 @@ class GroupEventEngine
 		{
 			drawManager.requestNextFrameListener(image -> executor.execute(() -> graveShot.keep(grave, png(image))));
 		}
+	}
+
+	/**
+	 * This player's death, told to the wave run first (which posts its activity death). False when the plain death
+	 * is not wanted, or when it was a death in a run whose activity death posts to Discord: one death, one post
+	 * (docs/plans/activities.md §0, "Activity death vs plain DEATH").
+	 */
+	private boolean postsPlainDeath()
+	{
+		boolean inRun = waves.died(System.currentTimeMillis(), group.localPlayer());
+		return wanted(GroupEvent.Type.DEATH) && !(inRun && settings.discord.contains(GroupEvent.Type.ACTIVITY_DEATH));
 	}
 
 	private void deathPost(Player me, String where)
@@ -1141,6 +1170,16 @@ class GroupEventEngine
 			{
 				boardSelf = new StatusBoard.Self(was.name, false, was.world, System.currentTimeMillis());
 			}
+			// A run stays in the profile, paused, for this account's next login; members see it end now.
+			long now = System.currentTimeMillis();
+			waves.pause(now);
+			if (waves.active())
+			{
+				saveProfile(WAVE_RUN_KEY, waves.save());
+			}
+			waves.reset();
+			waves.takeChanged();
+			group.shareActivity(waves.state(now));
 			// Another account may log in next: what this one was in the middle of (a grave, a raid) goes too.
 			watchers.reset();
 			graveShot.free();
@@ -1231,8 +1270,11 @@ class GroupEventEngine
 		{
 			loginPending = false;
 			login(now, me.getName());
+			// A run this account left mid-way: paused until the player is back in its arena.
+			waves.restore(profile(WAVE_RUN_KEY));
 		}
 		releaseBursts(now);
+		activityTick(now, me);
 		checkBack(now);
 		StatusBoard.Self was = boardSelf;
 		if (was != null && was.online && was.world != client.getWorld())
@@ -1249,6 +1291,44 @@ class GroupEventEngine
 		readInterfaces(now);
 		dry.due(now).forEach(this::own);
 		watch(now, me);
+	}
+
+	/**
+	 * Each tick: the wave run. A completion first (its kill count and duration came this tick, before the teleport
+	 * out), then where the player stands, then the Colosseum's chosen modifiers and glory. A changed run, and a
+	 * run every {@link #ACTIVITY_KEEPALIVE_MS} while it lasts, goes to the roster, the profile and the party.
+	 */
+	private void activityTick(long now, Player me)
+	{
+		String name = me.getName();
+		waves.every(resolved().intValue(GroupSettingsSchema.WAVE_EVERY));
+		waves.tick(now, name);
+		waves.region(templateRegion(me), client.getWorld(), now, name);
+		if (waves.active())
+		{
+			waves.colosseum(ColosseumModifiers.describe(client::getVarbitValue),
+				client.getVarpValue(VarPlayerID.COLOSSEUM_GLORY));
+		}
+		boolean keepAlive = waves.active() && now - activitySentAt >= ACTIVITY_KEEPALIVE_MS;
+		if (waves.takeChanged() || keepAlive)
+		{
+			activitySentAt = now;
+			saveProfile(WAVE_RUN_KEY, waves.save());
+			group.shareActivity(waves.state(now));
+		}
+	}
+
+	/** The template region the player stands in, unwrapped from an instance (Fight Caves, Inferno); -1 if unknown. */
+	private int templateRegion(Player me)
+	{
+		WorldPoint at = me.getLocalLocation() == null ? null : WorldPoint.fromLocalInstance(client, me.getLocalLocation());
+		return at == null ? -1 : at.getRegionID();
+	}
+
+	/** "solo" or the team, group members named and anyone else counted ({@link TeamSummary}). */
+	private String teamMode()
+	{
+		return TeamSummary.of(group.localPlayer(), groupMembers(), playersHere()).mode();
 	}
 
 	/**

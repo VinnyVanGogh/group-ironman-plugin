@@ -216,29 +216,7 @@ final class EventWatchers
 	/** "Theatre of Blood; with Sam +1 other": names only for this group's members; anyone else is only counted. */
 	private String raidDetail(String me, Set<String> group, Collection<String> present)
 	{
-		List<String> named = new ArrayList<>();
-		int others = 0;
-		for (String player : present)
-		{
-			if (player.equalsIgnoreCase(me))
-			{
-				continue;
-			}
-			if (group.contains(player))
-			{
-				named.add(player);
-			}
-			else
-			{
-				others++;
-			}
-		}
-		String team = String.join(", ", named);
-		if (others > 0)
-		{
-			team += (team.isEmpty() ? "" : " ") + "+" + others + (others == 1 ? " other" : " others");
-		}
-		String with = team.isEmpty() ? "" : "with " + team;
+		String with = TeamSummary.of(me, group, present).with();
 		return raid.isEmpty() || with.isEmpty() ? raid + with : raid + "; " + with;
 	}
 

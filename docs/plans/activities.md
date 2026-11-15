@@ -201,6 +201,21 @@ Per `BASE_INSTRUCTIONS.md` (*Research Phase*) and [`EventChat.java:10-14`](../..
 | **Hallowed Sepulchre** | Floor regions `8797, 9051..10077` (`regions.txt:309`) mapped per floor `1–5` + Grand Hallowed Coffin completion chat | Live status `"Hallowed Sepulchre · Floor 5"`. | **Verified regions** (confirm per-floor region split in Slice D) |
 | **TzHaar-Ket-Rak's Challenges** | Challenge arena (`region 9043` without `"Wave: N"` chat, entered via Ket-Rak challenge selection `1–6 Jads`) + completion chat `"Your TzHaar-Ket-Rak's Challenge ... completion count is: ..."` | Live status `"Ket-Rak's Challenge · 4 Jads"`. | **Unverified chat wording** (confirm in Slice A alongside TzHaar) |
 
+### 2.5 Slice A verification (2026-11-14)
+
+Resolved with `javap -constants -cp runelite-api-1.13.6.jar net.runelite.api.gameval.VarbitID net.runelite.api.gameval.VarPlayerID` (the newest client in the Gradle cache; the build follows `latest.release`), and against the Hub plugin `LlemonDuck/fortis-colosseum` (`util/Modifier.java`, `util/ColosseumStateTracker.java`, read on GitHub):
+
+| Doc item | Resolved to | Source |
+| --- | --- | --- |
+| Colosseum glory | `VarPlayerID.COLOSSEUM_GLORY` (= 4130, a varp) | javap |
+| Colosseum modifier tiers | `VarbitID.COLOSSEUM_MODIFIER_{TOXICITY,BLASPHEMY,DOOM,FRAILTY,MANTIMAYHEM,MYOPIA,REENTRY,RELENTLESS,SOLARFLARE,VOLATILITY}_STACKS_CLIENT` (9791, 9790, 10681, 9796, 4588, 9795, 9792, 9798, 9797, 9799); value 0 = not chosen, 1..3 = tier I..III. *Bees!* is the game's `TOXICITY` varbit. | javap; fortis-colosseum `Modifier.levelVarb` uses the same ids |
+| Untiered modifiers (Dynamic Duo, Quartet, Red Flag, Totemic) | **Not built in Slice A.** No varbit; fortis-colosseum reads them from script 4931's argument bitmask, which has no `gameval` constant (`ScriptID` has none), so reading it would mean a magic script id. | javap of `net.runelite.api.ScriptID` |
+| `COLOSSEUM_DOOM_STACKS_CLIENT` (9801) | Not used: that is the live Doom stack on the player during a wave (a mechanic), not the chosen tier. | javap; §1.3 |
+| Wave line | `Wave: N` inside `<col>` tags in all three (fortis-colosseum `substring(18, len - 6)` strips exactly `<col=xxxxxx>Wave: ` and `</col>`). | fortis-colosseum `ColosseumStateTracker` |
+| Colosseum wave cleared | `^Wave (\d+) completed!` (followed by "Wave duration: ..."), wave 12 starts on "Sol Heredit jumps down from his seat". | fortis-colosseum `ColosseumStateTracker` |
+| Defeat line `You have been defeated!` | **Still unconfirmed in game.** The player's own `ActorDeath` covers a defeat without it; a defeat line within 3 s of the death is the same death. | — |
+| TzHaar-Ket-Rak's Challenges | **Not built in Slice A** (the brief's A1/A2 are the Fight Caves, Inferno and Colosseum). A run starts only on a `Wave: N` line inside region 9043, so a Ket-Rak challenge in the same region is not mistaken for the Inferno unless it prints that line (unconfirmed). | — |
+
 ---
 
 ## 3. Code Map (`main` @ `a545f38`, accounting for PRs #48 & #49)

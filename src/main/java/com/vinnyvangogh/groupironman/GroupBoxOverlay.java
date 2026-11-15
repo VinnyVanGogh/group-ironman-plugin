@@ -18,6 +18,7 @@ import net.runelite.client.ui.overlay.components.TitleComponent;
  */
 final class GroupBoxOverlay extends OverlayPanel
 {
+	private static final Color ACTIVITY = new Color(0xE0, 0xB0, 0x40);
 	private final ToastQueue toasts;
 	private final GroupIronmanConfig config;
 	private final GroupService group;
@@ -49,11 +50,19 @@ final class GroupBoxOverlay extends OverlayPanel
 			panelComponent.getChildren().add(LineComponent.builder().left("Nobody else online").leftColor(Color.GRAY)
 				.build());
 		}
+		Map<String, ActivityState> activities = group.roster().activities(now);
 		for (Map.Entry<String, Integer> e : online.entrySet())
 		{
 			int world = e.getValue();
 			panelComponent.getChildren().add(LineComponent.builder().left(e.getKey())
 				.right(world > 0 ? "W" + world : "").rightColor(Color.GREEN).build());
+			ActivityState a = activities.get(e.getKey());
+			if (a != null)
+			{
+				// Formatted when the state arrived, not here: this runs every frame.
+				panelComponent.getChildren().add(LineComponent.builder().left(a.overlayLine()).leftColor(ACTIVITY)
+					.build());
+			}
 		}
 		EasterEggs.Settings egg = eggs.get();
 		for (GroupEvent event : toasts.recent(config.overlayGroupBoxEvents()))

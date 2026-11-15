@@ -98,6 +98,23 @@ final class EventText
 		line(GroupEvent.Type.FARMING, "Farming run", (e, l) -> ready(e));
 		line(GroupEvent.Type.BIRDHOUSE, "Bird houses and Hespori", (e, l) -> ready(e));
 		line(GroupEvent.Type.REQUEST, "Request", (e, l) -> RequestBoard.describe(e));
+		line(GroupEvent.Type.ACTIVITY_START, "Activity started", (e, l) -> "started " + e.text + extra(e));
+		line(GroupEvent.Type.ACTIVITY_WAVE, "Activity wave", (e, l) -> "reached " + e.detail + " in " + e.text);
+		line(GroupEvent.Type.ACTIVITY_COMPLETE, "Activity completed", EventText::activityDone);
+		line(GroupEvent.Type.ACTIVITY_DEATH, "Activity death", (e, l) -> "died in " + e.text + extra(e)
+			+ (e.world > 0 ? " (world " + e.world + ")" : ""));
+	}
+
+	/** " (wave 58/69, 1h 12m)": the event's detail in brackets, or nothing. */
+	private static String extra(GroupEvent e)
+	{
+		return e.detail.isEmpty() ? "" : " (" + e.detail + ")";
+	}
+
+	/** "completed The Inferno, kill count 3 (69/69, 1:58:12)" or "left Fortis Colosseum (claimed loot after wave 7)". */
+	private static String activityDone(GroupEvent e, ItemLookup lookup)
+	{
+		return (e.number > 0 ? "completed " + e.text + ", kill count " + e.number : "left " + e.text) + extra(e);
 	}
 
 	private static boolean isOffline(GroupEvent e)

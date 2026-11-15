@@ -118,6 +118,12 @@ public class GroupIronmanPlugin extends Plugin
 	@Inject
 	private ConfigManager configManager;
 
+	/**
+	 * The Shopping tab's open lists and items ({@link ShopFolds}), in the logged-in character's RuneLite profile:
+	 * not a setting, never shown or sent. Frozen once published.
+	 */
+	static final String SHOPPING_OPEN_KEY = "shoppingOpen";
+
 	@Inject
 	private ChatMessageManager chatMessageManager;
 
@@ -315,6 +321,25 @@ public class GroupIronmanPlugin extends Plugin
 			public boolean claimRequest(String id, int itemId, boolean claimed)
 			{
 				return group.claimRequest(id, itemId, claimed);
+			}
+
+			@Override
+			public String openLists()
+			{
+				return configManager.getRSProfileConfiguration(GroupIronmanConfig.GROUP, SHOPPING_OPEN_KEY);
+			}
+
+			@Override
+			public void saveOpenLists(String keys)
+			{
+				if (keys == null)
+				{
+					configManager.unsetRSProfileConfiguration(GroupIronmanConfig.GROUP, SHOPPING_OPEN_KEY);
+				}
+				else
+				{
+					configManager.setRSProfileConfiguration(GroupIronmanConfig.GROUP, SHOPPING_OPEN_KEY, keys);
+				}
 			}
 
 			@Override

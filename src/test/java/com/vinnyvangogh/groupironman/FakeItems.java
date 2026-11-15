@@ -27,6 +27,7 @@ final class FakeItems implements ItemLookup
 	/** The game's noted yew logs (ItemID.YEW_LOGS + 1); the sender's counts canonicalise it to {@link #YEW_LOGS}. */
 	static final int NOTED_YEW_LOGS = 1516;
 	static final int LOGS = 1511;
+	static final int DRAGON_WARHAMMER = 13576;
 
 	private final Map<Integer, String> names = new HashMap<>();
 	private final Map<Integer, Long> prices = new HashMap<>();
@@ -52,6 +53,7 @@ final class FakeItems implements ItemLookup
 		add(YEW_LOGS, "Yew logs", 300);
 		add(NOTED_YEW_LOGS, "Yew logs", 300);
 		add(LOGS, "Logs", 50);
+		add(DRAGON_WARHAMMER, "Dragon warhammer", 0);
 	}
 
 	private void add(int id, String name, long price)

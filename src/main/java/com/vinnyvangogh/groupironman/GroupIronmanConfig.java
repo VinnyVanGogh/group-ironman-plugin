@@ -687,6 +687,37 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "discordActivityStart", name = "Activity started", description = "You started the Fight"
+		+ " Caves, the Inferno or the Fortis Colosseum (wave 1).", section = discordEventsSection, position = 35)
+	default boolean discordActivityStart()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordActivityWave", name = "Activity wave milestone", description = "You reached a wave"
+		+ " milestone ('Post every N waves' in Thresholds) or a final boss wave: Jad, Zuk, Sol Heredit.",
+		section = discordEventsSection, position = 36)
+	default boolean discordActivityWave()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordActivityComplete", name = "Activity completed", description = "You finished the"
+		+ " Fight Caves, the Inferno or the Colosseum, or claimed Colosseum loot early.",
+		section = discordEventsSection, position = 37)
+	default boolean discordActivityComplete()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordActivityDeath", name = "Activity death", description = "You died or were defeated"
+		+ " in the Fight Caves, the Inferno or the Colosseum, with the wave. Posted instead of 'Died' for that death.",
+		section = discordEventsSection, position = 38)
+	default boolean discordActivityDeath()
+	{
+		return false;
+	}
+
 	// ---- 4. Discord: how to post ----
 
 	@ConfigItem(keyName = "discordOnlineStatus", name = "Online status", description = "Posts: a post for each"
@@ -1209,6 +1240,35 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "overlayActivityStart", name = "Banner: Activity started", description = "A member"
+		+ " started the Fight Caves, the Inferno or the Colosseum.", section = inGameSection, position = 44)
+	default boolean overlayActivityStart()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayActivityWave", name = "Banner: Activity wave", description = "A member reached a"
+		+ " wave milestone ('Post every N waves') or a final boss wave.", section = inGameSection, position = 45)
+	default boolean overlayActivityWave()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayActivityComplete", name = "Banner: Activity completed", description = "A member"
+		+ " finished the Fight Caves, the Inferno or the Colosseum.", section = inGameSection, position = 46)
+	default boolean overlayActivityComplete()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayActivityDeath", name = "Banner: Activity death", description = "A member died or"
+		+ " was defeated in the Fight Caves, the Inferno or the Colosseum, with the wave.", section = inGameSection,
+		position = 47)
+	default boolean overlayActivityDeath()
+	{
+		return false;
+	}
+
 	// ---- 7. Thresholds: what counts. Both Discord and the banners read these. ----
 
 	@ConfigItem(keyName = "eventDropMinValue", name = "Valuable drop (gp)", description = "Valuable drop at least"
@@ -1301,6 +1361,15 @@ public interface GroupIronmanConfig extends Config
 	default String eventUntradeableIgnore()
 	{
 		return EventDetect.DEFAULT_UNTRADEABLE_IGNORE;
+	}
+
+	@ConfigItem(keyName = "eventWaveEvery", name = "Post every N waves", description = "Fight Caves, Inferno and"
+		+ " Colosseum: a wave milestone every this many waves, plus each final boss wave. 0 posts boss waves only.",
+		section = thresholdsSection, position = 10)
+	@Range(min = 0, max = 100)
+	default int eventWaveEvery()
+	{
+		return 10;
 	}
 
 	// ---- 8. Advanced: ::find colours ----

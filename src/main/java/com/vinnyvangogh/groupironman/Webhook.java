@@ -34,9 +34,10 @@ enum Webhook
 			GroupEvent.Type.BARROWS, GroupEvent.Type.RAID_UNIQUE, GroupEvent.Type.STORAGE_LAST);
 		on(PROGRESS, GroupEvent.Type.LEVEL_UP, GroupEvent.Type.MAXED, GroupEvent.Type.XP_MILESTONE,
 			GroupEvent.Type.COMBAT_LEVEL, GroupEvent.Type.TOTAL_LEVEL, GroupEvent.Type.QUEST,
-			GroupEvent.Type.QUEST_POINTS);
+			GroupEvent.Type.QUEST_POINTS, GroupEvent.Type.ACTIVITY_START, GroupEvent.Type.ACTIVITY_WAVE,
+			GroupEvent.Type.ACTIVITY_COMPLETE);
 		on(DEATHS, GroupEvent.Type.DEATH, GroupEvent.Type.DEATH_VALUE, GroupEvent.Type.GRAVESTONE_EXPIRING,
-			GroupEvent.Type.HC_LIFE_LOST);
+			GroupEvent.Type.HC_LIFE_LOST, GroupEvent.Type.ACTIVITY_DEATH);
 		on(STORAGE, GroupEvent.Type.STORAGE_DEPOSIT, GroupEvent.Type.STORAGE_WITHDRAWAL,
 			GroupEvent.Type.STORAGE_SUMMARY, GroupEvent.Type.STORAGE_MINIMUM);
 	}
