@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### One live board per channel, through restarts
+
+- Restarting RuneLite no longer posts a second "Group status" board and
+  leaves the old one behind. The board's message id is now saved to the
+  plugin's own folder the moment it changes; before, it sat in RuneLite's
+  settings, which are written to disk every few minutes, so a client closed
+  quickly forgot its board.
+- The board is tied to the webhook itself, so the same webhook pasted with
+  a `thread_id` or a trailing slash is still the same board.
+- After logging in, the board waits about 20 seconds for the group's
+  leader and shared webhooks to load before it sends anything.
+- Whenever a new board is posted, the ones before it that this client knows
+  about are deleted. Boards left over from before this update are not known
+  and need deleting by hand once.
+
 ### Inventories look like the game's, and online members come first
 
 - A member's inventory in the Group tab now shows their real 28 slots: each
