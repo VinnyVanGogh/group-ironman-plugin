@@ -59,6 +59,49 @@ public class GroupCacheTest
 	}
 
 	@Test
+	public void atMostFiftyMembersAreLookedAtPerSectionAndABadEntryCountsAsOne()
+	{
+		StringBuilder json = new StringBuilder("{\"v\":1,\"banks\":{\"Bad\":7");
+		for (int i = 0; i < 60; i++)
+		{
+			json.append(",\"M").append(i).append("\":{\"ts\":1,\"i\":[385,1]}");
+		}
+		json.append("},\"heard\":{\"Alex\":5,\"Sam\":-1,\"Kim\":\"x\"},\"played\":9}");
+		GroupRoster roster = new GroupRoster();
+		assertTrue(GroupCache.read(GSON, json.toString(), roster));
+		// "Bad" is not a bank, but it is still one of the fifty looked at.
+		assertEquals(GroupCache.MAX_MEMBERS - 1, roster.banks().size());
+		assertTrue(roster.banks().containsKey("M48"));
+		assertFalse(roster.banks().containsKey("M49"));
+		assertEquals(Long.valueOf(5), roster.lastHeard().get("Alex"));
+		assertEquals(1, roster.lastHeard().size());
+		assertEquals(9, roster.lastPlayed());
+	}
+
+	@Test
+	public void extrasSeenHeardStatsAndHiscoresRoundTrip()
+	{
+		GroupRoster before = new GroupRoster();
+		before.putExtras("Sam", new MemberExtras(items(SHARK, 2), items(), items(COAL, 3), 77));
+		before.heard("Sam", 500);
+		before.seen("Alex", new LastSeen(600, 302, true));
+		before.markPlayed(700);
+		GroupRoster after = new GroupRoster();
+		String json = GroupCache.write(GSON, before, "hooks");
+		assertTrue(GroupCache.read(GSON, json, after));
+		assertEquals("hooks", GroupCache.webhooks(GSON, json));
+		assertEquals(null, GroupCache.shop(GSON, json));
+		assertEquals(items(COAL, 3), after.extras().get("Sam").seedVault);
+		assertEquals(77, after.extras().get("Sam").seedVaultAt);
+		assertEquals(Long.valueOf(500), after.lastHeard().get("Sam"));
+		assertEquals(302, after.lastSeen().get("Alex").world);
+		assertTrue(after.lastSeen().get("Alex").plugin);
+		assertEquals(700, after.lastPlayed());
+		// A second write of what was read is the same document.
+		assertEquals(json, GroupCache.write(GSON, after, "hooks"));
+	}
+
+	@Test
 	public void aNewerCacheWithExtraFieldsIsStillRead()
 	{
 		GroupRoster roster = new GroupRoster();

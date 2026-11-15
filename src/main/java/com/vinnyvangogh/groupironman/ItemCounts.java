@@ -5,7 +5,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonPrimitive;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.function.IntUnaryOperator;
 
 /**
@@ -47,6 +49,18 @@ final class ItemCounts
 	{
 		long sum = (long) a + b;
 		return sum > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sum;
+	}
+
+	/** Every id in {@code maps}, for one batch of name lookups. */
+	@SafeVarargs
+	static Set<Integer> ids(Map<Integer, Integer>... maps)
+	{
+		Set<Integer> out = new TreeSet<>();
+		for (Map<Integer, Integer> m : maps)
+		{
+			out.addAll(m.keySet());
+		}
+		return out;
 	}
 
 	static Map<Integer, Integer> sorted(Map<Integer, Integer> counts)

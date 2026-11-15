@@ -89,9 +89,7 @@ final class DiscordWebhook
 		}
 		JsonObject o = poster(username);
 		o.addProperty("content", text.toString());
-		JsonObject allowed = new JsonObject();
-		allowed.add("parse", new JsonArray());
-		o.add("allowed_mentions", allowed);
+		allowMentions(o, false);
 		return gson.toJson(o);
 	}
 

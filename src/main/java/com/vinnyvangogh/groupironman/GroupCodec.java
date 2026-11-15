@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -191,6 +192,15 @@ final class GroupCodec
 			this.slots = inventorySlots(slots);
 			this.contents = contents.isEmpty() ? Collections.emptyMap()
 				: Collections.unmodifiableMap(new EnumMap<>(contents));
+		}
+
+		/** Every id carried: counted, in a slot or inside a container, for name lookups. */
+		Set<Integer> ids()
+		{
+			Set<Integer> out = ItemCounts.ids(inventory, worn);
+			out.addAll(slotIds());
+			out.addAll(heldIds());
+			return out;
 		}
 
 		/** The ids known inside containers, for name lookups (Find). */
@@ -711,9 +721,7 @@ final class GroupCodec
 	/** {@code {"v":1,"k":"posted","p":[key, ...]}}: the game broadcasts this client just posted. */
 	static String encodePosted(Gson gson, List<String> keys)
 	{
-		JsonObject o = new JsonObject();
-		o.addProperty("v", PROTOCOL);
-		o.addProperty("k", POSTED);
+		JsonObject o = header(POSTED);
 		JsonArray p = new JsonArray();
 		for (String key : keys)
 		{
@@ -769,7 +777,7 @@ final class GroupCodec
 	}
 
 	/** The payload's JSON object; null when it is empty, longer than {@code maxChars}, or not an object. */
-	private static JsonObject object(Gson gson, String json, int maxChars)
+	static JsonObject object(Gson gson, String json, int maxChars)
 	{
 		if (json == null || json.isEmpty() || json.length() > maxChars)
 		{
@@ -829,10 +837,29 @@ final class GroupCodec
 
 	private static JsonObject header(Kind kind)
 	{
+		return header(kind.name().toLowerCase(Locale.ROOT));
+	}
+
+	/** {@code {"v":1,"k":kind}}, the start of every payload; also {@link ShoppingCodec}'s and {@link GovernanceCodec}'s. */
+	static JsonObject header(String kind)
+	{
 		JsonObject o = new JsonObject();
 		o.addProperty("v", PROTOCOL);
-		o.addProperty("k", kind.name().toLowerCase(java.util.Locale.ROOT));
+		o.addProperty("k", kind);
 		return o;
+	}
+
+	/** {@code field} as a string, "" when missing or not a primitive. */
+	static String string(JsonObject in, String field)
+	{
+		return string(in.get(field));
+	}
+
+	/** {@code field} is true; false when missing or not a primitive. */
+	static boolean flag(JsonObject in, String field)
+	{
+		JsonElement e = in.get(field);
+		return e != null && e.isJsonPrimitive() && e.getAsBoolean();
 	}
 
 	private static long longOr(JsonElement e, long fallback)
