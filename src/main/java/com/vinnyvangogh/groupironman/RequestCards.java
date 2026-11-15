@@ -1,73 +1,86 @@
 package com.vinnyvangogh.groupironman;
 
-import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.GridLayout;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
-import javax.swing.BorderFactory;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.border.EmptyBorder;
 import net.runelite.client.game.ItemManager;
-import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.ui.FontManager;
 
 /**
  * The Shopping tab's request cards: each member's own list, what the group
  * holds of each item and who said they will get it. The owner renames,
- * closes or removes; anyone claims. The words are static so tests read them.
+ * closes or removes; anyone claims. Folded like the lists (Board 2026-11-14):
+ * a header with a preview until opened. The words are static so tests read
+ * them.
  */
 final class RequestCards
 {
-	private static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR.darker();
-	private static final Color DONE = ColorScheme.PROGRESS_COMPLETE_COLOR;
+	private static final Color MUTED = ShopCards.MUTED;
+	private static final Color DONE = ShopCards.DONE;
 
 	private final ShoppingTab.Actions actions;
 	private final ItemManager items;
 	/** Shows a refusal, or clears it with null. */
 	private final Consumer<String> say;
+	/** Folds and item lines, shared with the lists. */
+	private final ShoppingTab tab;
 
-	RequestCards(ShoppingTab.Actions actions, ItemManager items, Consumer<String> say)
+	RequestCards(ShoppingTab.Actions actions, ItemManager items, Consumer<String> say, ShoppingTab tab)
 	{
 		this.actions = actions;
 		this.items = items;
 		this.say = say;
+		this.tab = tab;
 	}
 
-	void draw(JPanel tab, List<RequestBoard.Card> cards, String self)
+	void draw(JPanel panel, List<RequestBoard.Card> cards, String self, ItemPaths.Planner paths)
 	{
 		if (cards.isEmpty())
 		{
 			return;
 		}
-		tab.add(GroupIronmanPanel.heading("Requests"));
+		panel.add(GroupIronmanPanel.heading("Requests"));
 		for (RequestBoard.Card c : cards)
 		{
-			tab.add(card(c, self));
+			panel.add(card(c, self, paths));
 		}
 	}
 
-	private JPanel card(RequestBoard.Card c, String self)
+	private JPanel card(RequestBoard.Card c, String self, ItemPaths.Planner paths)
 	{
-		JPanel box = new GroupIronmanPanel.Column();
-		box.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		box.setBorder(BorderFactory.createCompoundBorder(new EmptyBorder(0, 0, 6, 0), new EmptyBorder(6, 6, 6, 6)));
-		JLabel title = new JLabel(GroupIronmanPanel.escape(c.request.name));
-		title.setFont(FontManager.getRunescapeBoldFont());
-		title.setForeground(c.allDone() ? DONE : Color.WHITE);
-		box.add(title);
-		box.add(GroupIronmanPanel.text(byline(c, System.currentTimeMillis()), MUTED));
+		String key = ShopFolds.request(c.request.id);
+		boolean open = tab.isOpen(key);
+		List<RequestBoard.Row> needed = new ArrayList<>();
+		List<RequestBoard.Row> done = new ArrayList<>();
+		for (RequestBoard.Row r : c.rows)
+		{
+			(r.done() ? done : needed).add(r);
+		}
+		List<Integer> preview = new ArrayList<>();
+		needed.forEach(r -> preview.add(r.itemId));
+		JPanel box = ShopCards.box();
+		int finished = c.request.closed ? c.rows.size() : c.done();
+		ShopCards.header(box, c.request.name, open, finished, c.rows.size(), preview, items, () -> tab.fold(key));
+		if (!open)
+		{
+			return box;
+		}
+		box.add(new ShopCards.Wrap(byline(c, System.currentTimeMillis()), MUTED, ShopCards.CARD_TEXT));
 		boolean mine = c.request.ownedBy(self);
 		if (mine)
 		{
 			box.add(ownerButtons(c.request));
 		}
-		for (RequestBoard.Row r : c.rows)
+		for (RequestBoard.Row r : needed)
 		{
-			box.add(row(c.request, r, self, mine));
+			box.add(row(c.request, r, self, mine, stops(paths, c.request, r)));
 		}
+		tab.addDone(box, key, done.size(), () -> done.forEach(r -> box.add(row(c.request, r, self, mine,
+			stops(paths, c.request, r)))));
 		return box;
 	}
 
@@ -79,16 +92,20 @@ final class RequestCards
 		return "Asked by " + c.request.owner + ", " + BoostText.ago(now, c.request.created) + ". " + state;
 	}
 
-	/** "Shark: want 500, group has 450, 50 to go" or "Shark: done (500)". */
-	static String rowText(RequestBoard.Row r)
+	/** "Shark  450 / 500". */
+	static String summary(RequestBoard.Row r)
 	{
-		String want = Amounts.GAME.of(r.wanted);
-		if (r.done())
+		return r.name + "  " + Amounts.GAME.of(Math.min(r.have, r.wanted)) + " / " + Amounts.GAME.of(r.wanted);
+	}
+
+	/** "Need 50 more", "Done", or "Closed" when the owner closed it short. */
+	static String needText(RequestBoard.Row r)
+	{
+		if (r.have >= r.wanted)
 		{
-			return r.name + ": done (" + want + ")";
+			return "Done";
 		}
-		return r.name + ": want " + want + ", group has " + Amounts.GAME.of(r.have) + ", "
-			+ Amounts.GAME.of(r.wanted - r.have) + " to go";
+		return r.closed ? "Closed" : "Need " + Amounts.GAME.of(r.wanted - r.have) + " more";
 	}
 
 	/** "Bob and Cat will get it"; empty when nobody said. */
@@ -104,31 +121,34 @@ final class RequestCards
 		return who + " will get it";
 	}
 
-	private JPanel row(RequestList req, RequestBoard.Row r, String self, boolean mine)
+	/** Where "Path to" leads for one requested item; empty without a planner. */
+	private static List<ItemPaths.Stop> stops(ItemPaths.Planner paths, RequestList req, RequestBoard.Row r)
 	{
-		JPanel line = new JPanel(new BorderLayout(4, 0));
-		line.setOpaque(false);
-		line.setBorder(new EmptyBorder(3, 0, 3, 0));
-		JLabel icon = new JLabel();
-		if (items != null)
-		{
-			items.getImage(r.itemId).addTo(icon);
-		}
-		line.add(icon, BorderLayout.WEST);
+		return paths == null ? Collections.emptyList() : paths.request(req, r);
+	}
+
+	private JPanel row(RequestList req, RequestBoard.Row r, String self, boolean mine, List<ItemPaths.Stop> stops)
+	{
 		JPanel words = new GroupIronmanPanel.Column();
-		words.setOpaque(false);
-		words.add(ShoppingTab.label(rowText(r), r.done() ? DONE : Color.WHITE));
+		words.add(new ShopCards.Wrap(summary(r), r.done() ? DONE : Color.WHITE, ShopCards.ROW_TEXT));
+		words.add(new ShopCards.Bar(Math.min(r.have, r.wanted), r.wanted, ShopCards.ROW_TEXT));
+		words.add(new ShopCards.Wrap(needText(r), r.done() ? DONE : MUTED, ShopCards.ROW_TEXT));
 		String claims = claimText(r);
 		if (!claims.isEmpty())
 		{
-			words.add(ShoppingTab.label(claims, MUTED));
+			words.add(new ShopCards.Wrap(claims, MUTED, ShopCards.ROW_TEXT));
 		}
 		if (req.open() && !r.done())
 		{
 			words.add(rowButtons(req, r, self, mine));
 		}
-		line.add(words, BorderLayout.CENTER);
-		return line;
+		if (!stops.isEmpty())
+		{
+			ItemPaths.Stop to = stops.get(0);
+			ItemPaths.Target why = ItemPaths.Target.requestItem(req.id, r.itemId);
+			words.add(ShoppingTab.pathButton(to.label(), () -> say.accept(actions.pathTo(why, to))));
+		}
+		return tab.itemLine(r.itemId, words);
 	}
 
 	private JPanel rowButtons(RequestList req, RequestBoard.Row r, String self, boolean mine)
@@ -187,7 +207,7 @@ final class RequestCards
 	}
 
 	/** Changes when anything a request card draws changes. */
-	static String signature(List<RequestBoard.Card> cards, String self)
+	static String signature(List<RequestBoard.Card> cards, String self, ItemPaths.Planner paths)
 	{
 		StringBuilder s = new StringBuilder(self);
 		for (RequestBoard.Card c : cards)
@@ -195,7 +215,8 @@ final class RequestCards
 			s.append('|').append(c.request.id).append(c.request.rev);
 			for (RequestBoard.Row r : c.rows)
 			{
-				s.append(rowText(r)).append(claimText(r));
+				s.append(summary(r)).append(needText(r)).append(claimText(r))
+					.append(ShoppingTab.first(stops(paths, c.request, r)));
 			}
 		}
 		return s.toString();

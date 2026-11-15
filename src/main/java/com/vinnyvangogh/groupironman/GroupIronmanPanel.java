@@ -213,7 +213,11 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			sprites.getSpriteAsync(slot.getValue(), 0, image ->
 			{
-				slotIcons.put(slot.getKey(), image);
+				BufferedImage light = WornSlotIcons.lighten(image);
+				if (light != null)
+				{
+					slotIcons.put(slot.getKey(), light);
+				}
 				SwingUtilities.invokeLater(this::redraw);
 			});
 		}
@@ -1489,6 +1493,11 @@ class GroupIronmanPanel extends PluginPanel
 		static final int H = 20;
 		/** The game's stack-number yellow. */
 		private static final Color COUNT = new Color(0xFF, 0xFF, 0x00);
+		/**
+		 * Every slot's ground, a step lighter than the card (DARKER_GRAY_COLOR) so the grids read as slots,
+		 * empty ones included (Board 2026-11-14: DARK_GRAY_COLOR was barely apart from the card).
+		 */
+		static final Color CELL = new Color(0x3A, 0x3A, 0x3A);
 		private final AsyncBufferedImage image;
 		/** Items inside a container, or -1 for no number. */
 		final int inside;
@@ -1513,7 +1522,7 @@ class GroupIronmanPanel extends PluginPanel
 		@Override
 		protected void paintComponent(Graphics g)
 		{
-			g.setColor(ColorScheme.DARK_GRAY_COLOR);
+			g.setColor(CELL);
 			g.fillRect(0, 0, W, H);
 			if (image != null)
 			{

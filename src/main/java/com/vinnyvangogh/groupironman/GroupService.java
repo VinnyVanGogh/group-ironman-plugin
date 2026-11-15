@@ -207,6 +207,8 @@ class GroupService
 	private final Map<Integer, Boolean> tradeable = new ConcurrentHashMap<>();
 	/** This player's real levels, read with their quest progress, for which shops will serve them. */
 	private volatile Map<String, Integer> ownLevels = Collections.emptyMap();
+	/** Where this player stood on the last tick, for "Path to"; null when logged out. */
+	private volatile WorldPoint here;
 	// Client thread only.
 	private final ShopVisits shopVisits = new ShopVisits();
 	private int ticksSinceQuests = QUEST_INTERVAL_TICKS;
@@ -1029,8 +1031,10 @@ class GroupService
 		ticksSinceExtras++;
 		if (client.getGameState() != GameState.LOGGED_IN)
 		{
+			here = null;
 			return;
 		}
+		here = position();
 		long now = System.currentTimeMillis();
 		watchStorageSave(now);
 		if (!session)
@@ -2090,6 +2094,12 @@ class GroupService
 	ShopPresets presets()
 	{
 		return presets;
+	}
+
+	/** Where this player stood on the last game tick; null when logged out. Any thread. */
+	WorldPoint here()
+	{
+		return here;
 	}
 
 	/** What a {@link ShoppingBoard} works from, as this client knows it now. Any thread. */

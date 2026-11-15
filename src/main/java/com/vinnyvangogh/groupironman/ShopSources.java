@@ -139,6 +139,18 @@ final class ShopSources
 		return met ? null : quest;
 	}
 
+	/**
+	 * Where {@code viewer} can get item {@code itemId}: the quest data's shops and drops ({@code item}, null when
+	 * no quest names it), then the bundled wiki drop table ({@link ItemDrops}) for monsters it does not name.
+	 */
+	static Options forViewer(int itemId, QuestData.Item item, Viewer viewer, QuestData data, ItemDrops table)
+	{
+		Options quest = forViewer(item, viewer, data);
+		List<Source> all = new ArrayList<>(quest.sources);
+		all.addAll(table.of(itemId));
+		return new Options(dedupe(all), quest.unreachableShops);
+	}
+
 	/** Where {@code viewer} can get {@code item}, as the quest data has it. */
 	static Options forViewer(QuestData.Item item, Viewer viewer, QuestData data)
 	{

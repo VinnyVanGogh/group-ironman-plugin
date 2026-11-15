@@ -37,6 +37,7 @@ import net.runelite.client.party.PartyDataType;
 import net.runelite.client.party.WSClient;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.Overlay;
@@ -117,9 +118,22 @@ public class GroupIronmanPlugin extends Plugin
 	@Inject
 	private ConfigManager configManager;
 
+	/**
+	 * The Shopping tab's open lists and items ({@link ShopFolds}), in the logged-in character's RuneLite profile:
+	 * not a setting, never shown or sent. Frozen once published.
+	 */
+	static final String SHOPPING_OPEN_KEY = "shoppingOpen";
+
 	@Inject
 	private ChatMessageManager chatMessageManager;
 
+	@Inject
+	private PluginManager pluginManager;
+
+	/** Bank tiles for "Path to" an item in group storage; read once. */
+	private final List<ItemPaths.Stop> banks = ItemPaths.loadBanks();
+	/** The path handed to Shortest Path; null when not running. */
+	private volatile PathSession paths;
 	private GroupIronmanPanel panel;
 	private NavigationButton navButton;
 	private SidebarButton sidebar;
@@ -138,6 +152,10 @@ public class GroupIronmanPlugin extends Plugin
 		// CHARACTER_NAME only while subscribed). Without the Party plugin, that is us.
 		partyDataService.subscribe(this, PartyDataType.CHARACTER_NAME);
 		eventBus.register(group);
+		// Shortest Path is reached only through RuneLite's own PluginMessage: no reflection, no dependency.
+		paths = new PathSession(new ShortestPathBridge(pluginManager::getPlugins,
+			p -> p instanceof Plugin && pluginManager.isPluginEnabled((Plugin) p),
+			ShortestPathBridge.clientThreadEventPoster(clientThread::invoke, eventBus::post)));
 		panel = new GroupIronmanPanel(itemManager, skillIconManager, spriteManager, new GroupIronmanPanel.Actions()
 		{
 			@Override
@@ -304,6 +322,43 @@ public class GroupIronmanPlugin extends Plugin
 			{
 				return group.claimRequest(id, itemId, claimed);
 			}
+
+			@Override
+			public String openLists()
+			{
+				return configManager.getRSProfileConfiguration(GroupIronmanConfig.GROUP, SHOPPING_OPEN_KEY);
+			}
+
+			@Override
+			public void saveOpenLists(String keys)
+			{
+				if (keys == null)
+				{
+					configManager.unsetRSProfileConfiguration(GroupIronmanConfig.GROUP, SHOPPING_OPEN_KEY);
+				}
+				else
+				{
+					configManager.setRSProfileConfiguration(GroupIronmanConfig.GROUP, SHOPPING_OPEN_KEY, keys);
+				}
+			}
+
+			@Override
+			public String pathTo(ItemPaths.Target why, ItemPaths.Stop to)
+			{
+				PathSession s = paths;
+				String said = s == null ? "" : s.go(why, to, group.here() != null);
+				redraw();
+				return said;
+			}
+
+			@Override
+			public String clearPath()
+			{
+				PathSession s = paths;
+				String said = s == null ? "" : s.stop();
+				redraw();
+				return said;
+			}
 		});
 		navButton = NavigationButton.builder()
 			.tooltip(NAME)
@@ -367,6 +422,13 @@ public class GroupIronmanPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		// Turning the plugin off takes its path with it.
+		PathSession s = paths;
+		paths = null;
+		if (s != null)
+		{
+			s.stop();
+		}
 		wsClient.unregisterMessage(VvgGroupIronmanMessage.class);
 		eventBus.unregister(events);
 		events.shutDown();
@@ -450,8 +512,19 @@ public class GroupIronmanPlugin extends Plugin
 		{
 			roster.add(group.self());
 		}
-		return new ShoppingTab.View(ShoppingBoard.of(lists, group.shoppingInputs()), group.presets().presets(),
-			roster, shop.history(), !group.self().isEmpty(), group.syncing(), group.requestCards(), group.self());
+		ShoppingBoard.Inputs in = group.shoppingInputs();
+		List<ShoppingBoard.Card> cards = ShoppingBoard.of(lists, in);
+		List<RequestBoard.Card> requests = group.requestCards();
+		ItemPaths.Planner planner = ItemPaths.Planner.of(in, banks, group.here());
+		// The path goes when its item is done, its list removed or its request closed.
+		PathSession s = paths;
+		if (s != null)
+		{
+			s.recheck(t -> ItemPaths.forTarget(t, cards, requests, planner));
+		}
+		return new ShoppingTab.View(cards, group.presets().presets(), roster, shop.history(),
+			!group.self().isEmpty(), group.syncing(), requests, group.self(), planner,
+			s == null ? "" : s.active());
 	}
 
 	/** The Settings tab's view, or null before group settings have started. */

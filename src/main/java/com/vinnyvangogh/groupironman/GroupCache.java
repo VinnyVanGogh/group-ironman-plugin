@@ -174,7 +174,9 @@ final class GroupCache
 		JsonObject carried = new JsonObject();
 		for (Map.Entry<String, GroupCodec.Carried> e : roster.allCarried().entrySet())
 		{
-			carried.addProperty(e.getKey(), GroupCodec.encodeCarried(gson, e.getValue().inventory, e.getValue().worn));
+			// The whole payload, slots included: counts alone drew a noted stack unnoted until the member
+			// resent (Board 2026-11-14). A build from before slots ignores the extra fields.
+			carried.addProperty(e.getKey(), GroupCodec.encodeCarried(gson, e.getValue()));
 		}
 		out.add("carried", carried);
 		out.add("hiscores", hiscoresJson(roster.hiscores()));
