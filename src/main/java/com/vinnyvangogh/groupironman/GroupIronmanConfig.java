@@ -41,6 +41,8 @@ public interface GroupIronmanConfig extends Config
 
 	/** Frozen. Written by the plugin once per version (UpdateNotes). */
 	String KEY_LAST_SEEN_VERSION = "lastSeenVersion";
+	/** 'Combine level-ups': frozen key; its default moved 30 → 60 for new installs only (GroupEventEngine). */
+	String KEY_COMBINE_LEVELS = "discordCombineLevels";
 
 	/**
 	 * The {@code @Units} on every gp number box: no suffix at all. RuneLite's number box is a fixed 6 columns
@@ -710,16 +712,17 @@ public interface GroupIronmanConfig extends Config
 		return 2;
 	}
 
-	@ConfigItem(keyName = "discordCombineLevels", name = "Combine level-ups", description = "Minutes to"
-		+ " combine level-ups for. More levels in the same skill within this many minutes of its first post edit"
-		+ " that post ('Prayer 23 → 25 (+2)') instead of posting again. 99s, total and combat levels always post."
-		+ " 0 turns it off.",
+	@ConfigItem(keyName = KEY_COMBINE_LEVELS, name = "Combine level-ups", description = "Minutes to"
+		+ " combine level-ups for. A member's levels within this many minutes of their first post go into that one"
+		+ " message, a card per skill (and one for combat level), each card edited as that skill levels"
+		+ " ('Prayer 23 → 25 (+2) in 4 min'). Past 10 skills a new message starts. 99s and total levels always"
+		+ " post. 0 turns it off.",
 		section = discordHowSection, position = 2)
 	@Range(max = 240)
 	@Units(Units.MINUTES)
 	default int discordCombineLevels()
 	{
-		return 30;
+		return 60;
 	}
 
 	@ConfigItem(keyName = "discordStyle", name = "Message style", description = "Rich embeds with item icons and a"

@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -190,26 +189,70 @@ final class DiscordWebhook
 	}
 
 	/**
-	 * A level streak's post ("Prayer 23 → 25 (+2) in 4 min"), as a new message under {@code username} (null for
-	 * the webhook's own, {@link PosterNames}): it never mentions anyone.
+	 * A member's level message as a new post under {@code username} (null for the webhook's own,
+	 * {@link PosterNames}): one embed card per skill, the most recently levelled first, the picture on the top card
+	 * (Board 2026-11-14). Plain style says one line per card. It never mentions anyone.
 	 */
-	static String levels(Gson gson, GroupEvent latest, String text, ItemLookup lookup, DiscordStyle style,
+	static String levels(Gson gson, String member, List<LevelThreads.Card> cards, DiscordStyle style,
 		boolean screenshot, String username)
 	{
-		DiscordMerge.Post post = new DiscordMerge.Post(latest, EventText.title(latest), text,
-			Collections.emptyMap(), Collections.emptyList(), false);
-		return payload(gson, post, lookup, style, null, screenshot, null, username);
+		JsonObject o = poster(username);
+		JsonObject allowed = new JsonObject();
+		allowed.add("parse", new JsonArray());
+		o.add("allowed_mentions", allowed);
+		if (style == DiscordStyle.PLAIN)
+		{
+			StringBuilder text = new StringBuilder();
+			for (LevelThreads.Card c : cards)
+			{
+				text.append(text.length() == 0 ? "" : "\n").append(member).append(": ").append(c.text());
+				if (c.broadcast)
+				{
+					text.append(" (").append(GroupBroadcasts.SOURCE).append(')');
+				}
+			}
+			o.addProperty("content", text.toString());
+			return gson.toJson(o);
+		}
+		JsonArray embeds = new JsonArray();
+		for (LevelThreads.Card c : cards)
+		{
+			embeds.add(card(member, c, screenshot && embeds.size() == 0));
+		}
+		o.add("embeds", embeds);
+		return gson.toJson(o);
+	}
+
+	/** One skill's card in a level message: "Alex: Level up", "Thieving 44 → 46 (+2) in 10 min". */
+	private static JsonObject card(String member, LevelThreads.Card c, boolean screenshot)
+	{
+		GroupEvent.Type type = c.combat() ? GroupEvent.Type.COMBAT_LEVEL : GroupEvent.Type.LEVEL_UP;
+		JsonObject embed = new JsonObject();
+		embed.addProperty("title", member + ": " + EventText.title(type));
+		embed.addProperty("description", c.text());
+		embed.addProperty("color", type.category.colour);
+		embed.addProperty("timestamp", Instant.ofEpochMilli(c.lastAt).toString());
+		if (screenshot)
+		{
+			JsonObject image = new JsonObject();
+			image.addProperty("url", "attachment://" + SCREENSHOT);
+			embed.add("image", image);
+		}
+		JsonObject footer = new JsonObject();
+		footer.addProperty("text", c.broadcast ? USERNAME + " · " + GroupBroadcasts.SOURCE : USERNAME);
+		embed.add("footer", footer);
+		return embed;
 	}
 
 	/**
-	 * The same, as an edit of the streak's message (Discord "Edit Webhook Message"): no {@code username}, which
+	 * The same, as an edit of the member's message (Discord "Edit Webhook Message"): no {@code username}, which
 	 * that endpoint does not take. A new screenshot replaces the old one: files sent with an edit are appended
 	 * unless {@code attachments} lists every file the message keeps, here only the new upload.
 	 */
-	static String levelsEdit(Gson gson, GroupEvent latest, String text, ItemLookup lookup, DiscordStyle style,
+	static String levelsEdit(Gson gson, String member, List<LevelThreads.Card> cards, DiscordStyle style,
 		boolean screenshot)
 	{
-		JsonObject o = gson.fromJson(levels(gson, latest, text, lookup, style, screenshot, null), JsonObject.class);
+		JsonObject o = gson.fromJson(levels(gson, member, cards, style, screenshot, null), JsonObject.class);
 		if (screenshot)
 		{
 			JsonObject upload = new JsonObject();

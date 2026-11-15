@@ -118,6 +118,8 @@ class GroupEventEngine
 	static final String LEVEL_FILE = "level-streaks.txt";
 	/** Config key: set once 'Online status' has been chosen for this install, so an upgrade keeps its old choice. */
 	static final String ONLINE_STATUS_CHOSEN_KEY = "onlineStatusChosen";
+	/** Config key: set once 'Combine level-ups' has been settled for this install ({@link #keepCombineWindow}). */
+	static final String COMBINE_CHOSEN_KEY = "combineLevelsChosen";
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
 		GroupEvent.Type.WILDERNESS, GroupEvent.Type.HC_LIFE_LOST);
 
@@ -167,7 +169,7 @@ class GroupEventEngine
 		this::toDigest, this::toLog);
 	/** Client thread: Discord events waiting for the rest of their moment. */
 	private final DiscordBatch batch = new DiscordBatch();
-	/** Level-ups of one skill as one post, edited in place. Any thread; open streaks kept in {@link #LEVEL_FILE}. */
+	/** A member's level-ups as one message, a card per skill, edited in place. Any thread; kept in {@link #LEVEL_FILE}. */
 	private LevelPosts levels;
 	/** Whether this run has read {@link #LEVEL_FILE}: nothing is written over it before. Timer and shutdown. */
 	private volatile boolean levelsLoaded;
@@ -221,8 +223,9 @@ class GroupEventEngine
 		group.events(this);
 		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient, gson), System::currentTimeMillis,
 			() -> LocalTime.now().getHour());
-		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle, this::discordWords,
+		levels = new LevelPosts(sender, gson, System::currentTimeMillis, config::discordStyle,
 			() -> posterName(Webhook.PROGRESS));
+		keepCombineWindow();
 		chooseOnlineStatus();
 		reloadConfig();
 		restorePresence();
@@ -508,6 +511,28 @@ class GroupEventEngine
 		{
 			log.debug("could not write the saved level streaks", e);
 		}
+	}
+
+	/**
+	 * Once per install, before {@link #chooseOnlineStatus} marks it as run: an install that had the plugin keeps
+	 * 'Combine level-ups' at its old 30 min default; only new installs get 60 ({@link LevelPosts#windowToKeep}).
+	 */
+	private void keepCombineWindow()
+	{
+		if (configManager.getConfiguration(GroupIronmanConfig.GROUP, COMBINE_CHOSEN_KEY) != null)
+		{
+			return;
+		}
+		// Every earlier build that ran set this marker at its first start.
+		boolean upgrading = configManager.getConfiguration(GroupIronmanConfig.GROUP,
+			ONLINE_STATUS_CHOSEN_KEY) != null;
+		Integer kept = LevelPosts.windowToKeep(upgrading,
+			configManager.getConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_COMBINE_LEVELS));
+		if (kept != null)
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_COMBINE_LEVELS, kept);
+		}
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, COMBINE_CHOSEN_KEY, "1");
 	}
 
 	/** Once per install: an upgrade keeps what its old "Online and offline" switch did ({@link OnlineStatus#upgrading}). */
@@ -1510,13 +1535,12 @@ class GroupEventEngine
 		{
 			return;
 		}
-		DiscordMerge.Family family = DiscordMerge.family(event.type);
 		if (event.broadcast)
 		{
-			// Another member's moment: never merged with this player's own, never a screenshot of this screen.
-			post(url, DiscordMerge.single(event, discordWords()), Collections.singletonList(event), false, null);
+			broadcastToDiscord(url, event);
 			return;
 		}
+		DiscordMerge.Family family = DiscordMerge.family(event.type);
 		if (family == null)
 		{
 			GraveShot.Choice shot = picture(event);
@@ -1540,6 +1564,24 @@ class GroupEventEngine
 			}));
 		}
 		done.forEach(this::flush);
+	}
+
+	/**
+	 * Another member's moment: never merged with this player's own, never a screenshot of this screen. A level
+	 * joins that member's streak post as a plugin user's own does (Board 2026-11-14).
+	 */
+	private void broadcastToDiscord(String url, GroupEvent event)
+	{
+		List<GroupEvent> one = Collections.singletonList(event);
+		DiscordMerge.Post single = DiscordMerge.single(event, discordWords());
+		Consumer<byte[]> streak = combineLevels(url,
+			LevelThreads.combinableBroadcast(event) == null ? null : one, single, one);
+		if (streak != null)
+		{
+			streak.accept(null);
+			return;
+		}
+		post(url, single, one, false, null);
 	}
 
 	/**
@@ -1577,7 +1619,7 @@ class GroupEventEngine
 		{
 			return;
 		}
-		Consumer<byte[]> send = combineLevels(url, moment);
+		Consumer<byte[]> send = combineLevels(url, LevelThreads.combinable(moment.events), post, moment.events);
 		if (send == null)
 		{
 			send = poster(url, post, moment.events, true);
@@ -1619,30 +1661,31 @@ class GroupEventEngine
 	}
 
 	/**
-	 * A moment that is one skill's level-up joins that skill's post when the combine window is on: the first
-	 * posts and is kept, later ones edit it ({@link LevelThreads}). Returns what sends it, given the picture; null
-	 * when the moment posts as usual.
+	 * A moment of one member's level-ups ({@code levels}: skills below 99 and combat levels, null when it is
+	 * anything else) joins that member's post when the combine window is on: the first posts {@code first} and is
+	 * kept, later ones edit it ({@link LevelThreads}). Returns what sends it, given the picture; null when the moment
+	 * posts as usual.
 	 */
-	private Consumer<byte[]> combineLevels(String url, DiscordBatch.Pending moment)
+	private Consumer<byte[]> combineLevels(String url, List<GroupEvent> levels, DiscordMerge.Post first,
+		List<GroupEvent> events)
 	{
 		long window = TimeUnit.MINUTES.toMillis(config.discordCombineLevels());
-		GroupEvent level = window > 0 ? LevelThreads.combinable(moment.events) : null;
-		if (level == null)
+		if (window <= 0 || levels == null)
 		{
 			return null;
 		}
 		// The egg reads the item cache: on the client thread, as every other post's does.
-		String egg = egg(moment.events);
-		return png -> levelUp(url, level, window, png, egg);
+		String egg = egg(events);
+		return png -> levelUp(url, levels, first, window, png, egg);
 	}
 
-	/** Any thread. A level-up into its streak, with the usual level-up post should it start a new one. */
-	private void levelUp(String url, GroupEvent level, long window, byte[] png, String egg)
+	/** Any thread. Level-ups into their member's streak, with the usual post should they start a new one. */
+	private void levelUp(String url, List<GroupEvent> levelUps, DiscordMerge.Post first, long window, byte[] png,
+		String egg)
 	{
-		String json = DiscordWebhook.payload(gson, DiscordMerge.single(level, discordWords()), discordWords(),
-			config.discordStyle(), config.discordMention(), png != null, egg,
-			posterName(Webhook.PROGRESS));
-		levels.level(url, level, window, png, json);
+		String json = DiscordWebhook.payload(gson, first, discordWords(), config.discordStyle(),
+			config.discordMention(), png != null, egg, posterName(Webhook.PROGRESS));
+		levels.level(url, levelUps, window, png, json);
 	}
 
 	/** The Easter egg line for a moment's events; null when Easter eggs are off or none applies. */
