@@ -68,6 +68,8 @@ final class EventWatchers
 	private final Map<Integer, Integer> last = new HashMap<>();
 	private final Map<String, Long> clueCounts = new LinkedHashMap<>();
 	private boolean baselined;
+	/** False while a login settles ({@link LoginGate}): polls only record. A new watcher counts. */
+	private boolean counting = true;
 	private boolean specialHeader;
 	private String pendingClue;
 	private String raid = "";
@@ -108,12 +110,11 @@ final class EventWatchers
 		}
 	}
 
-	/** Another account may log in next: every baseline starts over. */
+	/** Another account may log in next: every baseline starts over, and so does everything it was in the middle of. */
 	void reset()
 	{
-		last.clear();
+		rebaseline();
 		clueCounts.clear();
-		baselined = false;
 		specialHeader = false;
 		pendingClue = null;
 		raid = "";
@@ -126,6 +127,29 @@ final class EventWatchers
 		graveSeen = false;
 		graveItems = Collections.emptyMap();
 		slayer.reset();
+	}
+
+	/**
+	 * The polled values only: the next poll is a baseline, and none counts until {@link #settle}. A hop or a lost
+	 * connection keeps the rest (a grave's timer, a raid's count) for the same account.
+	 */
+	void rebaseline()
+	{
+		last.clear();
+		baselined = false;
+		counting = false;
+	}
+
+	/** A login is settling: polls only record until {@link #settle}, so a varbit sent a few ticks late is no rise. */
+	void quiet()
+	{
+		counting = false;
+	}
+
+	/** The login has settled: a polled value that goes up from here on is an event. */
+	void settle()
+	{
+		counting = true;
 	}
 
 	// ---- Chat ----
@@ -257,7 +281,7 @@ final class EventWatchers
 
 	// ---- Variables ----
 
-	/** Every polled variable that went up since the last poll, as events. The first poll only records. */
+	/** Every polled variable that went up since the last poll, as events. The first poll, and any while quiet, only record. */
 	void poll(IntUnaryOperator read, long now, String me)
 	{
 		Map<Integer, Boolean> rose = new TreeMap<>();
@@ -267,7 +291,7 @@ final class EventWatchers
 			Integer before = last.put(id, value);
 			rose.put(id, baselined && before != null && value > before);
 		}
-		if (!baselined)
+		if (!baselined || !counting)
 		{
 			baselined = true;
 			return;

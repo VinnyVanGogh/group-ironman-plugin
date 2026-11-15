@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Fix: switching accounts no longer posts old achievements
+
+- Logging into another account (or hopping, reconnecting, or changing
+  profile) used to be able to post that account's long-done diaries and
+  levels to Discord as if new. Every login now starts fresh: for its first
+  few seconds skills, total, combat level, quest points and diaries are only
+  recorded, never posted.
+- Safety net: a login's first minute of achievements (and of game
+  broadcasts posted for members without the plugin) is held. Up to three
+  post as usual once the minute is over; more than that is treated as a
+  backlog and nothing is posted.
+
 ### Shopping: "Path to" with Shortest Path
 
 - Each line still to get, and each requested item, has a **Path to** button
