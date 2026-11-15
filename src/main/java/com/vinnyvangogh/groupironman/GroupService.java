@@ -1437,9 +1437,6 @@ class GroupService
 					return;
 				}
 				break;
-			case POSTED:
-				receivePosted(decoded.posted);
-				break;
 			default:
 				return;
 		}
@@ -1448,13 +1445,23 @@ class GroupService
 		onChange.run();
 	}
 
-	/** A payload {@link GroupCodec} does not read: roles, group settings or an announce, or one from a newer build. */
+	/**
+	 * A payload {@link GroupCodec#decode} does not read: roles, group settings or an announce, a "posted" claim, or
+	 * one from a newer build.
+	 */
 	private void notData(String name, VvgGroupIronmanMessage message)
 	{
 		GovernanceSync g = governance;
 		String payload = message.getPayload();
 		if (g != null && GovernanceSync.isGovernance(payload) && g.receive(name, payload))
 		{
+			roster.heard(name, System.currentTimeMillis());
+			return;
+		}
+		List<String> posted = GroupCodec.posted(gson, payload);
+		if (posted != null)
+		{
+			receivePosted(posted);
 			roster.heard(name, System.currentTimeMillis());
 			return;
 		}

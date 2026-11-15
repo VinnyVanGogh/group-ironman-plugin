@@ -181,13 +181,14 @@ public class GroupBroadcastsTest
 	{
 		GroupEvent e = parse("Ott has reached Herblore level 21.");
 		Gson gson = new Gson();
-		GroupCodec.Decoded claim = GroupCodec.decode(gson, GroupCodec.encodePosted(gson,
-			Collections.singletonList(GroupBroadcasts.key(e))));
-		assertEquals(GroupCodec.Kind.POSTED, claim.kind);
+		String payload = GroupCodec.encodePosted(gson, Collections.singletonList(GroupBroadcasts.key(e)));
+		assertNull("an older build's decoder reads it as an unknown kind", GroupCodec.decode(gson, payload));
+		List<String> claim = GroupCodec.posted(gson, payload);
+		assertEquals(Collections.singletonList(GroupBroadcasts.key(e)), claim);
 
 		// Two clients both think they post (their views of who is online differ): the late one hears the claim.
 		GroupBroadcasts.Seen late = new GroupBroadcasts.Seen();
-		claim.posted.forEach(k -> late.add(k, NOW));
+		claim.forEach(k -> late.add(k, NOW));
 		assertEquals(GroupBroadcasts.Action.SHOW, GroupBroadcasts.decide(e, NOBODY, true, late, NOW + 2000));
 	}
 
@@ -210,9 +211,11 @@ public class GroupBroadcastsTest
 		{
 			many.add("k" + i);
 		}
-		assertEquals(GroupCodec.MAX_POSTED, GroupCodec.decode(gson, GroupCodec.encodePosted(gson, many)).posted.size());
-		assertEquals(Collections.singletonList("ok"), GroupCodec.decode(gson,
-			"{\"v\":1,\"k\":\"posted\",\"p\":[1,{\"a\":1},\"ok\",\"\"]}").posted);
+		assertEquals(GroupCodec.MAX_POSTED, GroupCodec.posted(gson, GroupCodec.encodePosted(gson, many)).size());
+		assertEquals(Collections.singletonList("ok"), GroupCodec.posted(gson,
+			"{\"v\":1,\"k\":\"posted\",\"p\":[1,{\"a\":1},\"ok\",\"\"]}"));
+		assertNull("not a claim", GroupCodec.posted(gson, "{\"v\":1,\"k\":\"events\",\"e\":[]}"));
+		assertNull(GroupCodec.posted(gson, "not json {"));
 	}
 
 	// ---- Toggles, N levels, the footer ----

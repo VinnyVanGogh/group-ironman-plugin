@@ -81,14 +81,18 @@ final class GroupCodec
 
 	/**
 	 * The {@code k} on the wire. {@link #EXTRAS} and {@link #EVENTS} came in
-	 * part 3; a part 2 build reads them as an unknown kind and ignores them. {@link #POSTED} (the game broadcasts a
-	 * client posted, {@link GroupBroadcasts}) is read the same way by every older build.
+	 * part 3; a part 2 build reads them as an unknown kind and ignores them.
 	 */
 	enum Kind
 	{
-		BANK, CARRIED, STORAGE, STATS, EXTRAS, EVENTS, POSTED
+		BANK, CARRIED, STORAGE, STATS, EXTRAS, EVENTS
 	}
 
+	/**
+	 * The {@code k} of a "posted" claim ({@link #encodePosted}): not a {@link Kind}, as it is no member data;
+	 * {@link #decode} reads it as unknown, like every older build does, and {@link #posted} reads it.
+	 */
+	static final String POSTED = "posted";
 	/** Most broadcast keys one claim carries, and the longest key kept. */
 	static final int MAX_POSTED = 20;
 	static final int MAX_POSTED_CHARS = 200;
@@ -249,11 +253,9 @@ final class GroupCodec
 		final MemberExtras extras;
 		/** Each with an empty member: the receiver files them under the party member they came from. */
 		final List<GroupEvent> events;
-		/** The broadcast keys a member's client posted ({@link GroupBroadcasts#key}). */
-		final List<String> posted;
 
 		private Decoded(Kind kind, BankPart bank, Carried carried, StorageChange storage, MemberStats stats,
-			MemberExtras extras, List<GroupEvent> events, List<String> posted)
+			MemberExtras extras, List<GroupEvent> events)
 		{
 			this.kind = kind;
 			this.bank = bank;
@@ -262,42 +264,36 @@ final class GroupCodec
 			this.stats = stats;
 			this.extras = extras;
 			this.events = events;
-			this.posted = posted;
 		}
 
 		static Decoded of(BankPart bank)
 		{
-			return new Decoded(Kind.BANK, bank, null, null, null, null, null, null);
+			return new Decoded(Kind.BANK, bank, null, null, null, null, null);
 		}
 
 		static Decoded of(Carried carried)
 		{
-			return new Decoded(Kind.CARRIED, null, carried, null, null, null, null, null);
+			return new Decoded(Kind.CARRIED, null, carried, null, null, null, null);
 		}
 
 		static Decoded of(StorageChange storage)
 		{
-			return new Decoded(Kind.STORAGE, null, null, storage, null, null, null, null);
+			return new Decoded(Kind.STORAGE, null, null, storage, null, null, null);
 		}
 
 		static Decoded of(MemberStats stats)
 		{
-			return new Decoded(Kind.STATS, null, null, null, stats, null, null, null);
+			return new Decoded(Kind.STATS, null, null, null, stats, null, null);
 		}
 
 		static Decoded of(MemberExtras extras)
 		{
-			return new Decoded(Kind.EXTRAS, null, null, null, null, extras, null, null);
+			return new Decoded(Kind.EXTRAS, null, null, null, null, extras, null);
 		}
 
 		static Decoded of(List<GroupEvent> events)
 		{
-			return new Decoded(Kind.EVENTS, null, null, null, null, null, events, null);
-		}
-
-		static Decoded posted(List<String> keys)
-		{
-			return new Decoded(Kind.POSTED, null, null, null, null, null, null, keys);
+			return new Decoded(Kind.EVENTS, null, null, null, null, null, events);
 		}
 	}
 
@@ -578,25 +574,11 @@ final class GroupCodec
 	/** The decoded message, or null when it is not one this build can read. */
 	static Decoded decode(Gson gson, String json)
 	{
-		if (json == null || json.isEmpty() || json.length() > MAX_PAYLOAD_CHARS * 4)
+		JsonObject in = object(gson, json, MAX_PAYLOAD_CHARS * 4);
+		if (in == null)
 		{
 			return null;
 		}
-		JsonObject in;
-		try
-		{
-			JsonElement root = gson.fromJson(json, JsonElement.class);
-			if (root == null || !root.isJsonObject())
-			{
-				return null;
-			}
-			in = root.getAsJsonObject();
-		}
-		catch (RuntimeException e)
-		{
-			return null;
-		}
-
 		Long v = ItemCounts.longValue(in.get("v"));
 		if (v == null || v < 1)
 		{
@@ -634,8 +616,6 @@ final class GroupCodec
 					longOr(in.get("svts"), -1)));
 			case "events":
 				return decodeEvents(in);
-			case "posted":
-				return decodePosted(in);
 			default:
 				// A kind from a newer build.
 				return null;
@@ -731,7 +711,9 @@ final class GroupCodec
 	/** {@code {"v":1,"k":"posted","p":[key, ...]}}: the game broadcasts this client just posted. */
 	static String encodePosted(Gson gson, List<String> keys)
 	{
-		JsonObject o = header(Kind.POSTED);
+		JsonObject o = new JsonObject();
+		o.addProperty("v", PROTOCOL);
+		o.addProperty("k", POSTED);
 		JsonArray p = new JsonArray();
 		for (String key : keys)
 		{
@@ -744,23 +726,59 @@ final class GroupCodec
 		return gson.toJson(o);
 	}
 
-	/** Strings only, each within {@link #MAX_POSTED_CHARS}, at most {@link #MAX_POSTED}. */
-	private static Decoded decodePosted(JsonObject in)
+	/**
+	 * The keys of a "posted" claim: strings only, each within {@link #MAX_POSTED_CHARS}, at most {@link #MAX_POSTED}.
+	 * Null for any other payload.
+	 */
+	static List<String> posted(Gson gson, String json)
 	{
+		JsonObject in = object(gson, json, MAX_PAYLOAD_CHARS);
+		JsonElement k = in == null ? null : in.get("k");
+		if (k == null || !k.isJsonPrimitive() || !POSTED.equals(k.getAsString()))
+		{
+			return null;
+		}
 		List<String> keys = new ArrayList<>();
 		JsonElement p = in.get("p");
 		if (p != null && p.isJsonArray())
 		{
 			for (JsonElement item : p.getAsJsonArray())
 			{
-				if (keys.size() < MAX_POSTED && item.isJsonPrimitive() && item.getAsJsonPrimitive().isString()
-					&& !item.getAsString().isEmpty() && item.getAsString().length() <= MAX_POSTED_CHARS)
+				if (keys.size() < MAX_POSTED && isPostedKey(item))
 				{
 					keys.add(item.getAsString());
 				}
 			}
 		}
-		return Decoded.posted(keys);
+		return keys;
+	}
+
+	private static boolean isPostedKey(JsonElement item)
+	{
+		if (!item.isJsonPrimitive() || !item.getAsJsonPrimitive().isString())
+		{
+			return false;
+		}
+		String key = item.getAsString();
+		return !key.isEmpty() && key.length() <= MAX_POSTED_CHARS;
+	}
+
+	/** The payload's JSON object; null when it is empty, longer than {@code maxChars}, or not an object. */
+	private static JsonObject object(Gson gson, String json, int maxChars)
+	{
+		if (json == null || json.isEmpty() || json.length() > maxChars)
+		{
+			return null;
+		}
+		try
+		{
+			JsonElement root = gson.fromJson(json, JsonElement.class);
+			return root != null && root.isJsonObject() ? root.getAsJsonObject() : null;
+		}
+		catch (RuntimeException e)
+		{
+			return null;
+		}
 	}
 
 	private static Decoded decodeStats(JsonObject in)
