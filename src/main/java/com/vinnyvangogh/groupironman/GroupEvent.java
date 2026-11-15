@@ -160,6 +160,11 @@ final class GroupEvent
 	 * member's event from the party. This client only: never sent, saved or compared.
 	 */
 	final long previous;
+	/**
+	 * Read from the game's own Group channel broadcast for a member without the plugin ({@link GroupBroadcasts}),
+	 * not seen by their client. This client only: never sent, saved or compared.
+	 */
+	final boolean broadcast;
 
 	private GroupEvent(Builder b)
 	{
@@ -174,6 +179,7 @@ final class GroupEvent
 		this.world = Math.max(0, b.world);
 		this.location = clip(b.location);
 		this.previous = Math.max(0, b.previous);
+		this.broadcast = b.broadcast;
 	}
 
 	private static String clip(String text)
@@ -217,7 +223,7 @@ final class GroupEvent
 	Builder toBuilder()
 	{
 		return of(type, at, member).text(text).items(items).taken(taken).number(number).detail(detail)
-			.world(world).location(location).previous(previous);
+			.world(world).location(location).previous(previous).broadcast(broadcast);
 	}
 
 	GroupEvent withMember(String name)
@@ -231,8 +237,9 @@ final class GroupEvent
 		switch (type.need)
 		{
 			case ITEMS:
-				// A drop names its NPC, as in 1.0.0; storage kinds have no text.
-				return !items.isEmpty() && (type != Type.DROP || !text.isEmpty());
+				// A drop names its NPC, as in 1.0.0, except a broadcast's (the game's line has none); storage kinds
+				// have no text.
+				return !items.isEmpty() && (type != Type.DROP || broadcast || !text.isEmpty());
 			case TEXT:
 				return !text.isEmpty();
 			default:
@@ -273,6 +280,7 @@ final class GroupEvent
 		private int world;
 		private String location;
 		private long previous;
+		private boolean broadcast;
 
 		private Builder(Type type, long at, String member)
 		{
@@ -332,6 +340,12 @@ final class GroupEvent
 		Builder previous(long v)
 		{
 			previous = v;
+			return this;
+		}
+
+		Builder broadcast(boolean v)
+		{
+			broadcast = v;
 			return this;
 		}
 

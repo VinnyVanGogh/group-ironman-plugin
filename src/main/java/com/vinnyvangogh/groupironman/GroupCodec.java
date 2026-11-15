@@ -81,12 +81,17 @@ final class GroupCodec
 
 	/**
 	 * The {@code k} on the wire. {@link #EXTRAS} and {@link #EVENTS} came in
-	 * part 3; a part 2 build reads them as an unknown kind and ignores them.
+	 * part 3; a part 2 build reads them as an unknown kind and ignores them. {@link #POSTED} (the game broadcasts a
+	 * client posted, {@link GroupBroadcasts}) is read the same way by every older build.
 	 */
 	enum Kind
 	{
-		BANK, CARRIED, STORAGE, STATS, EXTRAS, EVENTS
+		BANK, CARRIED, STORAGE, STATS, EXTRAS, EVENTS, POSTED
 	}
+
+	/** Most broadcast keys one claim carries, and the longest key kept. */
+	static final int MAX_POSTED = 20;
+	static final int MAX_POSTED_CHARS = 200;
 
 	/** One part of a split bank snapshot. */
 	static final class BankPart
@@ -244,9 +249,11 @@ final class GroupCodec
 		final MemberExtras extras;
 		/** Each with an empty member: the receiver files them under the party member they came from. */
 		final List<GroupEvent> events;
+		/** The broadcast keys a member's client posted ({@link GroupBroadcasts#key}). */
+		final List<String> posted;
 
 		private Decoded(Kind kind, BankPart bank, Carried carried, StorageChange storage, MemberStats stats,
-			MemberExtras extras, List<GroupEvent> events)
+			MemberExtras extras, List<GroupEvent> events, List<String> posted)
 		{
 			this.kind = kind;
 			this.bank = bank;
@@ -255,36 +262,42 @@ final class GroupCodec
 			this.stats = stats;
 			this.extras = extras;
 			this.events = events;
+			this.posted = posted;
 		}
 
 		static Decoded of(BankPart bank)
 		{
-			return new Decoded(Kind.BANK, bank, null, null, null, null, null);
+			return new Decoded(Kind.BANK, bank, null, null, null, null, null, null);
 		}
 
 		static Decoded of(Carried carried)
 		{
-			return new Decoded(Kind.CARRIED, null, carried, null, null, null, null);
+			return new Decoded(Kind.CARRIED, null, carried, null, null, null, null, null);
 		}
 
 		static Decoded of(StorageChange storage)
 		{
-			return new Decoded(Kind.STORAGE, null, null, storage, null, null, null);
+			return new Decoded(Kind.STORAGE, null, null, storage, null, null, null, null);
 		}
 
 		static Decoded of(MemberStats stats)
 		{
-			return new Decoded(Kind.STATS, null, null, null, stats, null, null);
+			return new Decoded(Kind.STATS, null, null, null, stats, null, null, null);
 		}
 
 		static Decoded of(MemberExtras extras)
 		{
-			return new Decoded(Kind.EXTRAS, null, null, null, null, extras, null);
+			return new Decoded(Kind.EXTRAS, null, null, null, null, extras, null, null);
 		}
 
 		static Decoded of(List<GroupEvent> events)
 		{
-			return new Decoded(Kind.EVENTS, null, null, null, null, null, events);
+			return new Decoded(Kind.EVENTS, null, null, null, null, null, events, null);
+		}
+
+		static Decoded posted(List<String> keys)
+		{
+			return new Decoded(Kind.POSTED, null, null, null, null, null, null, keys);
 		}
 	}
 
@@ -621,6 +634,8 @@ final class GroupCodec
 					longOr(in.get("svts"), -1)));
 			case "events":
 				return decodeEvents(in);
+			case "posted":
+				return decodePosted(in);
 			default:
 				// A kind from a newer build.
 				return null;
@@ -711,6 +726,41 @@ final class GroupCodec
 			}
 		}
 		return Decoded.of(events);
+	}
+
+	/** {@code {"v":1,"k":"posted","p":[key, ...]}}: the game broadcasts this client just posted. */
+	static String encodePosted(Gson gson, List<String> keys)
+	{
+		JsonObject o = header(Kind.POSTED);
+		JsonArray p = new JsonArray();
+		for (String key : keys)
+		{
+			if (p.size() < MAX_POSTED && key != null && !key.isEmpty() && key.length() <= MAX_POSTED_CHARS)
+			{
+				p.add(key);
+			}
+		}
+		o.add("p", p);
+		return gson.toJson(o);
+	}
+
+	/** Strings only, each within {@link #MAX_POSTED_CHARS}, at most {@link #MAX_POSTED}. */
+	private static Decoded decodePosted(JsonObject in)
+	{
+		List<String> keys = new ArrayList<>();
+		JsonElement p = in.get("p");
+		if (p != null && p.isJsonArray())
+		{
+			for (JsonElement item : p.getAsJsonArray())
+			{
+				if (keys.size() < MAX_POSTED && item.isJsonPrimitive() && item.getAsJsonPrimitive().isString()
+					&& !item.getAsString().isEmpty() && item.getAsString().length() <= MAX_POSTED_CHARS)
+				{
+					keys.add(item.getAsString());
+				}
+			}
+		}
+		return Decoded.posted(keys);
 	}
 
 	private static Decoded decodeStats(JsonObject in)

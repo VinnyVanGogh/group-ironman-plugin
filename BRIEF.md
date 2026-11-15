@@ -357,6 +357,47 @@ This amends the roster line in round 2 ("no hiscores or Wise Old Man
 calls"): the roster still comes only from the game; hiscores add levels, not
 members.
 
+### Phase 0 addendum — group broadcasts for members without the plugin (2026-11-14)
+
+Board, 2026-11-14: members online without the plugin still produce the game's
+own Group channel broadcasts ("[GroupPures] GroupOtt has reached Herblore
+level 21.", "... has completed a quest: Black Knights' Fortress"); post those
+to Discord too.
+
+**27. Posting the game's Group broadcasts to the group's Discord — allowed,
+with precedent.** *The feature, as what the player now knows:* nothing new.
+Every member already sees each broadcast in their own chatbox; this copies
+the line, as a group event, into the group's own Discord channel. *Nearest
+rules:* Data & Privacy, "no crowdsourcing data about other players" and "no
+exposing player information over HTTP". Neither applies beyond what #18
+already settled: the source is this player's own Group channel
+(`ChatMessageType.CLAN_GIM_MESSAGE`), the members are their own group, and the
+destination is the group's own webhook, opted into by its members. Nothing is
+sent to any server of ours. *Precedent:* **Dink** (pajlads/DinkPlugin,
+`DinkPlugin.onChatMessage`) routes `CLAN_MESSAGE`, `CLAN_GUEST_MESSAGE` and
+`CLAN_GIM_MESSAGE` to `PetNotifier.onClanNotification` and posts other clan
+members' pets from their broadcasts to a Discord webhook (`CLAN_REGEX`, read
+2026-11-14).
+
+*Conditions this build keeps* (`GroupBroadcasts`, `GroupEventEngine.groupBroadcast`):
+- Only `CLAN_GIM_MESSAGE` lines, parsed with fixed patterns; no chat is sent
+  anywhere but the configured webhook, and only events the group's per-kind
+  Discord switches allow, after "Post every N levels" and the drop minimum.
+  Quiet hours hold them like every other post.
+- A member heard from over the group sync posts their own events and is
+  skipped (the board's "(no plugin)" rule), so nothing is posted twice.
+- One plugin user posts each line: the leader while online and in the party,
+  else the first by name (`ChannelPosts.leads`). It tells the party with a
+  `posted` claim (the line's key, nothing of its own) and keeps posted keys a
+  day, so a restart or a second client never posts it again.
+- The group setting "Post events for members without the plugin" (default on)
+  turns it off for everyone. The poster's own "don't post my events" applies
+  to their own events only: members without the plugin cannot opt out in-game.
+- Posts say "from the game's group broadcast" in the footer. No screenshot is
+  attached: the poster's screen is not the member's moment.
+- *Unverified:* the wording of every line but the Board's two captures and
+  Dink's pet line. A line worded differently is simply not posted.
+
 ### Phase 0 addendum — group settings and roles (2026-11-10)
 
 Board, 2026-11-10: group-synced settings with a leader and editors, and

@@ -388,6 +388,28 @@ class GroupService
 		}
 	}
 
+	/**
+	 * Client thread. A game broadcast this client just posted ({@link GroupBroadcasts}), so another plugin user's
+	 * client that also thinks it posts skips it. Carries no data of this player's own: every member's game showed
+	 * the same line.
+	 */
+	void sharePosted(String key)
+	{
+		if (syncing())
+		{
+			partyService.send(new VvgGroupIronmanMessage(GroupCodec.encodePosted(gson,
+				Collections.singletonList(key))));
+		}
+	}
+
+	/** The group's signed leader, empty when this client has no roles yet. */
+	String leaderName()
+	{
+		GroupGovernance g = governance();
+		GroupRoles roles = g == null ? null : g.roles();
+		return roles == null ? "" : roles.leader;
+	}
+
 	GroupOutbox.Switches switches()
 	{
 		return new GroupOutbox.Switches(config.groupShareBank(), config.groupShareStorage(),
@@ -1415,6 +1437,9 @@ class GroupService
 					return;
 				}
 				break;
+			case POSTED:
+				receivePosted(decoded.posted);
+				break;
 			default:
 				return;
 		}
@@ -1481,6 +1506,16 @@ class GroupService
 			saveCache();
 		}
 		return true;
+	}
+
+	/** A member's client posted these game broadcasts: this one never posts them too. */
+	private void receivePosted(List<String> keys)
+	{
+		GroupEventEngine engine = events;
+		if (engine != null)
+		{
+			engine.claimed(keys);
+		}
 	}
 
 	private void memberStorage(StorageChange change)

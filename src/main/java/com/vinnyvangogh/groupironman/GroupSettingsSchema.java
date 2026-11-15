@@ -70,6 +70,8 @@ final class GroupSettingsSchema
 	 * webhook keeps the board, and a group switch would post beside it.
 	 */
 	static final GroupEvent.Type OWN_DISCORD = GroupEvent.Type.ONLINE;
+	/** "Post events for members without the plugin" ({@link GroupBroadcasts}), on by default. */
+	static final String NO_PLUGIN_EVENTS = "discordNoPluginEvents";
 
 	private static final long GP_MAX = Integer.MAX_VALUE;
 	private static final Map<String, Setting> BY_KEY = new LinkedHashMap<>();
@@ -112,6 +114,8 @@ final class GroupSettingsSchema
 		flag("discordEasterEggs", "Easter eggs", TIMING, GroupIronmanConfig::discordEasterEggs);
 		timing("discordLegendAt", "Legend at (gp)", 0, GP_MAX, GroupIronmanConfig::discordLegendAt);
 		timing("discordFreeloaderAt", "Freeloader at (gp)", 0, GP_MAX, GroupIronmanConfig::discordFreeloaderAt);
+		flag(NO_PLUGIN_EVENTS, "Post events for members without the plugin", TIMING,
+			GroupIronmanConfig::discordNoPluginEvents);
 
 		ALL = Collections.unmodifiableList(new ArrayList<>(BY_KEY.values()));
 	}

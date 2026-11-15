@@ -797,6 +797,16 @@ public interface GroupIronmanConfig extends Config
 		return 1_000_000;
 	}
 
+	@ConfigItem(keyName = "discordNoPluginEvents", name = "Members without the plugin", description = "Post the"
+		+ " game's own Group channel broadcasts (level-ups, quests, drops, collection log, pets, deaths, ...) for"
+		+ " members who do not run this plugin, under the same event switches. One plugin user posts each (the"
+		+ " leader when online), marked 'from the game's group broadcast'. A group setting: the leader's choice"
+		+ " wins.", section = discordHowSection, position = 14)
+	default boolean discordNoPluginEvents()
+	{
+		return true;
+	}
+
 	/** Replaced by {@link #discordOnlineStatus}; still read once, so an older install keeps its choice. */
 	@ConfigItem(keyName = "discordOnline", name = "Online and offline", description = "Replaced by 'Online"
 		+ " status'.", hidden = true, section = discordHowSection, position = 12)

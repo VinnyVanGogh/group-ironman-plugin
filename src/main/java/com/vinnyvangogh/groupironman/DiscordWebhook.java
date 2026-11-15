@@ -243,6 +243,10 @@ final class DiscordWebhook
 		{
 			text.append("; ").append(extra[1]);
 		}
+		if (post.lead.broadcast)
+		{
+			text.append(" (").append(GroupBroadcasts.SOURCE).append(')');
+		}
 		return egg < 0 ? text.toString() : text.append(words.substring(egg)).toString();
 	}
 
@@ -273,7 +277,7 @@ final class DiscordWebhook
 			embed.add("image", image);
 		}
 		JsonObject footer = new JsonObject();
-		footer.addProperty("text", USERNAME);
+		footer.addProperty("text", e.broadcast ? USERNAME + " · " + GroupBroadcasts.SOURCE : USERNAME);
 		embed.add("footer", footer);
 		return embed;
 	}
