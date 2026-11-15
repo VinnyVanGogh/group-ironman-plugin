@@ -677,6 +677,14 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "discordRequest", name = "Shopping requests", description = "You asked the group for items"
+		+ " in the Shopping tab, said you'll get one, or the group got everything on your request.",
+		section = discordEventsSection, position = 34)
+	default boolean discordRequest()
+	{
+		return false;
+	}
+
 	// ---- 4. Discord: how to post ----
 
 	@ConfigItem(keyName = "discordOnlineStatus", name = "Online status", description = "Posts: a post for each"
@@ -1187,6 +1195,13 @@ public interface GroupIronmanConfig extends Config
 		+ " up to a shop that sells something a list in the Shopping tab still needs, once per visit. Only shops"
 		+ " you can be served at.", section = inGameSection, position = 42)
 	default boolean shoppingShopAlert()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayRequest", name = "Banner: Shopping requests", description = "A member asked the"
+		+ " group for items, said they'll get one, or a request is done.", section = inGameSection, position = 43)
+	default boolean overlayRequest()
 	{
 		return false;
 	}

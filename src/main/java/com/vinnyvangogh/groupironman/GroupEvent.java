@@ -88,7 +88,9 @@ final class GroupEvent
 		WEEKLY_RECAP("wr", Category.GROUP, Need.TEXT, false),
 		SLAYER("sy", Category.ACTIVITIES, Need.TEXT, false),
 		FARMING("fr", Category.ACTIVITIES, Need.TEXT, false),
-		BIRDHOUSE("bh", Category.ACTIVITIES, Need.TEXT, false);
+		BIRDHOUSE("bh", Category.ACTIVITIES, Need.TEXT, false),
+		/** A Shopping tab request made, claimed or done: {@link RequestBoard}. */
+		REQUEST("rq", Category.GROUP, Need.TEXT, false);
 
 		private static final Map<String, Type> BY_CODE = new HashMap<>();
 

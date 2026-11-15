@@ -112,6 +112,8 @@ class GroupService
 	/** How often this player's quest progress is re-read for the Shopping tab (about half a minute). */
 	static final int QUEST_INTERVAL_TICKS = 50;
 	static final int SHOP_ALERT_INTERVAL_TICKS = 3;
+	/** How often the owner's client closes request items the group now holds (about three seconds). */
+	static final int SEAL_INTERVAL_TICKS = 5;
 	/** The chatFilterCheck script callback the base chat filter plugin uses to drop a line. */
 	private static final String CHAT_FILTER_CHECK = "chatFilterCheck";
 
@@ -209,6 +211,7 @@ class GroupService
 	private final ShopVisits shopVisits = new ShopVisits();
 	private int ticksSinceQuests = QUEST_INTERVAL_TICKS;
 	private int ticksSinceShopAlert;
+	private int ticksSinceSeal;
 
 	private volatile LowStock lowStock = LowStock.parse("");
 	private volatile GroupMembers members = GroupMembers.UNKNOWN;
@@ -1009,6 +1012,7 @@ class GroupService
 		refreshRoster();
 		pollQuests();
 		shopAlert();
+		sealRequests();
 		carriedDirty |= containers.tick();
 		GroupOutbox.Switches s = switches();
 		updateCarried(s);
@@ -2094,6 +2098,140 @@ class GroupService
 		});
 	}
 
+	// ---- Requests: each member's own lists the group fills ----
+
+	/** A request of this player's own; a blank name becomes "Name's requests". False when refused. */
+	boolean addRequest(String name, Map<Integer, Integer> items)
+	{
+		ShoppingSync shop = shopping;
+		if (shop == null || self.isEmpty())
+		{
+			return false;
+		}
+		long now = System.currentTimeMillis();
+		RequestList r = RequestList.create(name, items, self, now);
+		boolean ok = shop.addRequest(r);
+		if (ok)
+		{
+			resolve(r.items.keySet());
+			postRequest(RequestBoard.made(r, lookup::name, now));
+		}
+		return ok;
+	}
+
+	/** Owner only, as every request edit below. */
+	boolean renameRequest(String id, String name)
+	{
+		ShoppingSync shop = shopping;
+		return shop != null && !self.isEmpty() && shop.renameRequest(id, name, self, System.currentTimeMillis());
+	}
+
+	boolean removeRequest(String id)
+	{
+		ShoppingSync shop = shopping;
+		return shop != null && !self.isEmpty() && shop.removeRequest(id, self, System.currentTimeMillis());
+	}
+
+	/** The owner closes the whole list by hand: no "done" post, since the group may not have it all. */
+	boolean closeRequest(String id)
+	{
+		ShoppingSync shop = shopping;
+		return shop != null && !self.isEmpty() && shop.closeRequest(id, self, System.currentTimeMillis());
+	}
+
+	boolean closeRequestItem(String id, int itemId)
+	{
+		ShoppingSync shop = shopping;
+		if (shop == null || self.isEmpty())
+		{
+			return false;
+		}
+		RequestList next = shop.closeItems(id, Collections.singleton(itemId), self, System.currentTimeMillis());
+		postIfDone(next);
+		return next != null;
+	}
+
+	/** "I'll get it" (or taking it back): anyone, on an open item. */
+	boolean claimRequest(String id, int itemId, boolean claimed)
+	{
+		ShoppingSync shop = shopping;
+		long now = System.currentTimeMillis();
+		if (shop == null || self.isEmpty() || !shop.claim(id, itemId, self, claimed, now))
+		{
+			return false;
+		}
+		RequestList r = shop.request(id);
+		if (claimed && r != null)
+		{
+			postRequest(RequestBoard.claimed(r, itemId, lookup.name(itemId), self, now));
+		}
+		return true;
+	}
+
+	/** Every request, worked out against what the group holds now. Any thread. */
+	List<RequestBoard.Card> requestCards()
+	{
+		ShoppingSync shop = shopping;
+		List<RequestBoard.Card> out = new ArrayList<>();
+		if (shop == null)
+		{
+			return out;
+		}
+		ShopAllocation.Holdings holdings = ShopAllocation.Holdings.from(roster.searchSources());
+		for (RequestList r : shop.requests())
+		{
+			out.add(RequestBoard.card(r, shop.claims(r.id), holdings, lookup::name));
+		}
+		return out;
+	}
+
+	/**
+	 * Client thread, every {@link #SEAL_INTERVAL_TICKS}. Only the owner's client writes a request, so it is the
+	 * one that closes items the group now holds enough of, and posts "done" (once) when that closes the list.
+	 */
+	private void sealRequests()
+	{
+		ShoppingSync shop = shopping;
+		if (shop == null || self.isEmpty() || ++ticksSinceSeal < SEAL_INTERVAL_TICKS)
+		{
+			return;
+		}
+		ticksSinceSeal = 0;
+		ShopAllocation.Holdings holdings = null;
+		for (RequestList r : shop.requests())
+		{
+			if (!r.open() || !r.ownedBy(self))
+			{
+				continue;
+			}
+			if (holdings == null)
+			{
+				holdings = ShopAllocation.Holdings.from(roster.searchSources());
+			}
+			Set<Integer> reached = RequestBoard.reached(RequestBoard.card(r, Collections.emptyList(), holdings,
+				lookup::name));
+			postIfDone(shop.closeItems(r.id, reached, self, System.currentTimeMillis()));
+		}
+	}
+
+	private void postIfDone(RequestList next)
+	{
+		if (next != null && next.closed)
+		{
+			postRequest(RequestBoard.done(next, next.at));
+		}
+	}
+
+	/** One of this player's request events, to Discord and the banners under their own switches. */
+	private void postRequest(GroupEvent event)
+	{
+		GroupEventEngine engine = events;
+		if (engine != null)
+		{
+			clientThread.invokeLater(() -> engine.request(event));
+		}
+	}
+
 	/** Someone joined or the party changed: every list, removals included, goes out on the next tick. */
 	private void resendShopping()
 	{
@@ -2112,6 +2250,10 @@ class GroupService
 		if (shop == null)
 		{
 			return ids;
+		}
+		for (RequestList r : shop.requests())
+		{
+			ids.addAll(r.items.keySet());
 		}
 		for (ShoppingList l : shop.active())
 		{

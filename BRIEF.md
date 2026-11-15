@@ -430,6 +430,34 @@ RuneLite config is "Forget leader" on each client, then a new claim.
 `@ConfigItem` (`memberIdentity`, `groupRoles`, `groupSettings`): no new file
 I/O (Board rule).
 
+### Phase 0 addendum — Shopping tab requests (2026-11-14, RUNELITE-149)
+
+Board, 2026-11-14: each member keeps their own named request lists ("Fire
+cape": 500 sharks, 20 prayer potions) that the group fills; anyone can say
+"I'll get it"; an item closes when the group holds the amount.
+
+**28. Requests and claims — allowed.** *Nearest rules:* Data & Privacy, "no
+crowdsourcing data about other players" and "no exposing player information
+over HTTP": a request is text a member typed for their own group, and the
+counts it shows are the item counts members already share with each other
+(#8 to #17, the same `Holdings` the shopping list reads). It travels only to
+the members' own party, as two more kinds on the shopping list's messages
+(`req`, `rqc`), through `PartyService`; nothing new goes over HTTP.
+*Input Restrictions:* nothing is automated. "I'll get it" is a note to the
+group; no item is moved, withdrawn, bought or traded for anyone, and the
+plugin never touches the trade screen. *Discord:* one more opt-in kind
+(`discordRequest`, off), posted only by the member whose action it was
+(#18): the owner for "made" and "done", the claimer for a claim.
+*Forbidden language features:* none. *Precedent:* the base client's `party`
+plugin relays member-chosen state; the shopping list (#8 to #17 data,
+RUNELITE-136) already shows these same counts.
+
+**Trust model.** A request is edited only by its owner: each client refuses a
+revision naming a different owner than the one it holds
+(`RequestsTest.aRevisionNamingAnotherOwnerIsIgnored`). A member who edits
+their own client can still forge their own claims; that is their own word to
+their own group, as every other kind.
+
 ### Research — which group storage actions save (2026-11-14)
 
 Bug (Board 2026-11-14): 1,000 logs deposited, the window left without Save,

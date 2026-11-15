@@ -99,15 +99,18 @@ final class ShoppingList
 		{
 			return true;
 		}
-		if (rev != other.rev)
+		int order = order(rev, at, other.rev, other.at);
+		if (order != 0)
 		{
-			return rev > other.rev;
-		}
-		if (at != other.at)
-		{
-			return at > other.at;
+			return order > 0;
 		}
 		return by.compareTo(other.by) > 0 || by.equals(other.by) && removed && !other.removed;
+	}
+
+	/** Revisions in order: the higher revision, then the later one; 0 on a tie. Requests share it. */
+	static int order(long rev, long at, long otherRev, long otherAt)
+	{
+		return rev != otherRev ? Long.compare(rev, otherRev) : Long.compare(at, otherAt);
 	}
 
 	private ShoppingList next(String newName, Collection<String> newMembers, Map<Integer, Integer> newItems,
@@ -147,7 +150,8 @@ final class ShoppingList
 		return Collections.unmodifiableList(out);
 	}
 
-	private static Map<Integer, Integer> capItems(Map<Integer, Integer> in)
+	/** Real item ids with a positive count, at most {@link #MAX_ITEMS}; requests ({@link RequestList}) share it. */
+	static Map<Integer, Integer> capItems(Map<Integer, Integer> in)
 	{
 		Map<Integer, Integer> out = new TreeMap<>();
 		for (Map.Entry<Integer, Integer> e : in == null ? Collections.<Integer, Integer>emptyMap().entrySet()

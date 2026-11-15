@@ -701,6 +701,12 @@ class GroupEventEngine
 
 	// ---- This player's own events ----
 
+	/** Client thread. This player's Shopping tab request made, claimed or done ({@link RequestBoard}). */
+	void request(GroupEvent event)
+	{
+		own(event);
+	}
+
 	/** Client thread. Routes one of this player's events and, when shared, sends it to the party. */
 	private void own(GroupEvent event)
 	{
