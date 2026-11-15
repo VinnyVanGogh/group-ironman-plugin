@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Shopping: "Path to" with Shortest Path
+
+- Each line still to get, and each requested item, has a **Path to** button
+  naming where it goes ("Path to: Harry's Fishing Shop"): the nearest shop
+  you can be served at, or the nearest bank when the group holds some in
+  group storage. Needs the Shortest Path plugin, which draws the way; you
+  walk it.
+- **Path to next** on each list walks its stops in order, nearest first,
+  and moves on by itself once a stop has nothing left to get.
+- The path clears when the item is done, the list is removed or the request
+  closes, or with **Stop path**. Without Shortest Path the button says so.
+
 ### Shopping: shared lists for the group, with 1 Defence pure presets
 
 - New **Shopping** tab. Anyone adds a list for one or more members; it goes

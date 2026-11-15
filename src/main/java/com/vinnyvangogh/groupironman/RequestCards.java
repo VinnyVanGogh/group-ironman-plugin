@@ -3,6 +3,7 @@ package com.vinnyvangogh.groupironman;
 import java.awt.Color;
 import java.awt.GridLayout;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import javax.swing.JOptionPane;
@@ -36,7 +37,7 @@ final class RequestCards
 		this.tab = tab;
 	}
 
-	void draw(JPanel panel, List<RequestBoard.Card> cards, String self)
+	void draw(JPanel panel, List<RequestBoard.Card> cards, String self, ItemPaths.Planner paths)
 	{
 		if (cards.isEmpty())
 		{
@@ -45,11 +46,11 @@ final class RequestCards
 		panel.add(GroupIronmanPanel.heading("Requests"));
 		for (RequestBoard.Card c : cards)
 		{
-			panel.add(card(c, self));
+			panel.add(card(c, self, paths));
 		}
 	}
 
-	private JPanel card(RequestBoard.Card c, String self)
+	private JPanel card(RequestBoard.Card c, String self, ItemPaths.Planner paths)
 	{
 		String key = ShopFolds.request(c.request.id);
 		boolean open = tab.isOpen(key);
@@ -76,9 +77,10 @@ final class RequestCards
 		}
 		for (RequestBoard.Row r : needed)
 		{
-			box.add(row(c.request, r, self, mine));
+			box.add(row(c.request, r, self, mine, stops(paths, c.request, r)));
 		}
-		tab.addDone(box, key, done.size(), () -> done.forEach(r -> box.add(row(c.request, r, self, mine))));
+		tab.addDone(box, key, done.size(), () -> done.forEach(r -> box.add(row(c.request, r, self, mine,
+			stops(paths, c.request, r)))));
 		return box;
 	}
 
@@ -119,7 +121,13 @@ final class RequestCards
 		return who + " will get it";
 	}
 
-	private JPanel row(RequestList req, RequestBoard.Row r, String self, boolean mine)
+	/** Where "Path to" leads for one requested item; empty without a planner. */
+	private static List<ItemPaths.Stop> stops(ItemPaths.Planner paths, RequestList req, RequestBoard.Row r)
+	{
+		return paths == null ? Collections.emptyList() : paths.request(req, r);
+	}
+
+	private JPanel row(RequestList req, RequestBoard.Row r, String self, boolean mine, List<ItemPaths.Stop> stops)
 	{
 		JPanel words = new GroupIronmanPanel.Column();
 		words.add(new ShopCards.Wrap(summary(r), r.done() ? DONE : Color.WHITE, ShopCards.ROW_TEXT));
@@ -133,6 +141,12 @@ final class RequestCards
 		if (req.open() && !r.done())
 		{
 			words.add(rowButtons(req, r, self, mine));
+		}
+		if (!stops.isEmpty())
+		{
+			ItemPaths.Stop to = stops.get(0);
+			ItemPaths.Target why = ItemPaths.Target.requestItem(req.id, r.itemId);
+			words.add(ShoppingTab.pathButton(to.label(), () -> say.accept(actions.pathTo(why, to))));
 		}
 		return tab.itemLine(r.itemId, words);
 	}
@@ -193,7 +207,7 @@ final class RequestCards
 	}
 
 	/** Changes when anything a request card draws changes. */
-	static String signature(List<RequestBoard.Card> cards, String self)
+	static String signature(List<RequestBoard.Card> cards, String self, ItemPaths.Planner paths)
 	{
 		StringBuilder s = new StringBuilder(self);
 		for (RequestBoard.Card c : cards)
@@ -201,7 +215,8 @@ final class RequestCards
 			s.append('|').append(c.request.id).append(c.request.rev);
 			for (RequestBoard.Row r : c.rows)
 			{
-				s.append(summary(r)).append(needText(r)).append(claimText(r));
+				s.append(summary(r)).append(needText(r)).append(claimText(r))
+					.append(ShoppingTab.first(stops(paths, c.request, r)));
 			}
 		}
 		return s.toString();

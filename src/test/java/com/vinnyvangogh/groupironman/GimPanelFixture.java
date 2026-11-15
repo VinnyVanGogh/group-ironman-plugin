@@ -244,6 +244,20 @@ final class GimPanelFixture
 		{
 			openLists = keys;
 		}
+
+		@Override
+		public String pathTo(ItemPaths.Target why, ItemPaths.Stop to)
+		{
+			calls.add("pathTo:" + why.kind + ":" + why.id + ":" + why.itemId + "=" + to.name);
+			return to.label() + ".";
+		}
+
+		@Override
+		public String clearPath()
+		{
+			calls.add("clearPath");
+			return "Path cleared.";
+		}
 	}
 
 	/** Everything the panel draws from; change a field, then {@link #show}. */
@@ -270,13 +284,21 @@ final class GimPanelFixture
 	}
 
 	final Recorder actions = new Recorder();
+	/** The mocked ItemManager the panel draws icons from, so a test can check which ids it asked for. */
+	final ItemManager items = itemManager();
 	final GroupIronmanPanel panel;
 	final SwingDriver ui;
 
 	/** Call on the Swing thread. */
 	GimPanelFixture()
 	{
-		panel = new GroupIronmanPanel(itemManager(), new SkillIconManager(), mock(SpriteManager.class), actions);
+		this(mock(SpriteManager.class));
+	}
+
+	/** Call on the Swing thread. With {@code sprites} answering, e.g. with stand-in worn-slot silhouettes. */
+	GimPanelFixture(SpriteManager sprites)
+	{
+		panel = new GroupIronmanPanel(items, new SkillIconManager(), sprites, actions);
 		ui = new SwingDriver(panel);
 	}
 
@@ -437,7 +459,7 @@ final class GimPanelFixture
 		List<RequestBoard.Card> requests = Collections.singletonList(
 			RequestBoard.card(ask, Collections.emptyList(), holdings, names::name));
 		s.shopping = new ShoppingTab.View(ShoppingBoard.of(lists, in), ShopPresets.load(gson).presets(),
-			NAMES, Collections.emptyList(), true, true, requests, SELF);
+			NAMES, Collections.emptyList(), true, true, requests, SELF, null, "");
 		return s;
 	}
 

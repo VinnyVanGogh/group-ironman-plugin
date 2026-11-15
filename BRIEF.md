@@ -458,6 +458,50 @@ revision naming a different owner than the one it holds
 their own client can still forge their own claims; that is their own word to
 their own group, as every other kind.
 
+### Phase 0 addendum — "Path to" with Shortest Path (2026-11-14)
+
+Board, 2026-11-14: shopping lines and requested items should let you "run to
+the items, the way Quest Path does".
+
+**29. "Path to" through Shortest Path — allowed, with precedent.** A button
+on each line still to get, on each requested item, and "Path to next" on each
+list, hands one tile to the Shortest Path plugin, which draws a route.
+*Nearest rules:* Input Restrictions ("no automating input", no walking for
+the player): nothing moves the player; Shortest Path only draws a line, and
+the player walks it. Inter-plugin: the **Out of scope** rule below (no
+reflection; "the channel is `PluginMessage`"). The message is
+`PluginMessage("shortestpath", "path", {"target": Set<WorldPoint>})` and
+`PluginMessage("shortestpath", "clear", {})`, posted on RuneLite's own
+`EventBus`: no reflection, no dependency on Shortest Path, nothing reads its
+state but "is a plugin of that class loaded and on" through
+`PluginManager`. *Precedent:* Shortest Path documents this API for other
+plugins (`docs/Cross-plugin-communication.md` in `Skretzo/shortest-path`,
+read 2026-11-14: "Every message uses the namespace `shortestpath`", `path`
+"shows a path", `clear` "removes the shown path"); Quest Path
+(questpath-plugin `80cdafb`, `ShortestPathBridge`) and Combat Vitals post the
+same messages. The Board also named RuneLite's Clue Scroll plugin; that was
+not re-checked here. *Forbidden language features:* none.
+
+Where it paths, and the sources: the shops are the quest data's shop table
+(`QuestData.shop`, `quest-items.json` from questpath-plugin `ee638ff`), the
+same table and reachability check the shop alert uses (`ShopSources`,
+`ShopVisits`): a shop this player cannot be served at is never a target.
+Drops are not targets (the data names a monster's region, not a tile). For an
+item the group holds in group storage, the nearest bank: group storage
+opens "via the regular Bank interface" (OSRS Wiki, "Group storage", read
+2026-11-14). Bank tiles: `banks.tsv`, one ungated tile per bank from Shortest
+Path's `destinations/game_features/bank.tsv` (THIRD_PARTY_NOTICES.md).
+Nearest is straight-line steps from the player's tile on the last game tick,
+another floor costing 50 more; "Path to next" walks greedy nearest-next.
+
+The path clears when its item is done, its list is removed, its request
+closes or the plugin is turned off; "Path to next" moves on to the nearest
+remaining stop once the current one has nothing left to get. With Shortest
+Path missing or off, the button says so and sends nothing.
+
+Not verifiable from here: that the line is drawn in a running client
+(`EventBus#post` is fire-and-forget; Quest Path's bridge doc).
+
 ### Research — which group storage actions save (2026-11-14)
 
 Bug (Board 2026-11-14): 1,000 logs deposited, the window left without Save,

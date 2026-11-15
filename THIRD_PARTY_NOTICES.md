@@ -73,6 +73,18 @@ Attribution-NonCommercial-ShareAlike 3.0 license
 (<https://creativecommons.org/licenses/by-nc-sa/3.0/>); the table is a small
 adaptation of it, shared under the same license.
 
+## Shortest Path: bank tiles
+
+`src/main/resources/com/vinnyvangogh/groupironman/banks.tsv` lists one tile
+per bank with no skill, quest or varbit requirement, taken from Shortest
+Path's `src/main/resources/destinations/game_features/bank.tsv`
+(<https://github.com/Skretzo/shortest-path>, master, read 2026-11-14), and
+renames Varrock's and Falador's two banks East and West. No code was copied;
+"Path to" talks to Shortest Path only through RuneLite's `PluginMessage`.
+Shortest Path is under the BSD 2-Clause license, with the terms above; its
+`LICENSE` file carries the template line "Copyright (c) <YEAR>, <COPYRIGHT
+HOLDER>" rather than a name.
+
 ## Group Ironmen Tracker
 
 The group features match features of Group Ironmen Tracker
