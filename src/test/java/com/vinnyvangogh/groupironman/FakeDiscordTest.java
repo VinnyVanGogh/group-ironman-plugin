@@ -88,8 +88,7 @@ public class FakeDiscordTest
 		server.start();
 		url = "http://127.0.0.1:" + server.getAddress().getPort() + "/api/webhooks/123/token";
 		sender = new DiscordSender(DiscordSender.okHttp(http, gson), () -> now, () -> 12);
-		levels = new LevelPosts(sender, gson, () -> now, () -> DiscordStyle.EMBED, FakeItems::new,
-			() -> DiscordWebhook.USERNAME);
+		levels = new LevelPosts(sender, gson, () -> now, () -> DiscordStyle.EMBED, () -> DiscordWebhook.USERNAME);
 	}
 
 	@After
@@ -149,9 +148,8 @@ public class FakeDiscordTest
 
 	private void gain(int n, byte[] png)
 	{
-		String json = DiscordWebhook.levels(gson, prayer(n), "Prayer level " + n, new FakeItems(), DiscordStyle.EMBED,
-			png != null, DiscordWebhook.USERNAME);
-		levels.level(url, prayer(n), WINDOW, png, json);
+		// No usual post handed in: the first post is the message's card, "Prayer level 24".
+		levels.level(url, prayer(n), WINDOW, png, null);
 	}
 
 	/** The engine's tick, then wait for the request it sent (if any) to be answered and its outcome handled. */

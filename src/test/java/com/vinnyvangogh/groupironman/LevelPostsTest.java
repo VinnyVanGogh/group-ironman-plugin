@@ -1,6 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,12 +34,13 @@ public class LevelPostsTest
 	}, () -> now, () -> 12);
 	/** The Progress poster name the replacement post is sent under. */
 	private String poster = "Iron Pals";
+	private DiscordStyle style = DiscordStyle.EMBED;
 	private LevelPosts levels = client();
 
 	/** A client's level posts; a second one is the same client after a restart. */
 	private LevelPosts client()
 	{
-		return new LevelPosts(sender, gson, () -> now, () -> DiscordStyle.EMBED, FakeItems::new, () -> poster);
+		return new LevelPosts(sender, gson, () -> now, () -> style, () -> poster);
 	}
 
 	private static GroupEvent level(String skill, int n)
@@ -68,10 +71,26 @@ public class LevelPostsTest
 		pending.remove(0).done(status, null, messageId);
 	}
 
+	/** The top card's words. */
 	private static String description(DiscordQueue.Post post)
 	{
-		JsonObject o = new Gson().fromJson(post.json, JsonObject.class);
-		return o.getAsJsonArray("embeds").get(0).getAsJsonObject().get("description").getAsString();
+		return cards(post).get(0);
+	}
+
+	/** Every card's words, top first. */
+	private static List<String> cards(DiscordQueue.Post post)
+	{
+		List<String> out = new ArrayList<>();
+		for (JsonElement embed : embeds(post))
+		{
+			out.add(embed.getAsJsonObject().get("description").getAsString());
+		}
+		return out;
+	}
+
+	private static JsonArray embeds(DiscordQueue.Post post)
+	{
+		return new Gson().fromJson(post.json, JsonObject.class).getAsJsonArray("embeds");
 	}
 
 	@Test
@@ -117,7 +136,7 @@ public class LevelPostsTest
 	}
 
 	@Test
-	public void aNinetyNineTotalOrCombatLevelIsNeverCombined()
+	public void aNinetyNineOrTotalLevelIsNeverCombinedButSkillsAndCombatAre()
 	{
 		assertNotNull(LevelThreads.combinable(Collections.singletonList(level("Prayer", 25))));
 		assertNull("a 99", LevelThreads.combinable(Arrays.asList(level("Prayer", 99),
@@ -126,9 +145,11 @@ public class LevelPostsTest
 			Collections.singletonList(level("Prayer", 99))));
 		assertNull("a total level", LevelThreads.combinable(Arrays.asList(level("Prayer", 50),
 			GroupEvent.of(GroupEvent.Type.TOTAL_LEVEL, 0, "Alex").number(1000).build())));
-		assertNull("a combat level", LevelThreads.combinable(Arrays.asList(level("Prayer", 50),
-			GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, 0, "Alex").number(90).build())));
-		assertNull("two skills", LevelThreads.combinable(Arrays.asList(level("Attack", 50), level("Hitpoints", 50))));
+		assertNull("nothing", LevelThreads.combinable(Collections.emptyList()));
+		assertEquals("a level with its combat level", 2, LevelThreads.combinable(Arrays.asList(level("Prayer", 50),
+			GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, 0, "Alex").number(90).build())).size());
+		assertEquals("two skills", 2, LevelThreads.combinable(Arrays.asList(level("Attack", 50),
+			level("Hitpoints", 50))).size());
 	}
 
 	@Test
@@ -354,7 +375,7 @@ public class LevelPostsTest
 	public void aDroppedEditEndsTheStreak()
 	{
 		LevelThreads threads = new LevelThreads();
-		LevelThreads.Streak s = threads.level(level("Prayer", 24), URL, 0, WINDOW, null);
+		LevelThreads.Streak s = threads.level(level("Prayer", 24), URL, 0, WINDOW, null).streak;
 		threads.posted(s, 200, "m1", 0);
 		assertNull("joins", threads.level(level("Prayer", 25), URL, SEC, WINDOW, null));
 		LevelThreads.Edit edit = threads.due(LevelThreads.EDIT_GAP).get(0);
@@ -371,13 +392,23 @@ public class LevelPostsTest
 	}
 
 	@Test
-	public void anEditWithANewScreenshotReplacesTheOldOne()
+	public void anEditWithANewScreenshotReplacesTheOldOneOnTheTopCardOnly()
 	{
-		JsonObject o = gson.fromJson(DiscordWebhook.levelsEdit(gson, level("Prayer", 25), "Prayer 23 → 25 (+2)",
-			new FakeItems(), DiscordStyle.EMBED, true), JsonObject.class);
+		byte[] png = {1};
+		levels.level(URL, level("Thieving", 46), WINDOW, png, null);
+		tick();
+		reply(200, "m1");
+		now += 60 * SEC;
+		levels.level(URL, level("Ranged", 66), WINDOW, new byte[] {2}, null);
+		tick();
+		DiscordQueue.Post edit = sent.get(1);
+		JsonObject o = gson.fromJson(edit.json, JsonObject.class);
 		assertEquals(DiscordWebhook.SCREENSHOT,
 			o.getAsJsonArray("attachments").get(0).getAsJsonObject().get("filename").getAsString());
 		assertFalse(o.has("username"));
+		assertEquals("one picture per message: the latest level-up's", 2, edit.png[0]);
+		assertTrue(embeds(edit).get(0).getAsJsonObject().has("image"));
+		assertFalse(embeds(edit).get(1).getAsJsonObject().has("image"));
 	}
 
 	@Test
@@ -501,21 +532,399 @@ public class LevelPostsTest
 		tick();
 		reply(200, "m1");
 		String saved = levels.saved();
-		assertTrue(saved.startsWith("w123456789012345678\tAlex\tPrayer\t23\t24\t"));
-		assertTrue(saved.endsWith("\tm1"));
+		long at = now;
+		assertEquals("L2\tw123456789012345678\tAlex\t" + at + "\t" + at + "\tm1\tPrayer\t23\t24\t" + at + "\t" + at
+			+ "\t1\t0", saved);
 		assertFalse("the webhook's token stays out of the file", saved.contains("AbC-def_GHI123"));
 		assertNull("saved once", levels.saved());
 		now += 60 * SEC;
 		gain(25);
-		assertTrue("a joined level is saved", levels.saved().contains("\t25\t"));
+		assertTrue("a joined level is saved", levels.saved().endsWith("\tPrayer\t23\t25\t" + at + "\t" + now
+			+ "\t2\t0"));
+	}
+
+	// Board 2026-11-14: GroupOtt (no plugin) Thieving 45 at 7:03 PM and 46 at 7:13 PM were two posts read from the
+	// game's group broadcast. A broadcast level now joins that member's streak as a plugin user's own does.
+
+	/** A level the game's group broadcast read, as GroupEventEngine hands the poster's client one. */
+	private static GroupEvent heard(String line)
+	{
+		GroupEvent e = LevelThreads.combinableBroadcast(GroupBroadcasts.parse(line, 0, name -> null));
+		assertNotNull(line, e);
+		return e;
+	}
+
+	/** The broadcast's level into its streak on {@code on}, its first post the usual one for it. */
+	private void hear(LevelPosts on, String line)
+	{
+		GroupEvent e = heard(line);
+		on.level(URL, e, WINDOW, null, DiscordWebhook.payload(gson, e, new FakeItems(), DiscordStyle.EMBED, null,
+			false));
+	}
+
+	private static String footer(DiscordQueue.Post post)
+	{
+		JsonObject o = new Gson().fromJson(post.json, JsonObject.class);
+		return o.getAsJsonArray("embeds").get(0).getAsJsonObject().getAsJsonObject("footer").get("text")
+			.getAsString();
+	}
+
+	@Test
+	public void twoBroadcastLevelsInOneSkillInsideTheWindowAreOnePostThenOneEdit()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		now += 10 * 60 * SEC;
+		hear(levels, "GroupOtt has reached Thieving level 46.");
+		tick();
+
+		assertEquals(2, sent.size());
+		assertNull(sent.get(0).edit);
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("read one below the first, as a member's level is", "Thieving 44 → 46 (+2) in 10 min",
+			description(sent.get(1)));
+		assertTrue("the edit keeps the broadcast footer", footer(sent.get(1)).endsWith(GroupBroadcasts.SOURCE));
+		assertTrue(footer(sent.get(0)).endsWith(GroupBroadcasts.SOURCE));
+	}
+
+	@Test
+	public void aBroadcastLevelOutsideTheWindowIsANewPost()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		now += WINDOW + SEC;
+		hear(levels, "GroupOtt has reached Thieving level 46.");
+		tick();
+		assertEquals(2, sent.size());
+		assertNull("a new post, not an edit", sent.get(1).edit);
+	}
+
+	@Test
+	public void broadcastLevelsInDifferentSkillsAddACardToTheMembersMessage()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		now += 60 * SEC;
+		hear(levels, "GroupOtt has reached Agility level 30.");
+		tick();
+		assertEquals(2, sent.size());
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals(Arrays.asList("Agility level 30", "Thieving level 45"), cards(sent.get(1)));
+		for (JsonElement card : embeds(sent.get(1)))
+		{
+			assertTrue("every card keeps the broadcast footer", card.getAsJsonObject().getAsJsonObject("footer")
+				.get("text").getAsString().endsWith(GroupBroadcasts.SOURCE));
+		}
+	}
+
+	@Test
+	public void differentMembersAreSeparatePosts()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		now += 60 * SEC;
+		hear(levels, "IronPal has reached Thieving level 45.");
+		tick();
+		assertEquals(2, sent.size());
+		assertNull(sent.get(1).edit);
+	}
+
+	@Test
+	public void aBroadcastStreakSurvivesARestart()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		restart(levels.saved());
+		now += 16 * 60 * SEC;
+		hear(levels, "GroupOtt has reached Thieving level 46.");
+		tick();
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("Thieving 44 → 46 (+2) in 16 min", description(sent.get(1)));
+		assertTrue(footer(sent.get(1)).endsWith(GroupBroadcasts.SOURCE));
+	}
+
+	@Test
+	public void broadcastCombatLevelsGroupTooAcrossARestart()
+	{
+		hear(levels, "GroupOtt has reached combat level 100.");
+		tick();
+		reply(200, "m1");
+		String saved = levels.saved();
+		assertTrue(saved.contains("\tGroupOtt\t"));
+		assertTrue("the card remembers it was a broadcast", saved.endsWith("\tm1\tCombat\t99\t100\t" + now + "\t"
+			+ now + "\t1\t1"));
+		restart(saved);
+		now += 60 * SEC;
+		hear(levels, "GroupOtt has reached combat level 101.");
+		tick();
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("Combat 99 → 101 (+2) in 1 min", description(sent.get(1)));
+	}
+
+	@Test
+	public void aNewPosterMidStreakStartsANewPost()
+	{
+		hear(levels, "GroupOtt has reached Thieving level 45.");
+		tick();
+		reply(200, "m1");
+		// The leader logged out: the backup's client, with no streak of its own, hears the next one.
+		LevelPosts backup = client();
+		now += 60 * SEC;
+		hear(backup, "GroupOtt has reached Thieving level 46.");
+		backup.tick();
+		sender.pump();
+		assertEquals(2, sent.size());
+		assertNull("the backup posts anew", sent.get(1).edit);
+	}
+
+	@Test
+	public void onlyABroadcastsSkillOrCombatLevelJoinsAStreak()
+	{
+		assertNull("a plugin user's own level is decided by combinable", LevelThreads.combinableBroadcast(
+			level("Thieving", 46)));
+		assertNotNull("a plugin user's own combat level joins their post too", LevelThreads.combinable(
+			Collections.singletonList(GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, 0, "Alex").number(90).build())));
+		assertNull("a 99", LevelThreads.combinableBroadcast(GroupBroadcasts.parse(
+			"GroupOtt has reached Thieving level 99.", 0, name -> null)));
+		assertNull("a total level", LevelThreads.combinableBroadcast(GroupBroadcasts.parse(
+			"GroupOtt has reached a total level of 1,000.", 0, name -> null)));
+		assertNull("a quest", LevelThreads.combinableBroadcast(GroupBroadcasts.parse(
+			"GroupOtt has completed a quest: Black Knights' Fortress.", 0, name -> null)));
+		assertNull(LevelThreads.combinableBroadcast(null));
+	}
+
+	// Board 2026-11-14, final design: one Discord message per member per window holding one embed card per skill
+	// (combat level its own card), each card edited on its own skill's level, most recent level-up on top. Past
+	// Discord's 10 embeds a new message starts.
+
+	private void gain(String skill, int n)
+	{
+		levels.level(URL, level(skill, n), WINDOW, null, "first " + skill + " " + n);
+	}
+
+	/** Thieving 46 posts as m1, then Ranged 66 a gap later and is sent. */
+	private void thievingThenRanged(long gap)
+	{
+		gain("Thieving", 46);
+		tick();
+		reply(200, "m1");
+		now += gap;
+		gain("Ranged", 66);
+		tick();
+	}
+
+	private static GroupEvent combat(int n)
+	{
+		return GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, 0, "Alex").number(n).build();
+	}
+
+	private static String title(DiscordQueue.Post post, int card)
+	{
+		return embeds(post).get(card).getAsJsonObject().get("title").getAsString();
+	}
+
+	@Test
+	public void twoSkillsInsideTheWindowAreOneMessageWithTwoCards()
+	{
+		thievingThenRanged(5 * 60 * SEC);
+		assertEquals(2, sent.size());
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals("the newer skill's card on top", Arrays.asList("Ranged level 66", "Thieving level 46"),
+			cards(sent.get(1)));
+		assertEquals("Alex: Level up", title(sent.get(1), 0));
+	}
+
+	@Test
+	public void theSameSkillAgainUpdatesItsOwnCard()
+	{
+		thievingThenRanged(60 * SEC);
+		reply(200, null);
+		now += 9 * 60 * SEC;
+		gain("Thieving", 47);
+		tick();
+		assertEquals(3, sent.size());
+		assertEquals("m1", sent.get(2).edit);
+		assertEquals("the card's own span, from its own first level",
+			Arrays.asList("Thieving 45 → 47 (+2) in 10 min", "Ranged level 66"), cards(sent.get(2)));
+	}
+
+	@Test
+	public void combatLevelIsACardOfItsOwn()
+	{
+		thievingThenRanged(5 * 60 * SEC);
+		reply(200, null);
+		now += 7 * 60 * SEC;
+		levels.level(URL, combat(70), WINDOW, null, "first combat 70");
+		tick();
+		assertEquals(3, sent.size());
+		assertEquals("m1", sent.get(2).edit);
+		assertEquals(Arrays.asList("combat level 70", "Ranged level 66", "Thieving level 46"), cards(sent.get(2)));
+		assertEquals("Alex: Combat level", title(sent.get(2), 0));
+	}
+
+	@Test
+	public void theSkillThatJustLevelledMovesToTheTop()
+	{
+		thievingThenRanged(60 * SEC);
+		reply(200, null);
+		now += 60 * SEC;
+		gain("Thieving", 47);
+		tick();
+		assertEquals("most recent first, not most levels first",
+			Arrays.asList("Thieving 45 → 47 (+2) in 2 min", "Ranged level 66"), cards(sent.get(2)));
+		reply(200, null);
+		now += 60 * SEC;
+		gain("Ranged", 67);
+		tick();
+		assertEquals(Arrays.asList("Ranged 65 → 67 (+2) in 2 min", "Thieving 45 → 47 (+2) in 2 min"),
+			cards(sent.get(3)));
+	}
+
+	@Test
+	public void anEleventhSkillStartsANewMessage()
+	{
+		String[] skills = {"Attack", "Strength", "Defence", "Ranged", "Prayer", "Magic", "Runecraft", "Hitpoints",
+			"Crafting", "Mining"};
+		levels.level(URL, level(skills[0], 50), WINDOW, null, null);
+		tick();
+		reply(200, "m1");
+		for (int i = 1; i < skills.length; i++)
+		{
+			now += LevelThreads.EDIT_GAP;
+			levels.level(URL, level(skills[i], 50), WINDOW, null, null);
+			tick();
+			reply(200, null);
+		}
+		DiscordQueue.Post full = sent.get(sent.size() - 1);
+		assertEquals("m1", full.edit);
+		assertEquals(LevelThreads.MAX_CARDS, embeds(full).size());
+
+		now += LevelThreads.EDIT_GAP;
+		levels.level(URL, level("Smithing", 50), WINDOW, null, null);
+		tick();
+		DiscordQueue.Post next = sent.get(sent.size() - 1);
+		assertNull("a new message, not an eleventh card", next.edit);
+		assertEquals(Collections.singletonList("Smithing level 50"), cards(next));
+		reply(200, "m2");
+
+		now += LevelThreads.EDIT_GAP;
+		levels.level(URL, level("Attack", 51), WINDOW, null, null);
+		tick();
+		assertEquals("the member's levels go on in the new message", "m2", sent.get(sent.size() - 1).edit);
+	}
+
+	@Test
+	public void anotherSkillAfterTheWindowIsANewMessage()
+	{
+		gain("Thieving", 46);
+		tick();
+		reply(200, "m1");
+		now += WINDOW + SEC;
+		gain("Ranged", 66);
+		tick();
+		assertEquals(2, sent.size());
+		assertNull("a new post, not an edit", sent.get(1).edit);
+		assertEquals("first Ranged 66", sent.get(1).json);
+	}
+
+	@Test
+	public void aMomentOfALevelAndItsCombatLevelPostsTwoCards()
+	{
+		levels.level(URL, Arrays.asList(level("Attack", 69, 70), combat(80)), WINDOW, null, "first moment");
+		tick();
+		assertEquals("two cards, not the merged usual post", Arrays.asList("combat level 80", "Attack level 70"),
+			cards(sent.get(0)));
+		assertEquals("Iron Pals", gson.fromJson(sent.get(0).json, JsonObject.class).get("username").getAsString());
+		reply(200, "m1");
+		now += 60 * SEC;
+		levels.level(URL, Arrays.asList(level("Strength", 70, 71), combat(81)), WINDOW, null, "second moment");
+		tick();
+		assertEquals(2, sent.size());
+		assertEquals("m1", sent.get(1).edit);
+		assertEquals(Arrays.asList("Combat 79 → 81 (+2) in 1 min", "Strength level 71", "Attack level 70"),
+			cards(sent.get(1)));
+	}
+
+	@Test
+	public void plainStyleSaysOneLinePerCard()
+	{
+		style = DiscordStyle.PLAIN;
+		levels = client();
+		thievingThenRanged(60 * SEC);
+		JsonObject o = gson.fromJson(sent.get(1).json, JsonObject.class);
+		assertEquals("Alex: Ranged level 66\nAlex: Thieving level 46", o.get("content").getAsString());
+		assertFalse(o.has("embeds"));
+	}
+
+	@Test
+	public void aRepeatedLevelChangesNothing()
+	{
+		gain("Thieving", 46);
+		tick();
+		reply(200, "m1");
+		levels.saved();
+		now += 60 * SEC;
+		gain("Thieving", 46);
+		now += LevelThreads.EDIT_GAP;
+		tick();
+		assertEquals("no edit", 1, sent.size());
+		assertNull("nothing to save", levels.saved());
+	}
+
+	@Test
+	public void aRestartMidWindowKeepsEditingTheCardsInTheirOrder()
+	{
+		thievingThenRanged(60 * SEC);
+		reply(200, null);
+		restart(levels.saved());
+		now += 60 * SEC;
+		gain("Thieving", 47);
+		tick();
+		assertEquals("m1", sent.get(2).edit);
+		assertEquals(Arrays.asList("Thieving 45 → 47 (+2) in 2 min", "Ranged level 66"), cards(sent.get(2)));
+		reply(200, null);
+		now += LevelThreads.EDIT_GAP;
+		gain("Agility", 30);
+		tick();
+		assertEquals(Arrays.asList("Agility level 30", "Thieving 45 → 47 (+2) in 2 min", "Ranged level 66"),
+			cards(sent.get(3)));
+	}
+
+	@Test
+	public void linesSavedByEarlierBuildsAreDropped()
+	{
+		levels.restore("w123456789012345678\tAlex\tPrayer\t23\t24\t" + now + "\t" + now + "\tm1\n"
+			+ "w123456789012345678\tAlex\t" + now + "\t" + now + "\tm1\tPrayer\t23\t24\tRanged\t65\t66", WINDOW);
+		assertEquals("the old lines are dropped from the file", "", levels.saved());
+		gain(25);
+		tick();
+		assertEquals(1, sent.size());
+		assertNull(sent.get(0).edit);
+	}
+
+	@Test
+	public void onlyAnUpgradeThatNeverSetTheWindowKeepsThirtyMinutes()
+	{
+		assertEquals(Integer.valueOf(LevelPosts.OLD_DEFAULT_WINDOW), LevelPosts.windowToKeep(true, null));
+		assertNull("its own value stays", LevelPosts.windowToKeep(true, "45"));
+		assertNull("a new install gets the new default", LevelPosts.windowToKeep(false, null));
+		assertEquals(60, new GroupIronmanConfig()
+		{
+		}.discordCombineLevels());
 	}
 
 	@Test
 	public void aDamagedFileIsIgnored()
 	{
 		levels.restore(null, WINDOW);
-		levels.restore("w1\tAlex\tPrayer\tx\n\nnot a line\nw123456789012345678\tAlex\tPrayer\t23\t24\tz\t0\tm1",
-			WINDOW);
+		levels.restore("w1\tAlex\tPrayer\tx\n\nnot a line\nw123456789012345678\tAlex\tPrayer\t23\t24\tz\t0\tm1\n"
+			+ "w123456789012345678\tAlex\t" + now + "\t" + now + "\tm1\tPrayer\t23\n"
+			+ "w123456789012345678\tAlex\t" + now + "\t" + now + "\tm1\t\t23\t24", WINDOW);
 		gain(25);
 		tick();
 		assertEquals(1, sent.size());

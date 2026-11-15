@@ -64,7 +64,7 @@ final class GimScenarioRig
 		unanswered.add(done);
 	}, () -> now, () -> 12);
 	private final LevelPosts levels = new LevelPosts(sender, gson, () -> now, () -> DiscordStyle.EMBED,
-		() -> items, () -> DiscordWebhook.USERNAME);
+		() -> DiscordWebhook.USERNAME);
 	private final List<String> overlay = new ArrayList<>();
 	private final EventRouter router = new EventRouter(this::toDiscord, e -> overlay.add(EventText.sentence(e, items)));
 	private final ChannelPosts channel = new ChannelPosts(ZoneOffset.UTC);
