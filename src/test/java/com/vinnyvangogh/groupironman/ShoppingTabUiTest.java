@@ -86,12 +86,12 @@ public class ShoppingTabUiTest
 			GimPanelFixture.Scene scene = GimPanelFixture.shoppingScene();
 			GimPanelFixture f = shopping(scene, null);
 			click(f, f.ui.label("cox"));
-			f.ui.assertShows("Dragon warhammer  0 / 2");
+			f.ui.assertShows("Dragon warhammer 0 / 2");
 			f.ui.assertShows("Need 2 more");
-			f.ui.assertShows("Shark  12 / 40");
+			f.ui.assertShows("Shark 12 / 40");
 			f.ui.assertShows("Need 28 more");
 			f.ui.assertShows("1 done");
-			f.ui.assertHides("Coal  10 / 10");
+			f.ui.assertHides("Coal 10 / 10");
 			assertNotNull(f.actions.openLists);
 			assertTrue(f.actions.openLists, f.actions.openLists.startsWith("l:"));
 
@@ -109,12 +109,12 @@ public class ShoppingTabUiTest
 			GimPanelFixture f = shopping(GimPanelFixture.shoppingScene(), null);
 			click(f, f.ui.label("cox"));
 			click(f, f.ui.label("1 done"));
-			f.ui.assertShows("Coal  10 / 10");
+			f.ui.assertShows("Coal 10 / 10");
 			f.ui.assertHides("Lizardman shaman");
-			click(f, clickTarget(f.ui.label("Dragon warhammer  0 / 2")));
+			click(f, clickTarget(f.ui.label("Dragon warhammer 0 / 2")));
 			f.ui.assertShows("Get: Drop: Lizardman shaman (1/3,000)");
 			f.ui.assertHides("Held by " + GimPanelFixture.SELF + " 12");
-			click(f, clickTarget(f.ui.label("Shark  12 / 40")));
+			click(f, clickTarget(f.ui.label("Shark 12 / 40")));
 			f.ui.assertShows("Held by " + GimPanelFixture.SELF + " 12");
 			assertEquals(new ArrayList<String>(), clipped(f));
 		});
@@ -131,7 +131,7 @@ public class ShoppingTabUiTest
 			assertEquals(new ArrayList<String>(), clipped(f));
 			click(f, f.ui.label("cox"));
 			click(f, f.ui.label("Ancient Magicks"));
-			click(f, clickTarget(f.ui.label("Dragon warhammer  0 / 2")));
+			click(f, clickTarget(f.ui.label("Dragon warhammer 0 / 2")));
 			SwingDriver.writePng(f.ui.render(WIDTH, 0, ReadmeShots.SCALE),
 				new File(ReadmeShots.outputDir(), "shopping-open.png"));
 			assertEquals(new ArrayList<String>(), clipped(f));

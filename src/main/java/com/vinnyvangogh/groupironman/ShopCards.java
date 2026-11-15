@@ -197,7 +197,7 @@ final class ShopCards
 	/** "▸ 3 done": opens the card's finished items. */
 	static JLabel doneToggle(int count, boolean open, Runnable toggle)
 	{
-		JLabel l = new JLabel(count + " done", new GroupIronmanPanel.Arrow(open), SwingConstants.LEFT);
+		JLabel l = new JLabel(Amounts.GAME.of(count) + " done", new GroupIronmanPanel.Arrow(open), SwingConstants.LEFT);
 		l.setIconTextGap(4);
 		l.setFont(FontManager.getRunescapeSmallFont());
 		l.setForeground(DONE);
