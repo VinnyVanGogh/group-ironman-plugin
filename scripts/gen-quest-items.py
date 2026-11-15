@@ -97,16 +97,29 @@ def quest_names(src):
     return {str(k): names[k] for k in sorted(names)}
 
 
+def named(quests, field):
+    """Every name in one list field of the carried quests' items."""
+    out = set()
+    for q in quests:
+        for i in q.get("items", []):
+            out.update(i.get(field, []))
+    return out
+
+
+def pick_shops(src, names):
+    return sorted((shop(s) for s in src.get("shops") or [] if s.get("name") in names), key=lambda s: s["name"])
+
+
+def pick_drops(src, names):
+    pairs = {(d.get("source_name"), d.get("region") or "") for d in src.get("drop_locations") or []
+             if d.get("source_name") in names}
+    return [compact({"source_name": n, "region": r}) for n, r in sorted(pairs)]
+
+
 def generate(src, presets, commit):
     by_name = {q["name"]: q for q in src["quests"]}
     by_id = {q["id"]: q for q in src["quests"]}
     quests = [quest(q) for q in closure(by_name, by_id, roots(presets))]
-    shop_names = {n for q in quests for i in q.get("items", []) for n in i.get("shop_names", [])}
-    droppers = {n for q in quests for i in q.get("items", []) for n in i.get("drop_source_names", [])}
-    shops = sorted((shop(s) for s in src.get("shops") or [] if s.get("name") in shop_names),
-                   key=lambda s: s["name"])
-    drops = sorted({(d.get("source_name"), d.get("region") or "") for d in src.get("drop_locations") or []
-                    if d.get("source_name") in droppers})
     return {
         "source": {
             "repo": "VinnyVanGogh/questpath-plugin",
@@ -116,8 +129,8 @@ def generate(src, presets, commit):
         },
         "quests": quests,
         "quest_names": quest_names(src),
-        "shops": shops,
-        "drop_locations": [compact({"source_name": n, "region": r}) for n, r in drops],
+        "shops": pick_shops(src, named(quests, "shop_names")),
+        "drop_locations": pick_drops(src, named(quests, "drop_source_names")),
     }
 
 

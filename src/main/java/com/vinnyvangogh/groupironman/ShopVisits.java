@@ -36,7 +36,7 @@ final class ShopVisits
 				continue;
 			}
 			seen.add(name);
-			int d = shop.plane() == plane ? Math.max(Math.abs(shop.x() - x), Math.abs(shop.y() - y)) : Integer.MAX_VALUE;
+			int d = shop.plane == plane ? Math.max(Math.abs(shop.x - x), Math.abs(shop.y - y)) : Integer.MAX_VALUE;
 			if (d <= NEAR && inside.add(name))
 			{
 				out.add(name);

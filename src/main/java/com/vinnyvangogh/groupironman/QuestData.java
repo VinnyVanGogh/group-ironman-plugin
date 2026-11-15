@@ -265,14 +265,15 @@ final class QuestData
 		@SerializedName("name")
 		private String name;
 
+		/** The shop's tile; plane 0 for the ground floor, which is nearly every shop. */
 		@SerializedName("x")
-		private int x;
+		int x;
 
 		@SerializedName("y")
-		private int y;
+		int y;
 
 		@SerializedName("plane")
-		private int plane;
+		int plane;
 
 		@SerializedName("town")
 		private String town;
@@ -283,21 +284,6 @@ final class QuestData
 		String name()
 		{
 			return name == null ? "" : name;
-		}
-
-		int x()
-		{
-			return x;
-		}
-
-		int y()
-		{
-			return y;
-		}
-
-		int plane()
-		{
-			return plane;
 		}
 
 		String town()

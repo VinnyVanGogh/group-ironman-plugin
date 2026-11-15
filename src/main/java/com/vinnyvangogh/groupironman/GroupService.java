@@ -1272,11 +1272,7 @@ class GroupService
 				// Sent on the next tick: roles first, then the settings they authorise.
 				g.resendAll();
 			}
-			ShoppingSync shop = shopping;
-			if (shop != null)
-			{
-				shop.resendAll();
-			}
+			resendShopping();
 			if (!syncing())
 			{
 				return;
@@ -1312,11 +1308,7 @@ class GroupService
 		{
 			g.resendAll();
 		}
-		ShoppingSync shop = shopping;
-		if (shop != null)
-		{
-			shop.resendAll();
-		}
+		resendShopping();
 		assembler.clear();
 		roster.clearStrangers();
 		lastStatsSent = null;
@@ -2041,6 +2033,16 @@ class GroupService
 			}
 			done.accept(hits);
 		});
+	}
+
+	/** Someone joined or the party changed: every list, removals included, goes out on the next tick. */
+	private void resendShopping()
+	{
+		ShoppingSync shop = shopping;
+		if (shop != null)
+		{
+			shop.resendAll();
+		}
 	}
 
 	/** Every item any live list may show, for names and whether it can change hands. */

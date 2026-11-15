@@ -188,7 +188,8 @@ final class ShoppingBoard
 		for (int i = 0; i < named; i++)
 		{
 			ShopAllocation.Line line = lines.get(i);
-			text.append(i == 0 ? "" : ", ").append(line.stillNeeded()).append(" more ").append(line.name);
+			text.append(i == 0 ? "" : ", ").append(Amounts.GAME.of(line.stillNeeded())).append(" more ")
+				.append(line.name);
 		}
 		int rest = lines.size() - named;
 		if (rest > 0)

@@ -284,19 +284,20 @@ final class ShoppingTab
 	static String rowText(ShoppingBoard.Row r)
 	{
 		ShopAllocation.Line l = r.line;
-		String need = (l.stated ? "" : "at least ") + l.totalNeeded();
+		String need = (l.stated ? "" : "at least ") + Amounts.GAME.of(l.totalNeeded());
 		if (l.done())
 		{
 			return l.name + ": done (" + need + ")";
 		}
-		StringBuilder s = new StringBuilder(l.name).append(": need ").append(need).append(", have ").append(l.have());
+		StringBuilder s = new StringBuilder(l.name).append(": need ").append(need).append(", have ")
+			.append(Amounts.GAME.of(l.have()));
 		if (l.stillNeeded() > 0)
 		{
-			s.append(", get ").append(l.stillNeeded());
+			s.append(", get ").append(Amounts.GAME.of(l.stillNeeded()));
 		}
 		if (l.unknownNeed() > 0)
 		{
-			s.append(", ").append(l.unknownNeed()).append(" not judged");
+			s.append(", ").append(Amounts.GAME.of(l.unknownNeed())).append(" not judged");
 		}
 		if (l.obtainable)
 		{
@@ -318,7 +319,7 @@ final class ShoppingTab
 			return "";
 		}
 		List<String> parts = new ArrayList<>();
-		all.forEach((who, n) -> parts.add(who + " " + n));
+		all.forEach((who, n) -> parts.add(who + " " + Amounts.GAME.of(n)));
 		return "Held: " + String.join(", ", parts) + (l.tradeable ? "" : " (can't be traded: only your own counts)");
 	}
 
@@ -523,8 +524,8 @@ final class ShoppingTab
 			for (Map.Entry<Integer, Integer> e : stagedItems.entrySet())
 			{
 				JPanel line = new JPanel(new BorderLayout(2, 0));
-				line.add(GroupIronmanPanel.text(e.getValue() + " x " + stagedNames.get(e.getKey()), Color.WHITE),
-					BorderLayout.CENTER);
+				line.add(GroupIronmanPanel.text(Amounts.GAME.of(e.getValue()) + " x " + stagedNames.get(e.getKey()),
+					Color.WHITE), BorderLayout.CENTER);
 				int id = e.getKey();
 				line.add(button("x", () ->
 				{

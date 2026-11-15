@@ -367,20 +367,28 @@ final class ShoppingSync
 		{
 			for (String payload : strings(in.get("lists")))
 			{
-				ShoppingCodec.Message m = ShoppingCodec.decode(gson, payload);
-				if (m != null && m.list != null && !(m.list.removed && now - m.list.at > TOMBSTONE_MS))
-				{
-					ShoppingList current = lists.get(m.list.id);
-					if (m.list.newerThan(current) && (current != null || lists.size() < MAX_LISTS))
-					{
-						lists.put(m.list.id, m.list);
-					}
-				}
+				readList(payload, now);
 			}
 			readHistory(in.get("hist"));
 			readProgress(in.get("qp"));
 		}
 		onChange.run();
+	}
+
+	/** One cached list, unless it is a removal past its time or older than what is held. Holds the lock. */
+	private void readList(String payload, long now)
+	{
+		ShoppingCodec.Message m = ShoppingCodec.decode(gson, payload);
+		ShoppingList l = m == null ? null : m.list;
+		if (l == null || l.removed && now - l.at > TOMBSTONE_MS)
+		{
+			return;
+		}
+		ShoppingList current = lists.get(l.id);
+		if (l.newerThan(current) && (current != null || lists.size() < MAX_LISTS))
+		{
+			lists.put(l.id, l);
+		}
 	}
 
 	private void readHistory(JsonElement e)
@@ -391,17 +399,24 @@ final class ShoppingSync
 		}
 		for (JsonElement line : e.getAsJsonArray())
 		{
-			if (history.size() >= MAX_HISTORY || !line.isJsonArray() || line.getAsJsonArray().size() < 2)
+			Change c = history.size() < MAX_HISTORY ? change(line) : null;
+			if (c != null)
 			{
-				continue;
-			}
-			JsonArray a = line.getAsJsonArray();
-			Long at = ItemCounts.longValue(a.get(0));
-			if (at != null && a.get(1).isJsonPrimitive())
-			{
-				history.addLast(new Change(at, ShoppingList.cap(a.get(1).getAsString(), 200)));
+				history.addLast(c);
 			}
 		}
+	}
+
+	/** {@code [at, text]}, or null when it is not one. */
+	private static Change change(JsonElement line)
+	{
+		JsonArray a = line.isJsonArray() ? line.getAsJsonArray() : null;
+		if (a == null || a.size() < 2 || !a.get(1).isJsonPrimitive())
+		{
+			return null;
+		}
+		Long at = ItemCounts.longValue(a.get(0));
+		return at == null ? null : new Change(at, ShoppingList.cap(a.get(1).getAsString(), 200));
 	}
 
 	private void readProgress(JsonElement e)

@@ -77,7 +77,7 @@ final class ShopSources
 			String head = (shop ? "Shop: " : "Drop: ") + name;
 			if (shop)
 			{
-				return price >= 0 ? head + " (" + price + " gp)" : head;
+				return price >= 0 ? head + " (" + Amounts.GAME.of(price) + " gp)" : head;
 			}
 			return detail.isEmpty() ? head : head + " (" + detail + ")";
 		}
@@ -118,17 +118,25 @@ final class ShopSources
 		}
 		for (Long id : gates.requiredQuestIds())
 		{
-			String quest = id == null ? null : data.questName(id);
-			if (quest == null)
+			String missing = missingQuest(id, gates, viewer, data);
+			if (missing != null)
 			{
-				blocked.add("an unknown quest");
-			}
-			else if (!(gates.startedOnly(id) ? viewer.quests.started(quest) : viewer.quests.finished(quest)))
-			{
-				blocked.add(quest);
+				blocked.add(missing);
 			}
 		}
 		return String.join(", ", blocked);
+	}
+
+	/** The quest gate's name when the viewer has not met it, or null when they have. */
+	private static String missingQuest(Long id, QuestData.Reachability gates, Viewer viewer, QuestData data)
+	{
+		String quest = id == null ? null : data.questName(id);
+		if (quest == null)
+		{
+			return "an unknown quest";
+		}
+		boolean met = gates.startedOnly(id) ? viewer.quests.started(quest) : viewer.quests.finished(quest);
+		return met ? null : quest;
 	}
 
 	/** Where {@code viewer} can get {@code item}, as the quest data has it. */

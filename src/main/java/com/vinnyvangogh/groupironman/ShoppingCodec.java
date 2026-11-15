@@ -88,19 +88,10 @@ final class ShoppingCodec
 	/** The message in {@code json}, or null when it is neither kind or not readable. */
 	static Message decode(Gson gson, String json)
 	{
-		if (json == null || json.isEmpty() || json.length() > GroupCodec.MAX_PAYLOAD_CHARS * 2)
-		{
-			return null;
-		}
+		JsonObject in = object(gson, json);
+		String kind = in == null ? "" : string(in, "k");
 		try
 		{
-			JsonElement root = gson.fromJson(json, JsonElement.class);
-			if (root == null || !root.isJsonObject())
-			{
-				return null;
-			}
-			JsonObject in = root.getAsJsonObject();
-			String kind = string(in, "k");
 			if (SHOP.equals(kind))
 			{
 				ShoppingList l = list(in);
@@ -108,6 +99,25 @@ final class ShoppingCodec
 			}
 			return QUESTS.equals(kind) ? new Message(null, QuestProgress.of(names(in.get("f")), names(in.get("s"))))
 				: null;
+		}
+		catch (RuntimeException e)
+		{
+			// A field of the wrong type: not a list anyone sent.
+			return null;
+		}
+	}
+
+	/** The JSON object in {@code json}, or null when it is not one, too long or does not parse. */
+	private static JsonObject object(Gson gson, String json)
+	{
+		if (json == null || json.isEmpty() || json.length() > GroupCodec.MAX_PAYLOAD_CHARS * 2)
+		{
+			return null;
+		}
+		try
+		{
+			JsonElement root = gson.fromJson(json, JsonElement.class);
+			return root != null && root.isJsonObject() ? root.getAsJsonObject() : null;
 		}
 		catch (RuntimeException e)
 		{
