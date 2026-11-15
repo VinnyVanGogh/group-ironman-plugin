@@ -62,12 +62,39 @@ final class GroupCache
 	 */
 	static String write(Gson gson, GroupRoster roster, String webhooks)
 	{
+		return write(gson, roster, webhooks, null);
+	}
+
+	/**
+	 * With {@code shop}, the Shopping tab's lists, their history and members' quest progress ({@link
+	 * ShoppingSync#toCache}); null for none. A build from before the Shopping tab ignores the key.
+	 */
+	static String write(Gson gson, GroupRoster roster, String webhooks, JsonObject shop)
+	{
 		JsonObject out = json(gson, roster);
 		if (webhooks != null)
 		{
 			out.addProperty("gweb", webhooks);
 		}
+		if (shop != null)
+		{
+			out.add("shop", shop);
+		}
 		return gson.toJson(out);
+	}
+
+	/** The {@code shop} entry {@link #write} kept, or null when there is none or the text is unreadable. */
+	static JsonElement shop(Gson gson, String json)
+	{
+		try
+		{
+			JsonElement root = json == null ? null : gson.fromJson(json, JsonElement.class);
+			return root != null && root.isJsonObject() ? root.getAsJsonObject().get("shop") : null;
+		}
+		catch (RuntimeException e)
+		{
+			return null;
+		}
 	}
 
 	private static JsonObject json(Gson gson, GroupRoster roster)

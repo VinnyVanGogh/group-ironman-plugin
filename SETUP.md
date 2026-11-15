@@ -341,6 +341,31 @@ Members, items, drops and the map:
     on, each panel shows only its own plugin's members, and the chat shows no
     errors.
 
+Shopping (two members on this build, both in group sync):
+
+14. **Mithril gloves.** Open the **Shopping** tab, pick *1 Defence pure:
+    Mithril gloves*, keep the five ticked subquests (Awowogei unticked), tick
+    both of you under *For*, press *Add list*. Within a tick your friend's
+    Shopping tab shows the same list, "Added by <you>". Each line reads
+    `need N, have N, get N`; Cook's Assistant's milk, egg and flour are on it
+    if you have not done Cook's Assistant.
+15. **Ticks off.** With *Share bank* on, put an item the list needs in your
+    bank and close it: its line's *have* goes up, and at the full count it
+    reads `done`. A noted stack counts the same as unnoted.
+16. **Quest progress.** Finish (or have finished) a quest on the list: within
+    about half a minute its items leave your share of the list. Before your
+    friend's client sends theirs, their card says *No quest progress from ...
+    yet*.
+17. **Custom list, rename, remove.** Make a custom list (search `rope`, add 2,
+    name it), rename it from your friend's client, then remove it from yours:
+    both panels follow, and the *Changes* list names who did each.
+18. **Shop alert.** Turn on *Shopping: shop alert* (In-game) and walk up to a
+    shop a line lists under *Get*: one chat line naming what the group still
+    needs there. Standing there says nothing more; walk away and back and it
+    says it again.
+19. **Old clients.** A member on gim-test-3 sees no Shopping tab and nothing
+    breaks for them: their banks, stats and storage still arrive.
+
 ## Limitations
 
 - **Banks are as of the last close.** Items moved since then, or a bank never

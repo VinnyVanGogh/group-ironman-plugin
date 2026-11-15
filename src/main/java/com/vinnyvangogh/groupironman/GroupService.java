@@ -109,6 +109,9 @@ class GroupService
 	static final int MAX_EVENT_LINES = 50;
 	/** How often the group roster is re-read from the game's clan data. */
 	static final int ROSTER_INTERVAL_TICKS = 10;
+	/** How often this player's quest progress is re-read for the Shopping tab (about half a minute). */
+	static final int QUEST_INTERVAL_TICKS = 50;
+	static final int SHOP_ALERT_INTERVAL_TICKS = 3;
 	/** The chatFilterCheck script callback the base chat filter plugin uses to drop a line. */
 	private static final String CHAT_FILTER_CHECK = "chatFilterCheck";
 
@@ -194,6 +197,18 @@ class GroupService
 	private volatile String cachedWebhooks;
 	/** The group event engine, told about storage visits, minimums and members' events; null when not running. */
 	private volatile GroupEventEngine events;
+	/** The Shopping tab's shared lists and members' quest progress; null when not running. */
+	private volatile ShoppingSync shopping;
+	private volatile QuestData questData = QuestData.empty();
+	private volatile ShopPresets presets = new ShopPresets();
+	/** Whether each item can change hands, read with its name on the client thread. */
+	private final Map<Integer, Boolean> tradeable = new ConcurrentHashMap<>();
+	/** This player's real levels, read with their quest progress, for which shops will serve them. */
+	private volatile Map<String, Integer> ownLevels = Collections.emptyMap();
+	// Client thread only.
+	private final ShopVisits shopVisits = new ShopVisits();
+	private int ticksSinceQuests = QUEST_INTERVAL_TICKS;
+	private int ticksSinceShopAlert;
 
 	private volatile LowStock lowStock = LowStock.parse("");
 	private volatile GroupMembers members = GroupMembers.UNKNOWN;
@@ -308,12 +323,19 @@ class GroupService
 			cachedWebhooks = webhooks;
 			saveCache();
 		});
+		shopping = new ShoppingSync(gson, payload -> partyService.send(new VvgGroupIronmanMessage(payload)), () ->
+		{
+			saveCache();
+			this.onChange.run();
+		});
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
 		executor.execute(() ->
 		{
 			regions = RegionNames.load();
+			questData = QuestData.load(gson);
+			presets = ShopPresets.load(gson);
 			loadCache();
 		});
 	}
@@ -332,6 +354,9 @@ class GroupService
 		}
 		members = GroupMembers.UNKNOWN;
 		governance = null;
+		shopping = null;
+		tradeable.clear();
+		ownLevels = Collections.emptyMap();
 		cachedWebhooks = null;
 		cacheLoaded = false;
 		session = false;
@@ -982,6 +1007,8 @@ class GroupService
 		}
 		recordSeen(now);
 		refreshRoster();
+		pollQuests();
+		shopAlert();
 		carriedDirty |= containers.tick();
 		GroupOutbox.Switches s = switches();
 		updateCarried(s);
@@ -1273,6 +1300,7 @@ class GroupService
 				// Sent on the next tick: roles first, then the settings they authorise.
 				g.resendAll();
 			}
+			resendShopping();
 			if (!syncing())
 			{
 				return;
@@ -1308,6 +1336,7 @@ class GroupService
 		{
 			g.resendAll();
 		}
+		resendShopping();
 		assembler.clear();
 		roster.clearStrangers();
 		lastStatsSent = null;
@@ -1458,6 +1487,13 @@ class GroupService
 			roster.heard(name, System.currentTimeMillis());
 			return;
 		}
+		ShoppingSync shop = shopping;
+		if (shop != null && ShoppingSync.isShopping(payload) && shop.receive(name, payload))
+		{
+			roster.heard(name, System.currentTimeMillis());
+			resolve(shoppingItemIds());
+			return;
+		}
 		List<String> posted = GroupCodec.posted(gson, payload);
 		if (posted != null)
 		{
@@ -1468,13 +1504,18 @@ class GroupService
 		log.debug("ignored unreadable group payload from {}", message.getMemberId());
 	}
 
-	/** Game tick, connected: roles, settings and this member's announce, whichever changed. */
+	/** Game tick, connected: roles, settings and this member's announce, then shopping lists, whichever changed. */
 	private void flushGovernance()
 	{
 		GovernanceSync g = governance;
 		if (g != null)
 		{
 			g.flush(MemberPrefs.of(config));
+		}
+		ShoppingSync shop = shopping;
+		if (shop != null)
+		{
+			shop.flush(self);
 		}
 	}
 
@@ -1857,6 +1898,7 @@ class GroupService
 			if (name != null && !name.isEmpty() && !"null".equalsIgnoreCase(name))
 			{
 				names.put(id, name);
+				tradeable.put(id, item.isTradeable());
 				prices.put(id, (long) itemManager.getItemPrice(id));
 				ItemStats stats = itemManager.getItemStats(id);
 				slots.put(id, stats == null || stats.getEquipment() == null ? -1 : stats.getEquipment().getSlot());
@@ -1909,6 +1951,11 @@ class GroupService
 				return false;
 			}
 			restoreWebhooks(GroupCache.webhooks(gson, json));
+			ShoppingSync shop = shopping;
+			if (shop != null)
+			{
+				shop.fromCache(GroupCache.shop(gson, json), System.currentTimeMillis());
+			}
 			return true;
 		}
 		catch (Exception e)
@@ -1941,7 +1988,8 @@ class GroupService
 			// Whatever arrived meanwhile is in the roster and goes out with the first save after loading.
 			return;
 		}
-		String json = GroupCache.write(gson, roster, cachedWebhooks);
+		ShoppingSync shop = shopping;
+		String json = GroupCache.write(gson, roster, cachedWebhooks, shop == null ? null : shop.toCache());
 		executor.execute(() ->
 		{
 			try
@@ -1971,6 +2019,158 @@ class GroupService
 	boolean cacheLoaded()
 	{
 		return cacheLoaded;
+	}
+
+	// ---- The Shopping tab ----
+
+	/** The shared lists, or null when not running. */
+	ShoppingSync shopping()
+	{
+		return shopping;
+	}
+
+	ShopPresets presets()
+	{
+		return presets;
+	}
+
+	/** What a {@link ShoppingBoard} works from, as this client knows it now. Any thread. */
+	ShoppingBoard.Inputs shoppingInputs()
+	{
+		ShoppingSync shop = shopping;
+		QuestProgress mine = shop == null ? QuestProgress.UNKNOWN : shop.progress(self);
+		return new ShoppingBoard.Inputs(questData, presets,
+			member -> shop == null ? QuestProgress.UNKNOWN : shop.progress(member),
+			ShopAllocation.Holdings.from(roster.searchSources()), id -> tradeable.getOrDefault(id, false),
+			lookup::name, new ShopSources.Viewer(ownLevels, mine));
+	}
+
+	/** "Add list": false when not logged in, not started or the book is full. */
+	boolean addShoppingList(String name, String preset, List<String> picks, List<String> members,
+		Map<Integer, Integer> items)
+	{
+		ShoppingSync shop = shopping;
+		if (shop == null || self.isEmpty() || members.isEmpty())
+		{
+			return false;
+		}
+		boolean ok = shop.add(ShoppingList.create(name, preset, picks, members, items, self,
+			System.currentTimeMillis()));
+		if (ok)
+		{
+			resolve(shoppingItemIds());
+		}
+		return ok;
+	}
+
+	boolean renameShoppingList(String id, String name)
+	{
+		ShoppingSync shop = shopping;
+		return shop != null && !self.isEmpty() && shop.rename(id, name, self, System.currentTimeMillis());
+	}
+
+	boolean removeShoppingList(String id)
+	{
+		ShoppingSync shop = shopping;
+		return shop != null && !self.isEmpty() && shop.remove(id, self, System.currentTimeMillis());
+	}
+
+	/** A custom list's item search, on the client thread; {@code done} gets tradeable matches, best first. */
+	void searchItems(String query, java.util.function.Consumer<List<ShoppingTab.Hit>> done)
+	{
+		clientThread.invokeLater(() ->
+		{
+			List<ShoppingTab.Hit> hits = new ArrayList<>();
+			for (net.runelite.http.api.item.ItemPrice p : itemManager.search(query))
+			{
+				if (hits.size() >= ShoppingTab.MAX_HITS)
+				{
+					break;
+				}
+				names.putIfAbsent(p.getId(), p.getName());
+				hits.add(new ShoppingTab.Hit(p.getId(), p.getName()));
+			}
+			done.accept(hits);
+		});
+	}
+
+	/** Someone joined or the party changed: every list, removals included, goes out on the next tick. */
+	private void resendShopping()
+	{
+		ShoppingSync shop = shopping;
+		if (shop != null)
+		{
+			shop.resendAll();
+		}
+	}
+
+	/** Every item any live list may show, for names and whether it can change hands. */
+	private Set<Integer> shoppingItemIds()
+	{
+		Set<Integer> ids = new HashSet<>();
+		ShoppingSync shop = shopping;
+		if (shop == null)
+		{
+			return ids;
+		}
+		for (ShoppingList l : shop.active())
+		{
+			ids.addAll(l.items.keySet());
+			ShopPresets.Preset p = l.custom() ? null : presets.preset(l.preset);
+			if (p == null)
+			{
+				continue;
+			}
+			for (QuestData.Quest q : ShopNeeds.closure(questData, p.roots(l.picks)))
+			{
+				q.items().stream().filter(ShopNeeds::shoppable).forEach(i -> ids.add(i.itemId()));
+			}
+		}
+		return ids;
+	}
+
+	/** Client thread. This player's quest progress and levels, every {@link #QUEST_INTERVAL_TICKS}. */
+	private void pollQuests()
+	{
+		ShoppingSync shop = shopping;
+		if (++ticksSinceQuests < QUEST_INTERVAL_TICKS || shop == null || self.isEmpty())
+		{
+			return;
+		}
+		ticksSinceQuests = 0;
+		Map<String, Integer> levels = new HashMap<>();
+		for (Skill skill : Skill.values())
+		{
+			if (skill != Skill.OVERALL)
+			{
+				levels.put(skill.getName(), client.getRealSkillLevel(skill));
+			}
+		}
+		ownLevels = levels;
+		shop.ownProgress(self, QuestStates.read(QuestStates.wanted(questData), q -> q.getState(client)));
+		resolveNow(shoppingItemIds());
+	}
+
+	/** Client thread. "Shopping: shop alert": once per approach to a shop selling something still needed. */
+	private void shopAlert()
+	{
+		if (!config.shoppingShopAlert() || ++ticksSinceShopAlert < SHOP_ALERT_INTERVAL_TICKS)
+		{
+			return;
+		}
+		ticksSinceShopAlert = 0;
+		ShoppingSync shop = shopping;
+		WorldPoint at = position();
+		List<ShoppingList> lists = shop == null ? Collections.emptyList() : shop.active();
+		if (at == null || lists.isEmpty())
+		{
+			return;
+		}
+		Map<String, List<ShopAllocation.Line>> shops = ShoppingBoard.byShop(ShoppingBoard.of(lists, shoppingInputs()));
+		for (String name : shopVisits.arrived(at.getX(), at.getY(), at.getPlane(), shops.keySet(), questData))
+		{
+			tell(name + ": " + ShoppingBoard.describe(shops.get(name)) + ".");
+		}
 	}
 
 	/** Kept for the panel: is any group feature on; false shows its "everything is off" notice. */
