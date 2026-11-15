@@ -23,7 +23,13 @@ import static org.junit.Assert.assertTrue;
 public class GroupBroadcastsTest
 {
 	private static final Function<String, Integer> ITEMS = name ->
-		"Abyssal whip".equalsIgnoreCase(name) ? FakeItems.WHIP : "Shark".equalsIgnoreCase(name) ? FakeItems.SHARK : null;
+	{
+		if ("Abyssal whip".equalsIgnoreCase(name))
+		{
+			return FakeItems.WHIP;
+		}
+		return "Shark".equalsIgnoreCase(name) ? Integer.valueOf(FakeItems.SHARK) : null;
+	};
 	private static final Predicate<String> NOBODY = n -> false;
 
 	private static GroupEvent parse(String line)
