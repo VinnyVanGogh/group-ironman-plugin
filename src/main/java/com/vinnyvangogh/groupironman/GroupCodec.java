@@ -340,7 +340,7 @@ final class GroupCodec
 		return out;
 	}
 
-	/** Counts only, the shape every build reads; the disk cache stores carried items this way. */
+	/** Counts only, the shape every build reads and a build from before slots sends. */
 	static String encodeCarried(Gson gson, Map<Integer, Integer> inventory, Map<Integer, Integer> worn)
 	{
 		return encodeCarried(gson, inventory, worn, Collections.emptyList());
