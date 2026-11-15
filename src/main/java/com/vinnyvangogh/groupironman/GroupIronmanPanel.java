@@ -157,6 +157,8 @@ class GroupIronmanPanel extends PluginPanel
 	private final SkillIconManager skillIcons;
 	/** The minimap orbs' own icons, by bar label; filled in as the sprites load. */
 	private final Map<String, BufferedImage> orbIcons = new ConcurrentHashMap<>();
+	/** The worn tab's empty-slot silhouettes, by equipment slot; filled in as the sprites load. */
+	private final Map<Integer, BufferedImage> slotIcons = new ConcurrentHashMap<>();
 	private final Actions actions;
 	private final GroupSettingsTab settingsTab;
 
@@ -192,6 +194,14 @@ class GroupIronmanPanel extends PluginPanel
 		loadOrbIcon(sprites, "Prayer", SpriteID.MINIMAP_ORB_PRAYER_ICON);
 		loadOrbIcon(sprites, "Run", SpriteID.MINIMAP_ORB_RUN_ICON);
 		loadOrbIcon(sprites, "Spec", SpriteID.MINIMAP_ORB_SPECIAL_ICON);
+		for (Map.Entry<Integer, Integer> slot : WornSlotIcons.SPRITES.entrySet())
+		{
+			sprites.getSpriteAsync(slot.getValue(), 0, image ->
+			{
+				slotIcons.put(slot.getKey(), image);
+				SwingUtilities.invokeLater(this::redraw);
+			});
+		}
 		this.itemManager = itemManager;
 		this.skillIcons = skillIcons;
 		this.actions = actions;
@@ -712,9 +722,15 @@ class GroupIronmanPanel extends PluginPanel
 		grid.setOpaque(false);
 		for (int i = 0; i < cells.length; i++)
 		{
-			grid.add(cells[i] != null ? cells[i] : WORN_LAYOUT[i] < 0 ? spacer() : emptySlot());
+			grid.add(cells[i] != null ? cells[i] : WORN_LAYOUT[i] < 0 ? spacer() : emptyWornSlot(WORN_LAYOUT[i]));
 		}
 		return grid;
+	}
+
+	/** An empty worn slot with the game's silhouette for it, as the Worn Equipment tab draws it. */
+	private JComponent emptyWornSlot(int slot)
+	{
+		return new SmallItem(null, null, -1, slot, slotIcons.get(slot));
 	}
 
 	/** Equipment slot index (EquipmentInventorySlot) per cell of the 3 x 5 layout; -1 is a gap. */
@@ -777,7 +793,7 @@ class GroupIronmanPanel extends PluginPanel
 
 	private JComponent smallItem(PanelModel.ItemCell item)
 	{
-		return new SmallItem(icon(item.id, item.quantity), item.tooltip());
+		return new SmallItem(icon(item.id, item.quantity), item.tooltip(), item.inside, -1, null);
 	}
 
 	/**
@@ -793,7 +809,7 @@ class GroupIronmanPanel extends PluginPanel
 
 	private static JComponent emptySlot()
 	{
-		return new SmallItem(null, null);
+		return new SmallItem(null, null, -1, -1, null);
 	}
 
 	private static JComponent spacer()
@@ -1345,16 +1361,30 @@ class GroupIronmanPanel extends PluginPanel
 		}
 	}
 
-	/** An item icon drawn smaller than ItemManager's 36x32, for the worn and inventory layouts. */
-	private static final class SmallItem extends JComponent
+	/**
+	 * An item icon drawn smaller than ItemManager's 36x32, for the worn and inventory layouts. A log basket,
+	 * fish barrel or coal bag with known contents shows the count in the game's stack-text yellow; an empty
+	 * worn slot shows the game's silhouette for it.
+	 */
+	static final class SmallItem extends JComponent
 	{
 		static final int W = 22;
 		static final int H = 20;
+		/** The game's stack-number yellow. */
+		private static final Color COUNT = new Color(0xFF, 0xFF, 0x00);
 		private final AsyncBufferedImage image;
+		/** Items inside a container, or -1 for no number. */
+		final int inside;
+		/** The equipment slot whose silhouette this empty cell draws, or -1. */
+		final int emptySlot;
+		private final BufferedImage silhouette;
 
-		SmallItem(AsyncBufferedImage image, String tooltip)
+		SmallItem(AsyncBufferedImage image, String tooltip, int inside, int emptySlot, BufferedImage silhouette)
 		{
 			this.image = image;
+			this.inside = inside;
+			this.emptySlot = emptySlot;
+			this.silhouette = silhouette;
 			setPreferredSize(new Dimension(W, H));
 			setToolTipText(tooltip);
 			if (image != null)
@@ -1372,6 +1402,28 @@ class GroupIronmanPanel extends PluginPanel
 			{
 				g.drawImage(image, 0, 0, W, H, null);
 			}
+			else if (silhouette != null)
+			{
+				// Centred at its own size, at most the cell's, as the worn tab draws it.
+				int w = Math.min(W, silhouette.getWidth());
+				int h = Math.min(H, silhouette.getHeight());
+				g.drawImage(silhouette, (W - w) / 2, (H - h) / 2, w, h, null);
+			}
+			if (inside >= 0)
+			{
+				drawCount(g, String.valueOf(inside));
+			}
+		}
+
+		/** Top left with a black shadow, where the game draws a stack's number. */
+		private static void drawCount(Graphics g, String text)
+		{
+			g.setFont(FontManager.getRunescapeSmallFont());
+			int y = g.getFontMetrics().getAscent() - 2;
+			g.setColor(Color.BLACK);
+			g.drawString(text, 1, y + 1);
+			g.setColor(COUNT);
+			g.drawString(text, 0, y);
 		}
 	}
 }

@@ -172,6 +172,10 @@ class GroupService
 	@Inject
 	private HiscoreClient hiscoreClient;
 
+	/** Log basket, fish barrel and coal bag contents, from the game's own lines. Client thread. */
+	@Inject
+	private CarriedContainers containers;
+
 	private final GroupRoster roster = new GroupRoster();
 	private final BankAssembler assembler = new BankAssembler();
 	private final Map<Integer, String> names = new ConcurrentHashMap<>();
@@ -216,6 +220,8 @@ class GroupService
 	private int lastPlane;
 	private String lastStatsSent;
 	private String lastCarriedSent;
+	/** This player's carried items as last put on their own card, sent or not. */
+	private String lastCarriedLocal;
 	private boolean extrasDirty;
 	private int ticksSinceExtras = EXTRAS_INTERVAL_TICKS;
 	private String lastExtrasSent;
@@ -342,6 +348,8 @@ class GroupService
 		lastBank = null;
 		lastStatsSent = null;
 		lastCarriedSent = null;
+		lastCarriedLocal = null;
+		containers.loggedOut();
 		onChange = () -> { };
 	}
 
@@ -649,6 +657,8 @@ class GroupService
 		{
 			lastStatsSent = null;
 			lastCarriedSent = null;
+			// Turning sharing off cleared every card's items, this player's own too: put it back.
+			lastCarriedLocal = null;
 			lastExtrasSent = null;
 			statsDirty = true;
 			carriedDirty = true;
@@ -672,6 +682,8 @@ class GroupService
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
+		// Fill / Empty on a log basket, barrel or coal bag: read only, the click goes through untouched.
+		containers.clicked(event.getMenuOption(), event.getMenuTarget());
 		if (storage.isOpen() && event.getParam1() == InterfaceID.SharedBank.SAVE_BUTTON)
 		{
 			commitStorage(storage.save(System.currentTimeMillis(), localName()));
@@ -689,6 +701,7 @@ class GroupService
 		}
 		else if (id == InventoryID.INV || id == InventoryID.WORN)
 		{
+			containers.itemsChanged();
 			carriedDirty = true;
 		}
 		else if (id == InventoryID.SEED_VAULT)
@@ -723,6 +736,8 @@ class GroupService
 		}
 		if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
+			// Another account may log in next: its own counts are restored from its profile.
+			containers.loggedOut();
 			hiscoresOnLogin = true;
 			refreshPresence();
 		}
@@ -760,6 +775,10 @@ class GroupService
 		{
 			receiveKey(event.getName(), key);
 			return;
+		}
+		if (event.getType() == ChatMessageType.GAMEMESSAGE || event.getType() == ChatMessageType.SPAM)
+		{
+			carriedDirty |= containers.chat(event.getMessage());
 		}
 		if (event.getType() != ChatMessageType.GAMEMESSAGE || !switches().drops)
 		{
@@ -941,22 +960,18 @@ class GroupService
 		}
 		recordSeen(now);
 		refreshRoster();
+		carriedDirty |= containers.tick();
+		GroupOutbox.Switches s = switches();
+		updateCarried(s);
 		if (!syncing())
 		{
 			return;
 		}
 		flushGovernance();
-		GroupOutbox.Switches s = switches();
 
 		if (s.stats)
 		{
 			pollStats(s);
-		}
-
-		if (s.carried && carriedDirty && ticksSinceCarried >= CARRIED_INTERVAL_TICKS)
-		{
-			carriedDirty = false;
-			sendCarried(s);
 		}
 
 		if (s.extras && extrasDirty && ticksSinceExtras >= EXTRAS_INTERVAL_TICKS)
@@ -1351,6 +1366,7 @@ class GroupService
 				resolve(decoded.carried.inventory.keySet());
 				resolve(decoded.carried.worn.keySet());
 				resolve(decoded.carried.slotIds());
+				resolve(decoded.carried.heldIds());
 				break;
 			case STORAGE:
 				if (!s.storage)
@@ -1638,25 +1654,39 @@ class GroupService
 		return out;
 	}
 
-	/** Client thread. */
-	private void sendCarried(GroupOutbox.Switches s)
+	/**
+	 * Client thread. This player's own inventory, worn items and container contents onto their own card, joined
+	 * or not (Board 2026-11-14: the card shows them while 'Not connected'); sent to the party only when syncing
+	 * and shared.
+	 */
+	private void updateCarried(GroupOutbox.Switches s)
 	{
-		ItemContainer inv = client.getItemContainer(InventoryID.INV);
-		GroupCodec.Carried carried = new GroupCodec.Carried(counts(inv),
-			counts(client.getItemContainer(InventoryID.WORN)), inventorySlots(inv));
-		String payload = GroupOutbox.carried(gson, s, carried);
-		if (payload == null || Objects.equals(payload, lastCarriedSent))
+		if (!carriedDirty || ticksSinceCarried < CARRIED_INTERVAL_TICKS)
 		{
 			return;
 		}
-		partyService.send(new VvgGroupIronmanMessage(payload));
-		lastCarriedSent = payload;
+		carriedDirty = false;
 		ticksSinceCarried = 0;
-		resolveNow(carried.inventory.keySet());
-		resolveNow(carried.worn.keySet());
-		resolveNow(carried.slotIds());
-		roster.putCarried(localName(), carried);
-		onChange.run();
+		ItemContainer inv = client.getItemContainer(InventoryID.INV);
+		GroupCodec.Carried carried = new GroupCodec.Carried(counts(inv),
+			counts(client.getItemContainer(InventoryID.WORN)), inventorySlots(inv), containers.held());
+		String local = GroupCodec.encodeCarried(gson, carried);
+		if (!local.equals(lastCarriedLocal))
+		{
+			lastCarriedLocal = local;
+			resolveNow(carried.inventory.keySet());
+			resolveNow(carried.worn.keySet());
+			resolveNow(carried.slotIds());
+			resolveNow(carried.heldIds());
+			roster.putCarried(localName(), carried);
+			onChange.run();
+		}
+		String payload = syncing() ? GroupOutbox.carried(gson, s, carried) : null;
+		if (payload != null && !Objects.equals(payload, lastCarriedSent))
+		{
+			partyService.send(new VvgGroupIronmanMessage(payload));
+			lastCarriedSent = payload;
+		}
 	}
 
 	/** Client thread. The inventory's slots in order with raw ids, so a noted stack draws noted; none without one. */

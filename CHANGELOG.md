@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Log basket counts and the worn-equipment slot icons
+
+- A carried log basket, fish barrel or coal bag shows how many items are
+  inside on its inventory slot (yellow, like the game's stack number), once
+  the game has said: a Check, an empty, or logs, fish or coal gathered into an
+  open one. Until then it shows no number, never a guess. Counts are kept per
+  account across logins.
+- Where every item inside is known (after a Check, then logs or coal that
+  name themselves), Find and `::find` count them too: "Yew logs: Alex log
+  basket 14". After a Fill the count stays but Find leaves the basket out.
+- The counts reach the group with the inventory. A member on an older build
+  simply shows no number; nothing else about their messages changes.
+- The worn grid shows the game's own empty-slot icons (head, cape, neck,
+  ammo, weapon, body, shield, legs, hands, feet, ring) wherever nothing is
+  worn, so it reads like the Worn Equipment tab.
+- Your own card shows your inventory, worn items and counts before you join
+  a group too.
 ### One live board per channel, through restarts
 
 - Restarting RuneLite no longer posts a second "Group status" board and

@@ -98,7 +98,7 @@ final class GroupOutbox
 		{
 			return null;
 		}
-		return GroupCodec.encodeCarried(gson, carried.inventory, carried.worn, carried.slots);
+		return GroupCodec.encodeCarried(gson, carried);
 	}
 
 	static String extras(Gson gson, Switches switches, MemberExtras extras)
