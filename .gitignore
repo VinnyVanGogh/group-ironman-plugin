@@ -20,3 +20,6 @@ docs/measurements/*.csv
 
 # macOS Finder droppings.
 .DS_Store
+
+# Python bytecode from the scripts in tools/.
+__pycache__/
