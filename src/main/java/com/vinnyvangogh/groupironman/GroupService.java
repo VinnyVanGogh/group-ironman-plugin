@@ -977,11 +977,6 @@ class GroupService
 			return;
 		}
 		flushGovernance();
-		ShoppingSync shop = shopping;
-		if (shop != null)
-		{
-			shop.flush(self);
-		}
 		GroupOutbox.Switches s = switches();
 
 		if (s.stats)
@@ -1465,13 +1460,18 @@ class GroupService
 		log.debug("ignored unreadable group payload from {}", message.getMemberId());
 	}
 
-	/** Game tick, connected: roles, settings and this member's announce, whichever changed. */
+	/** Game tick, connected: roles, settings and this member's announce, then shopping lists, whichever changed. */
 	private void flushGovernance()
 	{
 		GovernanceSync g = governance;
 		if (g != null)
 		{
 			g.flush(MemberPrefs.of(config));
+		}
+		ShoppingSync shop = shopping;
+		if (shop != null)
+		{
+			shop.flush(self);
 		}
 	}
 

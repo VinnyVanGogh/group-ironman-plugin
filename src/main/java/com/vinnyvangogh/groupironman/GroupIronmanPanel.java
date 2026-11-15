@@ -265,33 +265,9 @@ class GroupIronmanPanel extends PluginPanel
 			return;
 		}
 		tab.removeAll();
-		long now = System.currentTimeMillis();
 		try
 		{
-			switch (current)
-			{
-				case "Banks":
-					drawBanks(tab, v, now);
-					break;
-				case "Storage":
-					drawStorage(tab, v, now);
-					break;
-				case "Find":
-					drawFind(tab, v, now);
-					break;
-				case "Log":
-					drawLog(tab, v, now);
-					break;
-				case "Shopping":
-					drawShopping(tab, v);
-					break;
-				case "Settings":
-					drawSettings(tab, v, now);
-					break;
-				default:
-					drawGroup(tab, v, now);
-					break;
-			}
+			drawCurrent(tab, v, System.currentTimeMillis());
 		}
 		catch (RuntimeException | AssertionError e)
 		{
@@ -303,6 +279,34 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		tab.revalidate();
 		tab.repaint();
+	}
+
+	private void drawCurrent(JPanel tab, View v, long now)
+	{
+		switch (current)
+		{
+			case "Banks":
+				drawBanks(tab, v, now);
+				break;
+			case "Storage":
+				drawStorage(tab, v, now);
+				break;
+			case "Find":
+				drawFind(tab, v, now);
+				break;
+			case "Log":
+				drawLog(tab, v, now);
+				break;
+			case "Shopping":
+				drawShopping(tab, v);
+				break;
+			case "Settings":
+				drawSettings(tab, v, now);
+				break;
+			default:
+				drawGroup(tab, v, now);
+				break;
+		}
 	}
 
 	/** The Settings tab is on screen and shows the same as before: rebuilding would lose a half-typed number. */
