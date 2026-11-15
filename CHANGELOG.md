@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### Live activities: Fight Caves, Inferno and Fortis Colosseum waves
+
+- The group sees who is in the **Fight Caves** (63 waves), the **Inferno**
+  (69) or the **Fortis Colosseum** (12, Sol Heredit), on which wave, solo or
+  with whom, and for how long. Colosseum runs also show glory and the
+  modifiers already chosen, with their tier.
+- Shown on the member's card in the **Group** tab ("Fight Caves - wave
+  37/63 - solo"), in a new **Activities** tab (live cards, then recent
+  completions and deaths, filtered All / Bossing / Minigames), under the
+  member in the in-game **Group box**, and on the Discord **live board**
+  ("in Fight Caves, wave 35": it moves every 5 waves, so the message is not
+  edited every wave).
+- Four new Discord posts and banners, each its own switch, all off by
+  default: **Activity started**, **Activity wave milestone** (every N waves,
+  new *Thresholds* setting **Post every N waves**, default 10, plus Jad,
+  Triple Jads, Zuk and Sol Heredit), **Activity completed** (with the kill
+  count and time, or an early Colosseum loot claim) and **Activity death**
+  (with the wave; posted instead of 'Died' for that death).
+- A logout mid-run resumes on the next wave with the time kept.
+- Shared only with *Share group events* on; your own run always shows on your
+  own screen. "Don't post my events" and per-kind opt-outs keep a member off
+  Discord and off the live board. Members on an older build ignore the new
+  messages and kinds; nothing changes for them.
+- Only where-and-how-far: no boss attack, prayer, spawn or hazard is ever
+  read or shown.
 ### Shopping: "Path to" with Shortest Path
 
 - Each line still to get, and each requested item, has a **Path to** button
