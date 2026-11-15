@@ -1,15 +1,11 @@
 package com.vinnyvangogh.groupironman;
 
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.Insets;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.util.List;
-import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -130,15 +126,6 @@ final class ShopCards
 		}
 	}
 
-	/** An empty card: a dark box with padding, holding a column. */
-	static JPanel box()
-	{
-		JPanel box = new GroupIronmanPanel.Column();
-		box.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		box.setBorder(BorderFactory.createCompoundBorder(new EmptyBorder(0, 0, 6, 0), new EmptyBorder(6, 6, 6, 6)));
-		return box;
-	}
-
 	/** "0 of 39 done" / "Done: 39 of 39". */
 	static String progress(int done, int total)
 	{
@@ -156,7 +143,7 @@ final class ShopCards
 		name.setIcon(new GroupIronmanPanel.Arrow(open));
 		name.setIconTextGap(4);
 		name.setFont(FontManager.getRunescapeBoldFont());
-		clickable(name, toggle);
+		Ui.clickable(name, toggle);
 		box.add(name);
 		box.add(new Wrap(progress(done, total), MUTED, CARD_TEXT));
 		box.add(new Bar(done, total, CARD_TEXT));
@@ -183,14 +170,11 @@ final class ShopCards
 		int more = needed.size() - shown;
 		if (more > 0)
 		{
-			JLabel rest = new JLabel("+" + more + " more");
-			rest.setFont(FontManager.getRunescapeSmallFont());
-			rest.setForeground(MUTED);
-			icons.add(rest);
+			icons.add(Ui.label("+" + more + " more", FontManager.getRunescapeSmallFont(), MUTED));
 		}
 		icons.setMaximumSize(new Dimension(CARD_TEXT, 34));
 		icons.setPreferredSize(new Dimension(CARD_TEXT, 34));
-		clickable(icons, toggle);
+		Ui.clickable(icons, toggle);
 		return icons;
 	}
 
@@ -202,20 +186,7 @@ final class ShopCards
 		l.setFont(FontManager.getRunescapeSmallFont());
 		l.setForeground(DONE);
 		l.setBorder(new EmptyBorder(4, 0, 2, 0));
-		clickable(l, toggle);
+		Ui.clickable(l, toggle);
 		return l;
-	}
-
-	static void clickable(JComponent c, Runnable action)
-	{
-		c.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		c.addMouseListener(new MouseAdapter()
-		{
-			@Override
-			public void mousePressed(MouseEvent e)
-			{
-				action.run();
-			}
-		});
 	}
 }

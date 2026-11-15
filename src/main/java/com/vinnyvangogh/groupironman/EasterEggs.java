@@ -162,7 +162,7 @@ final class EasterEggs
 	static String overlayTag(GroupEvent e, Settings settings)
 	{
 		String[] lines = settings.on ? levelNumber(e) : null;
-		if (lines == null)
+		if (lines == null || lines.length == 0)
 		{
 			return null;
 		}

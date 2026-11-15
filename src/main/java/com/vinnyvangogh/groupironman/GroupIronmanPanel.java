@@ -4,7 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
@@ -22,9 +21,6 @@ import net.runelite.client.util.AsyncBufferedImage;
 import java.awt.GridLayout;
 import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.StringSelection;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,7 +30,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
@@ -378,10 +373,7 @@ class GroupIronmanPanel extends PluginPanel
 		ButtonGroup group = new ButtonGroup();
 		for (String name : names)
 		{
-			JToggleButton b = new JToggleButton(name, name.equals(current));
-			b.setFont(FontManager.getRunescapeSmallFont());
-			b.setFocusable(false);
-			b.setMargin(new java.awt.Insets(2, 0, 2, 0));
+			JToggleButton b = Ui.toggle(name, name.equals(current), 2);
 			b.addActionListener(e ->
 			{
 				current = name;
@@ -433,11 +425,9 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			header.add(offNotice());
 		}
-		SyncHeader h =SyncHeader.of(v.sync, v.group.othersOnline(v.self, System.currentTimeMillis()), v.members);
-		JLabel title = new JLabel(h.title);
-		title.setFont(FontManager.getRunescapeBoldFont());
-		title.setForeground(h.ok ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.BRAND_ORANGE);
-		header.add(title);
+		SyncHeader h = SyncHeader.of(v.sync, v.group.othersOnline(v.self, System.currentTimeMillis()), v.members);
+		header.add(Ui.label(h.title, FontManager.getRunescapeBoldFont(),
+			h.ok ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.BRAND_ORANGE));
 		if (h.detail != null)
 		{
 			header.add(text(h.detail, MUTED));
@@ -447,7 +437,7 @@ class GroupIronmanPanel extends PluginPanel
 		JPanel buttons = new JPanel(new GridLayout(0, 2, 2, 2));
 		for (SyncHeader.Button b : h.buttons)
 		{
-			buttons.add(button(b));
+			buttons.add(Ui.button(b.label, b.tooltip, () -> press(b)));
 		}
 		header.add(buttons);
 		if (keyNote != null && System.currentTimeMillis() - keyNoteAt < 30_000)
@@ -471,13 +461,7 @@ class GroupIronmanPanel extends PluginPanel
 		JLabel line = text(SidebarButton.OFF_TEXT, ColorScheme.BRAND_ORANGE);
 		line.setFont(FontManager.getRunescapeBoldFont());
 		box.add(line);
-		JButton open = new JButton(SidebarButton.OFF_BUTTON);
-		open.setFont(FontManager.getRunescapeSmallFont());
-		open.setFocusable(false);
-		open.addActionListener(e -> actions.openSettings());
-		JPanel row = new JPanel(new GridLayout(1, 1));
-		row.add(open);
-		box.add(row);
+		box.add(Ui.wide(Ui.button(SidebarButton.OFF_BUTTON, null, actions::openSettings)));
 		return box;
 	}
 
@@ -489,10 +473,8 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			return;
 		}
-		JPanel box = section();
-		JLabel title = new JLabel("Share with your group?");
-		title.setFont(FontManager.getRunescapeBoldFont());
-		box.add(title);
+		JPanel box = Ui.card();
+		box.add(Ui.label("Share with your group?", FontManager.getRunescapeBoldFont(), null));
 		box.add(text(SharingPrompt.TEXT, MUTED));
 		JPanel buttons = new JPanel(new GridLayout(0, 1, 2, 2));
 		buttons.setOpaque(false);
@@ -513,26 +495,11 @@ class GroupIronmanPanel extends PluginPanel
 
 	private JButton cardButton(String label, String tooltip, Runnable action)
 	{
-		JButton button = new JButton(label);
-		button.setFont(FontManager.getRunescapeSmallFont());
-		button.setFocusable(false);
-		button.setToolTipText(tooltip);
-		button.addActionListener(e ->
+		return Ui.button(label, tooltip, () ->
 		{
 			action.run();
 			redraw();
 		});
-		return button;
-	}
-
-	private JButton button(SyncHeader.Button b)
-	{
-		JButton button = new JButton(b.label);
-		button.setFont(FontManager.getRunescapeSmallFont());
-		button.setFocusable(false);
-		button.setToolTipText(b.tooltip);
-		button.addActionListener(e -> press(b));
-		return button;
 	}
 
 	private void press(SyncHeader.Button b)
@@ -556,7 +523,7 @@ class GroupIronmanPanel extends PluginPanel
 				String key = actions.groupKey();
 				if (key != null)
 				{
-					Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(key), null);
+					Ui.copy(key);
 					keyNote = "Key copied. Send it to your group, e.g. in Discord. Anyone with it can join.";
 					keyNoteAt = System.currentTimeMillis();
 				}
@@ -627,7 +594,7 @@ class GroupIronmanPanel extends PluginPanel
 	/** A member's card; {@code activity} is what they are doing in a tracked activity now, or null. */
 	private JComponent memberCard(PanelModel.MemberCard c, ActivityState activity)
 	{
-		JPanel card = section();
+		JPanel card = Ui.card();
 		JPanel body = new Column();
 		body.setOpaque(false);
 		boolean open = !collapsed.contains(c.name);
@@ -700,14 +667,10 @@ class GroupIronmanPanel extends PluginPanel
 		name.setIconTextGap(4);
 		name.setFont(FontManager.getRunescapeBoldFont());
 		name.setForeground(color);
-		name.addMouseListener(new MouseAdapter()
+		Ui.onPress(name, () ->
 		{
-			@Override
-			public void mousePressed(MouseEvent e)
-			{
-				toggle.run();
-				redraw();
-			}
+			toggle.run();
+			redraw();
 		});
 		return name;
 	}
@@ -750,10 +713,7 @@ class GroupIronmanPanel extends PluginPanel
 	{
 		JPanel p = new Column();
 		p.setOpaque(false);
-		JLabel label = new JLabel(caption);
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(MUTED);
-		p.add(label);
+		p.add(Ui.label(caption, FontManager.getRunescapeSmallFont(), MUTED));
 		p.add(content);
 		return p;
 	}
@@ -909,23 +869,20 @@ class GroupIronmanPanel extends PluginPanel
 			cell.setForeground(!live ? MUTED : s.boosted > s.real ? ColorScheme.PROGRESS_COMPLETE_COLOR
 				: s.boosted < s.real ? ColorScheme.PROGRESS_ERROR_COLOR : Color.WHITE);
 			cell.setToolTipText(s.tooltip());
-			Skill skill = skill(s.skill);
-			if (skill != null)
-			{
-				cell.setIcon(new javax.swing.ImageIcon(skillIcons.getSkillImage(skill, true)));
-			}
+			cell.setIcon(skillIcon(s.skill));
 			grid.add(cell);
 		}
 		return grid;
 	}
 
-	private static Skill skill(String name)
+	/** The skill's small icon, or null when no skill has that name. */
+	private Icon skillIcon(String name)
 	{
 		for (Skill s : Skill.values())
 		{
 			if (s.getName().equalsIgnoreCase(name))
 			{
-				return s;
+				return new javax.swing.ImageIcon(skillIcons.getSkillImage(s, true));
 			}
 		}
 		return null;
@@ -987,26 +944,20 @@ class GroupIronmanPanel extends PluginPanel
 	private JComponent foldAllLink(Map<String, Boolean> matches)
 	{
 		boolean anyOpen = bankFolds.anyOpen(matches.keySet(), matches::get);
-		JLabel link = new JLabel(anyOpen ? "Collapse all" : "Expand all");
-		link.setFont(FontManager.getRunescapeSmallFont());
-		link.setForeground(ColorScheme.BRAND_ORANGE);
+		JLabel link = Ui.label(anyOpen ? "Collapse all" : "Expand all", FontManager.getRunescapeSmallFont(),
+			ColorScheme.BRAND_ORANGE);
 		link.setBorder(new EmptyBorder(0, 0, 4, 0));
-		link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		link.addMouseListener(new MouseAdapter()
+		Ui.clickable(link, () ->
 		{
-			@Override
-			public void mousePressed(MouseEvent e)
-			{
-				bankFolds.setAll(matches.keySet(), !anyOpen);
-				redraw();
-			}
+			bankFolds.setAll(matches.keySet(), !anyOpen);
+			redraw();
 		});
 		return link;
 	}
 
 	private JComponent bankCard(PanelModel.BankCard b, View v, boolean matches)
 	{
-		JPanel card = section();
+		JPanel card = Ui.card();
 		boolean open = bankFolds.open(b.member, matches);
 		boolean mine = !v.self.isEmpty() && v.self.equalsIgnoreCase(b.member);
 		card.add(foldHeader(mine ? "Your bank (" + b.member + ")" : b.member + "'s bank", open, Color.WHITE,
@@ -1028,10 +979,8 @@ class GroupIronmanPanel extends PluginPanel
 				+ " sent, and members' changes don't arrive.", ColorScheme.BRAND_ORANGE));
 		}
 		PanelModel.StorageView s = PanelModel.storage(v.group, v.items, v.self, storageFilter.getText(), now);
-		JPanel contents = section();
-		JLabel title = new JLabel("Group storage");
-		title.setFont(FontManager.getRunescapeBoldFont());
-		contents.add(title);
+		JPanel contents = Ui.card();
+		contents.add(Ui.label("Group storage", FontManager.getRunescapeBoldFont(), null));
 		if (s.snapshot == null)
 		{
 			contents.add(text("Not seen yet. Open group storage once and close it; what it holds shows here.", MUTED));
@@ -1044,10 +993,8 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		tab.add(contents);
 
-		JPanel log = section();
-		JLabel heading = new JLabel("Changes");
-		heading.setFont(FontManager.getRunescapeBoldFont());
-		log.add(heading);
+		JPanel log = Ui.card();
+		log.add(Ui.label("Changes", FontManager.getRunescapeBoldFont(), null));
 		if (s.log.isEmpty())
 		{
 			log.add(text("No changes yet. Deposits and withdrawals are logged when you press Save or close storage."
@@ -1080,8 +1027,8 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		for (PanelModel.FindRow r : rows)
 		{
-			JLabel row = new JLabel(r.text + (r.ago.isEmpty() ? "" : " (" + r.ago + ")"));
-			row.setFont(FontManager.getRunescapeSmallFont());
+			JLabel row = Ui.label(r.text + (r.ago.isEmpty() ? "" : " (" + r.ago + ")"), FontManager.getRunescapeSmallFont(),
+				null);
 			icon(r.itemId, r.quantity).addTo(row);
 			row.setToolTipText(r.tooltip);
 			row.setBorder(new EmptyBorder(1, 0, 1, 0));
@@ -1133,10 +1080,7 @@ class GroupIronmanPanel extends PluginPanel
 	private JToggleButton chip(GroupEvent.Category category)
 	{
 		String label = ActivityLog.label(category);
-		JToggleButton b = new JToggleButton(label);
-		b.setFont(FontManager.getRunescapeSmallFont());
-		b.setFocusable(false);
-		b.setMargin(new java.awt.Insets(1, 0, 1, 0));
+		JToggleButton b = Ui.toggle(label, false, 1);
 		b.setToolTipText("Show " + label + ". With none ticked, the Log shows everything.");
 		b.addActionListener(e ->
 		{
@@ -1193,10 +1137,7 @@ class GroupIronmanPanel extends PluginPanel
 		ButtonGroup group = new ButtonGroup();
 		for (ActivityRows.Filter f : ActivityRows.Filter.values())
 		{
-			JToggleButton b = new JToggleButton(f.label, f == activityFilter);
-			b.setFont(FontManager.getRunescapeSmallFont());
-			b.setFocusable(false);
-			b.setMargin(new java.awt.Insets(2, 0, 2, 0));
+			JToggleButton b = Ui.toggle(f.label, f == activityFilter, 2);
 			b.addActionListener(e ->
 			{
 				activityFilter = f;
@@ -1218,11 +1159,8 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		for (ActivityRows.Card c : live)
 		{
-			JPanel card = section();
-			JLabel title = new JLabel(c.title);
-			title.setFont(FontManager.getRunescapeBoldFont());
-			title.setForeground(Color.WHITE);
-			card.add(title);
+			JPanel card = Ui.card();
+			card.add(Ui.label(c.title, FontManager.getRunescapeBoldFont(), Color.WHITE));
 			c.lines.forEach(line -> card.add(text(line, ACTIVITY)));
 			tab.add(card);
 		}
@@ -1284,40 +1222,29 @@ class GroupIronmanPanel extends PluginPanel
 	/** Icon, member, short line and time; the full line and value on hover; Copy on right-click. */
 	private JComponent logRow(ActivityLog.Row r)
 	{
-		JLabel row = new JLabel("<html><body style='width:" + LOG_TEXT_WIDTH + "px'><b>" + escape(r.event.member)
-			+ "</b> " + escape(r.text) + " <font color='#9a9a9a'>(" + escape(r.ago) + ")</font></body></html>");
-		row.setFont(FontManager.getRunescapeSmallFont());
-		row.setForeground(Color.WHITE);
+		JLabel row = Ui.label("<html><body style='width:" + LOG_TEXT_WIDTH + "px'><b>" + escape(r.event.member)
+			+ "</b> " + escape(r.text) + " <font color='#9a9a9a'>(" + escape(r.ago) + ")</font></body></html>",
+			FontManager.getRunescapeSmallFont(), Color.WHITE);
 		row.setBorder(new EmptyBorder(2, 0, 2, 0));
 		row.setIconTextGap(4);
-		Skill skill = r.skill == null ? null : skill(r.skill);
 		if (r.itemId >= 0)
 		{
 			icon(r.itemId, r.quantity).addTo(row);
 		}
-		else if (skill != null)
+		else
 		{
-			row.setIcon(new javax.swing.ImageIcon(skillIcons.getSkillImage(skill, true)));
+			row.setIcon(skillIcon(r.skill));
 		}
 		row.setToolTipText("<html>" + escape(r.full + "\nRight-click to copy.").replace("\n", "<br>") + "</html>");
 		JPopupMenu menu = new JPopupMenu();
 		JMenuItem copy = new JMenuItem("Copy");
-		copy.addActionListener(e ->
-			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(r.copy), null));
+		copy.addActionListener(e -> Ui.copy(r.copy));
 		menu.add(copy);
 		row.setComponentPopupMenu(menu);
 		return row;
 	}
 
 	// Building blocks.
-
-	private static JPanel section()
-	{
-		JPanel p = new Column();
-		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		p.setBorder(BorderFactory.createCompoundBorder(new EmptyBorder(0, 0, 6, 0), new EmptyBorder(6, 6, 6, 6)));
-		return p;
-	}
 
 	private static void empty(JPanel tab, String title, String next)
 	{
@@ -1327,9 +1254,7 @@ class GroupIronmanPanel extends PluginPanel
 
 	static JLabel heading(String text)
 	{
-		JLabel label = new JLabel(text);
-		label.setFont(FontManager.getRunescapeBoldFont());
-		label.setForeground(ColorScheme.BRAND_ORANGE);
+		JLabel label = Ui.label(text, FontManager.getRunescapeBoldFont(), ColorScheme.BRAND_ORANGE);
 		label.setBorder(new EmptyBorder(6, 0, 2, 0));
 		return label;
 	}
@@ -1338,9 +1263,8 @@ class GroupIronmanPanel extends PluginPanel
 	{
 		// The html wrapper makes long lines wrap at the panel width. Text from
 		// peers is escaped first: a display name or item name is data, not markup.
-		JLabel label = new JLabel("<html><body style='width:175px'>" + escape(text) + "</body></html>");
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(color);
+		JLabel label = Ui.label("<html><body style='width:175px'>" + escape(text) + "</body></html>",
+			FontManager.getRunescapeSmallFont(), color);
 		label.setBorder(new EmptyBorder(1, 0, 1, 0));
 		return label;
 	}

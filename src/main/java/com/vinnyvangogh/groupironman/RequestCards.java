@@ -62,7 +62,7 @@ final class RequestCards
 		}
 		List<Integer> preview = new ArrayList<>();
 		needed.forEach(r -> preview.add(r.itemId));
-		JPanel box = ShopCards.box();
+		JPanel box = Ui.card();
 		int finished = c.request.closed ? c.rows.size() : c.done();
 		ShopCards.header(box, c.request.name, open, finished, c.rows.size(), preview, items, () -> tab.fold(key));
 		if (!open)
@@ -156,11 +156,11 @@ final class RequestCards
 		JPanel buttons = new JPanel(new GridLayout(1, 0, 2, 0));
 		buttons.setOpaque(false);
 		boolean claimed = claimedBy(r, self);
-		buttons.add(ShoppingTab.button(claimed ? "Not getting it" : "I'll get it", () -> say.accept(
+		buttons.add(Ui.button(claimed ? "Not getting it" : "I'll get it", null, () -> say.accept(
 			actions.claimRequest(req.id, r.itemId, !claimed) ? null : "Not changed: log in first.")));
 		if (mine)
 		{
-			buttons.add(ShoppingTab.button("Close item", () -> say.accept(
+			buttons.add(Ui.button("Close item", null, () -> say.accept(
 				actions.closeRequestItem(req.id, r.itemId) ? null : "Not closed: log in first.")));
 		}
 		return buttons;
@@ -182,7 +182,7 @@ final class RequestCards
 	{
 		JPanel row = new JPanel(new GridLayout(1, 0, 2, 0));
 		row.setOpaque(false);
-		row.add(ShoppingTab.button("Rename", () ->
+		row.add(Ui.button("Rename", null, () ->
 		{
 			String name = JOptionPane.showInputDialog(row, "New name for '" + r.name + "'", r.name);
 			if (name != null)
@@ -192,10 +192,10 @@ final class RequestCards
 		}));
 		if (r.open())
 		{
-			row.add(ShoppingTab.button("Close", () -> say.accept(actions.closeRequest(r.id) ? null
+			row.add(Ui.button("Close", null, () -> say.accept(actions.closeRequest(r.id) ? null
 				: "Not closed: log in first.")));
 		}
-		row.add(ShoppingTab.button("Remove", () ->
+		row.add(Ui.button("Remove", null, () ->
 		{
 			if (JOptionPane.showConfirmDialog(row, "Remove your request '" + r.name + "'?", "Remove request",
 				JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION)

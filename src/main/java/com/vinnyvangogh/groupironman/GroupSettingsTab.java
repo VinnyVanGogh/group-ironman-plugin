@@ -15,13 +15,14 @@ import java.util.function.Function;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
 import javax.swing.SpinnerNumberModel;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
+import static com.vinnyvangogh.groupironman.GroupIronmanPanel.heading;
+import static com.vinnyvangogh.groupironman.GroupIronmanPanel.text;
 
 /**
  * The panel's Settings tab: the group's shared settings (editable by the
@@ -496,10 +497,7 @@ final class GroupSettingsTab
 		JPanel right = new JPanel(new GridLayout(1, Math.max(1, cells.size()), 2, 0));
 		for (T c : cells)
 		{
-			JLabel l = new JLabel(show.apply(c));
-			l.setFont(FontManager.getRunescapeSmallFont());
-			l.setForeground(Color.WHITE);
-			right.add(l);
+			right.add(Ui.label(show.apply(c), FontManager.getRunescapeSmallFont(), Color.WHITE));
 		}
 		row.add(right, BorderLayout.EAST);
 		return row;
@@ -552,17 +550,12 @@ final class GroupSettingsTab
 
 	private JButton button(String label, String tooltip, Runnable action)
 	{
-		JButton b = new JButton(label);
-		b.setFont(FontManager.getRunescapeSmallFont());
-		b.setFocusable(false);
-		b.setToolTipText(tooltip);
-		b.addActionListener(e ->
+		return Ui.button(label, tooltip, () ->
 		{
 			action.run();
 			drawn = null;
 			refresh.run();
 		});
-		return b;
 	}
 
 	private static boolean confirm(String question)
@@ -588,16 +581,6 @@ final class GroupSettingsTab
 	{
 		c.setFont(FontManager.getRunescapeSmallFont());
 		c.setForeground(Color.WHITE);
-	}
-
-	private static JLabel heading(String text)
-	{
-		return GroupIronmanPanel.heading(text);
-	}
-
-	private static JLabel text(String text, Color color)
-	{
-		return GroupIronmanPanel.text(text, color);
 	}
 
 	/** Names as the grid lists them: the roster, or this player alone before it is known. */

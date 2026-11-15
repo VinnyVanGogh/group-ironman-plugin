@@ -18,57 +18,19 @@ import java.util.Map;
  */
 final class ItemQuery
 {
-	/** Shorthand players type for items, each to the name text it stands for. */
+	/** Shorthand players type for items, each to the name text it stands for, from {@code item-aliases.txt}. */
 	private static final Map<String, List<String>> ALIASES = new HashMap<>();
 
 	static
 	{
-		alias("ppot", "prayer potion");
-		alias("ppots", "prayer potion");
-		alias("pray pot", "prayer potion");
-		alias("brew", "saradomin brew");
-		alias("brews", "saradomin brew");
-		alias("sara brew", "saradomin brew");
-		alias("restore", "super restore");
-		alias("restores", "super restore");
-		alias("scb", "super combat potion");
-		alias("super combat", "super combat potion");
-		alias("stam", "stamina potion");
-		alias("stams", "stamina potion");
-		alias("antifire", "antifire potion", "extended antifire", "super antifire");
-		alias("ags", "armadyl godsword");
-		alias("bgs", "bandos godsword");
-		alias("sgs", "saradomin godsword");
-		alias("zgs", "zamorak godsword");
-		alias("dwh", "dragon warhammer");
-		alias("dhl", "dragon hunter lance");
-		alias("dhcb", "dragon hunter crossbow");
-		alias("dhw", "dragon hunter wand");
-		alias("bp", "toxic blowpipe");
-		alias("blowpipe", "toxic blowpipe");
-		alias("tbow", "twisted bow");
-		alias("fury", "amulet of fury");
-		alias("torture", "amulet of torture");
-		alias("anguish", "necklace of anguish");
-		alias("tent", "abyssal tentacle");
-		alias("rcb", "rune crossbow");
-		alias("acb", "armadyl crossbow");
-		alias("dds", "dragon dagger");
-		alias("glory", "amulet of glory");
-		alias("ess", "essence");
-		alias("pure ess", "pure essence");
-		alias("karam", "karambwan");
-		alias("dbones", "dragon bones");
-		alias("dbone", "dragon bones");
-		alias("law", "law rune");
-		alias("laws", "law rune");
-		alias("nats", "nature rune");
-		alias("nat", "nature rune");
-		alias("bloods", "blood rune");
-		alias("deaths", "death rune");
-		alias("souls", "soul rune");
-		alias("wraths", "wrath rune");
-		alias("cannonballs", "cannonball");
+		for (String line : RegionNames.resource("item-aliases.txt").split("\n"))
+		{
+			int eq = line.indexOf('=');
+			if (!line.startsWith("#") && eq > 0)
+			{
+				alias(line.substring(0, eq).trim(), line.substring(eq + 1).trim().split(","));
+			}
+		}
 	}
 
 	private final String whole;
