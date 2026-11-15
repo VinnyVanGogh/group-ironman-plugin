@@ -10,15 +10,14 @@ import java.util.function.Supplier;
  * {@link LevelThreads}' decisions sent through the {@link DiscordSender}: a member's message's first post (kept by
  * its message id), its owed edits, and the new post that replaces a message Discord no longer has. Any thread.
  */
-final class LevelPosts
+final class LevelPosts extends EditedPosts
 {
 	/** 'Combine level-ups' before Board 2026-11-14 made it 60: what an install that had the plugin keeps. */
 	static final int OLD_DEFAULT_WINDOW = 30;
 
-	private final LevelThreads threads = new LevelThreads();
+	private final LevelThreads threads;
 	private final DiscordSender sender;
 	private final Gson gson;
-	private final LongSupplier clock;
 	private final Supplier<DiscordStyle> style;
 	/** The Progress poster name ({@link PosterNames}); null for the webhook's own. */
 	private final Supplier<String> poster;
@@ -26,9 +25,16 @@ final class LevelPosts
 	LevelPosts(DiscordSender sender, Gson gson, LongSupplier clock, Supplier<DiscordStyle> style,
 		Supplier<String> poster)
 	{
+		this(new LevelThreads(), sender, gson, clock, style, poster);
+	}
+
+	private LevelPosts(LevelThreads threads, DiscordSender sender, Gson gson, LongSupplier clock,
+		Supplier<DiscordStyle> style, Supplier<String> poster)
+	{
+		super(threads, clock);
+		this.threads = threads;
 		this.sender = sender;
 		this.gson = gson;
-		this.clock = clock;
 		this.style = style;
 		this.poster = poster;
 	}
@@ -71,29 +77,6 @@ final class LevelPosts
 			String json = DiscordWebhook.levelsEdit(gson, edit.member, edit.cards, style.get(), edit.png != null);
 			sender.edit(edit.url, edit.messageId, json, edit.png, (status, id) -> refused(edit, status));
 		}
-	}
-
-	/** A logout: streaks end, owed edits still go. */
-	void close()
-	{
-		threads.close();
-	}
-
-	/** The open streaks to keep for a restart when they changed since the last call, else null ({@link LevelThreads#saved}). */
-	String saved()
-	{
-		return threads.saved();
-	}
-
-	/** Streaks an earlier run {@link #saved}, back as open while inside {@code window} of their first post. */
-	void restore(String text, long window)
-	{
-		threads.restore(text, clock.getAsLong(), window);
-	}
-
-	void clear()
-	{
-		threads.clear();
 	}
 
 	private void refused(LevelThreads.Edit edit, int status)

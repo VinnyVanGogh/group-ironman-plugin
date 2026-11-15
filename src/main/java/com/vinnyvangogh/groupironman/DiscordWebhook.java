@@ -252,7 +252,18 @@ final class DiscordWebhook
 	static String levelsEdit(Gson gson, String member, List<LevelThreads.Card> cards, DiscordStyle style,
 		boolean screenshot)
 	{
-		JsonObject o = gson.fromJson(levels(gson, member, cards, style, screenshot, null), JsonObject.class);
+		return asEdit(gson, gson.fromJson(levels(gson, member, cards, style, screenshot, null), JsonObject.class),
+			screenshot);
+	}
+
+	/**
+	 * A post's body made an edit's (Discord "Edit Webhook Message"): no {@code username}, which that endpoint does not
+	 * take, and with a screenshot the {@code attachments} list naming only the new upload, so it replaces the old one
+	 * instead of being appended.
+	 */
+	static String asEdit(Gson gson, JsonObject o, boolean screenshot)
+	{
+		o.remove("username");
 		if (screenshot)
 		{
 			JsonObject upload = new JsonObject();
@@ -263,6 +274,69 @@ final class DiscordWebhook
 			o.add("attachments", attachments);
 		}
 		return gson.toJson(o);
+	}
+
+	/**
+	 * A member's grouped message ({@link EventThreads}) as a new post under {@code username}: one card per moment,
+	 * newest first, at most {@link EditedThreads#MAX_CARDS}, the picture on the top card only (Board 2026-11-15: the
+	 * newest event's). Plain style says one line per card, newest first, within Discord's 2,000 characters. It never
+	 * mentions anyone: a moment that pings starts its own message.
+	 */
+	static JsonObject stack(Gson gson, List<EventThreads.Card> cards, DiscordStyle style, boolean screenshot,
+		String username)
+	{
+		JsonObject o = poster(username);
+		JsonObject allowed = new JsonObject();
+		allowed.add("parse", new JsonArray());
+		o.add("allowed_mentions", allowed);
+		if (style == DiscordStyle.PLAIN)
+		{
+			StringBuilder text = new StringBuilder();
+			for (EventThreads.Card c : cards)
+			{
+				if (c.line == null || text.length() + c.line.length() + 1 > MAX_DIGEST)
+				{
+					break;
+				}
+				text.append(text.length() == 0 ? "" : "\n").append(c.line);
+			}
+			o.addProperty("content", text.toString());
+			return o;
+		}
+		JsonArray embeds = new JsonArray();
+		for (EventThreads.Card c : cards)
+		{
+			if (c.embed == null || embeds.size() >= EditedThreads.MAX_CARDS)
+			{
+				continue;
+			}
+			JsonObject embed = gson.fromJson(c.embed, JsonObject.class);
+			embed.remove("image");
+			if (screenshot && embeds.size() == 0)
+			{
+				JsonObject image = new JsonObject();
+				image.addProperty("url", "attachment://" + SCREENSHOT);
+				embed.add("image", image);
+			}
+			embeds.add(embed);
+		}
+		o.add("embeds", embeds);
+		return o;
+	}
+
+	/** The first embed of a post's body, as JSON; null for a plain post. */
+	static String firstEmbed(Gson gson, String json)
+	{
+		JsonObject o = json == null ? null : gson.fromJson(json, JsonObject.class);
+		JsonArray embeds = o == null || !o.has("embeds") ? null : o.getAsJsonArray("embeds");
+		return embeds == null || embeds.size() == 0 ? null : gson.toJson(embeds.get(0));
+	}
+
+	/** A post's {@code content}; null when it has none. */
+	static String content(Gson gson, String json)
+	{
+		JsonObject o = json == null ? null : gson.fromJson(json, JsonObject.class);
+		return o == null || !o.has("content") ? null : o.get("content").getAsString();
 	}
 
 	/** A post's body, with the {@code username} key only when there is a name to send. */
