@@ -7,6 +7,9 @@ import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import static com.vinnyvangogh.groupironman.GroupCodec.flag;
+import static com.vinnyvangogh.groupironman.GroupCodec.header;
+import static com.vinnyvangogh.groupironman.GroupCodec.string;
 
 /**
  * The Shopping tab's two kinds inside a {@link VvgGroupIronmanMessage}, next
@@ -148,7 +151,7 @@ final class ShoppingCodec
 	/** The message in {@code json}, or null when it is none of the kinds or not readable. */
 	static Message decode(Gson gson, String json)
 	{
-		JsonObject in = object(gson, json);
+		JsonObject in = GroupCodec.object(gson, json, GroupCodec.MAX_PAYLOAD_CHARS * 2);
 		if (in == null)
 		{
 			return null;
@@ -181,24 +184,6 @@ final class ShoppingCodec
 				return new Message(null, QuestProgress.of(names(in.get("f")), names(in.get("s"))));
 			default:
 				return null;
-		}
-	}
-
-	/** The JSON object in {@code json}, or null when it is not one, too long or does not parse. */
-	private static JsonObject object(Gson gson, String json)
-	{
-		if (json == null || json.isEmpty() || json.length() > GroupCodec.MAX_PAYLOAD_CHARS * 2)
-		{
-			return null;
-		}
-		try
-		{
-			JsonElement root = gson.fromJson(json, JsonElement.class);
-			return root != null && root.isJsonObject() ? root.getAsJsonObject() : null;
-		}
-		catch (RuntimeException e)
-		{
-			return null;
 		}
 	}
 
@@ -248,12 +233,6 @@ final class ShoppingCodec
 		return new RequestClaim(id, item.intValue(), member, flag(in, "y"), at);
 	}
 
-	private static boolean flag(JsonObject in, String field)
-	{
-		JsonElement e = in.get(field);
-		return e != null && e.isJsonPrimitive() && e.getAsBoolean();
-	}
-
 	private static List<Integer> ids(JsonElement e)
 	{
 		List<Integer> out = new ArrayList<>();
@@ -298,19 +277,5 @@ final class ShoppingCodec
 		JsonArray out = new JsonArray();
 		values.forEach(out::add);
 		return out;
-	}
-
-	private static String string(JsonObject in, String field)
-	{
-		JsonElement e = in.get(field);
-		return e == null || !e.isJsonPrimitive() ? "" : e.getAsString();
-	}
-
-	private static JsonObject header(String kind)
-	{
-		JsonObject o = new JsonObject();
-		o.addProperty("v", 1);
-		o.addProperty("k", kind);
-		return o;
 	}
 }

@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
-import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -24,7 +23,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.ui.FontManager;
 
 /**
  * The panel's Shopping tab: the group's shared shopping lists, each line what
@@ -233,9 +231,7 @@ final class ShoppingTab
 		if (!v.pathing.isEmpty())
 		{
 			tab.add(GroupIronmanPanel.text("Pathing to " + v.pathing + " with Shortest Path.", MUTED));
-			JPanel stop = new JPanel(new GridLayout(1, 1));
-			stop.add(button("Stop path", () -> say(actions.clearPath())));
-			tab.add(stop);
+			tab.add(Ui.wide(Ui.button("Stop path", null, () -> say(actions.clearPath()))));
 		}
 		requestCards.draw(tab, v.requests, v.self, v.paths);
 		if (v.cards.isEmpty() && v.requests.isEmpty())
@@ -306,7 +302,7 @@ final class ShoppingTab
 		}
 		List<Integer> preview = new ArrayList<>();
 		needed.forEach(r -> preview.add(r.line.itemId));
-		JPanel box = ShopCards.box();
+		JPanel box = Ui.card();
 		ShopCards.header(box, c.list.name, open, c.done(), c.rows.size(), preview, items, () -> fold(key));
 		if (!open)
 		{
@@ -366,11 +362,8 @@ final class ShoppingTab
 	/** A full-width "Path to" button; the whole label is also its tooltip, for long shop names. */
 	static JPanel pathButton(String label, Runnable action)
 	{
-		JPanel wrap = new JPanel(new GridLayout(1, 1));
+		JPanel wrap = Ui.wide(Ui.button(label, label, action));
 		wrap.setOpaque(false);
-		JButton b = button(label, action);
-		b.setToolTipText(label);
-		wrap.add(b);
 		return wrap;
 	}
 
@@ -445,7 +438,7 @@ final class ShoppingTab
 		{
 			line.setToolTipText("<html>" + GroupIronmanPanel.escape(String.join("\n", details)).replace("\n", "<br>")
 				+ "</html>");
-			ShopCards.clickable(line, () -> fold(key));
+			Ui.clickable(line, () -> fold(key));
 		}
 		return line;
 	}
@@ -569,7 +562,7 @@ final class ShoppingTab
 		row.setOpaque(false);
 		if (l.custom())
 		{
-			row.add(button("Rename", () ->
+			row.add(Ui.button("Rename", null, () ->
 			{
 				String name = JOptionPane.showInputDialog(row, "New name for '" + l.name + "'", l.name);
 				if (name != null)
@@ -578,7 +571,7 @@ final class ShoppingTab
 				}
 			}));
 		}
-		row.add(button("Remove", () ->
+		row.add(Ui.button("Remove", null, () ->
 		{
 			if (JOptionPane.showConfirmDialog(row, "Remove '" + l.name + "' for the whole group?", "Remove list",
 				JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION)
@@ -593,15 +586,6 @@ final class ShoppingTab
 	{
 		note = text == null || text.isEmpty() ? null : text;
 		refresh.run();
-	}
-
-	static JButton button(String text, Runnable action)
-	{
-		JButton b = new JButton(text);
-		b.setFont(FontManager.getRunescapeSmallFont());
-		b.setFocusable(false);
-		b.addActionListener(e -> action.run());
-		return b;
 	}
 
 	// ---- The form ----
@@ -638,9 +622,7 @@ final class ShoppingTab
 			panel.add(custom);
 			panel.add(forLabel);
 			panel.add(members);
-			JPanel add = new JPanel(new GridLayout(1, 1));
-			add.add(button("Add list", this::submit));
-			panel.add(add);
+			panel.add(Ui.wide(Ui.button("Add list", null, this::submit)));
 		}
 
 		private void buildCustom()
@@ -650,12 +632,12 @@ final class ShoppingTab
 			custom.add(ShopCards.tabText("Item (tradeable items)", MUTED));
 			JPanel search = new JPanel(new BorderLayout(2, 0));
 			search.add(query, BorderLayout.CENTER);
-			search.add(button("Search", this::search), BorderLayout.EAST);
+			search.add(Ui.button("Search", null, this::search), BorderLayout.EAST);
 			custom.add(search);
 			custom.add(hits);
 			JPanel add = new JPanel(new BorderLayout(2, 0));
 			add.add(quantity, BorderLayout.CENTER);
-			add.add(button("Add item", this::stage), BorderLayout.EAST);
+			add.add(Ui.button("Add item", null, this::stage), BorderLayout.EAST);
 			custom.add(add);
 			custom.add(staged);
 		}
@@ -761,7 +743,7 @@ final class ShoppingTab
 				line.add(new ShopCards.Wrap(Amounts.GAME.of(e.getValue()) + " x " + stagedNames.get(e.getKey()),
 					Color.WHITE, ShopCards.TAB_TEXT - 40), BorderLayout.CENTER);
 				int id = e.getKey();
-				line.add(button("x", () ->
+				line.add(Ui.button("x", null, () ->
 				{
 					stagedItems.remove(id);
 					redrawStaged();

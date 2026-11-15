@@ -69,7 +69,7 @@ final class ActivityCodec
 	/** The state sent, {@link ActivityState#NONE} for a clear frame, or null for anything malformed. */
 	static ActivityState decode(Gson gson, String json)
 	{
-		JsonObject o = object(gson, json);
+		JsonObject o = GroupCodec.object(gson, json, MAX_CHARS);
 		if (o == null || !KIND.equals(string(o, "k", 16)) || number(o, "v", 0, Integer.MAX_VALUE) < 1)
 		{
 			return null;
@@ -96,23 +96,6 @@ final class ActivityCodec
 			.startedAt(number(o, "startedAt", 0, Long.MAX_VALUE)).elapsedMs(number(o, "elapsedMs", 0, MAX_ELAPSED_MS))
 			.stats(string(o, "stats", MAX_STATS)).mods(string(o, "mods", MAX_MODS)).team(string(o, "team", MAX_TEAM))
 			.build();
-	}
-
-	private static JsonObject object(Gson gson, String json)
-	{
-		if (json == null || json.isEmpty() || json.length() > MAX_CHARS)
-		{
-			return null;
-		}
-		try
-		{
-			JsonElement root = gson.fromJson(json, JsonElement.class);
-			return root != null && root.isJsonObject() ? root.getAsJsonObject() : null;
-		}
-		catch (RuntimeException e)
-		{
-			return null;
-		}
 	}
 
 	/** The field as safe display text, at most {@code max} characters; empty when missing or not a string. */

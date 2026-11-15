@@ -4,9 +4,13 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * What survives a restart: members' last banks, the storage log, the last
@@ -86,15 +90,14 @@ final class GroupCache
 	/** The {@code shop} entry {@link #write} kept, or null when there is none or the text is unreadable. */
 	static JsonElement shop(Gson gson, String json)
 	{
-		try
-		{
-			JsonElement root = json == null ? null : gson.fromJson(json, JsonElement.class);
-			return root != null && root.isJsonObject() ? root.getAsJsonObject().get("shop") : null;
-		}
-		catch (RuntimeException e)
-		{
-			return null;
-		}
+		JsonObject root = root(gson, json);
+		return root == null ? null : root.get("shop");
+	}
+
+	/** The document's JSON object; null for no text, unreadable text or anything but an object. */
+	private static JsonObject root(Gson gson, String json)
+	{
+		return GroupCodec.object(gson, json, Integer.MAX_VALUE);
 	}
 
 	private static JsonObject json(Gson gson, GroupRoster roster)
@@ -102,15 +105,13 @@ final class GroupCache
 		JsonObject out = new JsonObject();
 		out.addProperty("v", VERSION);
 
-		JsonObject banks = new JsonObject();
-		for (Map.Entry<String, BankSnapshot> e : roster.banks().entrySet())
+		out.add("banks", byMember(roster.banks(), b ->
 		{
 			JsonObject bank = new JsonObject();
-			bank.addProperty("ts", e.getValue().takenAt());
-			bank.add("i", ItemCounts.toJson(e.getValue().items()));
-			banks.add(e.getKey(), bank);
-		}
-		out.add("banks", banks);
+			bank.addProperty("ts", b.takenAt());
+			bank.add("i", ItemCounts.toJson(b.items()));
+			return bank;
+		}));
 
 		JsonArray log = new JsonArray();
 		for (StorageChange c : roster.log().entries())
@@ -128,17 +129,15 @@ final class GroupCache
 			out.add("storage", storage);
 		}
 
-		JsonObject extras = new JsonObject();
-		for (Map.Entry<String, MemberExtras> e : roster.extras().entrySet())
+		out.add("extras", byMember(roster.extras(), e ->
 		{
 			JsonObject x = new JsonObject();
-			x.add("rp", ItemCounts.toJson(e.getValue().runePouch));
-			x.add("q", ItemCounts.toJson(e.getValue().quiver));
-			x.add("sv", ItemCounts.toJson(e.getValue().seedVault));
-			x.addProperty("svts", e.getValue().seedVaultAt);
-			extras.add(e.getKey(), x);
-		}
-		out.add("extras", extras);
+			x.add("rp", ItemCounts.toJson(e.runePouch));
+			x.add("q", ItemCounts.toJson(e.quiver));
+			x.add("sv", ItemCounts.toJson(e.seedVault));
+			x.addProperty("svts", e.seedVaultAt);
+			return x;
+		}));
 
 		JsonArray events = new JsonArray();
 		for (GroupEvent e : roster.events().entries())
@@ -153,54 +152,50 @@ final class GroupCache
 		}
 		out.add("events", events);
 		out.add("feed", feedJson(roster));
-
-		JsonObject heard = new JsonObject();
-		for (Map.Entry<String, Long> e : roster.lastHeard().entrySet())
+		out.add("heard", byMember(roster.lastHeard(), JsonPrimitive::new));
+		// When each member was last seen online ({@link LastSeen}): ts, w the world, p plugin.
+		out.add("seen", byMember(roster.lastSeen(), s ->
 		{
-			heard.addProperty(e.getKey(), e.getValue());
-		}
-		out.add("heard", heard);
-		out.add("seen", seenJson(roster));
+			JsonObject seen = new JsonObject();
+			seen.addProperty("ts", s.at);
+			seen.addProperty("w", s.world);
+			seen.addProperty("p", s.plugin);
+			return seen;
+		}));
 		out.addProperty("played", roster.lastPlayed());
 
 		// Round 2: the last stats and carried items per member, for offline cards. Stored as
 		// the party payload itself so the one decoder (and its limits) reads both.
-		JsonObject stats = new JsonObject();
-		for (Map.Entry<String, MemberStats> e : roster.allStats().entrySet())
-		{
-			stats.addProperty(e.getKey(), GroupCodec.encodeStats(gson, e.getValue()));
-		}
-		out.add("stats", stats);
-		JsonObject carried = new JsonObject();
-		for (Map.Entry<String, GroupCodec.Carried> e : roster.allCarried().entrySet())
-		{
-			// The whole payload, slots included: counts alone drew a noted stack unnoted until the member
-			// resent (Board 2026-11-14). A build from before slots ignores the extra fields.
-			carried.addProperty(e.getKey(), GroupCodec.encodeCarried(gson, e.getValue()));
-		}
-		out.add("carried", carried);
-		out.add("hiscores", hiscoresJson(roster.hiscores()));
-		return out;
-	}
-
-	/** Each member's last hiscore lookup: {@code {"name": {"ts": 1700000000000, "l": {"Attack": 99}}}}. */
-	private static JsonObject hiscoresJson(HiscoreBook book)
-	{
-		JsonObject out = new JsonObject();
-		for (Map.Entry<String, HiscoreBook.Entry> e : book.all().entrySet())
+		out.add("stats", byMember(roster.allStats(), s -> new JsonPrimitive(GroupCodec.encodeStats(gson, s))));
+		// The whole payload, slots included: counts alone drew a noted stack unnoted until the member
+		// resent (Board 2026-11-14). A build from before slots ignores the extra fields.
+		out.add("carried", byMember(roster.allCarried(), c -> new JsonPrimitive(GroupCodec.encodeCarried(gson, c))));
+		// Each member's last hiscore lookup: {"name": {"ts": 1700000000000, "l": {"Attack": 99}}}.
+		out.add("hiscores", byMember(roster.hiscores().all(), h ->
 		{
 			JsonObject entry = new JsonObject();
-			entry.addProperty("ts", e.getValue().at);
+			entry.addProperty("ts", h.at);
 			JsonObject levels = new JsonObject();
-			e.getValue().levels.forEach(levels::addProperty);
+			h.levels.forEach(levels::addProperty);
 			entry.add("l", levels);
-			out.add(e.getKey(), entry);
-		}
+			return entry;
+		}));
 		return out;
 	}
 
-	/** A file from before hiscores has no key and loads as before. */
-	private static void readHiscores(JsonElement in, HiscoreBook book)
+	/** {@code {"name": entry, ...}} in the map's order. */
+	private static <T> JsonObject byMember(Map<String, T> members, Function<T, JsonElement> entry)
+	{
+		JsonObject out = new JsonObject();
+		members.forEach((name, value) -> out.add(name, entry.apply(value)));
+		return out;
+	}
+
+	/**
+	 * Each of the first {@link #MAX_MEMBERS} entries of a by-member object; nothing when {@code in} is not one (a
+	 * file from before that key). An entry that is not readable still counts toward the limit.
+	 */
+	private static void eachMember(JsonElement in, BiConsumer<String, JsonElement> read)
 	{
 		if (in == null || !in.isJsonObject())
 		{
@@ -209,18 +204,46 @@ final class GroupCache
 		int n = 0;
 		for (Map.Entry<String, JsonElement> e : in.getAsJsonObject().entrySet())
 		{
-			if (n++ >= MAX_MEMBERS || !e.getValue().isJsonObject())
+			if (n++ < MAX_MEMBERS)
 			{
-				continue;
-			}
-			JsonObject entry = e.getValue().getAsJsonObject();
-			Long ts = ItemCounts.longValue(entry.get("ts"));
-			JsonElement l = entry.get("l");
-			if (ts != null && l != null && l.isJsonObject())
-			{
-				book.restore(e.getKey(), ts, levelsFrom(l.getAsJsonObject()));
+				read.accept(e.getKey(), e.getValue());
 			}
 		}
+	}
+
+	/** {@link #eachMember}, for the entries that are objects. */
+	private static void eachMemberObject(JsonElement in, BiConsumer<String, JsonObject> read)
+	{
+		eachMember(in, (name, value) ->
+		{
+			if (value.isJsonObject())
+			{
+				read.accept(name, value.getAsJsonObject());
+			}
+		});
+	}
+
+	/** Each object in the array {@code in}; nothing when it is not an array. */
+	private static void eachObject(JsonElement in, Consumer<JsonObject> read)
+	{
+		if (in == null || !in.isJsonArray())
+		{
+			return;
+		}
+		for (JsonElement item : in.getAsJsonArray())
+		{
+			if (item.isJsonObject())
+			{
+				read.accept(item.getAsJsonObject());
+			}
+		}
+	}
+
+	/** {@code by}, the member an entry is filed under; null when missing. */
+	private static String by(JsonObject entry)
+	{
+		JsonElement by = entry.get("by");
+		return by == null || !by.isJsonPrimitive() ? null : by.getAsString();
 	}
 
 	/** The numbers in {@code l}; {@link HiscoreBook#restore} drops the ones out of range. */
@@ -256,39 +279,6 @@ final class GroupCache
 			feed.add(entry);
 		}
 		return feed;
-	}
-
-	/** When each member was last seen online ({@link LastSeen}): {@code ts}, {@code w} the world, {@code p} plugin. */
-	private static JsonObject seenJson(GroupRoster roster)
-	{
-		JsonObject seen = new JsonObject();
-		for (Map.Entry<String, LastSeen> e : roster.lastSeen().entrySet())
-		{
-			JsonObject s = new JsonObject();
-			s.addProperty("ts", e.getValue().at);
-			s.addProperty("w", e.getValue().world);
-			s.addProperty("p", e.getValue().plugin);
-			seen.add(e.getKey(), s);
-		}
-		return seen;
-	}
-
-	/** A file from before last-seen was kept has none, and loads as before. */
-	private static void readSeen(JsonElement in, GroupRoster roster)
-	{
-		if (in == null || !in.isJsonObject())
-		{
-			return;
-		}
-		int n = 0;
-		for (Map.Entry<String, JsonElement> e : in.getAsJsonObject().entrySet())
-		{
-			LastSeen s = n++ < MAX_MEMBERS ? lastSeen(e.getValue()) : null;
-			if (s != null)
-			{
-				roster.seen(e.getKey(), s);
-			}
-		}
 	}
 
 	/** One {@code seen} entry; null without a time. */
@@ -338,9 +328,8 @@ final class GroupCache
 	/** One feed entry; null when it has no member or is not an event this build reads. */
 	private static GroupEvent feedEvent(JsonElement item)
 	{
-		JsonElement by = item.isJsonObject() ? item.getAsJsonObject().get("by") : null;
-		GroupEvent event = by == null || !by.isJsonPrimitive() ? null
-			: GroupCodec.eventFrom(item.getAsJsonObject(), by.getAsString());
+		String by = item.isJsonObject() ? by(item.getAsJsonObject()) : null;
+		GroupEvent event = by == null ? null : GroupCodec.eventFrom(item.getAsJsonObject(), by);
 		return event == null ? null : event.toBuilder()
 			.taken(ItemCounts.fromJson(item.getAsJsonObject().get("tk"), GroupCodec.MAX_STORAGE_ITEMS)).build();
 	}
@@ -361,182 +350,115 @@ final class GroupCache
 
 	private static void readPayloads(Gson gson, JsonElement in, GroupRoster roster)
 	{
-		if (in == null || !in.isJsonObject())
+		eachMember(in, (name, value) ->
 		{
-			return;
-		}
-		int n = 0;
-		for (Map.Entry<String, JsonElement> e : in.getAsJsonObject().entrySet())
-		{
-			if (n++ >= MAX_MEMBERS || !e.getValue().isJsonPrimitive())
-			{
-				continue;
-			}
-			GroupCodec.Decoded d = GroupCodec.decode(gson, e.getValue().getAsString());
+			GroupCodec.Decoded d = value.isJsonPrimitive() ? GroupCodec.decode(gson, value.getAsString()) : null;
 			if (d != null && d.kind == GroupCodec.Kind.STATS)
 			{
-				roster.putStats(e.getKey(), d.stats);
+				roster.putStats(name, d.stats);
 			}
 			else if (d != null && d.kind == GroupCodec.Kind.CARRIED)
 			{
-				roster.putCarried(e.getKey(), d.carried);
+				roster.putCarried(name, d.carried);
 			}
-		}
+		});
 	}
 
 	/** The webhooks document {@link #write(Gson, GroupRoster, String)} kept, or null; its signature is checked later. */
 	static String webhooks(Gson gson, String json)
 	{
-		try
-		{
-			JsonElement root = json == null ? null : gson.fromJson(json, JsonElement.class);
-			JsonElement w = root != null && root.isJsonObject() ? root.getAsJsonObject().get("gweb") : null;
-			return w != null && w.isJsonPrimitive() ? w.getAsString() : null;
-		}
-		catch (RuntimeException e)
-		{
-			return null;
-		}
+		JsonObject root = root(gson, json);
+		JsonElement w = root == null ? null : root.get("gweb");
+		return w != null && w.isJsonPrimitive() ? w.getAsString() : null;
 	}
 
 	/** Loads into {@code roster}. Returns false, leaving it untouched, when the text is unreadable. */
 	static boolean read(Gson gson, String json, GroupRoster roster)
 	{
-		JsonObject in;
-		try
-		{
-			JsonElement root = json == null ? null : gson.fromJson(json, JsonElement.class);
-			if (root == null || !root.isJsonObject())
-			{
-				return false;
-			}
-			in = root.getAsJsonObject();
-		}
-		catch (RuntimeException e)
-		{
-			return false;
-		}
-		Long v = ItemCounts.longValue(in.get("v"));
+		JsonObject in = root(gson, json);
+		Long v = in == null ? null : ItemCounts.longValue(in.get("v"));
 		if (v == null || v < 1)
 		{
 			return false;
 		}
 
-		JsonElement banks = in.get("banks");
-		if (banks != null && banks.isJsonObject())
+		eachMemberObject(in.get("banks"), (name, bank) ->
 		{
-			int n = 0;
-			for (Map.Entry<String, JsonElement> e : banks.getAsJsonObject().entrySet())
+			Long ts = ItemCounts.longValue(bank.get("ts"));
+			if (ts != null)
 			{
-				if (n++ >= MAX_MEMBERS || !e.getValue().isJsonObject())
-				{
-					continue;
-				}
-				JsonObject bank = e.getValue().getAsJsonObject();
-				Long ts = ItemCounts.longValue(bank.get("ts"));
-				if (ts != null)
-				{
-					roster.putBank(e.getKey(), new BankSnapshot(ts,
-						ItemCounts.fromJson(bank.get("i"), GroupCodec.MAX_BANK_ITEMS)));
-				}
+				roster.putBank(name, new BankSnapshot(ts, ItemCounts.fromJson(bank.get("i"), GroupCodec.MAX_BANK_ITEMS)));
 			}
-		}
+		});
 
-		JsonElement log = in.get("log");
-		if (log != null && log.isJsonArray())
+		eachObject(in.get("log"), entry ->
 		{
-			for (JsonElement item : log.getAsJsonArray())
+			Long ts = ItemCounts.longValue(entry.get("ts"));
+			String by = by(entry);
+			if (ts != null && by != null)
 			{
-				if (!item.isJsonObject())
-				{
-					continue;
-				}
-				JsonObject entry = item.getAsJsonObject();
-				Long ts = ItemCounts.longValue(entry.get("ts"));
-				JsonElement by = entry.get("by");
-				if (ts == null || by == null || !by.isJsonPrimitive())
-				{
-					continue;
-				}
-				roster.log().add(new StorageChange(ts, by.getAsString(),
+				roster.log().add(new StorageChange(ts, by,
 					ItemCounts.fromJson(entry.get("took"), GroupCodec.MAX_STORAGE_ITEMS),
 					ItemCounts.fromJson(entry.get("dep"), GroupCodec.MAX_STORAGE_ITEMS),
 					Collections.emptyMap(), !isTrue(entry.get("ns"))));
 			}
-		}
+		});
 
 		JsonElement storage = in.get("storage");
 		if (storage != null && storage.isJsonObject())
 		{
 			JsonObject s = storage.getAsJsonObject();
 			Long ts = ItemCounts.longValue(s.get("ts"));
-			JsonElement by = s.get("by");
+			String by = by(s);
 			if (ts != null)
 			{
-				roster.restoreStorage(ts, by != null && by.isJsonPrimitive() ? by.getAsString() : "",
+				roster.restoreStorage(ts, by == null ? "" : by,
 					ItemCounts.fromJson(s.get("i"), GroupCodec.MAX_STORAGE_ITEMS));
 			}
 		}
 
 		// Part 3. A part 2 file has none of these keys and loads as before.
-		JsonElement extras = in.get("extras");
-		if (extras != null && extras.isJsonObject())
+		eachMemberObject(in.get("extras"), (name, x) ->
 		{
-			int n = 0;
-			for (Map.Entry<String, JsonElement> e : extras.getAsJsonObject().entrySet())
-			{
-				if (n++ >= MAX_MEMBERS || !e.getValue().isJsonObject())
-				{
-					continue;
-				}
-				JsonObject x = e.getValue().getAsJsonObject();
-				Long svts = ItemCounts.longValue(x.get("svts"));
-				roster.putExtras(e.getKey(), new MemberExtras(
-					ItemCounts.fromJson(x.get("rp"), GroupCodec.MAX_POUCH_ITEMS),
-					ItemCounts.fromJson(x.get("q"), GroupCodec.MAX_QUIVER_ITEMS),
-					ItemCounts.fromJson(x.get("sv"), GroupCodec.MAX_SEED_VAULT_ITEMS),
-					svts == null ? -1 : svts));
-			}
-		}
+			Long svts = ItemCounts.longValue(x.get("svts"));
+			roster.putExtras(name, new MemberExtras(
+				ItemCounts.fromJson(x.get("rp"), GroupCodec.MAX_POUCH_ITEMS),
+				ItemCounts.fromJson(x.get("q"), GroupCodec.MAX_QUIVER_ITEMS),
+				ItemCounts.fromJson(x.get("sv"), GroupCodec.MAX_SEED_VAULT_ITEMS),
+				svts == null ? -1 : svts));
+		});
 
-		JsonElement events = in.get("events");
-		if (events != null && events.isJsonArray())
+		eachObject(in.get("events"), entry ->
 		{
-			for (JsonElement item : events.getAsJsonArray())
+			String by = by(entry);
+			GroupEvent event = by == null ? null : GroupCodec.eventFrom(entry, by);
+			if (event != null && event.type.logged())
 			{
-				if (!item.isJsonObject())
-				{
-					continue;
-				}
-				JsonObject entry = item.getAsJsonObject();
-				JsonElement by = entry.get("by");
-				GroupEvent event = by == null || !by.isJsonPrimitive() ? null
-					: GroupCodec.eventFrom(entry, by.getAsString());
-				if (event != null && event.type.logged())
-				{
-					roster.events().add(event);
-				}
+				roster.events().add(event);
 			}
-		}
+		});
 
 		// After "log" and "events": an older file's feed starts from them.
 		readFeed(in.get("feed"), roster);
 
-		JsonElement heard = in.get("heard");
-		if (heard != null && heard.isJsonObject())
+		eachMember(in.get("heard"), (name, value) ->
 		{
-			int n = 0;
-			for (Map.Entry<String, JsonElement> e : heard.getAsJsonObject().entrySet())
+			Long at = ItemCounts.longValue(value);
+			if (at != null && at > 0)
 			{
-				Long at = ItemCounts.longValue(e.getValue());
-				if (n++ < MAX_MEMBERS && at != null && at > 0)
-				{
-					roster.heard(e.getKey(), at);
-				}
+				roster.heard(name, at);
 			}
-		}
+		});
 
-		readSeen(in.get("seen"), roster);
+		// A file from before last-seen was kept has none, and loads as before.
+		eachMember(in.get("seen"), (name, value) ->
+		{
+			LastSeen s = lastSeen(value);
+			if (s != null)
+			{
+				roster.seen(name, s);
+			}
+		});
 
 		Long played = ItemCounts.longValue(in.get("played"));
 		if (played != null && played > 0)
@@ -545,7 +467,16 @@ final class GroupCache
 		}
 		readPayloads(gson, in.get("stats"), roster);
 		readPayloads(gson, in.get("carried"), roster);
-		readHiscores(in.get("hiscores"), roster.hiscores());
+		// A file from before hiscores has no key and loads as before.
+		eachMemberObject(in.get("hiscores"), (name, entry) ->
+		{
+			Long ts = ItemCounts.longValue(entry.get("ts"));
+			JsonElement l = entry.get("l");
+			if (ts != null && l != null && l.isJsonObject())
+			{
+				roster.hiscores().restore(name, ts, levelsFrom(l.getAsJsonObject()));
+			}
+		});
 		return true;
 	}
 }

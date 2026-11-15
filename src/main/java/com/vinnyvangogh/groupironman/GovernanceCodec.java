@@ -9,6 +9,9 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import static com.vinnyvangogh.groupironman.GroupCodec.flag;
+import static com.vinnyvangogh.groupironman.GroupCodec.header;
+import static com.vinnyvangogh.groupironman.GroupCodec.string;
 
 /**
  * The three governance kinds inside a {@link VvgGroupIronmanMessage}, next to
@@ -123,10 +126,7 @@ final class GovernanceCodec
 		o.addProperty("ld", r.leader);
 		o.addProperty("lk", r.leaderKey);
 		JsonObject eds = new JsonObject();
-		for (Map.Entry<String, String> e : r.editors.entrySet())
-		{
-			eds.addProperty(e.getKey(), e.getValue());
-		}
+		r.editors.forEach(eds::addProperty);
 		o.add("ed", eds);
 		o.addProperty("sig", r.signature);
 		return o;
@@ -140,10 +140,7 @@ final class GovernanceCodec
 		o.addProperty("by", s.by);
 		o.addProperty("bk", s.byKey);
 		JsonObject vals = new JsonObject();
-		for (Map.Entry<String, Long> e : s.values.entrySet())
-		{
-			vals.addProperty(e.getKey(), e.getValue());
-		}
+		s.values.forEach(vals::addProperty);
 		o.add("val", vals);
 		JsonArray hist = new JsonArray();
 		for (GroupSettings.Change c : s.history)
@@ -161,25 +158,13 @@ final class GovernanceCodec
 		return o;
 	}
 
-	private static JsonObject header(String kind)
-	{
-		JsonObject o = new JsonObject();
-		o.addProperty("v", 1);
-		o.addProperty("k", kind);
-		return o;
-	}
-
 	/** The governance message in {@code json}, or null when it is not one (or not readable). */
 	static Message decode(Gson gson, String json)
 	{
-		if (json == null || json.isEmpty() || json.length() > GroupCodec.MAX_PAYLOAD_CHARS * 2)
-		{
-			return null;
-		}
+		JsonObject root = GroupCodec.object(gson, json, GroupCodec.MAX_PAYLOAD_CHARS * 2);
 		try
 		{
-			JsonElement root = gson.fromJson(json, JsonElement.class);
-			return root != null && root.isJsonObject() ? decode(root.getAsJsonObject()) : null;
+			return root == null ? null : decode(root);
 		}
 		catch (RuntimeException e)
 		{
@@ -197,7 +182,7 @@ final class GovernanceCodec
 			case SETTINGS:
 				return new Message(SETTINGS, null, settings(in), null, null);
 			case MEMBER:
-				return new Message(MEMBER, null, null, string(in, "pk"), new MemberPrefs(bool(in, "all"),
+				return new Message(MEMBER, null, null, string(in, "pk"), new MemberPrefs(flag(in, "all"),
 					MemberPrefs.parse(string(in, "np")), MemberPrefs.NONE.mute));
 			case WEBHOOKS:
 				return new Message(WEBHOOKS, null, null, null, null, webhooks(in));
@@ -280,7 +265,7 @@ final class GovernanceCodec
 			}
 		}
 		return new GroupWebhooks(string(in, "g"), number(in, "ver"), number(in, "ts"), cap(string(in, "by")),
-			string(in, "bk"), bool(in, "sh"), hooks, string(in, "sig"));
+			string(in, "bk"), flag(in, "sh"), hooks, string(in, "sig"));
 	}
 
 	private static <E extends Enum<E>> E known(E[] values, String name)
@@ -295,22 +280,10 @@ final class GovernanceCodec
 		return null;
 	}
 
-	private static String string(JsonObject in, String field)
-	{
-		JsonElement e = in.get(field);
-		return e == null || !e.isJsonPrimitive() ? "" : e.getAsString();
-	}
-
 	private static long number(JsonObject in, String field)
 	{
 		JsonElement e = in.get(field);
 		return e == null || !e.isJsonPrimitive() ? 0 : e.getAsLong();
-	}
-
-	private static boolean bool(JsonObject in, String field)
-	{
-		JsonElement e = in.get(field);
-		return e != null && e.isJsonPrimitive() && e.getAsBoolean();
 	}
 
 	private static String cap(String s)

@@ -16,6 +16,8 @@ import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
@@ -75,6 +77,7 @@ import net.runelite.client.party.events.UserPart;
 import net.runelite.client.util.Filepath;
 import net.runelite.client.util.Text;
 import net.runelite.client.party.messages.UserSync;
+import net.runelite.http.api.item.ItemPrice;
 
 /**
  * The Group Ironman extras: member banks, the group storage log, live stats
@@ -105,8 +108,6 @@ class GroupService
 	static final int MOVE_TILES = 8;
 	static final int CARRIED_INTERVAL_TICKS = 5;
 	static final int EXTRAS_INTERVAL_TICKS = 5;
-	/** How many drops and log slots the panel lists. */
-	static final int MAX_EVENT_LINES = 50;
 	/** How often the group roster is re-read from the game's clan data. */
 	static final int ROSTER_INTERVAL_TICKS = 10;
 	/** Roster reads with no group before a login is told it is not in the group: 5 reads, about 30 s. */
@@ -327,7 +328,7 @@ class GroupService
 			@Override
 			public String get(String key)
 			{
-				return configManager.getConfiguration(GroupIronmanConfig.GROUP, key);
+				return getConfig(key);
 			}
 
 			@Override
@@ -339,16 +340,16 @@ class GroupService
 				}
 				else
 				{
-					configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value);
+					setConfig(key, value);
 				}
 			}
-		}, payload -> partyService.send(new VvgGroupIronmanMessage(payload)), () -> this.onChange.run(), webhooks ->
+		}, this::send, () -> this.onChange.run(), webhooks ->
 		{
 			// The leader's shared webhooks: kept in the group cache file, never the RuneLite config.
 			cachedWebhooks = webhooks;
 			saveCache();
 		});
-		shopping = new ShoppingSync(gson, payload -> partyService.send(new VvgGroupIronmanMessage(payload)), () ->
+		shopping = new ShoppingSync(gson, this::send, () ->
 		{
 			saveCache();
 			this.onChange.run();
@@ -428,13 +429,9 @@ class GroupService
 	/** Client thread. One of this player's group events (not a drop or log slot) for the party, when shared. */
 	void shareGroupEvent(GroupEvent event, boolean share)
 	{
-		if (!syncing())
+		if (syncing())
 		{
-			return;
-		}
-		for (String payload : GroupOutbox.groupEvents(gson, share, Collections.singletonList(event)))
-		{
-			partyService.send(new VvgGroupIronmanMessage(payload));
+			GroupOutbox.groupEvents(gson, share, Collections.singletonList(event)).forEach(this::send);
 		}
 	}
 
@@ -457,7 +454,7 @@ class GroupService
 		String payload = GroupOutbox.activity(gson, syncing(), config.groupShareEvents(), state, activityOut);
 		if (payload != null)
 		{
-			partyService.send(new VvgGroupIronmanMessage(payload));
+			send(payload);
 			activityOut = config.groupShareEvents() && state.active();
 		}
 		onChange.run();
@@ -490,8 +487,7 @@ class GroupService
 	{
 		if (syncing())
 		{
-			partyService.send(new VvgGroupIronmanMessage(GroupCodec.encodePosted(gson,
-				Collections.singletonList(key))));
+			send(GroupCodec.encodePosted(gson, Collections.singletonList(key)));
 		}
 	}
 
@@ -604,7 +600,7 @@ class GroupService
 	 */
 	void newKey()
 	{
-		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_KEY, GroupKey.generate());
+		setConfig(GroupIronmanConfig.KEY_GROUP_KEY, GroupKey.generate());
 		claimLeadership();
 	}
 
@@ -627,15 +623,19 @@ class GroupService
 	/** "Claim leadership", shown only while this client knows of no leader. False when refused. */
 	boolean claimLeadership()
 	{
-		GovernanceSync g = governance;
-		return g != null && !self.isEmpty() && g.claim(self, System.currentTimeMillis());
+		return asSelf(governance, g -> g.claim(self, System.currentTimeMillis()));
 	}
 
 	/** The leader's "Make editor" and "Remove editor". False when refused. */
 	boolean setEditor(String name, boolean editor)
 	{
-		GovernanceSync g = governance;
-		return g != null && !self.isEmpty() && g.setEditor(self, name, editor, System.currentTimeMillis());
+		return asSelf(governance, g -> g.setEditor(self, name, editor, System.currentTimeMillis()));
+	}
+
+	/** {@code action} on {@code target} (read once by the caller), false when not running or not logged in. */
+	private <T> boolean asSelf(T target, Predicate<T> action)
+	{
+		return target != null && !self.isEmpty() && action.test(target);
 	}
 
 	/** The leader's or an editor's "Save to group", and why it did not go out when it did not. */
@@ -657,9 +657,7 @@ class GroupService
 	/** The leader's "Share webhooks with the group". False when refused: this client is not the leader. */
 	boolean shareWebhooks(boolean share)
 	{
-		GovernanceSync g = governance;
-		return g != null && !self.isEmpty() && g.shareWebhooks(self, share, Webhooks.of(config),
-			System.currentTimeMillis());
+		return asSelf(governance, g -> g.shareWebhooks(self, share, Webhooks.of(config), System.currentTimeMillis()));
 	}
 
 	/** The leader's shared webhooks this client holds, or null when the leader shares none. */
@@ -698,10 +696,15 @@ class GroupService
 	/** "Forget leader": this client only. */
 	void forgetLeader()
 	{
-		GovernanceSync g = governance;
-		if (g != null)
+		ifSet(governance, GovernanceSync::forgetLeader);
+	}
+
+	/** {@code action} on {@code target} (read once by the caller) unless it is null: a part not running. */
+	private static <T> void ifSet(T target, Consumer<T> action)
+	{
+		if (target != null)
 		{
-			g.forgetLeader();
+			action.accept(target);
 		}
 	}
 
@@ -712,14 +715,30 @@ class GroupService
 		Set<GroupEvent.Type> types = MemberPrefs.parse(overlay ? config.overlayMuteTypes() : config.eventOptOutTypes());
 		if (out ? types.add(type) : types.remove(type))
 		{
-			configManager.setConfiguration(GroupIronmanConfig.GROUP, key, MemberPrefs.format(types));
+			setConfig(key, MemberPrefs.format(types));
 		}
+	}
+
+	private String getConfig(String key)
+	{
+		return configManager.getConfiguration(GroupIronmanConfig.GROUP, key);
+	}
+
+	private void setConfig(String key, String value)
+	{
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value);
+	}
+
+	/** For the config writes that are not strings (SharingPrompt's), which ConfigManager stringifies itself. */
+	private void setConfigObject(String key, Object value)
+	{
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value);
 	}
 
 	/** "Don't post my events". */
 	void optOutAll(boolean out)
 	{
-		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_OPT_OUT_ALL, out);
+		setConfigObject(GroupIronmanConfig.KEY_OPT_OUT_ALL, out);
 	}
 
 	/** What "Copy group key" puts on the clipboard, or null without a key. */
@@ -740,7 +759,7 @@ class GroupService
 		{
 			return false;
 		}
-		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_KEY, key);
+		setConfig(GroupIronmanConfig.KEY_GROUP_KEY, key);
 		return true;
 	}
 
@@ -753,13 +772,13 @@ class GroupService
 	/** "Turn on sharing": the player's own click, never on its own. */
 	void turnOnSharing()
 	{
-		SharingPrompt.turnOnSharing((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+		SharingPrompt.turnOnSharing(this::setConfigObject);
 	}
 
 	/** "Post my events to Discord": the player's own click. */
 	void postToDiscord()
 	{
-		SharingPrompt.postToDiscord((key, value) -> configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value));
+		SharingPrompt.postToDiscord(this::setConfigObject);
 	}
 
 	void reloadConfig()
@@ -780,11 +799,7 @@ class GroupService
 			ticksSinceRoster = ROSTER_INTERVAL_TICKS;
 		}
 		keySeen = key;
-		GovernanceSync g = governance;
-		if (g != null)
-		{
-			g.prefs(MemberPrefs.of(config));
-		}
+		ifSet(governance, g -> g.prefs(MemberPrefs.of(config)));
 		republishWebhooks();
 		GroupOutbox.Switches s = switches();
 		// Turning a live feature off drops what was collected for it.
@@ -802,16 +817,22 @@ class GroupService
 		}
 		clientThread.invokeLater(() ->
 		{
-			lastStatsSent = null;
-			lastCarriedSent = null;
+			resendLive();
 			// Turning sharing off cleared every card's items, this player's own too: put it back.
 			lastCarriedLocal = null;
-			lastExtrasSent = null;
-			statsDirty = true;
-			carriedDirty = true;
-			extrasDirty = true;
 		});
 		onChange.run();
+	}
+
+	/** Stats, carried items and extras all go out again on their next turn, unchanged or not. */
+	private void resendLive()
+	{
+		lastStatsSent = null;
+		lastCarriedSent = null;
+		lastExtrasSent = null;
+		statsDirty = true;
+		carriedDirty = true;
+		extrasDirty = true;
 	}
 
 	@Subscribe
@@ -953,7 +974,7 @@ class GroupService
 		{
 			return;
 		}
-		String bound = configManager.getConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_BOUND_GROUP);
+		String bound = getConfig(GroupIronmanConfig.KEY_BOUND_GROUP);
 		if (!member() && bound != null && !bound.isEmpty())
 		{
 			// Another group's chat: its key is not this client's group's, and would tie the client to it.
@@ -968,7 +989,7 @@ class GroupService
 			}
 			return;
 		}
-		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GROUP_KEY, key);
+		setConfig(GroupIronmanConfig.KEY_GROUP_KEY, key);
 		tell((mine ? "Group key saved" : "Group key received from " + GroupMembers.display(sender))
 			+ ". Press 'Join group sync' in the GIM Utilities panel.");
 	}
@@ -1007,6 +1028,12 @@ class GroupService
 			.type(ChatMessageType.GAMEMESSAGE)
 			.runeLiteFormattedMessage(GroupIronmanPlugin.NAME + ": " + text)
 			.build());
+	}
+
+	/** One payload to the party, which RuneLite sends on its own thread. */
+	private void send(String payload)
+	{
+		partyService.send(new VvgGroupIronmanMessage(payload));
 	}
 
 	/**
@@ -1055,10 +1082,7 @@ class GroupService
 		resolveNow(event.items.keySet());
 		if (syncing())
 		{
-			for (String payload : GroupOutbox.events(gson, switches(), Collections.singletonList(event)))
-			{
-				partyService.send(new VvgGroupIronmanMessage(payload));
-			}
+			GroupOutbox.events(gson, switches(), Collections.singletonList(event)).forEach(this::send);
 		}
 		saveCache();
 		onChange.run();
@@ -1168,10 +1192,9 @@ class GroupService
 		checkMember(now);
 		boolean isMember = member();
 		changed |= wasMember != isMember;
-		GovernanceSync g = governance;
-		if (g != null && now.known() && isMember)
+		if (now.known() && isMember)
 		{
-			g.group(now.group());
+			ifSet(governance, g -> g.group(now.group()));
 		}
 		// Anything members sent while this account was not one was dropped: ask again.
 		if ((first || isMember && !wasMember) && syncing())
@@ -1198,7 +1221,7 @@ class GroupService
 	{
 		Player player = client.getLocalPlayer();
 		String name = player == null || player.getName() == null ? "" : player.getName();
-		String bound = configManager.getConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_BOUND_GROUP);
+		String bound = getConfig(GroupIronmanConfig.KEY_BOUND_GROUP);
 		boolean unbound = bound == null || bound.isEmpty();
 		if (unbound && !cacheLoaded && !rebind)
 		{
@@ -1211,7 +1234,7 @@ class GroupService
 			: GroupBinding.check(bound, roster, name, savedRolesGroup(), heardNames());
 		if (r.bind != null)
 		{
-			configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_BOUND_GROUP, r.bind);
+			setConfig(GroupIronmanConfig.KEY_BOUND_GROUP, r.bind);
 			rebind = false;
 		}
 		memberName = r.member() ? GroupMembers.key(name) : "";
@@ -1236,8 +1259,7 @@ class GroupService
 	/** The group the saved signed roles are for ({@link GovernanceSync#KEY_ROLES}), "" when none are saved. */
 	private String savedRolesGroup()
 	{
-		GovernanceCodec.Message m = GovernanceCodec.decode(gson,
-			configManager.getConfiguration(GroupIronmanConfig.GROUP, GovernanceSync.KEY_ROLES));
+		GovernanceCodec.Message m = GovernanceCodec.decode(gson, getConfig(GovernanceSync.KEY_ROLES));
 		return m == null || m.roles == null || m.roles.group == null ? "" : m.roles.group;
 	}
 
@@ -1369,11 +1391,7 @@ class GroupService
 		GamePresence before = presence;
 		presence = now;
 		lookUpHiscores(GamePresence.cameOnline(members.names(), before, now), true);
-		GroupEventEngine e = events;
-		if (e != null)
-		{
-			e.gamePresence(now);
-		}
+		ifSet(events, e -> e.gamePresence(now));
 		onChange.run();
 	}
 
@@ -1475,36 +1493,20 @@ class GroupService
 	{
 		clientThread.invokeLater(() ->
 		{
-			lastStatsSent = null;
-			lastCarriedSent = null;
-			lastExtrasSent = null;
-			statsDirty = true;
-			carriedDirty = true;
-			extrasDirty = true;
-			GovernanceSync g = governance;
-			if (g != null)
-			{
-				// Sent on the next tick: roles first, then the settings they authorise.
-				g.resendAll();
-			}
-			resendShopping();
+			resendLive();
+			// Sent on the next tick: roles first, then the settings they authorise.
+			resendShared();
 			if (!syncing())
 			{
 				return;
 			}
 			if (lastBank != null)
 			{
-				for (String payload : GroupOutbox.bank(gson, switches(), lastBank))
-				{
-					partyService.send(new VvgGroupIronmanMessage(payload));
-				}
+				GroupOutbox.bank(gson, switches(), lastBank).forEach(this::send);
 			}
 			// The joiner may have been offline for these: this is how "since you last played" works with no server.
 			List<GroupEvent> mine = roster.events().recentBy(localName(), System.currentTimeMillis());
-			for (String payload : GroupOutbox.events(gson, switches(), mine))
-			{
-				partyService.send(new VvgGroupIronmanMessage(payload));
-			}
+			GroupOutbox.events(gson, switches(), mine).forEach(this::send);
 			if (lastActivity.active())
 			{
 				// A joiner mid-run sees it now, not at the next wave.
@@ -1523,20 +1525,10 @@ class GroupService
 
 	void onPartyChanged()
 	{
-		GovernanceSync g = governance;
-		if (g != null)
-		{
-			g.resendAll();
-		}
-		resendShopping();
+		resendShared();
 		assembler.clear();
 		roster.clearStrangers();
-		lastStatsSent = null;
-		lastCarriedSent = null;
-		lastExtrasSent = null;
-		statsDirty = true;
-		carriedDirty = true;
-		extrasDirty = true;
+		resendLive();
 		onChange.run();
 	}
 
@@ -1606,10 +1598,7 @@ class GroupService
 					return;
 				}
 				roster.putCarried(name, decoded.carried);
-				resolve(decoded.carried.inventory.keySet());
-				resolve(decoded.carried.worn.keySet());
-				resolve(decoded.carried.slotIds());
-				resolve(decoded.carried.heldIds());
+				resolve(decoded.carried.ids());
 				break;
 			case STORAGE:
 				if (!s.storage)
@@ -1621,9 +1610,7 @@ class GroupService
 					change.after());
 				if (roster.putStorage(change))
 				{
-					resolve(change.after().keySet());
-					resolve(change.took().keySet());
-					resolve(change.deposited().keySet());
+					resolve(ItemCounts.ids(change.after(), change.took(), change.deposited()));
 					checkLowStock(change.after());
 					memberStorage(change);
 					saveCache();
@@ -1643,9 +1630,7 @@ class GroupService
 				}
 				MemberExtras before = roster.extras().get(name);
 				roster.putExtras(name, decoded.extras);
-				resolve(decoded.extras.runePouch.keySet());
-				resolve(decoded.extras.quiver.keySet());
-				resolve(decoded.extras.seedVault.keySet());
+				resolve(ItemCounts.ids(decoded.extras.runePouch, decoded.extras.quiver, decoded.extras.seedVault));
 				if (before == null || before.seedVaultAt != roster.extras().get(name).seedVaultAt)
 				{
 					// The pouch changes every cast; only a new seed vault is worth a disk write.
@@ -1704,16 +1689,8 @@ class GroupService
 	/** Game tick, connected: roles, settings and this member's announce, then shopping lists, whichever changed. */
 	private void flushGovernance()
 	{
-		GovernanceSync g = governance;
-		if (g != null)
-		{
-			g.flush(MemberPrefs.of(config));
-		}
-		ShoppingSync shop = shopping;
-		if (shop != null)
-		{
-			shop.flush(self);
-		}
+		ifSet(governance, g -> g.flush(MemberPrefs.of(config)));
+		ifSet(shopping, shop -> shop.flush(self));
 	}
 
 	/**
@@ -1756,21 +1733,13 @@ class GroupService
 	/** A member's client posted these game broadcasts: this one never posts them too. */
 	private void receivePosted(List<String> keys)
 	{
-		GroupEventEngine engine = events;
-		if (engine != null)
-		{
-			engine.claimed(keys);
-		}
+		ifSet(events, e -> e.claimed(keys));
 	}
 
 	private void memberStorage(StorageChange change)
 	{
-		GroupEventEngine engine = events;
-		if (engine != null)
-		{
-			// Names resolve on the client thread; the value of a big move needs them.
-			clientThread.invokeLater(() -> engine.storage(change, false));
-		}
+		// Names resolve on the client thread; the value of a big move needs them.
+		ifSet(events, e -> clientThread.invokeLater(() -> e.storage(change, false)));
 	}
 
 	/**
@@ -1803,23 +1772,17 @@ class GroupService
 		{
 			return;
 		}
-		resolveNow(change.after().keySet());
-		resolveNow(change.took().keySet());
-		resolveNow(change.deposited().keySet());
+		resolveNow(ItemCounts.ids(change.after(), change.took(), change.deposited()));
 
 		// Minimums are checked on every own save, shared or not: the alert is for this player.
 		checkLowStockNow(change.after(), true);
-		GroupEventEngine engine = events;
-		if (engine != null)
-		{
-			engine.storage(change, true);
-		}
+		ifSet(events, e -> e.storage(change, true));
 
 		// Kept locally whether shared or not; with sharing off it is marked so and nothing is sent.
 		String payload = GroupOutbox.ownStorage(gson, switches(), change, roster);
 		if (payload != null && syncing())
 		{
-			partyService.send(new VvgGroupIronmanMessage(payload));
+			send(payload);
 		}
 		saveCache();
 		onChange.run();
@@ -1850,10 +1813,7 @@ class GroupService
 		roster.putBank(localName(), snapshot);
 		if (syncing())
 		{
-			for (String payload : GroupOutbox.bank(gson, s, snapshot))
-			{
-				partyService.send(new VvgGroupIronmanMessage(payload));
-			}
+			GroupOutbox.bank(gson, s, snapshot).forEach(this::send);
 		}
 		saveCache();
 		onChange.run();
@@ -1878,7 +1838,7 @@ class GroupService
 		{
 			return;
 		}
-		partyService.send(new VvgGroupIronmanMessage(payload));
+		send(payload);
 		lastStatsSent = payload;
 		ticksSinceStats = 0;
 		roster.putStats(localName(), stats);
@@ -1895,12 +1855,10 @@ class GroupService
 		{
 			return;
 		}
-		partyService.send(new VvgGroupIronmanMessage(payload));
+		send(payload);
 		lastExtrasSent = payload;
 		ticksSinceExtras = 0;
-		resolveNow(extras.runePouch.keySet());
-		resolveNow(extras.quiver.keySet());
-		resolveNow(extras.seedVault.keySet());
+		resolveNow(ItemCounts.ids(extras.runePouch, extras.quiver, extras.seedVault));
 		roster.putExtras(localName(), extras);
 		onChange.run();
 	}
@@ -1955,17 +1913,14 @@ class GroupService
 		if (!local.equals(lastCarriedLocal))
 		{
 			lastCarriedLocal = local;
-			resolveNow(carried.inventory.keySet());
-			resolveNow(carried.worn.keySet());
-			resolveNow(carried.slotIds());
-			resolveNow(carried.heldIds());
+			resolveNow(carried.ids());
 			roster.putCarried(localName(), carried);
 			onChange.run();
 		}
 		String payload = syncing() ? GroupOutbox.carried(gson, s, carried) : null;
 		if (payload != null && !Objects.equals(payload, lastCarriedSent))
 		{
-			partyService.send(new VvgGroupIronmanMessage(payload));
+			send(payload);
 			lastCarriedSent = payload;
 		}
 	}
@@ -2149,11 +2104,7 @@ class GroupService
 				return false;
 			}
 			restoreWebhooks(GroupCache.webhooks(gson, json));
-			ShoppingSync shop = shopping;
-			if (shop != null)
-			{
-				shop.fromCache(GroupCache.shop(gson, json), System.currentTimeMillis());
-			}
+			ifSet(shopping, shop -> shop.fromCache(GroupCache.shop(gson, json), System.currentTimeMillis()));
 			return true;
 		}
 		catch (Exception e)
@@ -2253,13 +2204,8 @@ class GroupService
 	boolean addShoppingList(String name, String preset, List<String> picks, List<String> members,
 		Map<Integer, Integer> items)
 	{
-		ShoppingSync shop = shopping;
-		if (shop == null || self.isEmpty() || members.isEmpty())
-		{
-			return false;
-		}
-		boolean ok = shop.add(ShoppingList.create(name, preset, picks, members, items, self,
-			System.currentTimeMillis()));
+		boolean ok = !members.isEmpty() && asSelf(shopping, shop -> shop.add(ShoppingList.create(name, preset, picks,
+			members, items, self, System.currentTimeMillis())));
 		if (ok)
 		{
 			resolve(shoppingItemIds());
@@ -2269,23 +2215,21 @@ class GroupService
 
 	boolean renameShoppingList(String id, String name)
 	{
-		ShoppingSync shop = shopping;
-		return shop != null && !self.isEmpty() && shop.rename(id, name, self, System.currentTimeMillis());
+		return asSelf(shopping, shop -> shop.rename(id, name, self, System.currentTimeMillis()));
 	}
 
 	boolean removeShoppingList(String id)
 	{
-		ShoppingSync shop = shopping;
-		return shop != null && !self.isEmpty() && shop.remove(id, self, System.currentTimeMillis());
+		return asSelf(shopping, shop -> shop.remove(id, self, System.currentTimeMillis()));
 	}
 
 	/** A custom list's item search, on the client thread; {@code done} gets tradeable matches, best first. */
-	void searchItems(String query, java.util.function.Consumer<List<ShoppingTab.Hit>> done)
+	void searchItems(String query, Consumer<List<ShoppingTab.Hit>> done)
 	{
 		clientThread.invokeLater(() ->
 		{
 			List<ShoppingTab.Hit> hits = new ArrayList<>();
-			for (net.runelite.http.api.item.ItemPrice p : itemManager.search(query))
+			for (ItemPrice p : itemManager.search(query))
 			{
 				if (hits.size() >= ShoppingTab.MAX_HITS)
 				{
@@ -2322,21 +2266,18 @@ class GroupService
 	/** Owner only, as every request edit below. */
 	boolean renameRequest(String id, String name)
 	{
-		ShoppingSync shop = shopping;
-		return shop != null && !self.isEmpty() && shop.renameRequest(id, name, self, System.currentTimeMillis());
+		return asSelf(shopping, shop -> shop.renameRequest(id, name, self, System.currentTimeMillis()));
 	}
 
 	boolean removeRequest(String id)
 	{
-		ShoppingSync shop = shopping;
-		return shop != null && !self.isEmpty() && shop.removeRequest(id, self, System.currentTimeMillis());
+		return asSelf(shopping, shop -> shop.removeRequest(id, self, System.currentTimeMillis()));
 	}
 
 	/** The owner closes the whole list by hand: no "done" post, since the group may not have it all. */
 	boolean closeRequest(String id)
 	{
-		ShoppingSync shop = shopping;
-		return shop != null && !self.isEmpty() && shop.closeRequest(id, self, System.currentTimeMillis());
+		return asSelf(shopping, shop -> shop.closeRequest(id, self, System.currentTimeMillis()));
 	}
 
 	boolean closeRequestItem(String id, int itemId)
@@ -2425,21 +2366,14 @@ class GroupService
 	/** One of this player's request events, to Discord and the banners under their own switches. */
 	private void postRequest(GroupEvent event)
 	{
-		GroupEventEngine engine = events;
-		if (engine != null)
-		{
-			clientThread.invokeLater(() -> engine.request(event));
-		}
+		ifSet(events, e -> clientThread.invokeLater(() -> e.request(event)));
 	}
 
-	/** Someone joined or the party changed: every list, removals included, goes out on the next tick. */
-	private void resendShopping()
+	/** Someone joined or the party changed: roles, settings and every list, removals included, go out next tick. */
+	private void resendShared()
 	{
-		ShoppingSync shop = shopping;
-		if (shop != null)
-		{
-			shop.resendAll();
-		}
+		ifSet(governance, GovernanceSync::resendAll);
+		ifSet(shopping, ShoppingSync::resendAll);
 	}
 
 	/** Every item any live list may show, for names and whether it can change hands. */

@@ -62,6 +62,20 @@ final class DiscordWebhook
 		return s;
 	}
 
+	/** Sets {@code allowed_mentions}: role and user pings only when {@code ping}, otherwise nobody. */
+	static void allowMentions(JsonObject o, boolean ping)
+	{
+		JsonObject allowed = new JsonObject();
+		JsonArray parse = new JsonArray();
+		if (ping)
+		{
+			parse.add("roles");
+			parse.add("users");
+		}
+		allowed.add("parse", parse);
+		o.add("allowed_mentions", allowed);
+	}
+
 	/** {@link #digest(Gson, GroupEvent.Category, List, String)} under today's name, "GIM Utilities". */
 	static String digest(Gson gson, GroupEvent.Category category, List<String> lines)
 	{
@@ -89,9 +103,7 @@ final class DiscordWebhook
 		}
 		JsonObject o = poster(username);
 		o.addProperty("content", text.toString());
-		JsonObject allowed = new JsonObject();
-		allowed.add("parse", new JsonArray());
-		o.add("allowed_mentions", allowed);
+		allowMentions(o, false);
 		return gson.toJson(o);
 	}
 
@@ -164,15 +176,7 @@ final class DiscordWebhook
 		JsonObject o = poster(username);
 		String tag = post.big && mention != null && !mention.trim().isEmpty() ? mention.trim() : "";
 		// Only the configured mention may ping; a member or item name can never.
-		JsonObject allowed = new JsonObject();
-		JsonArray parse = new JsonArray();
-		if (!tag.isEmpty())
-		{
-			parse.add("roles");
-			parse.add("users");
-		}
-		allowed.add("parse", parse);
-		o.add("allowed_mentions", allowed);
+		allowMentions(o, !tag.isEmpty());
 		if (style == DiscordStyle.PLAIN)
 		{
 			o.addProperty("content", (tag.isEmpty() ? "" : tag + " ") + plain(post, words));
@@ -197,9 +201,7 @@ final class DiscordWebhook
 		boolean screenshot, String username)
 	{
 		JsonObject o = poster(username);
-		JsonObject allowed = new JsonObject();
-		allowed.add("parse", new JsonArray());
-		o.add("allowed_mentions", allowed);
+		allowMentions(o, false);
 		if (style == DiscordStyle.PLAIN)
 		{
 			StringBuilder text = new StringBuilder();
@@ -286,9 +288,7 @@ final class DiscordWebhook
 		String username)
 	{
 		JsonObject o = poster(username);
-		JsonObject allowed = new JsonObject();
-		allowed.add("parse", new JsonArray());
-		o.add("allowed_mentions", allowed);
+		allowMentions(o, false);
 		if (style == DiscordStyle.PLAIN)
 		{
 			StringBuilder text = new StringBuilder();

@@ -465,18 +465,10 @@ class GroupEventEngine
 		{
 			return;
 		}
-		String text = null;
-		try
-		{
-			text = PluginFiles.read(group.dataFile(BOARD_FILE));
-		}
-		catch (Exception e)
-		{
-			log.debug("could not read the saved boards", e);
-		}
+		String text = readData(BOARD_FILE);
 		if (text == null)
 		{
-			text = configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY);
+			text = getConfig(BOARD_KEY);
 		}
 		boardSaved = text == null ? "" : text;
 	}
@@ -499,16 +491,40 @@ class GroupEventEngine
 		try
 		{
 			PluginFiles.write(group.dataFile(BOARD_FILE), text, "status-board");
-			if (configManager.getConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY) != null)
+			if (getConfig(BOARD_KEY) != null)
 			{
-				configManager.unsetConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY);
+				setConfig(BOARD_KEY, null);
 			}
 		}
 		catch (Exception e)
 		{
 			log.debug("could not write the saved boards", e);
-			configManager.setConfiguration(GroupIronmanConfig.GROUP, BOARD_KEY, text);
+			setConfig(BOARD_KEY, text);
 		}
+	}
+
+	private String getConfig(String key)
+	{
+		return configManager.getConfiguration(GroupIronmanConfig.GROUP, key);
+	}
+
+	/** Sets {@code key} in this plugin's config group; null unsets it. */
+	private void setConfig(String key, String value)
+	{
+		if (value == null)
+		{
+			configManager.unsetConfiguration(GroupIronmanConfig.GROUP, key);
+		}
+		else
+		{
+			configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value);
+		}
+	}
+
+	/** A value ConfigManager turns into its config string itself (a number, an enum). */
+	private void setConfig(String key, Object value)
+	{
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, key, value);
 	}
 
 	/** Timer, once a run: the level streaks a restart left open, while still inside 'Combine level-ups'. */
@@ -582,35 +598,33 @@ class GroupEventEngine
 	 */
 	private void keepCombineWindow()
 	{
-		if (configManager.getConfiguration(GroupIronmanConfig.GROUP, COMBINE_CHOSEN_KEY) != null)
+		if (getConfig(COMBINE_CHOSEN_KEY) != null)
 		{
 			return;
 		}
 		// Every earlier build that ran set this marker at its first start.
-		boolean upgrading = configManager.getConfiguration(GroupIronmanConfig.GROUP,
-			ONLINE_STATUS_CHOSEN_KEY) != null;
-		Integer kept = LevelPosts.windowToKeep(upgrading,
-			configManager.getConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_COMBINE_LEVELS));
+		boolean upgrading = getConfig(ONLINE_STATUS_CHOSEN_KEY) != null;
+		Integer kept = LevelPosts.windowToKeep(upgrading, getConfig(GroupIronmanConfig.KEY_COMBINE_LEVELS));
 		if (kept != null)
 		{
-			configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_COMBINE_LEVELS, kept);
+			setConfig(GroupIronmanConfig.KEY_COMBINE_LEVELS, kept);
 		}
-		configManager.setConfiguration(GroupIronmanConfig.GROUP, COMBINE_CHOSEN_KEY, "1");
+		setConfig(COMBINE_CHOSEN_KEY, "1");
 	}
 
 	/** Once per install: an upgrade keeps what its old "Online and offline" switch did ({@link OnlineStatus#upgrading}). */
 	private void chooseOnlineStatus()
 	{
-		if (configManager.getConfiguration(GroupIronmanConfig.GROUP, ONLINE_STATUS_CHOSEN_KEY) != null)
+		if (getConfig(ONLINE_STATUS_CHOSEN_KEY) != null)
 		{
 			return;
 		}
 		OnlineStatus kept = OnlineStatus.upgrading(config.discordOnline(), config.discordEnabled());
 		if (kept != null)
 		{
-			configManager.setConfiguration(GroupIronmanConfig.GROUP, "discordOnlineStatus", kept);
+			setConfig("discordOnlineStatus", kept);
 		}
-		configManager.setConfiguration(GroupIronmanConfig.GROUP, ONLINE_STATUS_CHOSEN_KEY, "1");
+		setConfig(ONLINE_STATUS_CHOSEN_KEY, "1");
 	}
 
 	// ---- Inputs from GroupService ----
@@ -1173,15 +1187,25 @@ class GroupEventEngine
 
 	private void clueReward(long now)
 	{
-		ItemContainer chest = client.getItemContainer(InventoryID.TRAIL_REWARDINV);
-		if (chest == null || !wanted(GroupEvent.Type.CLUE))
+		Map<Integer, Integer> items = rewardChest(GroupEvent.Type.CLUE);
+		if (items != null)
 		{
-			return;
+			watchers.clueReward(items, EventText.value(items, group.lookup), now, group.localPlayer());
+		}
+	}
+
+	/** The reward chest's items (clue or Barrows), names resolved, when {@code type} is wanted; else null. */
+	private Map<Integer, Integer> rewardChest(GroupEvent.Type type)
+	{
+		ItemContainer chest = client.getItemContainer(InventoryID.TRAIL_REWARDINV);
+		if (chest == null || !wanted(type))
+		{
+			return null;
 		}
 		Map<Integer, Integer> items = new TreeMap<>();
 		addAll(items, chest);
 		group.resolveItems(items.keySet());
-		watchers.clueReward(items, EventText.value(items, group.lookup), now, group.localPlayer());
+		return items;
 	}
 
 	@Subscribe
@@ -1200,17 +1224,14 @@ class GroupEventEngine
 		{
 			loginPending = true;
 		}
-		else if (state == GameState.HOPPING)
+		if (state == GameState.HOPPING || state == GameState.LOGIN_SCREEN)
 		{
-			// No ticks until the new world loads: post the held moments now. A hop is never a logout.
+			// No ticks until the new world loads, or the next login: post the held moments now.
 			batch.drain().forEach(this::flush);
 			levelShot.drain().forEach(this::shoot);
 		}
-		else if (state == GameState.LOGIN_SCREEN)
+		if (state == GameState.LOGIN_SCREEN)
 		{
-			// No more ticks until the next login: post what is held now.
-			batch.drain().forEach(this::flush);
-			levelShot.drain().forEach(this::shoot);
 			// A logout ends every level streak; an edit already owed still goes.
 			levels.close();
 			// A world hop (HOPPING) is never a logout: it posts nothing, whatever the grace.
@@ -1606,8 +1627,7 @@ class GroupEventEngine
 	{
 		synchronized (presenceLock)
 		{
-			presence = PresenceDebounce.parse(configManager.getConfiguration(GroupIronmanConfig.GROUP, PRESENCE_KEY),
-				ZoneId.systemDefault());
+			presence = PresenceDebounce.parse(getConfig(PRESENCE_KEY), ZoneId.systemDefault());
 			if (client.getGameState() == GameState.LOGGED_IN)
 			{
 				presence.resume();
@@ -1618,18 +1638,10 @@ class GroupEventEngine
 	/** Holding {@link #presenceLock}: writes the pending logout only when it changed. */
 	private void savePresence()
 	{
-		if (!presence.takeDirty())
+		if (presence.takeDirty())
 		{
-			return;
-		}
-		String saved = presence.save();
-		if (saved.isEmpty())
-		{
-			configManager.unsetConfiguration(GroupIronmanConfig.GROUP, PRESENCE_KEY);
-		}
-		else
-		{
-			configManager.setConfiguration(GroupIronmanConfig.GROUP, PRESENCE_KEY, saved);
+			String saved = presence.save();
+			setConfig(PRESENCE_KEY, saved.isEmpty() ? null : saved);
 		}
 	}
 
@@ -1688,21 +1700,14 @@ class GroupEventEngine
 
 	private void barrows(long now)
 	{
-		ItemContainer chest = client.getItemContainer(InventoryID.TRAIL_REWARDINV);
-		if (chest == null || !wanted(GroupEvent.Type.BARROWS))
+		Map<Integer, Integer> items = rewardChest(GroupEvent.Type.BARROWS);
+		if (items == null)
 		{
 			return;
 		}
-		Map<Integer, Integer> items = new TreeMap<>();
-		for (Item item : chest.getItems())
-		{
-			ItemCounts.add(items, item.getId(), item.getQuantity(), itemManager::canonicalize);
-		}
-		group.resolveItems(items.keySet());
-		BarrowsProgress sets = BarrowsProgress.parse(
-			configManager.getRSProfileConfiguration(GroupIronmanConfig.GROUP, BARROWS_KEY));
+		BarrowsProgress sets = BarrowsProgress.parse(profile(BARROWS_KEY));
 		String progressText = sets.add(items, group.lookup);
-		configManager.setRSProfileConfiguration(GroupIronmanConfig.GROUP, BARROWS_KEY, sets.save());
+		saveProfile(BARROWS_KEY, sets.save());
 		own(GroupEvent.of(GroupEvent.Type.BARROWS, now, group.localPlayer()).text("Barrows").items(items)
 			.number(kc("Barrows", now)).detail(progressText.isEmpty() ? "" : progressText + " from the chest")
 			.build());

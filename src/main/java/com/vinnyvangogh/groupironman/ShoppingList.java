@@ -32,7 +32,6 @@ final class ShoppingList
 
 	static final String ADDED = "added";
 	static final String RENAMED = "renamed";
-	static final String CHANGED = "changed";
 	static final String REMOVED = "removed";
 
 	final String id;
