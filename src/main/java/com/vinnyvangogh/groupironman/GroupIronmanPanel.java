@@ -12,6 +12,7 @@ import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.image.BufferedImage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import javax.swing.Icon;
 import lombok.extern.slf4j.Slf4j;
 import javax.swing.SwingUtilities;
@@ -151,7 +152,9 @@ class GroupIronmanPanel extends PluginPanel
 	private static final Color PRAYER = new Color(0x2E, 0x8B, 0xB0);
 	private static final Color RUN = new Color(0xC8, 0xA0, 0x2A);
 	private static final Color SPEC = new Color(0x3A, 0x9A, 0x4A);
-	private static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR.darker();
+	static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR.darker();
+	/** At most one data-driven redraw of the Banks or Storage tab per this long; a click or keystroke is never held. */
+	static final long GRID_REDRAW_GAP_MS = 1000;
 	/** Rows drawn at once; 2,000 labels in a side panel help nobody, the search and filters find the rest. */
 	private static final int MAX_LOG_ROWS = 200;
 	/** A row's text width, leaving room for its item or skill icon. */
@@ -196,10 +199,47 @@ class GroupIronmanPanel extends PluginPanel
 	private String keyNote;
 	private long keyNoteAt;
 	private final SharingPrompt sharing = new SharingPrompt();
-	private View view;
+	private volatile View view;
 
+	// Banks and Storage: models built off the Swing thread, drawn in place, at most once a second per tab.
+	private final RedrawCoalescer.Scheduler background;
+	private final Executor edt;
+	private final RedrawCoalescer banksRedraw;
+	private final RedrawCoalescer storageRedraw;
+	private final BanksTabView banksView;
+	private final StorageTabView storageView;
+	/** The filters' text, read off the Swing thread by the model builders. */
+	private volatile String bankQuery = "";
+	private volatile String storageQuery = "";
+	/** The last models handed to the Swing thread; null banks is "bank sharing is off". */
+	private volatile List<PanelModel.BankCard> lastBanks;
+	private volatile boolean banksHanded;
+	private volatile PanelModel.StorageView lastStorage;
+	private volatile boolean lastStorageSharing;
+	/** Banks/Storage models built and drawn: tests check what a sync costs. */
+	volatile int gridModels;
+	volatile int gridDraws;
+
+	/** Tests: everything runs at once on the caller's thread, so a test reads the tab straight after. */
 	GroupIronmanPanel(ItemManager itemManager, SkillIconManager skillIcons, SpriteManager sprites, Actions actions)
 	{
+		this(itemManager, skillIcons, sprites, actions, RedrawCoalescer.DIRECT, Runnable::run);
+	}
+
+	/**
+	 * @param background where the Banks and Storage models are built (sorting, filtering, value totals), never the
+	 *                   Swing thread: the game's clicks wait behind it
+	 * @param edt        hands the finished model to the Swing thread
+	 */
+	GroupIronmanPanel(ItemManager itemManager, SkillIconManager skillIcons, SpriteManager sprites, Actions actions,
+		RedrawCoalescer.Scheduler background, Executor edt)
+	{
+		this.background = background;
+		this.edt = edt;
+		this.banksRedraw = new RedrawCoalescer(GRID_REDRAW_GAP_MS, System::currentTimeMillis, background,
+			() -> safely(() -> buildBanks(false)));
+		this.storageRedraw = new RedrawCoalescer(GRID_REDRAW_GAP_MS, System::currentTimeMillis, background,
+			() -> safely(() -> buildStorage(false)));
 		loadOrbIcon(sprites, "HP", SpriteID.MINIMAP_ORB_HITPOINTS_ICON);
 		loadOrbIcon(sprites, "Prayer", SpriteID.MINIMAP_ORB_PRAYER_ICON);
 		loadOrbIcon(sprites, "Run", SpriteID.MINIMAP_ORB_RUN_ICON);
@@ -238,6 +278,9 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Shopping", null);
 		addTab("Settings", null);
 		add(views, BorderLayout.CENTER);
+		banksView = new BanksTabView(tabs.get("Banks"), bankFolds, this::paintCell, GRID_COLUMNS, MAX_GRID_ITEMS,
+			() -> applyGrid("Banks", () -> drawBanks(lastBanks, view), 0));
+		storageView = new StorageTabView(tabs.get("Storage"), this::paintCell, GRID_COLUMNS, MAX_GRID_ITEMS);
 	}
 
 	/** The search bar stays put above the content, so typing in it never loses focus to a rebuild. */
@@ -262,9 +305,20 @@ class GroupIronmanPanel extends PluginPanel
 	void render(View view)
 	{
 		this.view = view;
-		redraw();
+		// A sync on the Banks or Storage tab: coalesced, built off this thread, drawn only if it changed.
+		// A hidden Banks or Storage tab does no work at all; it is built once when shown.
+		RedrawCoalescer grid = "Banks".equals(current) ? banksRedraw : "Storage".equals(current) ? storageRedraw
+			: null;
+		if (grid == null)
+		{
+			redraw();
+			return;
+		}
+		drawHeader(view);
+		grid.request();
 	}
 
+	/** A click, keystroke or tab switch: drawn now. */
 	private void redraw()
 	{
 		View v = view;
@@ -273,6 +327,11 @@ class GroupIronmanPanel extends PluginPanel
 			return;
 		}
 		drawHeader(v);
+		if ("Banks".equals(current) || "Storage".equals(current))
+		{
+			refreshGrid();
+			return;
+		}
 		JPanel tab = tabs.get(current);
 		if (settingsUnchanged(tab, v))
 		{
@@ -285,26 +344,129 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		catch (RuntimeException | AssertionError e)
 		{
-			// A tab that fails to draw says so instead of going blank (the Group tab did, 2026-11-04).
-			log.warn("GIM Utilities: drawing the {} tab failed", current, e);
-			tab.removeAll();
-			empty(tab, "Could not draw this tab.", e.getClass().getSimpleName() + ": " + e.getMessage()
-				+ ". Please report it with the RuneLite log.");
+			drawFailed(tab, current, e);
 		}
 		tab.revalidate();
 		tab.repaint();
+	}
+
+	/** A tab that fails to draw says so instead of going blank (the Group tab did, 2026-11-04). */
+	private void drawFailed(JPanel tab, String name, Throwable e)
+	{
+		log.warn("GIM Utilities: drawing the {} tab failed", name, e);
+		tab.removeAll();
+		empty(tab, "Could not draw this tab.", e.getClass().getSimpleName() + ": " + e.getMessage()
+			+ ". Please report it with the RuneLite log.");
+		tab.revalidate();
+		tab.repaint();
+	}
+
+	/** Builds the shown Banks or Storage tab's model now (off this thread) and draws it even if unchanged. */
+	private void refreshGrid()
+	{
+		bankQuery = bankFilter.getText();
+		storageQuery = storageFilter.getText();
+		boolean banks = "Banks".equals(current);
+		background.schedule(() -> safely(() ->
+		{
+			if (banks)
+			{
+				buildBanks(true);
+			}
+			else
+			{
+				buildStorage(true);
+			}
+		}), 0);
+	}
+
+	/** A model builder off the Swing thread logs its failure: an executor would swallow it. */
+	private static void safely(Runnable task)
+	{
+		try
+		{
+			task.run();
+		}
+		catch (RuntimeException e)
+		{
+			log.warn("GIM Utilities: building a panel tab failed", e);
+		}
+	}
+
+	/** Off the Swing thread: the Banks model, handed over only when it differs from the last ({@code force}: always). */
+	private void buildBanks(boolean force)
+	{
+		View v = view;
+		if (v == null)
+		{
+			return;
+		}
+		long start = System.nanoTime();
+		List<PanelModel.BankCard> banks = v.switches.bank
+			? PanelModel.banks(v.group, v.items, bankQuery, System.currentTimeMillis()) : null;
+		gridModels++;
+		if (!force && banksHanded && PanelModel.BankCard.same(banks, lastBanks))
+		{
+			return;
+		}
+		lastBanks = banks;
+		banksHanded = true;
+		long modelNanos = System.nanoTime() - start;
+		edt.execute(() -> applyGrid("Banks", () -> drawBanks(banks, v), modelNanos));
+	}
+
+	/** Off the Swing thread: the Storage model, handed over only when it differs from the last. */
+	private void buildStorage(boolean force)
+	{
+		View v = view;
+		if (v == null)
+		{
+			return;
+		}
+		long start = System.nanoTime();
+		PanelModel.StorageView s = PanelModel.storage(v.group, v.items, v.self, storageQuery,
+			System.currentTimeMillis());
+		boolean sharing = v.switches.storage;
+		gridModels++;
+		if (!force && s.sameAs(lastStorage) && sharing == lastStorageSharing)
+		{
+			return;
+		}
+		lastStorage = s;
+		lastStorageSharing = sharing;
+		long modelNanos = System.nanoTime() - start;
+		edt.execute(() -> applyGrid("Storage", () -> storageView.apply(s, sharing), modelNanos));
+	}
+
+	/** On the Swing thread: draws a built Banks or Storage model in place, timing it. A hidden tab is skipped. */
+	private void applyGrid(String name, java.util.function.IntSupplier draw, long modelNanos)
+	{
+		if (!name.equals(current) || view == null)
+		{
+			return;
+		}
+		long start = System.nanoTime();
+		int touched;
+		try
+		{
+			touched = draw.getAsInt();
+		}
+		catch (RuntimeException | AssertionError e)
+		{
+			banksView.clear();
+			storageView.clear();
+			drawFailed(tabs.get(name), name, e);
+			touched = -1;
+		}
+		gridDraws++;
+		log.debug("GIM Utilities: {} redraw took {} us on the Swing thread, {} cells changed (model {} us off it)",
+			name, (System.nanoTime() - start) / 1000, touched, modelNanos / 1000);
 	}
 
 	private void drawCurrent(JPanel tab, View v, long now)
 	{
 		switch (current)
 		{
-			case "Banks":
-				drawBanks(tab, v, now);
-				break;
-			case "Storage":
-				drawStorage(tab, v, now);
-				break;
 			case "Find":
 				drawFind(tab, v, now);
 				break;
@@ -662,16 +824,23 @@ class GroupIronmanPanel extends PluginPanel
 	/** A card's clickable title with its fold arrow; {@code toggle} flips the card, then the tab redraws. */
 	private JLabel foldHeader(String title, boolean open, Color color, Runnable toggle)
 	{
-		// A drawn arrow: the RuneScape font has no glyph for ▾/▸ and showed a box.
-		JLabel name = new JLabel(title, new Arrow(open), SwingConstants.LEFT);
-		name.setIconTextGap(4);
-		name.setFont(FontManager.getRunescapeBoldFont());
-		name.setForeground(color);
+		JLabel name = foldLabel(title, open, color);
 		Ui.onPress(name, () ->
 		{
 			toggle.run();
 			redraw();
 		});
+		return name;
+	}
+
+	/** A card title with its fold arrow, not yet clickable. */
+	static JLabel foldLabel(String title, boolean open, Color color)
+	{
+		// A drawn arrow: the RuneScape font has no glyph for ▾/▸ and showed a box.
+		JLabel name = new JLabel(title, new Arrow(open), SwingConstants.LEFT);
+		name.setIconTextGap(4);
+		name.setFont(FontManager.getRunescapeBoldFont());
+		name.setForeground(color);
 		return name;
 	}
 
@@ -890,121 +1059,51 @@ class GroupIronmanPanel extends PluginPanel
 
 	private JComponent itemGrid(List<PanelModel.ItemCell> items)
 	{
-		JPanel wrap = new Column();
-		wrap.setOpaque(false);
-		JPanel grid = new JPanel(new GridLayout(0, GRID_COLUMNS, 1, 1));
-		grid.setOpaque(false);
-		for (int i = 0; i < items.size() && i < MAX_GRID_ITEMS; i++)
-		{
-			PanelModel.ItemCell item = items.get(i);
-			JLabel cell = new JLabel();
-			cell.setPreferredSize(new Dimension(36, 32));
-			cell.setHorizontalAlignment(SwingConstants.CENTER);
-			cell.setToolTipText(item.tooltip() + (item.value > 0 ? " (" + Amounts.EXACT.of(item.value) + " gp)" : ""));
-			icon(item.id, item.quantity).addTo(cell);
-			grid.add(cell);
-		}
-		wrap.add(grid);
-		if (items.size() > MAX_GRID_ITEMS)
-		{
-			wrap.add(text("and " + (items.size() - MAX_GRID_ITEMS) + " more: use the filter to find them.", MUTED));
-		}
-		return wrap;
+		ItemGridView grid = new ItemGridView(this::paintCell, GRID_COLUMNS, MAX_GRID_ITEMS);
+		grid.update(items);
+		return grid.component();
 	}
 
-	// Banks and Storage: filterable icon grids with value.
-
-	private void drawBanks(JPanel tab, View v, long now)
+	/**
+	 * A grid cell's icon and tooltip. ItemManager hands back its cached image or an empty one it fills on
+	 * the client thread, so no image is made on the Swing thread.
+	 */
+	private void paintCell(JLabel cell, PanelModel.ItemCell item)
 	{
-		if (!v.switches.bank)
-		{
-			empty(tab, "Bank sharing is off.", "Turn on 'Share bank' in GIM Utilities' settings to see members' banks.");
-			return;
-		}
-		List<PanelModel.BankCard> banks = PanelModel.banks(v.group, v.items, bankFilter.getText(), now);
-		if (banks.isEmpty())
-		{
-			empty(tab, "No banks yet.", "Open and close your bank. Members' banks appear after they do the same.");
-			return;
-		}
-		bankFolds.filter(bankFilter.getText());
-		Map<String, Boolean> matches = new LinkedHashMap<>();
-		banks.forEach(b -> matches.put(b.member, !b.items.isEmpty()));
-		if (banks.size() >= 2)
-		{
-			tab.add(foldAllLink(matches));
-		}
-		for (PanelModel.BankCard b : banks)
-		{
-			tab.add(bankCard(b, v, matches.get(b.member)));
-		}
+		cell.setToolTipText(item.tooltip() + (item.value > 0 ? " (" + Amounts.EXACT.of(item.value) + " gp)" : ""));
+		icon(item.id, item.quantity).addTo(cell);
 	}
 
-	/** Collapse all while any bank is open, Expand all once every one is folded. */
-	private JComponent foldAllLink(Map<String, Boolean> matches)
+	// Banks and Storage: filterable icon grids with value, drawn in place (BanksTabView, StorageTabView).
+
+	/** On the Swing thread: the Banks tab for a built model; null is "bank sharing is off". */
+	private int drawBanks(List<PanelModel.BankCard> banks, View v)
 	{
-		boolean anyOpen = bankFolds.anyOpen(matches.keySet(), matches::get);
-		JLabel link = Ui.label(anyOpen ? "Collapse all" : "Expand all", FontManager.getRunescapeSmallFont(),
-			ColorScheme.BRAND_ORANGE);
-		link.setBorder(new EmptyBorder(0, 0, 4, 0));
-		Ui.clickable(link, () ->
+		JPanel tab = tabs.get("Banks");
+		if (banks == null || banks.isEmpty())
 		{
-			bankFolds.setAll(matches.keySet(), !anyOpen);
-			redraw();
-		});
-		return link;
+			banksView.clear();
+			tab.removeAll();
+			if (banks == null)
+			{
+				empty(tab, "Bank sharing is off.",
+					"Turn on 'Share bank' in GIM Utilities' settings to see members' banks.");
+			}
+			else
+			{
+				empty(tab, "No banks yet.", "Open and close your bank. Members' banks appear after they do the same.");
+			}
+			tab.revalidate();
+			tab.repaint();
+			return -1;
+		}
+		return banksView.apply(banks, v.self, bankQuery);
 	}
 
-	private JComponent bankCard(PanelModel.BankCard b, View v, boolean matches)
+	/** Banks cards built from scratch so far: tests check a sync updates in place instead. */
+	int bankRebuilds()
 	{
-		JPanel card = Ui.card();
-		boolean open = bankFolds.open(b.member, matches);
-		boolean mine = !v.self.isEmpty() && v.self.equalsIgnoreCase(b.member);
-		card.add(foldHeader(mine ? "Your bank (" + b.member + ")" : b.member + "'s bank", open, Color.WHITE,
-			() -> bankFolds.toggle(b.member, matches)));
-		card.add(tip(text(b.summary, MUTED), b.exact));
-		if (open)
-		{
-			card.add(b.items.isEmpty() ? text("No item matches the filter.", MUTED) : itemGrid(b.items));
-		}
-		return card;
-	}
-
-	private void drawStorage(JPanel tab, View v, long now)
-	{
-		if (!v.switches.storage)
-		{
-			// Own visits are still kept here, so a withdrawal made before ticking the switch is not a mystery.
-			tab.add(text("'Share group storage changes' is off: your own visits are kept here only and nothing is"
-				+ " sent, and members' changes don't arrive.", ColorScheme.BRAND_ORANGE));
-		}
-		PanelModel.StorageView s = PanelModel.storage(v.group, v.items, v.self, storageFilter.getText(), now);
-		JPanel contents = Ui.card();
-		contents.add(Ui.label("Group storage", FontManager.getRunescapeBoldFont(), null));
-		if (s.snapshot == null)
-		{
-			contents.add(text("Not seen yet. Open group storage once and close it; what it holds shows here.", MUTED));
-		}
-		else
-		{
-			contents.add(tip(text(s.snapshot + ", " + Amounts.GAME.of(s.value) + " gp", MUTED),
-				Amounts.EXACT.of(s.value) + " gp"));
-			contents.add(s.items.isEmpty() ? text("Empty, or no item matches the filter.", MUTED) : itemGrid(s.items));
-		}
-		tab.add(contents);
-
-		JPanel log = Ui.card();
-		log.add(Ui.label("Changes", FontManager.getRunescapeBoldFont(), null));
-		if (s.log.isEmpty())
-		{
-			log.add(text("No changes yet. Deposits and withdrawals are logged when you press Save or close storage."
-				+ " Members' changes arrive while you are synced with them.", MUTED));
-		}
-		for (PanelModel.LogRow row : s.log)
-		{
-			log.add(tip(text(row.text + " (" + row.ago + ")", Color.WHITE), row.exact));
-		}
-		tab.add(log);
+		return banksView.rebuilds();
 	}
 
 	// Find: one icon row per item and place.
@@ -1263,10 +1362,15 @@ class GroupIronmanPanel extends PluginPanel
 	{
 		// The html wrapper makes long lines wrap at the panel width. Text from
 		// peers is escaped first: a display name or item name is data, not markup.
-		JLabel label = Ui.label("<html><body style='width:175px'>" + escape(text) + "</body></html>",
-			FontManager.getRunescapeSmallFont(), color);
+		JLabel label = Ui.label(html(text), FontManager.getRunescapeSmallFont(), color);
 		label.setBorder(new EmptyBorder(1, 0, 1, 0));
 		return label;
+	}
+
+	/** {@link #text}'s label text: escaped, wrapping at the panel width. */
+	static String html(String text)
+	{
+		return "<html><body style='width:175px'>" + escape(text) + "</body></html>";
 	}
 
 	/** {@code label} with the exact amounts in its tooltip; the label shows the game's short ones. */

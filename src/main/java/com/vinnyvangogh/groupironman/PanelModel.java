@@ -124,6 +124,18 @@ final class PanelModel
 			return id <= 0;
 		}
 
+		/** Draws the same as {@code o}: same item, stack, value and contents. */
+		boolean sameAs(ItemCell o)
+		{
+			return o != null && id == o.id && quantity == o.quantity && value == o.value && inside == o.inside
+				&& name.equals(o.name);
+		}
+
+		static boolean same(List<ItemCell> a, List<ItemCell> b)
+		{
+			return sameLists(a, b, ItemCell::sameAs);
+		}
+
 		/** "450,001 x Coins": the exact amount, which the icon's own stack text shortens; "Log basket (19 inside)". */
 		String tooltip()
 		{
@@ -199,6 +211,23 @@ final class PanelModel
 			this.value = value;
 			this.items = items;
 		}
+
+		/** Draws the same card as {@code o}: the Banks tab leaves it alone. */
+		boolean sameAs(BankCard o)
+		{
+			return member.equals(o.member) && summary.equals(o.summary) && exact.equals(o.exact)
+				&& ItemCell.same(items, o.items);
+		}
+
+		/** Whether two Banks tabs draw the same; null is "bank sharing is off". */
+		static boolean same(List<BankCard> a, List<BankCard> b)
+		{
+			if (a == null || b == null)
+			{
+				return a == b;
+			}
+			return sameLists(a, b, BankCard::sameAs);
+		}
 	}
 
 	static final class LogRow
@@ -214,6 +243,11 @@ final class PanelModel
 			this.text = text;
 			this.exact = exact;
 			this.ago = ago;
+		}
+
+		boolean sameAs(LogRow o)
+		{
+			return text.equals(o.text) && exact.equals(o.exact) && ago.equals(o.ago);
 		}
 	}
 
@@ -232,6 +266,30 @@ final class PanelModel
 			this.items = items;
 			this.log = log;
 		}
+
+		/** Draws the same Storage tab as {@code o}; {@code o} may be null (nothing drawn yet). */
+		boolean sameAs(StorageView o)
+		{
+			return o != null && value == o.value && java.util.Objects.equals(snapshot, o.snapshot)
+				&& ItemCell.same(items, o.items) && sameLists(log, o.log, LogRow::sameAs);
+		}
+	}
+
+	/** Same length and {@code same} pair by pair: what decides a panel tab needs no redraw. */
+	static <T> boolean sameLists(List<T> a, List<T> b, java.util.function.BiPredicate<T, T> same)
+	{
+		if (a.size() != b.size())
+		{
+			return false;
+		}
+		for (int i = 0; i < a.size(); i++)
+		{
+			if (!same.test(a.get(i), b.get(i)))
+			{
+				return false;
+			}
+		}
+		return true;
 	}
 
 	static final class FindRow
