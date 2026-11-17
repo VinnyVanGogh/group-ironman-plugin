@@ -554,7 +554,7 @@ final class PanelModel
 			long worth = 0;
 			for (Map.Entry<Integer, Integer> e : h.items.entrySet())
 			{
-				held.add(e.getValue() + " x " + items.name(e.getKey()));
+				held.add(Amounts.EXACT.of(e.getValue()) + " x " + items.name(e.getKey()));
 				worth += items.price(e.getKey()) * e.getValue();
 			}
 			out.add(new ItemCell(s.id, name, s.quantity, items.price(s.id) * s.quantity, h.count, held, worth,
