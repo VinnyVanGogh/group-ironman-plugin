@@ -169,12 +169,12 @@ final class OverlayStyle
 			g.fillRect(x, y, ACCENT_BAR, h);
 			int badgeW = badge.isEmpty() ? 0 : g.getFontMetrics(plain).stringWidth(badge);
 			int room = w - ACCENT_BAR - 5 - (badgeW == 0 ? 0 : badgeW + GAP);
-			OverlayUtil.renderTextLocation(g, new Point(x + ACCENT_BAR + 5, y + fm.getAscent() + 1),
+			OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + ACCENT_BAR + 5, y + fm.getAscent() + 1),
 				fit(title, fm, room), accent);
 			g.setFont(plain);
 			if (badgeW > 0)
 			{
-				OverlayUtil.renderTextLocation(g, new Point(x + w - badgeW, y + fm.getAscent() + 1), badge, MUTED);
+				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + w - badgeW, y + fm.getAscent() + 1), badge, MUTED);
 			}
 			return h;
 		}
@@ -256,11 +256,11 @@ final class OverlayStyle
 			}
 			for (int i = 0; i < lines.size(); i++)
 			{
-				OverlayUtil.renderTextLocation(g, new Point(left, y + i * lh + fm.getAscent()), lines.get(i), color);
+				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(left, y + i * lh + fm.getAscent()), lines.get(i), color);
 			}
 			if (rightW > 0)
 			{
-				OverlayUtil.renderTextLocation(g, new Point(x + w - rightW, y + fm.getAscent()), right, rightColor);
+				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + w - rightW, y + fm.getAscent()), right, rightColor);
 			}
 			return lines.size() * lh;
 		}
