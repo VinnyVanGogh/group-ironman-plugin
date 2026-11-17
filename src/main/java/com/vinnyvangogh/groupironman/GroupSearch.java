@@ -67,20 +67,34 @@ final class GroupSearch
 	 */
 	static List<Hit> hits(String query, List<Source> sources, ItemLookup items)
 	{
+		return hits(query, sources, items, FindFilter.NONE);
+	}
+
+	/**
+	 * {@link #hits(String, List, ItemLookup)} narrowed by the Find tab's dropdowns. With a dropdown set the
+	 * query may be empty (everything of that kind is listed); with none set it still needs
+	 * {@link #MIN_QUERY} characters.
+	 */
+	static List<Hit> hits(String query, List<Source> sources, ItemLookup items, FindFilter filter)
+	{
 		List<Hit> out = new ArrayList<>();
 		ItemQuery q = ItemQuery.parse(query);
-		if (q == null)
+		if (q == null && !filter.active())
 		{
 			return out;
 		}
 		Map<String, List<Hit>> byItem = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 		for (Source source : sources)
 		{
+			if (!filter.keeps(source))
+			{
+				continue;
+			}
 			Map<String, long[]> byName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 			for (Map.Entry<Integer, Integer> e : source.items.entrySet())
 			{
 				String name = items.name(e.getKey());
-				if (q.matches(name))
+				if ((q == null || q.matches(name)) && filter.matches(e.getKey(), items))
 				{
 					// [id, quantity]: the first id seen stands for the icon.
 					byName.computeIfAbsent(name, k -> new long[]{e.getKey(), 0})[1] += e.getValue();

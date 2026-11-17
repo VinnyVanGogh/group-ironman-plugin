@@ -22,6 +22,18 @@ interface ItemLookup
 		return -1;
 	}
 
+	/** The {@link ItemStyles} bits from the item's equipment stats; 0 when it is not combat gear or not read yet. */
+	default int combatStyles(int id)
+	{
+		return 0;
+	}
+
+	/** What High Alchemy pays for one of the item in gp, 0 when unknown or not alchable. */
+	default long highAlch(int id)
+	{
+		return 0;
+	}
+
 	/**
 	 * An item quantity or gp value as text: the game's "450K" here, the exact
 	 * number or both through {@link Amounts#words}. Every line built from this

@@ -76,7 +76,7 @@ public class StorageLogTest
 		roster.putStorage(new StorageChange(now - TimeUnit.MINUTES.toMillis(3), "Alex", items(SHARK, 5),
 			items(COAL, 100, RUNE_SCIM, 1), items()));
 		roster.putStorage(new StorageChange(now - TimeUnit.MINUTES.toMillis(1), "Me", items(), items(COAL, 2), items()));
-		List<PanelModel.LogRow> rows = PanelModel.storage(roster, new FakeItems(), "me", null, now).log;
+		List<PanelModel.LogRow> rows = PanelModel.storage(roster, new FakeItems(), "me", GridFilter.NONE, now).log;
 		assertEquals("You deposited 2 Coal", rows.get(0).text);
 		assertEquals("1m ago", rows.get(0).ago);
 		assertEquals("Alex took 5 Shark, deposited 100 Coal, 1 Rune scimitar", rows.get(1).text);

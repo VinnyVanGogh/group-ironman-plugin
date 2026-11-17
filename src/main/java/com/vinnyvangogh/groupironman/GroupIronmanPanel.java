@@ -211,6 +211,17 @@ class GroupIronmanPanel extends PluginPanel
 	/** The filters' text, read off the Swing thread by the model builders. */
 	private volatile String bankQuery = "";
 	private volatile String storageQuery = "";
+	/** The category pills and the Banks tab's "Show all", likewise read by the model builders. */
+	private volatile ItemCategory bankCategory = ItemCategory.ALL;
+	private volatile ItemCategory storageCategory = ItemCategory.ALL;
+	private volatile boolean bankShowAll;
+	/** Find's quick-find dropdowns: category, sub-type, and who or where. */
+	private final JComboBox<FindQuick.Kind> findKind = new JComboBox<>(FindQuick.Kind.values());
+	private final JComboBox<String> findSub = new JComboBox<>();
+	private final JComboBox<String> findHolder = new JComboBox<>();
+	private List<String> findHolders = Collections.emptyList();
+	/** Set while the Find dropdowns are filled in code, so their own events do not redraw mid-update. */
+	private boolean updatingFind;
 	/** The last models handed to the Swing thread; null banks is "bank sharing is off". */
 	private volatile List<PanelModel.BankCard> lastBanks;
 	private volatile boolean banksHanded;
@@ -270,9 +281,9 @@ class GroupIronmanPanel extends PluginPanel
 		add(top, BorderLayout.NORTH);
 
 		addTab("Group", null);
-		addTab("Banks", bankFilter);
-		addTab("Storage", storageFilter);
-		addTab("Find", findQuery);
+		addTab("Banks", gridControls(bankFilter, c -> bankCategory = c, showAllToggle()));
+		addTab("Storage", gridControls(storageFilter, c -> storageCategory = c, null));
+		addTab("Find", findControls());
 		addTab("Log", logControls());
 		addTab("Activities", activityFilters());
 		addTab("Shopping", null);
@@ -403,7 +414,8 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		long start = System.nanoTime();
 		List<PanelModel.BankCard> banks = v.switches.bank
-			? PanelModel.banks(v.group, v.items, bankQuery, System.currentTimeMillis()) : null;
+			? PanelModel.banks(v.group, v.items, new GridFilter(bankQuery, bankCategory, bankShowAll),
+				System.currentTimeMillis()) : null;
 		gridModels++;
 		if (!force && banksHanded && PanelModel.BankCard.same(banks, lastBanks))
 		{
@@ -424,8 +436,8 @@ class GroupIronmanPanel extends PluginPanel
 			return;
 		}
 		long start = System.nanoTime();
-		PanelModel.StorageView s = PanelModel.storage(v.group, v.items, v.self, storageQuery,
-			System.currentTimeMillis());
+		PanelModel.StorageView s = PanelModel.storage(v.group, v.items, v.self,
+			new GridFilter(storageQuery, storageCategory, false), System.currentTimeMillis());
 		boolean sharing = v.switches.storage;
 		gridModels++;
 		if (!force && s.sameAs(lastStorage) && sharing == lastStorageSharing)
@@ -1070,7 +1082,11 @@ class GroupIronmanPanel extends PluginPanel
 	 */
 	private void paintCell(JLabel cell, PanelModel.ItemCell item)
 	{
-		cell.setToolTipText(item.tooltip() + (item.value > 0 ? " (" + Amounts.EXACT.of(item.value) + " gp)" : ""));
+		String worth = item.value > 0 ? " (" + Amounts.EXACT.of(item.value) + " gp" : "";
+		// High alchemy is the secondary figure: what the stack pays when alched, beside its Grand Exchange value.
+		String alch = item.highAlch > 0 ? (worth.isEmpty() ? " (" : ", ") + "alch " + Amounts.EXACT.of(item.highAlch)
+			+ " gp" : "";
+		cell.setToolTipText(item.tooltip() + worth + alch + (worth.isEmpty() && alch.isEmpty() ? "" : ")"));
 		icon(item.id, item.quantity).addTo(cell);
 	}
 
@@ -1111,18 +1127,23 @@ class GroupIronmanPanel extends PluginPanel
 	private void drawFind(JPanel tab, View v, long now)
 	{
 		String q = findQuery.getText();
-		if (ItemQuery.parse(q) == null)
+		refreshHolders(FindQuick.holders(v.group.searchSources()));
+		FindFilter filter = findFilter();
+		boolean typed = ItemQuery.parse(q) != null;
+		if (!typed && !filter.active())
 		{
-			empty(tab, "Who has it?", "Type at least " + GroupSearch.MIN_QUERY + " letters of an item name. Searches"
-				+ " members' last banks, inventories, equipment, pouches and group storage. '::find guam' in the"
-				+ " chatbox gives the same answer.");
+			empty(tab, "Who has it?", "Type at least " + GroupSearch.MIN_QUERY + " letters of an item name, or pick a"
+				+ " category above, or press Runes anywhere, Food or Teleports. Searches members' last banks,"
+				+ " inventories, equipment, pouches and group storage. '::find guam' in the chatbox gives the same"
+				+ " answer.");
 			return;
 		}
-		List<PanelModel.FindRow> rows = PanelModel.find(q, v.group, v.items, now, v.self);
+		List<PanelModel.FindRow> rows = PanelModel.find(q, v.group, v.items, now, v.self, filter);
 		if (rows.isEmpty())
 		{
-			empty(tab, "Nobody has it.", "Nothing shared matches '" + ItemQuery.normalize(q) + "'. Only members running"
-				+ " GIM Utilities with sharing on are searched, as of their last sync.");
+			empty(tab, "Nobody has it.", (typed ? "Nothing shared matches '" + ItemQuery.normalize(q) + "'"
+				: "Nothing shared matches " + filter.kind.label.toLowerCase(java.util.Locale.ROOT)) + ". Only members"
+				+ " running GIM Utilities with sharing on are searched, as of their last sync.");
 		}
 		for (PanelModel.FindRow r : rows)
 		{
@@ -1140,6 +1161,167 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			tab.add(tip(text(history.get(i), MUTED), exact.get(i)));
 		}
+	}
+
+	// Banks, Storage and Find controls: category pills, the bank preview's "Show all", and the quick-find dropdowns.
+
+	/** The search box with the category pills below it; {@code extra} (may be null) sits under the pills. */
+	private JComponent gridControls(IconTextField search, java.util.function.Consumer<ItemCategory> pick,
+		JComponent extra)
+	{
+		JPanel controls = new Column();
+		controls.add(search);
+		JPanel pills = new JPanel(new GridLayout(0, 4, 2, 2));
+		pills.setBorder(new EmptyBorder(4, 0, 2, 0));
+		ButtonGroup group = new ButtonGroup();
+		for (ItemCategory c : ItemCategory.values())
+		{
+			JToggleButton b = Ui.toggle(c.label, c == ItemCategory.ALL, 1);
+			b.setToolTipText(c == ItemCategory.ALL ? "Every item" : "Only " + c.label.toLowerCase(java.util.Locale.ROOT));
+			b.addActionListener(e ->
+			{
+				pick.accept(c);
+				redraw();
+			});
+			group.add(b);
+			pills.add(b);
+		}
+		controls.add(pills);
+		if (extra != null)
+		{
+			controls.add(extra);
+		}
+		return controls;
+	}
+
+	/** Lifts the Banks preview: every stack of the chosen category, not just the top 20 by value. */
+	private JComponent showAllToggle()
+	{
+		JToggleButton b = Ui.toggle("Show all items", false, 1);
+		b.setToolTipText("Each bank draws its " + PanelModel.BANK_PREVIEW + " most valuable stacks. Search, or turn this"
+			+ " on, to see the rest.");
+		b.addActionListener(e ->
+		{
+			bankShowAll = b.isSelected();
+			redraw();
+		});
+		return Ui.wide(b);
+	}
+
+	/** Find's search box, three one-click buttons and the category, sub-type and who-or-where dropdowns. */
+	private JComponent findControls()
+	{
+		JPanel controls = new Column();
+		controls.add(findQuery);
+		JPanel presets = new JPanel(new GridLayout(1, 3, 2, 0));
+		presets.setBorder(new EmptyBorder(4, 0, 2, 0));
+		presets.add(presetButton("Runes anywhere", FindQuick.RUNES_ANYWHERE));
+		presets.add(presetButton("Food", FindQuick.FOOD));
+		presets.add(presetButton("Teleports", FindQuick.TELEPORTS));
+		controls.add(presets);
+		JPanel pickers = new JPanel(new GridLayout(1, 2, 2, 0));
+		for (JComboBox<?> box : new JComboBox<?>[]{findKind, findSub, findHolder})
+		{
+			box.setFont(FontManager.getRunescapeSmallFont());
+			box.setFocusable(false);
+		}
+		fillSubtypes(FindQuick.Kind.ANYTHING);
+		findHolder.addItem(FindQuick.ANYWHERE);
+		findKind.addActionListener(e ->
+		{
+			if (!updatingFind)
+			{
+				fillSubtypes((FindQuick.Kind) findKind.getSelectedItem());
+				redraw();
+			}
+		});
+		findSub.addActionListener(e -> findPicked());
+		findHolder.addActionListener(e -> findPicked());
+		pickers.add(findKind);
+		pickers.add(findSub);
+		controls.add(pickers);
+		JPanel where = new JPanel(new GridLayout(1, 1));
+		where.setBorder(new EmptyBorder(2, 0, 0, 0));
+		where.add(findHolder);
+		controls.add(where);
+		return controls;
+	}
+
+	private void findPicked()
+	{
+		if (!updatingFind)
+		{
+			redraw();
+		}
+	}
+
+	private JButton presetButton(String label, FindFilter preset)
+	{
+		JButton b = Ui.button(label, "Search the group for " + label.toLowerCase(java.util.Locale.ROOT), () ->
+		{
+			updatingFind = true;
+			try
+			{
+				findQuery.setText("");
+				findKind.setSelectedItem(preset.kind);
+				fillSubtypes(preset.kind);
+				findSub.setSelectedItem(preset.subtype);
+				findHolder.setSelectedIndex(0);
+			}
+			finally
+			{
+				updatingFind = false;
+			}
+			redraw();
+		});
+		b.setMargin(new java.awt.Insets(1, 0, 1, 0));
+		return b;
+	}
+
+	/** The sub-type dropdown for {@code kind}, {@code Any} picked. */
+	private void fillSubtypes(FindQuick.Kind kind)
+	{
+		boolean was = updatingFind;
+		updatingFind = true;
+		try
+		{
+			findSub.removeAllItems();
+			FindQuick.subtypes(kind).forEach(findSub::addItem);
+			findSub.setSelectedIndex(0);
+		}
+		finally
+		{
+			updatingFind = was;
+		}
+	}
+
+	/** The holder dropdown lists who the group has anything from; rebuilt only when that changes, keeping the pick. */
+	private void refreshHolders(List<String> holders)
+	{
+		if (holders.equals(findHolders))
+		{
+			return;
+		}
+		findHolders = holders;
+		Object picked = findHolder.getSelectedItem();
+		updatingFind = true;
+		try
+		{
+			findHolder.removeAllItems();
+			holders.forEach(findHolder::addItem);
+			findHolder.setSelectedItem(holders.contains(picked) ? picked : FindQuick.ANYWHERE);
+		}
+		finally
+		{
+			updatingFind = false;
+		}
+	}
+
+	private FindFilter findFilter()
+	{
+		Object holder = findHolder.getSelectedIndex() > 0 ? findHolder.getSelectedItem() : null;
+		return new FindFilter((FindQuick.Kind) findKind.getSelectedItem(), (String) findSub.getSelectedItem(),
+			holder == null ? null : holder.toString());
 	}
 
 	// Log: every group event, yours and members' (Board 2026-11-10), with search and filters.

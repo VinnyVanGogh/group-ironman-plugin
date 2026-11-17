@@ -124,6 +124,8 @@ final class BanksTabView
 		final JLabel summary = GroupIronmanPanel.text("", GroupIronmanPanel.MUTED);
 		final JLabel noMatch = GroupIronmanPanel.text("No item matches the filter.", GroupIronmanPanel.MUTED);
 		final ItemGridView grid = new ItemGridView(painter, columns, max);
+		/** "20 most valuable shown, 480 more: search, pick a category or Show all items." */
+		final JLabel more = GroupIronmanPanel.text("", GroupIronmanPanel.MUTED);
 
 		Card(String member)
 		{
@@ -137,6 +139,7 @@ final class BanksTabView
 			root.add(summary);
 			root.add(noMatch);
 			root.add(grid.component());
+			root.add(more);
 		}
 
 		/** Swing skips a setText or setVisible that changes nothing, so an unchanged card costs no layout. */
@@ -152,6 +155,9 @@ final class BanksTabView
 			summary.setToolTipText(b.exact);
 			noMatch.setVisible(open && b.items.isEmpty());
 			grid.component().setVisible(open && !b.items.isEmpty());
+			more.setText(GroupIronmanPanel.html(b.items.size() + " most valuable shown, " + b.hidden
+				+ " more: search, pick a category or turn on Show all items."));
+			more.setVisible(open && b.hidden > 0);
 			// A folded grid waits: opening it applies the model again.
 			return open ? grid.update(b.items) : 0;
 		}
