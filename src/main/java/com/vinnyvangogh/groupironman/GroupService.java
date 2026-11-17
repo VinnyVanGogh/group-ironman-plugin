@@ -2078,11 +2078,7 @@ class GroupService
 				names.put(id, name);
 				tradeable.put(id, item.isTradeable());
 				prices.put(id, (long) itemManager.getItemPrice(id));
-				ItemStats stats = itemManager.getItemStats(id);
-				ItemEquipmentStats gear = stats == null ? null : stats.getEquipment();
-				slots.put(id, gear == null ? -1 : gear.getSlot());
-				styles.put(id, gear == null ? 0 : styleOf(gear));
-				highAlchs.put(id, (long) item.getHaPrice());
+				readGear(id, item);
 			}
 		}
 	}
