@@ -90,17 +90,7 @@ final class GroupSearch
 			{
 				continue;
 			}
-			Map<String, long[]> byName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-			for (Map.Entry<Integer, Integer> e : source.items.entrySet())
-			{
-				String name = items.name(e.getKey());
-				if ((q == null || q.matches(name)) && filter.matches(e.getKey(), items))
-				{
-					// [id, quantity]: the first id seen stands for the icon.
-					byName.computeIfAbsent(name, k -> new long[]{e.getKey(), 0})[1] += e.getValue();
-				}
-			}
-			for (Map.Entry<String, long[]> e : byName.entrySet())
+			for (Map.Entry<String, long[]> e : matching(source, q, items, filter).entrySet())
 			{
 				byItem.computeIfAbsent(e.getKey(), k -> new ArrayList<>()).add(new Hit((int) e.getValue()[0],
 					e.getKey(), e.getValue()[1], source.member, source.where, source.seenAt));
@@ -118,6 +108,21 @@ final class GroupSearch
 			}
 		}
 		return out;
+	}
+
+	/** The source's matching items by name, each as [id, quantity]: the first id seen stands for the icon. */
+	private static Map<String, long[]> matching(Source source, ItemQuery q, ItemLookup items, FindFilter filter)
+	{
+		Map<String, long[]> byName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+		for (Map.Entry<Integer, Integer> e : source.items.entrySet())
+		{
+			String name = items.name(e.getKey());
+			if ((q == null || q.matches(name)) && filter.matches(e.getKey(), items))
+			{
+				byName.computeIfAbsent(name, k -> new long[]{e.getKey(), 0})[1] += e.getValue();
+			}
+		}
+		return byName;
 	}
 
 	/**

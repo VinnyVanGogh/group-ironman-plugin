@@ -2087,6 +2087,16 @@ class GroupService
 		}
 	}
 
+	/** Client thread: the item's equipment slot and combat style from its stats, and its alchemy value. */
+	private void readGear(int id, ItemComposition item)
+	{
+		ItemStats stats = itemManager.getItemStats(id);
+		ItemEquipmentStats gear = stats == null ? null : stats.getEquipment();
+		slots.put(id, gear == null ? -1 : gear.getSlot());
+		styles.put(id, gear == null ? 0 : styleOf(gear));
+		highAlchs.put(id, (long) item.getHaPrice());
+	}
+
 	/** Executor thread. */
 	private void loadCache()
 	{

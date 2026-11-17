@@ -124,24 +124,35 @@ final class FindQuick
 	/** Whether the item is of {@code kind} and {@code sub}; {@link #ANY} matches the whole kind. */
 	static boolean matches(Kind kind, String sub, int id, ItemLookup items)
 	{
-		String name = items.name(id).toLowerCase(Locale.ROOT);
-		switch (kind)
-		{
-			case ANYTHING:
-				return true;
-			case RUNES:
-				return ItemCategory.isRune(name) && (ANY.equals(sub) || name.startsWith(sub.toLowerCase(Locale.ROOT) + " "));
-			case COMBAT:
-				return combat(sub).matches(id, items);
-			case RESOURCES:
-				return ItemCategory.RESOURCES.matches(id, items) && (ANY.equals(sub) || sub(kind, sub).matcher(name).find());
-			case FOOD:
-				return food(name, sub);
-			case POTIONS:
-				return DOSED.matcher(name).find() && (ANY.equals(sub) || sub(kind, sub).matcher(name).find());
-			default:
-				return teleport(name, sub);
-		}
+		return RULES.get(kind).test(sub, id, items.name(id).toLowerCase(Locale.ROOT), items);
+	}
+
+	/** One kind's test: its sub-type, the item, its lower-cased name, and the lookup for stats. */
+	private interface Rule
+	{
+		boolean test(String sub, int id, String name, ItemLookup items);
+	}
+
+	private static final Map<Kind, Rule> RULES = new EnumMap<>(Kind.class);
+
+	static
+	{
+		RULES.put(Kind.ANYTHING, (sub, id, name, items) -> true);
+		RULES.put(Kind.RUNES, (sub, id, name, items) -> ItemCategory.isRune(name)
+			&& (ANY.equals(sub) || name.startsWith(sub.toLowerCase(Locale.ROOT) + " ")));
+		RULES.put(Kind.COMBAT, (sub, id, name, items) -> combat(sub).matches(id, items));
+		RULES.put(Kind.RESOURCES, (sub, id, name, items) -> ItemCategory.RESOURCES.matches(id, items)
+			&& named(Kind.RESOURCES, sub, name));
+		RULES.put(Kind.FOOD, (sub, id, name, items) -> food(name, sub));
+		RULES.put(Kind.POTIONS, (sub, id, name, items) -> DOSED.matcher(name).find()
+			&& named(Kind.POTIONS, sub, name));
+		RULES.put(Kind.TELEPORTS, (sub, id, name, items) -> teleport(name, sub));
+	}
+
+	/** {@link #ANY}, or the sub-type's pattern is found in the name. */
+	private static boolean named(Kind kind, String sub, String name)
+	{
+		return ANY.equals(sub) || sub(kind, sub).matcher(name).find();
 	}
 
 	private static ItemCategory combat(String sub)
