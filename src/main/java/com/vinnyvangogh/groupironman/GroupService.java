@@ -204,6 +204,8 @@ class GroupService
 	private volatile GroupEventEngine events;
 	/** The Shopping tab's shared lists and members' quest progress; null when not running. */
 	private volatile ShoppingSync shopping;
+	/** Members' boss bests and quests/diaries; null when not running. */
+	private volatile MemberProgressBook progress;
 	private volatile QuestData questData = QuestData.empty();
 	private volatile ShopPresets presets = new ShopPresets();
 	/** Whether each item can change hands, read with its name on the client thread. */
@@ -354,6 +356,7 @@ class GroupService
 			saveCache();
 			this.onChange.run();
 		});
+		progress = new MemberProgressBook(gson, this::send);
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
@@ -381,6 +384,7 @@ class GroupService
 		members = GroupMembers.UNKNOWN;
 		governance = null;
 		shopping = null;
+		progress = null;
 		tradeable.clear();
 		ownLevels = Collections.emptyMap();
 		cachedWebhooks = null;
@@ -1669,6 +1673,13 @@ class GroupService
 			roster.heard(name, System.currentTimeMillis());
 			return;
 		}
+		MemberProgressBook book = progress;
+		if (book != null && MemberProgressCodec.isProgress(payload) && book.receive(name, payload) != null)
+		{
+			roster.heard(name, System.currentTimeMillis());
+			onChange.run();
+			return;
+		}
 		ShoppingSync shop = shopping;
 		if (shop != null && ShoppingSync.isShopping(payload) && shop.receive(name, payload))
 		{
@@ -2171,6 +2182,12 @@ class GroupService
 	}
 
 	// ---- The Shopping tab ----
+
+	/** Members' boss bests and quests, or null when not running. */
+	MemberProgressBook progress()
+	{
+		return progress;
+	}
 
 	/** The shared lists, or null when not running. */
 	ShoppingSync shopping()
