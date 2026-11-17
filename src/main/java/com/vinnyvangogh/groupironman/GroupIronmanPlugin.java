@@ -41,6 +41,7 @@ import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.Overlay;
+import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
 
 /**
@@ -78,6 +79,13 @@ public class GroupIronmanPlugin extends Plugin
 
 	@Inject
 	private ClientToolbar clientToolbar;
+
+	@Inject
+	private OverlayManager overlayManager;
+
+	/** What the on-screen path card says; null while no path is in force. Built each redraw. */
+	private volatile PathStopPlan pathPlan;
+	private PathStopOverlay pathOverlay;
 
 	@Inject
 	private WSClient wsClient;
@@ -156,6 +164,8 @@ public class GroupIronmanPlugin extends Plugin
 		paths = new PathSession(new ShortestPathBridge(pluginManager::getPlugins,
 			p -> p instanceof Plugin && pluginManager.isPluginEnabled((Plugin) p),
 			ShortestPathBridge.clientThreadEventPoster(clientThread::invoke, eventBus::post)));
+		pathOverlay = new PathStopOverlay(config, () -> pathPlan);
+		overlayManager.add(pathOverlay);
 		panel = new GroupIronmanPanel(itemManager, skillIconManager, spriteManager, new GroupIronmanPanel.Actions()
 		{
 			@Override
@@ -425,9 +435,15 @@ public class GroupIronmanPlugin extends Plugin
 		// Turning the plugin off takes its path with it.
 		PathSession s = paths;
 		paths = null;
+		pathPlan = null;
 		if (s != null)
 		{
 			s.stop();
+		}
+		if (pathOverlay != null)
+		{
+			overlayManager.remove(pathOverlay);
+			pathOverlay = null;
 		}
 		wsClient.unregisterMessage(VvgGroupIronmanMessage.class);
 		eventBus.unregister(events);
@@ -522,6 +538,7 @@ public class GroupIronmanPlugin extends Plugin
 		if (s != null)
 		{
 			s.recheck(t -> ItemPaths.forTarget(t, cards, requests, planner));
+			pathPlan = PathStopPlan.of(s.activeTarget(), s.activeStop(), cards, requests, planner);
 		}
 		return new ShoppingTab.View(cards, group.presets().presets(), roster, shop.history(),
 			!group.self().isEmpty(), group.syncing(), requests, group.self(), planner,
