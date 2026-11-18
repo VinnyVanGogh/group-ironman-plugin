@@ -275,7 +275,7 @@ public class PanelModelTest
 	@Test
 	public void storageNeverSeenSaysSo()
 	{
-		PanelModel.StorageView v = PanelModel.storage(new GroupRoster(), ITEMS, "Me", null, NOW);
+		PanelModel.StorageView v = PanelModel.storage(new GroupRoster(), ITEMS, "Me", GridFilter.NONE, NOW);
 		assertNull(v.snapshot);
 		assertTrue(v.items.isEmpty());
 		assertTrue(v.log.isEmpty());
@@ -308,7 +308,7 @@ public class PanelModelTest
 		assertEquals("Coins - 450,001 in group storage", row.tooltip);
 		assertEquals("the icon is the stack's own pile", 450_001, row.quantity);
 
-		PanelModel.StorageView v = PanelModel.storage(roster, ITEMS, "Me", null, NOW);
+		PanelModel.StorageView v = PanelModel.storage(roster, ITEMS, "Me", GridFilter.NONE, NOW);
 		assertEquals("Sam took 40K Coins", v.log.get(0).text);
 		assertEquals("Sam took 40,000 Coins", v.log.get(0).exact);
 		assertEquals("450,001 x Coins", v.items.get(0).tooltip());

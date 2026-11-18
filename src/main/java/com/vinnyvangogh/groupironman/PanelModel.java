@@ -101,6 +101,8 @@ final class PanelModel
 
 		/** What a log basket, fish barrel or coal bag holds, drawn on its slot; -1 when unknown or not one. */
 		final int inside;
+		/** What High Alchemy pays for the whole stack in gp, 0 when unknown: the secondary figure in the tooltip. */
+		final long highAlch;
 
 		ItemCell(int id, String name, long quantity, long value)
 		{
@@ -116,11 +118,22 @@ final class PanelModel
 
 		ItemCell(int id, String name, long quantity, long value, int inside)
 		{
-			this(id, name, quantity, value, inside, Collections.emptyList(), 0, false);
+			this(id, name, quantity, value, inside, 0);
+		}
+
+		ItemCell(int id, String name, long quantity, long value, int inside, long highAlch)
+		{
+			this(id, name, quantity, value, inside, Collections.emptyList(), 0, false, highAlch);
 		}
 
 		ItemCell(int id, String name, long quantity, long value, int inside, List<String> held, long heldValue,
 			boolean showHeldValue)
+		{
+			this(id, name, quantity, value, inside, held, heldValue, showHeldValue, 0);
+		}
+
+		ItemCell(int id, String name, long quantity, long value, int inside, List<String> held, long heldValue,
+			boolean showHeldValue, long highAlch)
 		{
 			this.id = id;
 			this.name = name;
@@ -130,6 +143,7 @@ final class PanelModel
 			this.held = held;
 			this.heldValue = heldValue;
 			this.showHeldValue = showHeldValue;
+			this.highAlch = highAlch;
 		}
 
 		/** An empty inventory slot, kept so the items after it stay in their own slots. */
@@ -138,6 +152,19 @@ final class PanelModel
 		boolean empty()
 		{
 			return id <= 0;
+		}
+
+		/** Draws the same as {@code o}: same item, stack, value and contents. */
+		boolean sameAs(ItemCell o)
+		{
+			return o != null && id == o.id && quantity == o.quantity && value == o.value && inside == o.inside
+				&& highAlch == o.highAlch && heldValue == o.heldValue && showHeldValue == o.showHeldValue
+				&& name.equals(o.name) && held.equals(o.held);
+		}
+
+		static boolean same(List<ItemCell> a, List<ItemCell> b)
+		{
+			return sameLists(a, b, ItemCell::sameAs);
 		}
 
 		/** "450,001 x Coins": the exact amount, which the icon's own stack text shortens; "Log basket (19 inside)". */
@@ -220,15 +247,36 @@ final class PanelModel
 		/** {@link #summary} with every digit, for its tooltip: "812 items, 45,201,337 gp, seen 2h ago". */
 		final String exact;
 		final long value;
+		/** The cells drawn: the preview's top stacks, or every match when searching or "Show all". */
 		final List<ItemCell> items;
+		/** Matching stacks left out of {@link #items} by the preview; 0 when everything matching is drawn. */
+		final int hidden;
 
-		BankCard(String member, String summary, String exact, long value, List<ItemCell> items)
+		BankCard(String member, String summary, String exact, long value, List<ItemCell> items, int hidden)
 		{
 			this.member = member;
 			this.summary = summary;
 			this.exact = exact;
 			this.value = value;
 			this.items = items;
+			this.hidden = hidden;
+		}
+
+		/** Draws the same card as {@code o}: the Banks tab leaves it alone. */
+		boolean sameAs(BankCard o)
+		{
+			return member.equals(o.member) && summary.equals(o.summary) && exact.equals(o.exact)
+				&& hidden == o.hidden && ItemCell.same(items, o.items);
+		}
+
+		/** Whether two Banks tabs draw the same; null is "bank sharing is off". */
+		static boolean same(List<BankCard> a, List<BankCard> b)
+		{
+			if (a == null || b == null)
+			{
+				return a == b;
+			}
+			return sameLists(a, b, BankCard::sameAs);
 		}
 	}
 
@@ -245,6 +293,11 @@ final class PanelModel
 			this.text = text;
 			this.exact = exact;
 			this.ago = ago;
+		}
+
+		boolean sameAs(LogRow o)
+		{
+			return text.equals(o.text) && exact.equals(o.exact) && ago.equals(o.ago);
 		}
 	}
 
@@ -263,6 +316,30 @@ final class PanelModel
 			this.items = items;
 			this.log = log;
 		}
+
+		/** Draws the same Storage tab as {@code o}; {@code o} may be null (nothing drawn yet). */
+		boolean sameAs(StorageView o)
+		{
+			return o != null && value == o.value && java.util.Objects.equals(snapshot, o.snapshot)
+				&& ItemCell.same(items, o.items) && sameLists(log, o.log, LogRow::sameAs);
+		}
+	}
+
+	/** Same length and {@code same} pair by pair: what decides a panel tab needs no redraw. */
+	static <T> boolean sameLists(List<T> a, List<T> b, java.util.function.BiPredicate<T, T> same)
+	{
+		if (a.size() != b.size())
+		{
+			return false;
+		}
+		for (int i = 0; i < a.size(); i++)
+		{
+			if (!same.test(a.get(i), b.get(i)))
+			{
+				return false;
+			}
+		}
+		return true;
 	}
 
 	static final class FindRow
@@ -526,7 +603,7 @@ final class PanelModel
 	{
 		if (!counts.isEmpty())
 		{
-			out.add(new ItemGroup(title, cells(counts, items, null, false)));
+			out.add(new ItemGroup(title, cells(counts, items, GridFilter.NONE, false)));
 		}
 	}
 
@@ -585,14 +662,22 @@ final class PanelModel
 	 */
 	static List<ItemCell> cells(Map<Integer, Integer> counts, ItemLookup items, String filter, boolean byValue)
 	{
-		ItemQuery q = ItemQuery.parse(filter);
+		return cells(counts, items, GridFilter.of(filter), byValue);
+	}
+
+	/** {@link #cells(Map, ItemLookup, String, boolean)} for the search box and the category pill of {@code filter}. */
+	static List<ItemCell> cells(Map<Integer, Integer> counts, ItemLookup items, GridFilter filter, boolean byValue)
+	{
+		ItemQuery q = ItemQuery.parse(filter.query);
 		List<ItemCell> out = new ArrayList<>();
 		for (Map.Entry<Integer, Integer> e : counts.entrySet())
 		{
-			String name = items.name(e.getKey());
-			if (q == null || q.matches(name))
+			int id = e.getKey();
+			String name = items.name(id);
+			if ((q == null || q.matches(name)) && filter.category.matches(id, items))
 			{
-				out.add(new ItemCell(e.getKey(), name, e.getValue(), items.price(e.getKey()) * e.getValue()));
+				out.add(new ItemCell(id, name, e.getValue(), items.price(id) * e.getValue(), -1,
+					items.highAlch(id) * e.getValue()));
 			}
 		}
 		if (byValue)
@@ -612,8 +697,20 @@ final class PanelModel
 		return value;
 	}
 
-	/** One card per member's last bank, sorted by name, each grid most valuable first and filtered by {@code filter}. */
+	/** Stacks a bank card draws before a search, a category's "Show all" or the search box asks for more. */
+	static final int BANK_PREVIEW = 20;
+
 	static List<BankCard> banks(GroupRoster group, ItemLookup items, String filter, long now)
+	{
+		return banks(group, items, GridFilter.of(filter), now);
+	}
+
+	/**
+	 * One card per member's last bank, sorted by name, each grid most valuable first (Grand Exchange price times
+	 * quantity). Without a search or "Show all" a card draws only its {@link #BANK_PREVIEW} top stacks of the chosen
+	 * category and counts the rest in {@link BankCard#hidden}; the summary always describes the whole bank.
+	 */
+	static List<BankCard> banks(GroupRoster group, ItemLookup items, GridFilter filter, long now)
 	{
 		List<BankCard> out = new ArrayList<>();
 		for (Map.Entry<String, BankSnapshot> e : group.banks().entrySet())
@@ -628,13 +725,16 @@ final class PanelModel
 			String seen = " gp, seen " + BoostText.ago(now, e.getValue().takenAt());
 			String summary = Amounts.GAME.of(count) + " items, " + Amounts.GAME.of(value) + seen;
 			String exact = Amounts.EXACT.of(count) + " items, " + Amounts.EXACT.of(value) + seen;
-			out.add(new BankCard(e.getKey(), summary, exact, value, cells(bank, items, filter, true)));
+			List<ItemCell> matching = cells(bank, items, filter, true);
+			int shown = filter.previewing() ? Math.min(BANK_PREVIEW, matching.size()) : matching.size();
+			out.add(new BankCard(e.getKey(), summary, exact, value, new ArrayList<>(matching.subList(0, shown)),
+				matching.size() - shown));
 		}
 		return out;
 	}
 
 	/** The last storage contents as seen, with when and by whom, and the change log as lines. */
-	static StorageView storage(GroupRoster group, ItemLookup items, String self, String filter, long now)
+	static StorageView storage(GroupRoster group, ItemLookup items, String self, GridFilter filter, long now)
 	{
 		List<LogRow> log = new ArrayList<>();
 		for (StorageChange c : group.log().entries())
@@ -693,9 +793,16 @@ final class PanelModel
 	/** Rows read from your side: "Trout - 15 in your bank", "Trout - 140 in group storage". */
 	static List<FindRow> find(String query, GroupRoster group, ItemLookup items, long now, String self)
 	{
+		return find(query, group, items, now, self, FindFilter.NONE);
+	}
+
+	/** {@link #find(String, GroupRoster, ItemLookup, long, String)} narrowed by the quick-find dropdowns. */
+	static List<FindRow> find(String query, GroupRoster group, ItemLookup items, long now, String self,
+		FindFilter filter)
+	{
 		FindStyle words = new FindStyle(self, null, null, null, null, null, null);
 		List<FindRow> out = new ArrayList<>();
-		for (GroupSearch.Hit h : GroupSearch.hits(query, group.searchSources(), items))
+		for (GroupSearch.Hit h : GroupSearch.hits(query, group.searchSources(), items, filter))
 		{
 			out.add(new FindRow(h.itemId, h.quantity, h.name + " - " + words.place(h, Amounts.GAME),
 				h.name + " - " + words.place(h, Amounts.EXACT), h.seenAt < 0 ? "" : BoostText.ago(now, h.seenAt)));

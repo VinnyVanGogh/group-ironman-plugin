@@ -28,6 +28,7 @@ final class FakeItems implements ItemLookup
 	static final int NOTED_YEW_LOGS = 1516;
 	static final int LOGS = 1511;
 	static final int DRAGON_WARHAMMER = 13576;
+	static final int AIR_RUNE = 556;
 
 	private final Map<Integer, String> names = new HashMap<>();
 	private final Map<Integer, Long> prices = new HashMap<>();
@@ -54,6 +55,14 @@ final class FakeItems implements ItemLookup
 		add(NOTED_YEW_LOGS, "Yew logs", 300);
 		add(LOGS, "Logs", 50);
 		add(DRAGON_WARHAMMER, "Dragon warhammer", 0);
+		add(AIR_RUNE, "Air rune", 5);
+	}
+
+	/** The two melee weapons the table has, as RuneLite's item stats would class them. */
+	@Override
+	public int combatStyles(int id)
+	{
+		return id == WHIP || id == RUNE_SCIM ? ItemStyles.MELEE | ItemStyles.COMBAT : 0;
 	}
 
 	private void add(int id, String name, long price)

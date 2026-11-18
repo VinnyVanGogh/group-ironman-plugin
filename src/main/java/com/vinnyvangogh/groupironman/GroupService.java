@@ -66,6 +66,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemEquipmentStats;
 import net.runelite.client.game.ItemStats;
 import net.runelite.client.game.ItemStack;
 import net.runelite.client.hiscore.HiscoreClient;
@@ -190,6 +191,10 @@ class GroupService
 	private final Map<Integer, Long> prices = new ConcurrentHashMap<>();
 	/** Equipment slot per item, read on the client thread with the name (ItemManager stats need it). */
 	private final Map<Integer, Integer> slots = new ConcurrentHashMap<>();
+	/** {@link ItemStyles} bits per item, read from its equipment stats with the slot. */
+	private final Map<Integer, Integer> styles = new ConcurrentHashMap<>();
+	/** High Alchemy value per item, read with the name. */
+	private final Map<Integer, Long> highAlchs = new ConcurrentHashMap<>();
 	private Runnable onChange = () -> { };
 	private Callable<Filepath> dataDirectory = () ->
 	{
@@ -308,6 +313,18 @@ class GroupService
 		public int slot(int id)
 		{
 			return slots.getOrDefault(id, -1);
+		}
+
+		@Override
+		public int combatStyles(int id)
+		{
+			return styles.getOrDefault(id, 0);
+		}
+
+		@Override
+		public long highAlch(int id)
+		{
+			return highAlchs.getOrDefault(id, 0L);
 		}
 	};
 
@@ -2137,6 +2154,14 @@ class GroupService
 		}
 	}
 
+	private static int styleOf(ItemEquipmentStats g)
+	{
+		return ItemStyles.classify(g.getSlot(), Math.max(g.getAstab(), Math.max(g.getAslash(), g.getAcrush())),
+			g.getArange(), g.getAmagic(), g.getStr(), g.getRstr(), g.getMdmg(),
+			Math.max(g.getDstab(), Math.max(g.getDslash(), g.getDcrush())), g.getDrange(), g.getDmagic(),
+			g.getPrayer());
+	}
+
 	/** Client thread. */
 	private void resolveNow(Collection<Integer> ids)
 	{
@@ -2154,10 +2179,19 @@ class GroupService
 				names.put(id, name);
 				tradeable.put(id, item.isTradeable());
 				prices.put(id, (long) itemManager.getItemPrice(id));
-				ItemStats stats = itemManager.getItemStats(id);
-				slots.put(id, stats == null || stats.getEquipment() == null ? -1 : stats.getEquipment().getSlot());
+				readGear(id, item);
 			}
 		}
+	}
+
+	/** Client thread: the item's equipment slot and combat style from its stats, and its alchemy value. */
+	private void readGear(int id, ItemComposition item)
+	{
+		ItemStats stats = itemManager.getItemStats(id);
+		ItemEquipmentStats gear = stats == null ? null : stats.getEquipment();
+		slots.put(id, gear == null ? -1 : gear.getSlot());
+		styles.put(id, gear == null ? 0 : styleOf(gear));
+		highAlchs.put(id, (long) item.getHaPrice());
 	}
 
 	/** Executor thread. */

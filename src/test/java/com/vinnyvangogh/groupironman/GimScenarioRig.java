@@ -146,7 +146,7 @@ final class GimScenarioRig
 	private List<String> storageLog()
 	{
 		List<String> out = new ArrayList<>();
-		for (PanelModel.LogRow row : PanelModel.storage(roster, items, self, null, now).log)
+		for (PanelModel.LogRow row : PanelModel.storage(roster, items, self, GridFilter.NONE, now).log)
 		{
 			out.add(row.text);
 		}

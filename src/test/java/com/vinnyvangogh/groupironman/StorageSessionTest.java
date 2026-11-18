@@ -54,7 +54,7 @@ public class StorageSessionTest
 
 		List<PanelModel.LogRow> log(long now)
 		{
-			return PanelModel.storage(roster, ITEMS, "me", null, now).log;
+			return PanelModel.storage(roster, ITEMS, "me", GridFilter.NONE, now).log;
 		}
 
 		/** Open with 40 Sharks, then 5 Trout deposited and not yet saved. */
@@ -205,7 +205,7 @@ public class StorageSessionTest
 		sink.commit(snapshot);
 		s.close(NOW);
 
-		PanelModel.StorageView view = PanelModel.storage(sink.roster, ITEMS, "Me", null, NOW);
+		PanelModel.StorageView view = PanelModel.storage(sink.roster, ITEMS, "Me", GridFilter.NONE, NOW);
 		assertEquals("Last seen just now, by you", view.snapshot);
 		assertEquals(2, view.items.size());
 		assertEquals("most valuable stack first", SHARK, view.items.get(0).id);

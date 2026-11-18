@@ -66,6 +66,18 @@ enum Amounts
 			}
 
 			@Override
+			public int combatStyles(int id)
+			{
+				return base.combatStyles(id);
+			}
+
+			@Override
+			public long highAlch(int id)
+			{
+				return base.highAlch(id);
+			}
+
+			@Override
 			public String amount(long amount)
 			{
 				return style.of(amount);

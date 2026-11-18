@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Consumer;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
@@ -119,6 +121,10 @@ public class GroupIronmanPlugin extends Plugin
 
 	@Inject
 	private SpriteManager spriteManager;
+
+	/** RuneLite's shared background executor: the Banks and Storage tabs build their models here, not on Swing's thread. */
+	@Inject
+	private ScheduledExecutorService executor;
 
 	@Inject
 	private Client client;
@@ -381,7 +387,7 @@ public class GroupIronmanPlugin extends Plugin
 				redraw();
 				return said;
 			}
-		});
+		}, (task, delayMs) -> executor.schedule(task, delayMs, TimeUnit.MILLISECONDS), SwingUtilities::invokeLater);
 		navButton = NavigationButton.builder()
 			.tooltip(NAME)
 			.icon(icon())

@@ -298,7 +298,16 @@ final class GimPanelFixture
 	/** Call on the Swing thread. With {@code sprites} answering, e.g. with stand-in worn-slot silhouettes. */
 	GimPanelFixture(SpriteManager sprites)
 	{
-		panel = new GroupIronmanPanel(items, new SkillIconManager(), sprites, actions);
+		this(sprites, RedrawCoalescer.DIRECT, Runnable::run);
+	}
+
+	/**
+	 * Call on the Swing thread. Banks/Storage model builds go to {@code background} and their drawing to
+	 * {@code edt}, so a test can hold either and run it when it likes.
+	 */
+	GimPanelFixture(SpriteManager sprites, RedrawCoalescer.Scheduler background, java.util.concurrent.Executor edt)
+	{
+		panel = new GroupIronmanPanel(items, new SkillIconManager(), sprites, actions, background, edt);
 		ui = new SwingDriver(panel);
 	}
 
