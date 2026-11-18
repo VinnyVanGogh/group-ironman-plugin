@@ -29,11 +29,12 @@ public class EventSettingsTest
 		EventSettings s = EventSettings.from(DEFAULTS);
 		// Online status defaults to Posts (Board 2026-11-10); nothing posts until Discord is turned on.
 		assertEquals(EnumSet.of(GroupEvent.Type.ONLINE), s.discord);
-		assertTrue(s.overlay.isEmpty());
+		// Announcements are the one banner on by default (Board 2026-11-18); login alerts stay off.
+		assertEquals(EnumSet.of(GroupEvent.Type.ANNOUNCEMENT), s.overlay);
 		assertFalse(s.share);
 		for (GroupEvent.Type t : GroupEvent.Type.values())
 		{
-			assertEquals(t == GroupEvent.Type.ONLINE, s.wants(t));
+			assertEquals(t == GroupEvent.Type.ONLINE || t == GroupEvent.Type.ANNOUNCEMENT, s.wants(t));
 		}
 		assertEquals(1_000_000, s.dropMin);
 		assertEquals(7, s.backAfterDays);
