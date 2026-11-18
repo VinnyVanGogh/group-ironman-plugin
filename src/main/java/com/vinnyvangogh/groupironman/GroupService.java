@@ -272,6 +272,9 @@ class GroupService
 	/** This login has not asked the hiscores about the roster yet. */
 	private boolean hiscoresOnLogin = true;
 
+	/** The looting bag's item container id (InventoryID.LOOTING_BAG), sent by the game while the bag is viewed. */
+	private static final int LOOTING_BAG_CONTAINER = 516;
+
 	private volatile RegionNames regions = RegionNames.parse("");
 	/** Nothing is written to disk until the file has been read, or a save would replace it with less. */
 	private volatile boolean cacheLoaded;
@@ -870,6 +873,11 @@ class GroupService
 		else if (id == InventoryID.INV || id == InventoryID.WORN)
 		{
 			containers.itemsChanged();
+			carriedDirty = true;
+		}
+		else if (id == LOOTING_BAG_CONTAINER)
+		{
+			containers.lootingBag(event.getItemContainer());
 			carriedDirty = true;
 		}
 		else if (id == InventoryID.SEED_VAULT)
@@ -1908,7 +1916,8 @@ class GroupService
 		ticksSinceCarried = 0;
 		ItemContainer inv = client.getItemContainer(InventoryID.INV);
 		GroupCodec.Carried carried = new GroupCodec.Carried(counts(inv),
-			counts(client.getItemContainer(InventoryID.WORN)), inventorySlots(inv), containers.held());
+			counts(client.getItemContainer(InventoryID.WORN)), inventorySlots(inv), containers.held(),
+			jewelleryCharges(inv, client.getItemContainer(InventoryID.WORN)));
 		String local = GroupCodec.encodeCarried(gson, carried);
 		if (!local.equals(lastCarriedLocal))
 		{
@@ -1923,6 +1932,28 @@ class GroupService
 			send(payload);
 			lastCarriedSent = payload;
 		}
+	}
+
+	/** Client thread. Charges on jewellery in the inventory or worn, read as Item Charges shows them. */
+	private Map<String, Integer> jewelleryCharges(ItemContainer... sources)
+	{
+		List<String> names = new ArrayList<>();
+		for (ItemContainer container : sources)
+		{
+			if (container == null)
+			{
+				continue;
+			}
+			for (Item item : container.getItems())
+			{
+				if (item.getId() > 0)
+				{
+					names.add(itemManager.getItemComposition(item.getId()).getName());
+				}
+			}
+		}
+		return JewelleryCharges.of(names, key ->
+			configManager.getRSProfileConfiguration(JewelleryCharges.CONFIG_GROUP, key, Integer.class));
 	}
 
 	/** Client thread. The inventory's slots in order with raw ids, so a noted stack draws noted; none without one. */
@@ -2047,8 +2078,9 @@ class GroupService
 				continue;
 			}
 			ItemComposition item = itemManager.getItemComposition(id);
-			String name = item == null ? null : item.getName();
-			if (name != null && !name.isEmpty() && !"null".equalsIgnoreCase(name))
+			String name = item == null ? null : ItemNames.resolve(id,
+				i -> itemManager.getItemComposition(i).getName(), itemManager::canonicalize);
+			if (name != null)
 			{
 				names.put(id, name);
 				tradeable.put(id, item.isTradeable());

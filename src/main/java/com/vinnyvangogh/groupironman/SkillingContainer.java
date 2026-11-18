@@ -25,7 +25,12 @@ enum SkillingContainer
 	/** Fish barrel and Fish sack barrel: 28 raw fish of any kind. */
 	FISH_BARREL("Fish barrel", 28, "fish barrel", "fish sack barrel"),
 	/** 27 coal, 36 with a Smithing cape. */
-	COAL_BAG("Coal bag", 27, "coal bag");
+	COAL_BAG("Coal bag", 27, "coal bag"),
+	/**
+	 * Looting bag: 28 slots, read from the game's own container when the bag is viewed, not from chat. Its
+	 * count is the slots in use, since a stack of coins would pass any item count.
+	 */
+	LOOTING_BAG("Looting bag", 28, "looting bag");
 
 	static final int COAL_BAG_CAPE_CAPACITY = 36;
 	private static final String OPEN = "open ";
