@@ -216,6 +216,9 @@ class GroupService
 	private volatile WorldPoint here;
 	// Client thread only.
 	private final ShopVisits shopVisits = new ShopVisits();
+	/** This player's own boss bests, read from their own chat; shared only under "Share group events". */
+	private final PbCapture pbCapture = new PbCapture();
+	private volatile boolean pbDirty;
 	private int ticksSinceQuests = QUEST_INTERVAL_TICKS;
 	private int ticksSinceShopAlert;
 	private int ticksSinceSeal;
@@ -955,6 +958,11 @@ class GroupService
 		if (event.getType() == ChatMessageType.GAMEMESSAGE || event.getType() == ChatMessageType.SPAM)
 		{
 			carriedDirty |= containers.chat(event.getMessage());
+		}
+		if (event.getType() == ChatMessageType.GAMEMESSAGE && member() && config.groupShareEvents()
+			&& pbCapture.chat(event.getMessage()))
+		{
+			pbDirty = true;
 		}
 		if (event.getType() != ChatMessageType.GAMEMESSAGE || !switches().drops)
 		{
@@ -1702,6 +1710,15 @@ class GroupService
 	{
 		ifSet(governance, g -> g.flush(MemberPrefs.of(config)));
 		ifSet(shopping, shop -> shop.flush(self));
+		if (pbDirty && config.groupShareEvents())
+		{
+			pbDirty = false;
+			PersonalBests mine = pbCapture.bests();
+			if (!mine.isEmpty())
+			{
+				ifSet(progress, book -> book.publish(mine, null));
+			}
+		}
 	}
 
 	/**
@@ -2391,6 +2408,8 @@ class GroupService
 	{
 		ifSet(governance, GovernanceSync::resendAll);
 		ifSet(shopping, ShoppingSync::resendAll);
+		ifSet(progress, MemberProgressBook::resendAll);
+		pbDirty = true;
 	}
 
 	/** Every item any live list may show, for names and whether it can change hands. */
