@@ -1022,6 +1022,25 @@ class GroupService
 		}
 	}
 
+	/** The chat command that sends a short note to the group: {@code ::announce Raid at 8pm}. */
+	static final String ANNOUNCE_COMMAND = "announce";
+
+	/** Client thread. The player's own typed note, from the engine; a line back when it could not go as typed. */
+	private void announce(String text)
+	{
+		GroupEventEngine engine = events;
+		if (engine == null || !member())
+		{
+			tell("Announcements need you to be in the group.");
+			return;
+		}
+		String reply = engine.announce(text);
+		if (reply != null)
+		{
+			tell(reply);
+		}
+	}
+
 	private void tell(String text)
 	{
 		chatMessageManager.queue(QueuedMessage.builder()
@@ -1044,6 +1063,11 @@ class GroupService
 	@Subscribe
 	public void onCommandExecuted(CommandExecuted event)
 	{
+		if (ANNOUNCE_COMMAND.equalsIgnoreCase(event.getCommand()))
+		{
+			announce(String.join(" ", event.getArguments()));
+			return;
+		}
 		if (!FindCommand.NAME.equalsIgnoreCase(event.getCommand()) || !config.groupFindCommand())
 		{
 			return;

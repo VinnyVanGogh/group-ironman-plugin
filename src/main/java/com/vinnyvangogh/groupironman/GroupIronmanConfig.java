@@ -5,6 +5,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Keybind;
 import net.runelite.client.config.Range;
 import net.runelite.client.config.Units;
 
@@ -685,6 +686,21 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "discordAnnouncement", name = "Announcement",
+		description = "A note a member typed with ::announce.", section = discordEventsSection, position = 39)
+	default boolean discordAnnouncement()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordEveryoneOnline", name = "Everyone online",
+		description = "Everyone in the group is online. Posted by the group leader's client only.",
+		section = discordEventsSection, position = 40)
+	default boolean discordEveryoneOnline()
+	{
+		return false;
+	}
+
 	// ---- 4. Discord: how to post ----
 
 	@ConfigItem(keyName = "discordOnlineStatus", name = "Online status", description = "Posts: one per login and"
@@ -1225,6 +1241,45 @@ public interface GroupIronmanConfig extends Config
 	default boolean overlayActivityDeath()
 	{
 		return false;
+	}
+
+	@ConfigItem(keyName = "overlayAnnouncement", name = "Banner: Announcement",
+		description = "A note a member typed with ::announce. On by default.", section = inGameSection, position = 48)
+	default boolean overlayAnnouncement()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "overlayEveryoneOnline", name = "Banner: Everyone online",
+		description = "Everyone in the group is online at once.", section = inGameSection, position = 49)
+	default boolean overlayEveryoneOnline()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayDismissKey", name = "Dismiss banners key",
+		description = "Clears every banner on screen. Right-click a banner and choose Dismiss does the same.",
+		section = inGameSection, position = 50)
+	default Keybind overlayDismissKey()
+	{
+		return Keybind.NOT_SET;
+	}
+
+	@ConfigItem(keyName = "overlayQuietStart", name = "Banner quiet from",
+		description = "Hour banners stop showing (the Log still records them). Same as 'until' means no quiet hours.",
+		section = inGameSection, position = 51)
+	@Range(max = 23)
+	default int overlayQuietStart()
+	{
+		return 0;
+	}
+
+	@ConfigItem(keyName = "overlayQuietEnd", name = "Banner quiet until",
+		description = "Hour banners show again.", section = inGameSection, position = 52)
+	@Range(max = 23)
+	default int overlayQuietEnd()
+	{
+		return 0;
 	}
 
 	// ---- 7. Thresholds: what counts. Both Discord and the banners read these. ----

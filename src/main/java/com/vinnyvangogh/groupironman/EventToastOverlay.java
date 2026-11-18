@@ -6,6 +6,8 @@ import java.awt.Graphics2D;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import net.runelite.api.MenuAction;
+import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
@@ -17,6 +19,9 @@ import net.runelite.client.ui.overlay.components.TitleComponent;
  */
 final class EventToastOverlay extends OverlayPanel
 {
+	/** The right-click entry that clears every banner. */
+	static final String DISMISS = "Dismiss";
+
 	private final ToastQueue toasts;
 	private final GroupIronmanConfig config;
 	private final ItemLookup lookup;
@@ -30,6 +35,7 @@ final class EventToastOverlay extends OverlayPanel
 		this.lookup = lookup;
 		this.eggs = eggs;
 		setPosition(config.overlayPosition().position);
+		getMenuEntries().add(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY, DISMISS, "Group banners"));
 	}
 
 	void reposition()

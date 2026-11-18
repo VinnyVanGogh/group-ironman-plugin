@@ -69,6 +69,20 @@ final class ToastQueue
 		return out;
 	}
 
+	/** Clears every banner on screen; the group box's recent events stay. Returns how many were showing. */
+	synchronized int dismissAll()
+	{
+		int n = toasts.size();
+		toasts.clear();
+		return n;
+	}
+
+	/** Clears the newest banner only. False when none was showing. */
+	synchronized boolean dismissNewest()
+	{
+		return toasts.pollFirst() != null;
+	}
+
 	/** The newest {@code max} events seen, banners expired or not, for the group box. */
 	synchronized List<GroupEvent> recent(int max)
 	{

@@ -10,6 +10,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +56,9 @@ import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
+import net.runelite.client.events.OverlayMenuClicked;
+import net.runelite.client.input.KeyManager;
+import net.runelite.client.util.HotkeyListener;
 import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
@@ -125,6 +129,10 @@ class GroupEventEngine
 	static final String WAVE_RUN_KEY = "activityRun";
 	/** An activity is sent again this often while it lasts, so members can tell a crashed client's run apart. */
 	static final long ACTIVITY_KEEPALIVE_MS = 60_000;
+	/** "Everyone is online" fires at most this often, so a member's reconnects do not repeat it. */
+	static final long EVERYONE_COOLDOWN_MS = TimeUnit.MINUTES.toMillis(10);
+	/** Between one player's announcements. */
+	static final long ANNOUNCE_COOLDOWN_MS = TimeUnit.SECONDS.toMillis(5);
 	private static final EnumSet<GroupEvent.Type> POLLED = EnumSet.of(GroupEvent.Type.DIARY,
 		GroupEvent.Type.WILDERNESS, GroupEvent.Type.HC_LIFE_LOST);
 
@@ -161,6 +169,9 @@ class GroupEventEngine
 	@Inject
 	private ChatMessageManager chatMessageManager;
 
+	@Inject
+	private KeyManager keyManager;
+
 	private final ToastQueue toasts = new ToastQueue();
 	private final WebhookWarnings webhookWarnings = new WebhookWarnings();
 	private final PosterNames posterNames = new PosterNames();
@@ -170,8 +181,23 @@ class GroupEventEngine
 	private PresenceDebounce presence = new PresenceDebounce(ZoneId.systemDefault());
 	/** Members without the plugin, as the Group channel sees them; guarded by {@link #presenceLock} too. */
 	private final ChannelPosts channelPosts = new ChannelPosts(ZoneId.systemDefault());
-	private final EventRouter router = new EventRouter(this::toDiscord, e -> toasts.add(e, System.currentTimeMillis()),
-		this::toDigest, this::toLog);
+	private final EventRouter router = new EventRouter(this::toDiscord, this::toast, this::toDigest, this::toLog);
+	/** One banner per event, however many sources report it ({@link AlertDedup}). */
+	private final AlertDedup alertDedup = new AlertDedup();
+	/** Timer: the change to "everyone in the group is online" ({@link EveryoneOnline}). */
+	private final EveryoneOnline everyone = new EveryoneOnline();
+	private long everyoneAt;
+	/** Client thread: when this player last announced, so one cannot flood the group. */
+	private long announcedAt;
+	/** Clears every banner on screen: the dismiss key, and the banner's right-click Dismiss. */
+	private final HotkeyListener dismissKey = new HotkeyListener(() -> config.overlayDismissKey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			toasts.dismissAll();
+		}
+	};
 	/** Client thread: Discord events waiting for the rest of their moment. */
 	private final DiscordBatch batch = new DiscordBatch();
 	/** A member's level-ups as one message, a card per skill, edited in place. Any thread; kept in {@link #LEVEL_FILE}. */
@@ -252,6 +278,7 @@ class GroupEventEngine
 		boxOverlay = new GroupBoxOverlay(toasts, config, group, this::eggSettings);
 		overlayManager.add(toastOverlay);
 		overlayManager.add(boxOverlay);
+		keyManager.registerKeyListener(dismissKey);
 		pump = executor.scheduleWithFixedDelay(this::tick, 1, 1, TimeUnit.SECONDS);
 		loginPending = client.getGameState() == GameState.LOGGED_IN;
 	}
@@ -276,8 +303,11 @@ class GroupEventEngine
 		{
 			group.events(null);
 		}
+		keyManager.unregisterKeyListener(dismissKey);
 		overlayManager.remove(toastOverlay);
 		overlayManager.remove(boxOverlay);
+		alertDedup.clear();
+		everyone.reset();
 		toastOverlay = null;
 		boxOverlay = null;
 		if (sender != null)
@@ -398,6 +428,7 @@ class GroupEventEngine
 				router.route(offline, true, settings, group.lookup);
 			}
 			routeChannelPosts(others);
+			everyoneTick(System.currentTimeMillis());
 			boardTick(System.currentTimeMillis());
 		}
 		catch (RuntimeException e)
@@ -405,6 +436,95 @@ class GroupEventEngine
 			// A scheduled task that throws is never run again; keep the pump alive.
 			log.debug("group event tick failed", e);
 		}
+	}
+
+	/** Timer: every member online at once is one event, worked out here from the roster and presence. */
+	private void everyoneTick(long now)
+	{
+		Set<String> names = group.members().names();
+		StatusBoard.Self self = boardSelf;
+		if (!group.member() || names.isEmpty() || self == null || !self.online)
+		{
+			// Logged out or not in the group: no baseline, so the next login starts from what it sees.
+			everyone.reset();
+			return;
+		}
+		int count = everyone.update(names, onlineMembers(names, self.name, now));
+		if (count > 0 && now - everyoneAt >= EVERYONE_COOLDOWN_MS)
+		{
+			everyoneAt = now;
+			String group = this.group.members().group();
+			// The leader's client alone posts it to Discord; every client shows it, so each is told once.
+			router.route(GroupEvent.of(GroupEvent.Type.EVERYONE_ONLINE, now, group.isEmpty() ? "Group" : group)
+				.number(count).build(), this.group.isLeader(), settings, this.group.lookup);
+		}
+	}
+
+	/** The roster members online now: the game's Group channel where it speaks for them, else who was heard lately. */
+	private Set<String> onlineMembers(Set<String> names, String self, long now)
+	{
+		GamePresence game = group.presence();
+		Map<String, Long> heard = new HashMap<>();
+		group.roster().lastHeard().forEach((n, at) -> heard.put(GroupMembers.key(n), at));
+		Set<String> online = new HashSet<>();
+		for (String name : names)
+		{
+			String key = GroupMembers.key(name);
+			GamePresence.State state = game.state(name);
+			boolean heardLately = Presence.online(heard.getOrDefault(key, 0L), now);
+			if (key.equals(GroupMembers.key(self)) || state == GamePresence.State.ONLINE
+				|| state == GamePresence.State.UNKNOWN && heardLately)
+			{
+				online.add(name);
+			}
+		}
+		return online;
+	}
+
+	/** One banner for a repeat, and none in the banner quiet hours (the Log still records the event). */
+	private void toast(GroupEvent event)
+	{
+		long now = System.currentTimeMillis();
+		if (alertDedup.fresh(event, now)
+			&& !DiscordQueue.quiet(LocalTime.now().getHour(), config.overlayQuietStart(), config.overlayQuietEnd()))
+		{
+			toasts.add(event, now);
+		}
+	}
+
+	/** Right-click Dismiss on a banner. */
+	@Subscribe
+	public void onOverlayMenuClicked(OverlayMenuClicked click)
+	{
+		if (click.getOverlay() == toastOverlay && EventToastOverlay.DISMISS.equals(click.getEntry().getOption()))
+		{
+			toasts.dismissAll();
+		}
+	}
+
+	/**
+	 * Client thread. This player's {@code ::announce} note to the group: shown here, and sent to the party when
+	 * "Share group events" is on, like every other event. Returns a line to tell the player, or null.
+	 */
+	String announce(String text)
+	{
+		String note = text == null ? "" : text.trim();
+		long now = System.currentTimeMillis();
+		if (note.isEmpty())
+		{
+			return "Type a note, e.g. ::announce Raid at 8pm";
+		}
+		if (announcedAt > 0 && now - announcedAt < ANNOUNCE_COOLDOWN_MS)
+		{
+			return "Wait a few seconds between announcements.";
+		}
+		announcedAt = now;
+		own(GroupEvent.of(GroupEvent.Type.ANNOUNCEMENT, now, group.localPlayer()).text(note).build());
+		if (!settings.share)
+		{
+			return "Shown to you only. Turn on 'Share group events' to send announcements to the group.";
+		}
+		return note.length() > GroupEvent.MAX_TEXT ? "Cut to " + GroupEvent.MAX_TEXT + " characters." : null;
 	}
 
 	/**
