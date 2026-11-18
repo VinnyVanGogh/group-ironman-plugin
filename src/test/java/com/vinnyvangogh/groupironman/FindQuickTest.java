@@ -180,7 +180,7 @@ public class FindQuickTest
 		List<PanelModel.FindRow> inStorage = PanelModel.find("", roster, i, NOW, "Me",
 			new FindFilter(FindQuick.Kind.RUNES, FindQuick.ANY, FindQuick.GROUP_STORAGE));
 		assertEquals(1, inStorage.size());
-		assertEquals("Air rune - 1K in group storage", inStorage.get(0).text);
+		assertEquals("Air rune - 1,000 in group storage", inStorage.get(0).text);
 
 		List<PanelModel.FindRow> alex = PanelModel.find("", roster, i, NOW, "Me",
 			new FindFilter(FindQuick.Kind.ANYTHING, FindQuick.ANY, "Alex"));

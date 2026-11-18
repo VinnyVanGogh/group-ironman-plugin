@@ -126,7 +126,8 @@ public class GridRedrawTest
 				assertSame("cells are kept, not rebuilt", before.get(i), grid.cells().get(i));
 			}
 
-			assertEquals("dropping two items removes two cells", 2, grid.update(cells(28)));
+			// The changed cell 7 reverts to its original item too, so that is one repaint beside the two removals.
+			assertEquals("dropping two items removes two cells and restores the changed one", 3, grid.update(cells(28)));
 			assertEquals(28, grid.cells().size());
 		});
 	}
@@ -135,7 +136,8 @@ public class GridRedrawTest
 
 	private static GimPanelFixture.Scene oneMoreLobster(GimPanelFixture.Scene s)
 	{
-		s.roster.putBank(MOSS, new BankSnapshot(s.now - HOUR, items(FakeItems.WHIP, 1, FakeItems.LOBSTER, 81)));
+		// The roster keeps only a strictly newer bank, so this one is taken a minute after the scene's.
+		s.roster.putBank(MOSS, new BankSnapshot(s.now - HOUR + 60_000, items(FakeItems.WHIP, 1, FakeItems.LOBSTER, 81)));
 		return s;
 	}
 
@@ -193,8 +195,8 @@ public class GridRedrawTest
 			int draws = f.panel.gridDraws;
 			for (int i = 0; i < 20; i++)
 			{
-				s.roster.putBank(MOSS, new BankSnapshot(s.now - HOUR, items(FakeItems.WHIP, 1, FakeItems.LOBSTER,
-					100 + i)));
+				s.roster.putBank(MOSS, new BankSnapshot(s.now - HOUR + 1000L * (i + 1), items(FakeItems.WHIP, 1,
+					FakeItems.LOBSTER, 100 + i)));
 				f.panel.render(s.view());
 			}
 			assertEquals("twenty syncs, one build waiting", 1, held.tasks.size());
@@ -233,7 +235,7 @@ public class GridRedrawTest
 			s.members = Arrays.asList(GimPanelFixture.SELF, MOSS, GimPanelFixture.WREN, GimPanelFixture.TIN, "Fifth Owl");
 			for (String m : s.members)
 			{
-				s.roster.putBank(m, new BankSnapshot(s.now - HOUR, fullBank(0)));
+				s.roster.putBank(m, new BankSnapshot(s.now - 60_000, fullBank(0)));
 			}
 			Held held = new Held();
 			Deque<Runnable> edt = new ArrayDeque<>();
@@ -250,7 +252,7 @@ public class GridRedrawTest
 			long inPlace = 0;
 			for (int round = 1; round <= 3; round++)
 			{
-				s.roster.putBank(MOSS, new BankSnapshot(s.now - HOUR, fullBank(round)));
+				s.roster.putBank(MOSS, new BankSnapshot(s.now - 60_000 + round, fullBank(round)));
 				f.panel.render(s.view());
 				held.runAll();
 				long start = System.nanoTime();

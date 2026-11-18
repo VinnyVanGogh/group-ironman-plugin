@@ -22,7 +22,7 @@ public class BankFiltersUiTest
 		}
 		big.put(FakeItems.WHIP, 1);
 		big.put(FakeItems.AIR_RUNE, 900);
-		s.roster.putBank(GimPanelFixture.SELF, new BankSnapshot(s.now - 5 * 60_000, big));
+		s.roster.putBank(GimPanelFixture.SELF, new BankSnapshot(s.now - 4 * 60_000, big));
 		s.roster.putStorage(new StorageChange(s.now - 60_000, GimPanelFixture.MOSS, new TreeMap<>(),
 			GimPanelFixture.items(FakeItems.AIR_RUNE, 400, FakeItems.WHIP, 1, FakeItems.SHARK, 20),
 			GimPanelFixture.items(FakeItems.AIR_RUNE, 400, FakeItems.WHIP, 1, FakeItems.SHARK, 20)));
