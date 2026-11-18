@@ -35,6 +35,8 @@ public interface GroupIronmanConfig extends Config
 
 	/** Frozen. */
 	String KEY_GROUP_KEY = "groupKey";
+	/** Frozen once published (docs/plans/gim-server.md §3). */
+	String KEY_SERVER_SYNC = "serverSync";
 	String KEY_OPT_OUT_ALL = "eventOptOutAll";
 	String KEY_OPT_OUT_TYPES = "eventOptOutTypes";
 	String KEY_MUTE_TYPES = "overlayMuteTypes";
@@ -104,6 +106,20 @@ public interface GroupIronmanConfig extends Config
 	default boolean groupSync()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+		keyName = KEY_SERVER_SYNC,
+		name = "Sync through server",
+		description = "Stay synced from login with no 'Join group sync' click, through the GIM Utilities sync server."
+			+ " Needs the group key. Party stays the fallback.",
+		warning = ServerLink.WARNING,
+		section = groupSection,
+		position = 10
+	)
+	default boolean serverSync()
+	{
+		return false;
 	}
 
 	@ConfigItem(

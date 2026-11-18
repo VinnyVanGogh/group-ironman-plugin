@@ -79,6 +79,11 @@ final class SyncHeader
 					+ (othersOnline == 0 ? " (you)" : ""), "Synced with " + group + ". Only roster members are"
 					+ " shown.", true,
 					Button.COPY_KEY, Button.NEW_KEY, Button.LEAVE);
+			case SERVER:
+				return new SyncHeader("Connected, " + (othersOnline + 1) + " online"
+					+ (othersOnline == 0 ? " (you)" : ""), "Synced with " + group + " through the sync server. No"
+					+ " Join click needed.", true,
+					Button.COPY_KEY, Button.NEW_KEY);
 			default:
 				throw new IllegalArgumentException(String.valueOf(state));
 		}

@@ -1,0 +1,8 @@
+{
+  "comment": "Shared HKDF vectors: the plugin (ServerKeysTest) and the server (keys.test.ts) must both reproduce these. groupId = base32(HKDF-SHA256(ikm = the key's 16 bytes, salt = none, info = 'gimu/v1/id', 16 bytes)), lower case, no padding; groupAuth = base64url(HKDF(ikm, info = 'gimu/v1/auth', 32 bytes)), no padding. Generated with node:crypto by server/scripts/vectors.ts.",
+  "vectors": [
+    { "key": "00000000000000000000000000000000", "groupId": "mc2do3d2wf43qbbw3oxmnlzenq", "groupAuth": "kVejQNOeo5z_UTO_2Bd6ORO2XFAwoW65FgDG-VR1LMY" },
+    { "key": "0123456789abcdef0123456789abcdef", "groupId": "t5vzik3zosq2hclgyvnvj2cvqe", "groupAuth": "fQWfzLlwtw3kyfp6kkLM-UhMNIp46cWn_ZnXGO86iIE" },
+    { "key": "ffffffffffffffffffffffffffffffff", "groupId": "2gqn4wetra76org2v3gzexcikm", "groupAuth": "DTg0Lif7BbeNch5Jokfff-YvhL4CXV6XmFF8QNKR1XY" }
+  ]
+}

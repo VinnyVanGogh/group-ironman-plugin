@@ -1,0 +1,19 @@
+{
+	// GIM Utilities sync server. Free plan: SQLite-backed Durable Objects only, no D1 (every group's
+	// data lives in its own object, so there is one write meter to watch, not two).
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "gim-utilities-server",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-11-01",
+	"durable_objects": {
+		"bindings": [{ "name": "GROUPS", "class_name": "GroupHub" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["GroupHub"] }],
+	"vars": {
+		// Kill switch. "false" refuses new sockets with 503; clients fall back to RuneLite Party and
+		// their own Discord webhooks, with no error in game.
+		"SYNC_ENABLED": "true"
+	},
+	// PEPPER is a secret: wrangler secret put PEPPER (locally: .dev.vars, git-ignored).
+	"observability": { "enabled": true }
+}

@@ -100,9 +100,10 @@ public class PluginIdentityTest
 		// (In-game, Board 2026-11-14) adds one more, off: a chat line near a shop selling something a list still
 		// needs. Shopping requests (Board 2026-11-14) are one more kind, so two more switches, both off.
 		// Live activities Slice A adds four kinds (start, wave, completion, death): eight more switches, all off.
+		// "Sync through server" (docs/plans/gim-server.md) adds one more, off: it talks to a 3rd-party server.
 		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1
-			+ 1 + 1 + 1, switches);
-		assertEquals(106, switches);
+			+ 1 + 1 + 1 + 1, switches);
+		assertEquals(107, switches);
 		List<String> expectedOn = Arrays.asList("discordNoPluginEvents", "discordRepostBoard", "groupSync",
 			"showUpdateNotes");
 		Collections.sort(on);

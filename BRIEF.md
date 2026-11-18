@@ -306,6 +306,24 @@ client (HTTP interactions on the Worker) and never posts game data. Its
 commands are limited to Manage Server by default and re-checked on the
 server. Same reasoning as #23.
 
+**26. #22 as built (RUNELITE-206, 2026-11-18) — conditions re-checked.**
+The Board's pre-run answers (2026-11-18) and comment of the same day changed
+the design: Cloudflare Workers with **one SQLite-backed Durable Object per
+group and no D1**, a live hibernatable WebSocket as the primary path, and the
+**shared group key as the sole credential** (HKDF-derived `groupId` and bearer
+`groupAuth`; the key itself never leaves the client), not per-member tokens.
+#22's conditions still hold: (a) `serverSync` is off by default and its
+config item carries a `warning=` (`ServerLink.WARNING`); (b) a group's data is
+reachable only with that group's secret, the server has no list, search or
+lookup route and no public page, one socket per name (a second one replaces
+the first); (c) nothing about non-members is stored, and the plugin re-checks
+every relayed name against the in-game roster (`GroupMembers.check`) as it
+does for Party. Residual of dropping per-member tokens: a key holder can
+connect under any roster member's name until that member logs in and
+replaces them, the same exposure the Party key has today. Proposed Hub
+manifest line for the next Hub update (one line covers both 3rd parties):
+`warning=This plugin can send your IP address and what you share with your group to the GIM Utilities sync server, and your own events to a Discord webhook you enter. Both are optional and off by default, and both are 3rd parties not controlled or verified by the RuneLite Developers.`
+
 ### Phase 0 addendum — hiscore levels for members without the plugin (2026-11-11)
 
 Board in-game test, 2026-11-11: the Group tab should show something for a
