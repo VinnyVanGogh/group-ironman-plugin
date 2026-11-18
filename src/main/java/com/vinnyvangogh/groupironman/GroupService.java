@@ -219,6 +219,8 @@ class GroupService
 	/** This player's own boss bests, read from their own chat; shared only under "Share group events". */
 	private final PbCapture pbCapture = new PbCapture();
 	private volatile boolean pbDirty;
+	/** This player's quests, quest points and diaries, read with their quest progress; null until read. */
+	private volatile AchievementState ownAchievements;
 	private int ticksSinceQuests = QUEST_INTERVAL_TICKS;
 	private int ticksSinceShopAlert;
 	private int ticksSinceSeal;
@@ -905,6 +907,7 @@ class GroupService
 	{
 		pbCapture.load(Collections.emptyMap());
 		pbDirty = false;
+		ownAchievements = null;
 	}
 
 	@Subscribe
@@ -1728,6 +1731,11 @@ class GroupService
 				ifSet(progress, book -> book.publish(mine, null));
 			}
 		}
+		AchievementState ach = ownAchievements;
+		if (ach != null && config.groupShareEvents())
+		{
+			ifSet(progress, book -> book.publish(null, ach));
+		}
 	}
 
 	/**
@@ -2469,7 +2477,29 @@ class GroupService
 		}
 		ownLevels = levels;
 		shop.ownProgress(self, QuestStates.read(QuestStates.wanted(questData), q -> q.getState(client)));
+		ownAchievements = readAchievements();
 		resolveNow(shoppingItemIds());
+	}
+
+	/** Client thread. Every quest the game reports, quest points and diary tiers. */
+	private AchievementState readAchievements()
+	{
+		List<String> finished = new ArrayList<>();
+		List<String> started = new ArrayList<>();
+		for (net.runelite.api.Quest q : net.runelite.api.Quest.values())
+		{
+			net.runelite.api.QuestState state = q.getState(client);
+			if (state == net.runelite.api.QuestState.FINISHED)
+			{
+				finished.add(q.getName());
+			}
+			else if (state == net.runelite.api.QuestState.IN_PROGRESS)
+			{
+				started.add(q.getName());
+			}
+		}
+		return AchievementCapture.state(client.getVarpValue(net.runelite.api.gameval.VarPlayerID.QP), finished,
+			started, EventWatchers.diaryVarbits(), client::getVarbitValue);
 	}
 
 	/** Client thread. "Shopping: shop alert": once per approach to a shop selling something still needed. */
