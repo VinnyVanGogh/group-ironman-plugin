@@ -173,6 +173,8 @@ final class GroupCodec
 		final List<Slot> slots;
 		/** Known contents of carried containers; a container missing here is unknown. */
 		final Map<SkillingContainer, Held> contents;
+		/** Charges on carried or worn jewellery by label ("Ring of dueling" to 6); empty when none or not sent. */
+		final Map<String, Integer> charges;
 
 		Carried(Map<Integer, Integer> inventory, Map<Integer, Integer> worn)
 		{
@@ -187,6 +189,14 @@ final class GroupCodec
 		Carried(Map<Integer, Integer> inventory, Map<Integer, Integer> worn, List<Slot> slots,
 			Map<SkillingContainer, Held> contents)
 		{
+			this(inventory, worn, slots, contents, Collections.emptyMap());
+		}
+
+		Carried(Map<Integer, Integer> inventory, Map<Integer, Integer> worn, List<Slot> slots,
+			Map<SkillingContainer, Held> contents, Map<String, Integer> charges)
+		{
+			this.charges = charges.isEmpty() ? Collections.emptyMap()
+				: Collections.unmodifiableMap(new TreeMap<>(charges));
 			this.inventory = ItemCounts.sorted(inventory);
 			this.worn = ItemCounts.sorted(worn);
 			this.slots = inventorySlots(slots);
@@ -390,6 +400,12 @@ final class GroupCodec
 				cc.add(e.getKey().name(), held);
 			}
 			o.add("cc", cc);
+		}
+		if (!carried.charges.isEmpty())
+		{
+			JsonObject jc = new JsonObject();
+			carried.charges.forEach(jc::addProperty);
+			o.add("jc", jc);
 		}
 		return gson.toJson(o);
 	}
@@ -608,7 +624,8 @@ final class GroupCodec
 					ItemCounts.fromJson(in.get("inv"), MAX_CARRIED_ITEMS),
 					ItemCounts.fromJson(in.get("eq"), MAX_CARRIED_ITEMS),
 					slotsFrom(in.get("is")),
-					contentsFrom(in.get("cc"))));
+					contentsFrom(in.get("cc")),
+					chargesFrom(in.get("jc"))));
 			case "storage":
 				return Decoded.of(new StorageChange(
 					longOr(in.get("ts"), 0),
@@ -686,6 +703,25 @@ final class GroupCodec
 			if (n >= 0 && n <= MAX_HELD)
 			{
 				out.put(kind, new Held((int) n, ItemCounts.fromJson(held.get("i"), MAX_HELD_KINDS)));
+			}
+		}
+		return out;
+	}
+
+	/** Jewellery charges {@code {"Ring of dueling":6}}; a bad entry, or any past the limit, is skipped. */
+	private static Map<String, Integer> chargesFrom(JsonElement e)
+	{
+		Map<String, Integer> out = new TreeMap<>();
+		if (e == null || !e.isJsonObject())
+		{
+			return out;
+		}
+		for (Map.Entry<String, JsonElement> entry : e.getAsJsonObject().entrySet())
+		{
+			long n = longOr(entry.getValue(), -1);
+			if (out.size() < JewelleryCharges.MAX_LABELS && JewelleryCharges.plausible(entry.getKey(), n))
+			{
+				out.put(entry.getKey(), (int) n);
 			}
 		}
 		return out;
