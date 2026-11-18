@@ -11,7 +11,8 @@ public enum ToastPosition
 	TOP_CENTER("Top centre", OverlayPosition.TOP_CENTER),
 	TOP_LEFT("Top left", OverlayPosition.TOP_LEFT),
 	TOP_RIGHT("Top right", OverlayPosition.TOP_RIGHT),
-	ABOVE_CHATBOX("Above chatbox", OverlayPosition.ABOVE_CHATBOX_RIGHT);
+	ABOVE_CHATBOX("Above chatbox", OverlayPosition.ABOVE_CHATBOX_RIGHT),
+	ABOVE_PLAYER("Above player", OverlayPosition.DYNAMIC);
 
 	private final String label;
 	final OverlayPosition position;
