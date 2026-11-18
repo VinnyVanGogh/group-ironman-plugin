@@ -43,7 +43,9 @@ final class GroupSync
 		STALE,
 		/** In a party the player joined themselves. */
 		OTHER_PARTY,
-		CONNECTED
+		CONNECTED,
+		/** Not in the group's party, but connected through the sync server ({@link ServerLink}): no click needed. */
+		SERVER
 	}
 
 	private final Party party;

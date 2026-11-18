@@ -100,13 +100,14 @@ public class PluginIdentityTest
 		// (In-game, Board 2026-11-14) adds one more, off: a chat line near a shop selling something a list still
 		// needs. Shopping requests (Board 2026-11-14) are one more kind, so two more switches, both off.
 		// Live activities Slice A adds four kinds (start, wave, completion, death): eight more switches, all off.
+		// "Sync through server" (docs/plans/gim-server.md) adds one more, off: it talks to a 3rd-party server.
 		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1
-			+ 1 + 1 + 1 + 1, switches);
+			+ 1 + 1 + 1 + 1 + 1, switches);
 		// "Path stop card" (In-game) is off: the on-screen card while pathing from Shopping.
 		// Group announcements (Board 2026-11-18) add two kinds (Announcement, Everyone online), so four switches.
 		// "Banner: Announcement" is on by default: a note a member typed for the group, shown like any banner; the
 		// login alert ("Banner: Online") and "Banner: Everyone online" stay off.
-		assertEquals(111, switches);
+		assertEquals(112, switches);
 		List<String> expectedOn = Arrays.asList("discordNoPluginEvents", "discordRepostBoard", "groupSync",
 			"overlayAnnouncement", "showUpdateNotes");
 		Collections.sort(on);

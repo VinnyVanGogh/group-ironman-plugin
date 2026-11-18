@@ -1,0 +1,21 @@
+{
+	"name": "gim-utilities-server",
+	"private": true,
+	"type": "module",
+	"description": "Sync server for the GIM Utilities RuneLite plugin: one Durable Object per group, live over a hibernatable WebSocket.",
+	"license": "BSD-2-Clause",
+	"engines": { "node": ">=24" },
+	"scripts": {
+		"test": "node --test test/*.test.ts",
+		"typecheck": "tsc --noEmit",
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy",
+		"loadtest": "node scripts/loadtest.ts"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^5.20261118.1",
+		"@types/node": "^24.0.0",
+		"typescript": "^5.9.0",
+		"wrangler": "^4.164.0"
+	}
+}

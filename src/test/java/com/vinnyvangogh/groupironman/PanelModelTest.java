@@ -334,6 +334,13 @@ public class PanelModelTest
 		assertEquals("Connected, 1 online (you)", SyncHeader.of(GroupSync.State.CONNECTED, 0, group).title);
 		assertTrue(connected.ok);
 		assertEquals("Connected, 2 online", SyncHeader.of(GroupSync.State.CONNECTED, 1, group).title);
+		// Through the sync server: synced with no Join click, and no Leave (untick the setting instead).
+		SyncHeader server = SyncHeader.of(GroupSync.State.SERVER, 1, group);
+		assertTrue(server.ok);
+		assertEquals("Connected, 2 online", server.title);
+		assertTrue(server.detail.contains("sync server"));
+		assertFalse(server.buttons.contains(SyncHeader.Button.JOIN));
+		assertFalse(server.buttons.contains(SyncHeader.Button.LEAVE));
 		for (GroupSync.State s : GroupSync.State.values())
 		{
 			assertTrue(s.name(), SyncHeader.of(s, 0, GroupMembers.UNKNOWN).title.length() > 0);

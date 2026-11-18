@@ -16,6 +16,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import javax.inject.Inject;
@@ -78,6 +79,7 @@ import net.runelite.client.util.Filepath;
 import net.runelite.client.util.Text;
 import net.runelite.client.party.messages.UserSync;
 import net.runelite.http.api.item.ItemPrice;
+import okhttp3.OkHttpClient;
 
 /**
  * The Group Ironman extras: member banks, the group storage log, live stats
@@ -179,6 +181,12 @@ class GroupService
 
 	@Inject
 	private HiscoreClient hiscoreClient;
+
+	@Inject
+	private OkHttpClient http;
+
+	/** The sync server's live socket (docs/plans/gim-server.md): null until startUp. Party stays the fallback. */
+	private ServerLink link;
 
 	/** Log basket, fish barrel and coal bag contents, from the game's own lines. Client thread. */
 	@Inject
@@ -357,6 +365,20 @@ class GroupService
 			saveCache();
 			this.onChange.run();
 		});
+		link = new ServerLink(gson, new ServerDialer(http), new ServerLink.Clock()
+		{
+			@Override
+			public long now()
+			{
+				return System.currentTimeMillis();
+			}
+
+			@Override
+			public void schedule(Runnable task, long delayMs)
+			{
+				executor.schedule(task, delayMs, TimeUnit.MILLISECONDS);
+			}
+		}, new ServerEvents());
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
@@ -380,6 +402,11 @@ class GroupService
 		if (sync != null)
 		{
 			sync.leaveOwn();
+		}
+		if (link != null)
+		{
+			link.stop(true);
+			link = null;
 		}
 		members = GroupMembers.UNKNOWN;
 		governance = null;
@@ -534,7 +561,45 @@ class GroupService
 
 	GroupSync.State syncState()
 	{
-		return sync == null ? GroupSync.State.OFF : sync.state(config.groupSync(), members.group(), config.groupKey());
+		if (sync == null)
+		{
+			return GroupSync.State.OFF;
+		}
+		GroupSync.State party = sync.state(config.groupSync(), members.group(), config.groupKey());
+		// The group's own party wins the header (it has a Leave button); otherwise the server, if connected.
+		return party != GroupSync.State.CONNECTED && party != GroupSync.State.OFF && serverConnected()
+			? GroupSync.State.SERVER : party;
+	}
+
+	private boolean serverConnected()
+	{
+		ServerLink l = link;
+		return l != null && l.connected();
+	}
+
+	/** Sync through the server is wanted now: opted in, logged in as a member, with a group key. */
+	private boolean serverWanted()
+	{
+		return config.groupSync() && config.serverSync() && member()
+			&& client.getGameState() == GameState.LOGGED_IN && GroupKey.isValid(config.groupKey());
+	}
+
+	/** Client thread. Opens the server socket when wanted (no click), closes it when not; idempotent. */
+	private void updateServer()
+	{
+		ServerLink l = link;
+		if (l == null)
+		{
+			return;
+		}
+		if (serverWanted())
+		{
+			l.start(GroupKey.normalize(config.groupKey()), localName());
+		}
+		else if (l.state() != ServerLink.State.OFF)
+		{
+			l.stop(true);
+		}
 	}
 
 	/**
@@ -543,7 +608,8 @@ class GroupService
 	 */
 	boolean syncing()
 	{
-		return member() && syncState() == GroupSync.State.CONNECTED;
+		GroupSync.State s = syncState();
+		return member() && (s == GroupSync.State.CONNECTED || s == GroupSync.State.SERVER);
 	}
 
 	/**
@@ -823,6 +889,7 @@ class GroupService
 			resendLive();
 			// Turning sharing off cleared every card's items, this player's own too: put it back.
 			lastCarriedLocal = null;
+			updateServer();
 		});
 		onChange.run();
 	}
@@ -914,6 +981,8 @@ class GroupService
 		{
 			// Another account may log in next: its own counts are restored from its profile.
 			containers.loggedOut();
+			// Logged out: the last live state goes to the server for members who log in later, then the socket closes.
+			updateServer();
 			hiscoresOnLogin = true;
 			refreshPresence();
 			// The next login may be another account: its roster is read on its first tick, before anything runs.
@@ -999,7 +1068,8 @@ class GroupService
 		}
 		setConfig(GroupIronmanConfig.KEY_GROUP_KEY, key);
 		tell((mine ? "Group key saved" : "Group key received from " + GroupMembers.display(sender))
-			+ ". Press 'Join group sync' in the GIM Utilities panel.");
+			+ (config.serverSync() ? ". Connecting through the sync server."
+				: ". Press 'Join group sync' in the GIM Utilities panel."));
 	}
 
 	/**
@@ -1057,10 +1127,22 @@ class GroupService
 			.build());
 	}
 
-	/** One payload to the party, which RuneLite sends on its own thread. */
+	/**
+	 * One payload to the group: through the sync server when connected, and to the group's party when in it, so a
+	 * member not on the server yet still gets it. Receivers drop the party copy from a member who is on the server
+	 * ({@link #sender}). Both send on their own threads.
+	 */
 	private void send(String payload)
 	{
-		partyService.send(new VvgGroupIronmanMessage(payload));
+		ServerLink l = link;
+		if (l != null)
+		{
+			l.send(payload);
+		}
+		if (sync != null && sync.state(config.groupSync(), members.group(), config.groupKey()) == GroupSync.State.CONNECTED)
+		{
+			partyService.send(new VvgGroupIronmanMessage(payload));
+		}
 	}
 
 	/**
@@ -1238,6 +1320,8 @@ class GroupService
 			onChange.run();
 		}
 		refreshPresence();
+		// With each roster read: connects on login with no click once the account is known to be a member.
+		updateServer();
 		if (isMember)
 		{
 			// Another group's roster is not looked up: its levels would land in this group's cache.
@@ -1584,6 +1668,19 @@ class GroupService
 			log.debug("ignored group payload from unnamed member {}", message.getMemberId());
 			return null;
 		}
+		// The same payload also came, or is coming, through the sync server: take it once, from there.
+		return onServer(name) ? null : onRoster(name);
+	}
+
+	private boolean onServer(String name)
+	{
+		ServerLink l = link;
+		return l != null && l.connected() && l.online(name);
+	}
+
+	/** {@code name} when it is on the in-game group roster, else null (a stranger is noted for the panel). */
+	private String onRoster(String name)
+	{
 		GroupMembers.Verdict verdict = members.check(name);
 		if (verdict == GroupMembers.Verdict.STRANGER)
 		{
@@ -1591,6 +1688,53 @@ class GroupService
 			onChange.run();
 		}
 		return verdict == GroupMembers.Verdict.ACCEPT ? name : null;
+	}
+
+	/** The sync server's news, moved to the client thread before anything touches the roster or game state. */
+	private final class ServerEvents implements ServerLink.Listener
+	{
+		@Override
+		public void payload(String from, String payload)
+		{
+			clientThread.invokeLater(() -> receiveFromServer(from, payload));
+		}
+
+		@Override
+		public void connected(List<String> online)
+		{
+			// Like a party join: this member's state goes out again (onUserSync moves to the client thread itself).
+			onUserSync(new UserSync());
+		}
+
+		@Override
+		public void joined(String name)
+		{
+			// A member just logged in: they want this member's live state and bank now, not at the next change.
+			onUserSync(new UserSync());
+		}
+
+		@Override
+		public void left(String name)
+		{
+			clientThread.invokeLater(() -> onChange.run());
+		}
+
+		@Override
+		public void deleted()
+		{
+			clientThread.invokeLater(() ->
+			{
+				// A member deleted the group's data on the server: stop sending it there (plan §4.10).
+				setConfigObject(GroupIronmanConfig.KEY_SERVER_SYNC, false);
+				tell("Your group's data was deleted from the sync server. 'Sync through server' is now off.");
+			});
+		}
+
+		@Override
+		public void stateChanged(ServerLink.State state)
+		{
+			clientThread.invokeLater(() -> onChange.run());
+		}
 	}
 
 	@Subscribe
@@ -1601,96 +1745,127 @@ class GroupService
 		{
 			return;
 		}
-		GroupCodec.Decoded decoded = GroupCodec.decode(gson, message.getPayload());
-		if (decoded == null)
+		receive(name, message.getMemberId(), message.getPayload());
+	}
+
+	/**
+	 * Client thread. A payload the sync server relayed, under the name the server vouches for. Checked against the
+	 * in-game roster all the same, like a party member's (defence in depth).
+	 */
+	private void receiveFromServer(String from, String payload)
+	{
+		if (!syncing() || from == null || GroupMembers.key(from).equals(GroupMembers.key(localName())))
 		{
-			notData(name, message);
 			return;
 		}
-		GroupOutbox.Switches s = switches();
-		long now = System.currentTimeMillis();
-
-		switch (decoded.kind)
+		if (onRoster(from) != null)
 		{
-			case BANK:
-				if (!s.bank)
-				{
-					return;
-				}
-				BankSnapshot bank = assembler.accept(message.getMemberId(), decoded.bank);
-				if (bank != null && roster.putBank(name, new BankSnapshot(Math.min(bank.takenAt(), now), bank.items())))
-				{
-					resolve(bank.items().keySet());
-					saveCache();
-				}
-				break;
-			case CARRIED:
-				if (!s.carried)
-				{
-					return;
-				}
-				roster.putCarried(name, decoded.carried);
-				resolve(decoded.carried.ids());
-				break;
-			case STORAGE:
-				if (!s.storage)
-				{
-					return;
-				}
-				StorageChange change = decoded.storage.withMember(name);
-				change = new StorageChange(Math.min(change.at(), now), name, change.took(), change.deposited(),
-					change.after());
-				if (roster.putStorage(change))
-				{
-					resolve(ItemCounts.ids(change.after(), change.took(), change.deposited()));
-					checkLowStock(change.after());
-					memberStorage(change);
-					saveCache();
-				}
-				break;
-			case STATS:
-				if (!s.stats)
-				{
-					return;
-				}
-				roster.putStats(name, decoded.stats);
-				break;
-			case EXTRAS:
-				if (!s.extras)
-				{
-					return;
-				}
-				MemberExtras before = roster.extras().get(name);
-				roster.putExtras(name, decoded.extras);
-				resolve(ItemCounts.ids(decoded.extras.runePouch, decoded.extras.quiver, decoded.extras.seedVault));
-				if (before == null || before.seedVaultAt != roster.extras().get(name).seedVaultAt)
-				{
-					// The pouch changes every cast; only a new seed vault is worth a disk write.
-					saveCache();
-				}
-				break;
-			case EVENTS:
-				if (!receiveEvents(name, decoded.events, s))
-				{
-					return;
-				}
-				break;
-			default:
-				return;
+			receive(from, serverMemberId(from), payload);
+		}
+	}
+
+	/** A stand-in party member id for a member on the server, for the bank part assembler: negative, never a party id. */
+	static long serverMemberId(String name)
+	{
+		return -1L - (GroupMembers.key(name).hashCode() & 0x7fffffffL);
+	}
+
+	/** One accepted member's payload, from either transport. */
+	private void receive(String name, long memberId, String payload)
+	{
+		GroupCodec.Decoded decoded = GroupCodec.decode(gson, payload);
+		if (decoded == null)
+		{
+			notData(name, memberId, payload);
+			return;
+		}
+		long now = System.currentTimeMillis();
+		if (!take(name, memberId, decoded, switches(), now))
+		{
+			return;
 		}
 		// Anything accepted from a member means their client is running and in the party.
 		roster.heard(name, now);
 		onChange.run();
 	}
 
+	/** Files one decoded payload under its switch. False when the switch is off, so the member is not marked heard. */
+	private boolean take(String name, long memberId, GroupCodec.Decoded decoded, GroupOutbox.Switches s, long now)
+	{
+		switch (decoded.kind)
+		{
+			case BANK:
+				return s.bank && takeBank(name, assembler.accept(memberId, decoded.bank), now);
+			case CARRIED:
+				if (s.carried)
+				{
+					roster.putCarried(name, decoded.carried);
+					resolve(decoded.carried.ids());
+				}
+				return s.carried;
+			case STORAGE:
+				return s.storage && takeStorage(name, decoded.storage, now);
+			case STATS:
+				if (s.stats)
+				{
+					roster.putStats(name, decoded.stats);
+				}
+				return s.stats;
+			case EXTRAS:
+				return s.extras && takeExtras(name, decoded.extras);
+			case EVENTS:
+				return receiveEvents(name, decoded.events, s);
+			default:
+				return false;
+		}
+	}
+
+	/** A member's whole bank once its last part is in ({@code bank} null until then). Always true: they were heard. */
+	private boolean takeBank(String name, BankSnapshot bank, long now)
+	{
+		if (bank != null && roster.putBank(name, new BankSnapshot(Math.min(bank.takenAt(), now), bank.items())))
+		{
+			resolve(bank.items().keySet());
+			saveCache();
+		}
+		return true;
+	}
+
+	private boolean takeStorage(String name, StorageChange received, long now)
+	{
+		StorageChange change = received.withMember(name);
+		change = new StorageChange(Math.min(change.at(), now), name, change.took(), change.deposited(),
+			change.after());
+		if (roster.putStorage(change))
+		{
+			resolve(ItemCounts.ids(change.after(), change.took(), change.deposited()));
+			checkLowStock(change.after());
+			memberStorage(change);
+			saveCache();
+		}
+		return true;
+	}
+
+	private boolean takeExtras(String name, MemberExtras extras)
+	{
+		MemberExtras before = roster.extras().get(name);
+		roster.putExtras(name, extras);
+		resolve(ItemCounts.ids(extras.runePouch, extras.quiver, extras.seedVault));
+		if (before == null || before.seedVaultAt != roster.extras().get(name).seedVaultAt)
+		{
+			// The pouch changes every cast; only a new seed vault is worth a disk write.
+			saveCache();
+		}
+		return true;
+	}
+
 	/**
 	 * A payload {@link GroupCodec#decode} does not read: roles, group settings or an announce, a "posted" claim, or
 	 * one from a newer build.
 	 */
-	private void notData(String name, VvgGroupIronmanMessage message)
+	private void notData(String name, long memberId, String payload)
 	{
 		GovernanceSync g = governance;
-		String payload = message.getPayload();
 		if (ActivityCodec.isActivity(payload))
 		{
 			receiveActivity(name, payload);
@@ -1715,7 +1890,7 @@ class GroupService
 			roster.heard(name, System.currentTimeMillis());
 			return;
 		}
-		log.debug("ignored unreadable group payload from {}", message.getMemberId());
+		log.debug("ignored unreadable group payload from {}", memberId);
 	}
 
 	/** Game tick, connected: roles, settings and this member's announce, then shopping lists, whichever changed. */
