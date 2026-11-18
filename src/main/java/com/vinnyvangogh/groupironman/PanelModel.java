@@ -107,13 +107,29 @@ final class PanelModel
 			this(id, name, quantity, value, -1);
 		}
 
+		/** The items a container holds, by name, when its sender knows each one; empty otherwise. */
+		final List<String> held;
+		/** What {@link #held} is worth in gp; 0 when not known or worth nothing. */
+		final long heldValue;
+		/** Whether {@link #heldValue} belongs in the tooltip (a looting bag's contents are its value). */
+		final boolean showHeldValue;
+
 		ItemCell(int id, String name, long quantity, long value, int inside)
+		{
+			this(id, name, quantity, value, inside, Collections.emptyList(), 0, false);
+		}
+
+		ItemCell(int id, String name, long quantity, long value, int inside, List<String> held, long heldValue,
+			boolean showHeldValue)
 		{
 			this.id = id;
 			this.name = name;
 			this.quantity = quantity;
 			this.value = value;
 			this.inside = inside;
+			this.held = held;
+			this.heldValue = heldValue;
+			this.showHeldValue = showHeldValue;
 		}
 
 		/** An empty inventory slot, kept so the items after it stay in their own slots. */
@@ -128,7 +144,13 @@ final class PanelModel
 		String tooltip()
 		{
 			String base = quantity > 1 ? Amounts.EXACT.of(quantity) + " x " + name : name;
-			return inside >= 0 ? base + " (" + Amounts.EXACT.of(inside) + " inside)" : base;
+			if (inside < 0)
+			{
+				return base;
+			}
+			String what = held.isEmpty() ? "" : ": " + String.join(", ", held);
+			String worth = showHeldValue && heldValue > 0 ? ", worth " + Amounts.EXACT.of(heldValue) + " gp" : "";
+			return base + " (" + Amounts.EXACT.of(inside) + " inside" + what + worth + ")";
 		}
 	}
 
@@ -162,10 +184,19 @@ final class PanelModel
 		 * or null for shared stats or nothing at all.
 		 */
 		final String source;
+		/** "Ring of dueling 6, Games necklace 3": jewellery charges the member shares, or null. */
+		final String charges;
 
 		MemberCard(String name, boolean you, boolean online, String status, List<Bar> bars, List<SkillCell> skills,
 			List<ItemGroup> items, String seedVault, String source)
 		{
+			this(name, you, online, status, bars, skills, items, seedVault, source, null);
+		}
+
+		MemberCard(String name, boolean you, boolean online, String status, List<Bar> bars, List<SkillCell> skills,
+			List<ItemGroup> items, String seedVault, String source, String charges)
+		{
+			this.charges = charges;
 			this.name = name;
 			this.you = you;
 			this.online = online;
@@ -300,9 +331,11 @@ final class PanelModel
 			String st = status(s, at, g, game.world(name), regions, now);
 			List<ItemGroup> held = itemGroups(carried.get(name), extras.get(name), items);
 			String vault = seedVault(extras.get(name), now);
+			GroupCodec.Carried worn = carried.get(name);
+			String charges = worn == null || worn.charges.isEmpty() ? null : JewelleryCharges.text(worn.charges);
 			out.add(s != null
-				? new MemberCard(name, you, online, st, bars(s), skills(s), held, vault, null)
-				: fromHiscores(name, you, online, st, held, vault, group.hiscores(), now));
+				? new MemberCard(name, you, online, st, bars(s), skills(s), held, vault, null, charges)
+				: fromHiscores(name, you, online, st, held, vault, group.hiscores(), now, charges));
 		}
 		out.sort(MEMBER_ORDER);
 		return out;
@@ -322,7 +355,7 @@ final class PanelModel
 	 * only. Items are whatever they shared before, or none: nothing is made up.
 	 */
 	private static MemberCard fromHiscores(String name, boolean you, boolean online, String status,
-		List<ItemGroup> held, String vault, HiscoreBook hiscores, long now)
+		List<ItemGroup> held, String vault, HiscoreBook hiscores, long now, String charges)
 	{
 		HiscoreBook.Entry h = hiscores.entry(name);
 		List<Bar> bars = h != null && online ? hiscoreBars(h) : new ArrayList<>();
@@ -334,7 +367,7 @@ final class PanelModel
 			skills = skills(new MemberStats(levels, 0, 0, 0, 0));
 		}
 		return new MemberCard(name, you, online, status, bars, skills, held, vault,
-			hiscoreSource(h, hiscores.unavailable(name), now));
+			hiscoreSource(h, hiscores.unavailable(name), now), charges);
 	}
 
 	static List<Bar> hiscoreBars(HiscoreBook.Entry h)
@@ -510,8 +543,22 @@ final class PanelModel
 				continue;
 			}
 			String name = items.name(s.id);
-			out.add(new ItemCell(s.id, name, s.quantity, items.price(s.id) * s.quantity,
-				c.inside(SkillingContainer.fromItemName(name))));
+			SkillingContainer kind = SkillingContainer.fromItemName(name);
+			GroupCodec.Held h = kind == null ? null : c.contents.get(kind);
+			if (h == null)
+			{
+				out.add(new ItemCell(s.id, name, s.quantity, items.price(s.id) * s.quantity, -1));
+				continue;
+			}
+			List<String> held = new ArrayList<>();
+			long worth = 0;
+			for (Map.Entry<Integer, Integer> e : h.items.entrySet())
+			{
+				held.add(Amounts.EXACT.of(e.getValue()) + " x " + items.name(e.getKey()));
+				worth += items.price(e.getKey()) * e.getValue();
+			}
+			out.add(new ItemCell(s.id, name, s.quantity, items.price(s.id) * s.quantity, h.count, held, worth,
+				kind == SkillingContainer.LOOTING_BAG));
 		}
 		return out;
 	}

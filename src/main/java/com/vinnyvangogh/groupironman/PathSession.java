@@ -98,6 +98,18 @@ final class PathSession
 		return stop == null ? "" : stop.name;
 	}
 
+	/** What the path is for; null for none. */
+	synchronized ItemPaths.Target activeTarget()
+	{
+		return target;
+	}
+
+	/** The stop being pathed to; null for none. */
+	synchronized ItemPaths.Stop activeStop()
+	{
+		return stop;
+	}
+
 	static String unavailable(ShortestPathBridge.Availability a)
 	{
 		switch (a)

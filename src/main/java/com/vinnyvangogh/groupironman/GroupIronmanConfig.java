@@ -931,6 +931,14 @@ public interface GroupIronmanConfig extends Config
 		return 5;
 	}
 
+	@ConfigItem(keyName = "overlayPathStop", name = "Path stop card",
+		description = "On screen while you path from the Shopping tab: the stop, what to get there and for whom.",
+		section = inGameSection, position = 53)
+	default boolean overlayPathStop()
+	{
+		return false;
+	}
+
 	@ConfigItem(
 		keyName = "groupWorldMap",
 		name = "Show members on world map",

@@ -642,6 +642,10 @@ class GroupIronmanPanel extends PluginPanel
 			body.add(text(g.title, MUTED));
 			body.add(itemGrid(g.items));
 		}
+		if (c.charges != null)
+		{
+			body.add(text("Charges: " + c.charges, MUTED));
+		}
 		if (c.seedVault != null)
 		{
 			body.add(text(c.seedVault, MUTED));
