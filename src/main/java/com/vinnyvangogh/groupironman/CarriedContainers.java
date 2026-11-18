@@ -50,6 +50,9 @@ final class CarriedContainers
 
 	/** Containers carried in the inventory, from the last scan. */
 	private final Set<SkillingContainer> carried = EnumSet.noneOf(SkillingContainer.class);
+	/** The looting bag as last viewed this session, by canonical id; null until the game sends it. */
+	private Map<Integer, Integer> lootingItems;
+	private int lootingSlots;
 	/** The inventory's filling slots at the last scan, -1 until read. */
 	private int filling = -1;
 	/** The Check dialog text already read, so one dialog is read once. */
@@ -120,12 +123,39 @@ final class CarriedContainers
 		filling = -1;
 		dialog = null;
 		saved = null;
+		lootingItems = null;
+		lootingSlots = 0;
+	}
+
+	/** The looting bag's container changed (the game sends it while the bag is viewed): keep what it holds. */
+	void lootingBag(ItemContainer bag)
+	{
+		if (bag == null)
+		{
+			return;
+		}
+		Map<Integer, Integer> items = new TreeMap<>();
+		int slots = 0;
+		for (Item item : bag.getItems())
+		{
+			if (item.getId() > 0 && item.getQuantity() > 0)
+			{
+				slots++;
+				ItemCounts.add(items, item.getId(), item.getQuantity(), itemManager::canonicalize);
+			}
+		}
+		lootingSlots = slots;
+		lootingItems = items;
 	}
 
 	/** What each carried container is known to hold; one not carried, or unknown, is left out. */
 	Map<SkillingContainer, GroupCodec.Held> held()
 	{
 		Map<SkillingContainer, GroupCodec.Held> out = new EnumMap<>(SkillingContainer.class);
+		if (lootingItems != null && carried.contains(SkillingContainer.LOOTING_BAG))
+		{
+			out.put(SkillingContainer.LOOTING_BAG, new GroupCodec.Held(lootingSlots, lootingItems));
+		}
 		for (SkillingContainer kind : carried)
 		{
 			int n = contents.contents(kind);
