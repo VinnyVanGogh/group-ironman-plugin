@@ -4,6 +4,8 @@
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $windows = Split-Path -Parent $here
+$repo = Split-Path -Parent (Split-Path -Parent $windows)
+$launcher = Join-Path $windows 'Run-GimUtilities.cmd'
 . (Join-Path $windows 'Checksum.ps1')
 
 $failures = 0
@@ -17,7 +19,7 @@ function Expect-Throw([scriptblock]$body, [string]$like) {
     if (-not $threw) { throw 'expected a throw, got none' }
 }
 
-$dir = Join-Path ([IO.Path]::GetTempPath()) ("bg-checksum-" + [guid]::NewGuid())
+$dir = Join-Path ([IO.Path]::GetTempPath()) ("gu-checksum-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $dir | Out-Null
 $file = Join-Path $dir 'payload.bin'
 [IO.File]::WriteAllText($file, 'abc')
@@ -39,21 +41,60 @@ try {
     Check 'the .cmd carries the same Assert-Sha256 as Checksum.ps1' {
         $pattern = '(?s)# BEGIN Assert-Sha256.*?# END Assert-Sha256'
         $a = [regex]::Match((Get-Content -Raw (Join-Path $windows 'Checksum.ps1')), $pattern).Value -replace "`r", ''
-        $b = [regex]::Match((Get-Content -Raw (Join-Path $windows 'Run-BuildGuard.cmd')), $pattern).Value -replace "`r", ''
+        $b = [regex]::Match((Get-Content -Raw $launcher), $pattern).Value -replace "`r", ''
         if (-not $a) { throw 'markers missing from Checksum.ps1' }
-        if ($a -ne $b) { throw 'Run-BuildGuard.cmd and Checksum.ps1 have drifted' }
+        if ($a -ne $b) { throw 'Run-GimUtilities.cmd and Checksum.ps1 have drifted' }
     }
 
     Check 'the pinned JDK hash in the .cmd is well-formed' {
-        $cmd = Get-Content -Raw (Join-Path $windows 'Run-BuildGuard.cmd')
+        $cmd = Get-Content -Raw $launcher
         $m = [regex]::Match($cmd, "\`$JdkSha256\s*=\s*'([^']*)'")
         if (-not $m.Success) { throw 'no $JdkSha256 pin found' }
         if ($m.Groups[1].Value -notmatch '^[0-9a-f]{64}$') { throw "bad pin $($m.Groups[1].Value)" }
     }
 
+    Check 'the .cmd downloads this repo, not Build Guard' {
+        $cmd = Get-Content -Raw $launcher
+        if ($cmd -notmatch '/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/\$SourceRef\.zip') { throw 'SourceUrl does not point at group-ironman-plugin' }
+        if ($cmd -match '(?i)build.?guard') { throw 'the .cmd still mentions Build Guard' }
+    }
+
+    Check 'the source check in the .cmd names a package that exists' {
+        $cmd = Get-Content -Raw $launcher
+        $m = [regex]::Match($cmd, "'(src\\main\\java\\[^']+)'")
+        if (-not $m.Success) { throw 'no src\main\java path found in Test-Checkout' }
+        $path = Join-Path $repo ($m.Groups[1].Value -replace '\\', [IO.Path]::DirectorySeparatorChar)
+        if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "$path does not exist" }
+    }
+
+    # GU_BUILD_ONLY=1 lets CI run the launcher end to end without opening RuneLite.
+    $taskBlock = [regex]::Match((Get-Content -Raw $launcher), '(?s)# BEGIN Get-GradleTask.*?# END Get-GradleTask').Value
+    if ($taskBlock) { Invoke-Expression $taskBlock }
+    Check 'Get-GradleTask is marked in the .cmd' { if (-not $taskBlock) { throw 'BEGIN/END Get-GradleTask markers missing' } }
+    Check 'no GU_BUILD_ONLY starts the client' { if ((Get-GradleTask '') -ne 'run') { throw "got $(Get-GradleTask '')" } }
+    Check 'GU_BUILD_ONLY=1 only builds' { if ((Get-GradleTask '1') -ne 'build') { throw "got $(Get-GradleTask '1')" } }
+    Check 'any other GU_BUILD_ONLY value starts the client' {
+        foreach ($v in @('0', 'true', ' 1', 'yes')) { if ((Get-GradleTask $v) -ne 'run') { throw "'$v' gave $(Get-GradleTask $v)" } }
+    }
+    Check 'the .cmd passes the chosen task to Gradle' {
+        $cmd = Get-Content -Raw $launcher
+        if ($cmd -notmatch 'Get-GradleTask \$env:GU_BUILD_ONLY') { throw 'the task is not read from GU_BUILD_ONLY' }
+        if ($cmd -notmatch "gradlew\.bat'\) --console=plain \`$gradleTask") { throw 'gradlew.bat is not given $gradleTask' }
+    }
+
+    # Started from a PowerShell 7 window, powershell.exe inherits pwsh's
+    # PSModulePath and cannot load Get-FileHash (seen on windows-latest).
+    Check 'the .cmd clears PSModulePath before starting powershell' {
+        $lines = (Get-Content -Raw $launcher) -split "`r?`n"
+        $clear = [array]::IndexOf($lines, 'set "PSModulePath="')
+        $start = @(0..($lines.Count - 1) | Where-Object { $lines[$_] -like 'powershell *' })
+        if ($clear -lt 0) { throw 'no set "PSModulePath=" line' }
+        if ($start.Count -ne 1 -or $clear -gt $start[0]) { throw 'PSModulePath is not cleared before the powershell line' }
+    }
+
     Check 'the .cmd parses as PowerShell' {
         $errors = $null
-        $text = Get-Content -Raw (Join-Path $windows 'Run-BuildGuard.cmd')
+        $text = Get-Content -Raw $launcher
         [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$null, [ref]$errors) | Out-Null
         if ($errors.Count -gt 0) { throw ($errors | ForEach-Object { "line $($_.Extent.StartLineNumber): $($_.Message)" }) -join '; ' }
     }

@@ -1,0 +1,85 @@
+package com.vinnyvangogh.groupironman;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/** A tiny item table for tests, standing in for the plugin's ItemManager-backed lookup. */
+final class FakeItems implements ItemLookup
+{
+	static final int SHARK = 385;
+	/** The game's noted shark; the sender's counts canonicalise it to {@link #SHARK}. */
+	static final int NOTED_SHARK = 386;
+	static final int COAL = 453;
+	static final int RUNE_SCIM = 1333;
+	static final int PRAYER_POT_4 = 2434;
+	static final int PRAYER_POT_3 = 139;
+	static final int WHIP = 4151;
+	static final int TROUT = 333;
+	static final int GRIMY_GUAM = 199;
+	static final int GUAM_LEAF = 249;
+	static final int GUAM_UNF = 91;
+	static final int COINS = 995;
+	static final int LOBSTER = 379;
+	static final int SUPER_RESTORE_4 = 3024;
+	static final int LOG_BASKET = 28140;
+	static final int OPEN_LOG_BASKET = 28142;
+	static final int YEW_LOGS = 1515;
+	/** The game's noted yew logs (ItemID.YEW_LOGS + 1); the sender's counts canonicalise it to {@link #YEW_LOGS}. */
+	static final int NOTED_YEW_LOGS = 1516;
+	static final int LOGS = 1511;
+	static final int DRAGON_WARHAMMER = 13576;
+	static final int AIR_RUNE = 556;
+
+	private final Map<Integer, String> names = new HashMap<>();
+	private final Map<Integer, Long> prices = new HashMap<>();
+
+	FakeItems()
+	{
+		add(SHARK, "Shark", 800);
+		add(NOTED_SHARK, "Shark", 800);
+		add(COAL, "Coal", 150);
+		add(RUNE_SCIM, "Rune scimitar", 15_000);
+		add(PRAYER_POT_4, "Prayer potion(4)", 9_000);
+		add(PRAYER_POT_3, "Prayer potion(3)", 6_500);
+		add(WHIP, "Abyssal whip", 1_500_000);
+		add(TROUT, "Trout", 30);
+		add(GRIMY_GUAM, "Grimy guam leaf", 20);
+		add(GUAM_LEAF, "Guam leaf", 25);
+		add(GUAM_UNF, "Guam potion (unf)", 15);
+		add(COINS, "Coins", 1);
+		add(LOBSTER, "Lobster", 100);
+		add(SUPER_RESTORE_4, "Super restore(4)", 10_000);
+		add(LOG_BASKET, "Log basket", 0);
+		add(OPEN_LOG_BASKET, "Open log basket", 0);
+		add(YEW_LOGS, "Yew logs", 300);
+		add(NOTED_YEW_LOGS, "Yew logs", 300);
+		add(LOGS, "Logs", 50);
+		add(DRAGON_WARHAMMER, "Dragon warhammer", 0);
+		add(AIR_RUNE, "Air rune", 5);
+	}
+
+	/** The two melee weapons the table has, as RuneLite's item stats would class them. */
+	@Override
+	public int combatStyles(int id)
+	{
+		return id == WHIP || id == RUNE_SCIM ? ItemStyles.MELEE | ItemStyles.COMBAT : 0;
+	}
+
+	private void add(int id, String name, long price)
+	{
+		names.put(id, name);
+		prices.put(id, price);
+	}
+
+	@Override
+	public String name(int id)
+	{
+		return names.getOrDefault(id, "item " + id);
+	}
+
+	@Override
+	public long price(int id)
+	{
+		return prices.getOrDefault(id, 0L);
+	}
+}

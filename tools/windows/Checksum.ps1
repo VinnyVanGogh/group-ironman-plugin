@@ -1,7 +1,8 @@
-# The checksum step of Run-BuildGuard.cmd, extracted so it can be tested on
-# its own (tools/windows/tests/Checksum.Tests.ps1). Run-BuildGuard.cmd carries
-# an identical copy of this function between the BEGIN/END markers, because a
-# friend downloads only the .cmd; the test fails if the two copies drift.
+# The checksum step of Run-GimUtilities.cmd, extracted so it can be tested on
+# its own (tools/windows/tests/Checksum.Tests.ps1). Run-GimUtilities.cmd
+# carries an identical copy of this function between the BEGIN/END markers,
+# because a friend downloads only the .cmd; the test fails if the two copies
+# drift.
 
 # BEGIN Assert-Sha256
 function Assert-Sha256 {

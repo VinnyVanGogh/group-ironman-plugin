@@ -1,60 +1,58 @@
-# Build Guard: setup and testing
+# GIM Utilities: setup and testing
 
-Everything needed to install, configure and test Build Guard. For what the
+Everything needed to install, configure and test GIM Utilities. For what the
 plugin is, see the [README](README.md).
 
 - [Settings](#settings)
+- [Running it next to Build Guard](#running-it-next-to-build-guard)
 - [Testing with friends](#testing-with-friends)
-  - [Testing with friends (Windows)](#testing-with-friends-windows)
-  - [Testing with friends (macOS / Linux, or from a checkout)](#testing-with-friends-macos--linux-or-from-a-checkout)
+  - [Windows: double-click launcher](#windows-double-click-launcher)
   - [What to look at](#what-to-look-at)
 - [Limitations](#limitations)
 - [Building and tests](#building-and-tests)
 
 ## Settings
 
-**Build rules** is a text box. One rule per line, or separated by commas:
+The settings panel has eight sections, in this order. All but Group start
+closed, so a first install shows every section's name at once.
 
-```
-Defence: 1
-Prayer: none
-Strength: goal 99
-Ranged: soft
-```
+1. **Group**: *Sync with my group*, the *Group key*, what you share (bank,
+   group storage changes, stats, inventory and equipment, rune pouch / quiver /
+   seed vault, drops and collection log, group events) and *Storage minimums*.
+2. **Discord: connection**: *Post to Discord*, then seven webhooks (Main,
+   Online status, Drops & loot, Progress, Deaths & danger, Group storage,
+   Daily digest), each with its poster name choice and custom name. See
+   [Discord webhooks](README.md#discord-webhooks).
+3. **Discord: what to post**: one switch per event, grouped drops, deaths,
+   storage, progress, group, activities.
+4. **Discord: how to post**: *Online status* (Posts / Live board / Off),
+   *Offline grace*, *Combine level-ups*, message style, screenshots
+   (including *Grave picture*: *Where I died*, *Current view* or *None*), the
+   mention for big events, quiet hours, and the Easter eggs.
+5. **Discord: daily digest**: the digest hour and which categories it covers.
+6. **In-game**: banner time, position and how many at once, the group box,
+   world map markers, the `::find` command, then one *Banner:* switch per
+   event.
+7. **Thresholds** (closed): what is big enough to count, for Discord and
+   banners alike: *Valuable drop (gp)*, *Big storage (gp)*, *Clue reward
+   (gp)*, *Shared drops (gp)*, *Level ups from level*, *KC milestone every*,
+   *Back after (days)*, *Gravestone warning* and *Untradeables to ignore*.
+   Hover a setting for its full meaning ("at least this much").
+8. **Advanced** (closed): the `::find` colours: *Search colour*, *Colour item
+   names*, *Your bank colour*, *Member bank colour*, *Storage colour*,
+   *Carried colour* and *Item name colour*. Also *Show update notes* (on by
+   default): a welcome in the game chat on a fresh install, and what is new
+   once after each update.
 
-| You type | Means |
-| --- | --- |
-| `Defence: 1` | hard cap: Defence must stay at level 1 |
-| `Prayer: none` (or `no xp`) | no XP at all in Prayer |
-| `Strength: goal 99` | a goal; informs, never warns |
-| `Ranged: soft` | soft cap; informs, never warns |
+Moving or renaming a setting never resets it: each is saved under the same
+key it always was. The gp boxes show plain digits (`1000000`): RuneLite's
+number box is too narrow for `1,000,000` with commas.
 
-A line that does not parse (a misspelt skill, a missing colon) is ignored
-rather than guessed at.
-
-**Warn on attack style** (on by default; does nothing until you enter rules):
-a red chat line when the selected style trains a skill you capped. A hard cap
-warns once you have reached it; "no XP" always warns.
-
-**Group (RuneLite Party)**, all off by default:
-
-| Setting | What it sends to your party |
-| --- | --- |
-| Share build with party | Your rules, and your levels in only the skills those rules name. Also shows the party panel. Off means this client sends nothing and ignores other members' builds. |
-| Tell party when at risk | Adds a line like "Alex is at risk of Defence XP (Controlled attack style)". |
-| Share gear list | The names of the items you are wearing and carrying, for "who has what". Nothing from your bank. |
-
-Each member has to turn sharing on themselves; nobody's client can read
-another's. Everything travels through RuneLite's own Party service, the same
-one the built-in Party plugin uses. Build Guard makes no network connections of
-its own.
-
-If you turn sharing off while in a party, your client stops sending. Members
-keep the last build they received from you until you leave the party.
-
-**Group banks, storage and stats**, all off by default. Each one works on its
-own (you do not need *Share build with party* for them), and each only shows
-you other members' data while you share the same thing yourself.
+**Sharing** (in *Group*), all off by default, including `::find` (in
+*In-game*). Each one works on its own, and each only shows you other members'
+data while you share the same thing yourself. With every switch off the plugin
+sends nothing and collects nothing; its side panel stays, opening with an
+*Everything is off* notice and a button to these settings.
 
 | Setting | What it sends to your party |
 | --- | --- |
@@ -63,10 +61,59 @@ you other members' data while you share the same thing yourself.
 | Share stats | Every skill's real and boosted level (shown as `90 (+8)` or `70 (-3)`), HP, prayer, run energy, special attack, your world and where you are (resent every 8 tiles you walk, and once a minute so members see you as online). |
 | Share inventory and equipment | What you are carrying and wearing, with counts, for the panel's "Items" list and the search. |
 | Storage minimums | Not sent anywhere. One per line, `Shark: 100`. A desktop notification when a group storage close leaves an item below its minimum; once per item until it is restocked. Your own closes always count; other members' count when *Share group storage changes* is on. |
-| Share rune pouch, quiver, seed vault | What is in your rune pouch and Dizana's quiver, and your seed vault as of the last time you opened it. |
-| Share drops and collection log | Your NPC drops (items worth at least *Drops worth at least*, 10,000 gp by default; 0 sends everything) and each new collection log slot. Kept on disk for everyone, and resent for 7 days whenever someone joins the party. |
+| Share pouch, quiver, vault | What is in your rune pouch and Dizana's quiver, and your seed vault as of the last time you opened it. |
+| Share drops and collection log | Your NPC drops (items worth at least *Shared drops (gp)*, 10,000 gp by default; 0 sends everything) and each new collection log slot. Kept on disk for everyone, and resent for 7 days whenever someone joins the party. |
 | Show members on world map | Not sent anywhere. Marks online members on the world map. Needs *Share stats* on, for you and for them. |
-| ::find chat command | **On by default.** Not sent anywhere. Lets you type `::find dragon hunter wand` in the chatbox (see below). |
+| ::find chat command | Not sent anywhere. Lets you type `::find dragon hunter wand` in the chatbox (see below). |
+| Share group events | Your pets, deaths, levels, quests, logins and Barrows chests, so members see them as banners. Drops and collection log slots go with *Share drops and collection log*; storage events are worked out by each member from the storage changes already shared. |
+
+Each member has to turn sharing on themselves; nobody's client can read
+another's. Everything travels through RuneLite's own Party service, the same
+one the built-in Party plugin uses. The only network connection of GIM
+Utilities' own is the optional Discord webhook below.
+
+### Group events: Discord and banners
+
+Every event switch is off by default:
+
+- **Thresholds**: when something counts. *Valuable drop (gp)* (1M gp,
+  per item stack), *Big storage (gp)* (1M gp), *Level ups from level*
+  (1), *Back after (days)* (7), and *Untradeables to ignore* (clue scrolls,
+  keys, totems and the like, by name).
+- **Discord: connection** and **Discord: how to post**: *Post to Discord* (shows RuneLite's third-party
+  warning), the *Main webhook* (must be
+  `https://discord.com/api/webhooks/...`; a password field), six optional
+  category webhooks that fall back to Main when empty (see
+  [Discord webhooks](README.md#discord-webhooks)),
+  *Message style* (rich embed or plain text), *Attach a screenshot*, *Mention
+  for big events* (e.g. `<@&role id>`, put in front of pets, 99s, maxing and a
+  Hardcore group death), *Quiet hours from / until* (posts wait and go
+  when quiet hours end; the same hour twice means none), and each webhook's
+  *name*: *Webhook's own* (the default: the name and avatar you set on the
+  webhook in Discord), *Default name* (Town Crier, Party Pete and so on), or
+  *Custom*, which uses that webhook's *custom name* box (it starts filled
+  with the default name). A category posting to Main's webhook keeps its own
+  name. A blank custom name uses the default name; names are cut to 80
+  characters, and a name Discord refuses (containing "discord", "clyde", `@`,
+  `#`, `:` or ` ``` `, or exactly "everyone" or "here") gets a chat warning
+  and is not used: those posts go out under the default name. Every embed's
+  footer still says GIM Utilities.
+- **Discord: what to post** and the *Banner:* switches in **In-game**: one
+  switch per event, for each output. *Online status* (under *Discord: how to
+  post*) is *Posts* (the default: a post per
+  login and logout), *Live board* (one Group-channel message listing each
+  member, edited in place) or *Off*. Only one member sharing an Online status
+  webhook should turn on *Live board*: each member who has it on keeps a board
+  of their own in that channel. Level-up posts use the Progress poster name and
+  the board the Online status one; the board's edits count toward that
+  webhook's 20 posts a minute (each webhook has its own limit).
+- **In-game**: *Banner time*, *Banner position*, *Most banners at once*, the
+  *Group box* (who is online and on which world, and the latest events) and
+  how many events it lists.
+
+Your client posts only your own events, so a group where everyone posts sees
+each event once. At most 20 posts go per minute and 50 wait; Discord's own
+rate limit is honoured.
 
 The panel's **Members** list shows each member as *online* (heard from in
 the last 3 minutes), *last seen 2h ago*, or *not seen yet*, with their world
@@ -79,13 +126,14 @@ out. On the first run it lists the latest ones instead. New collection log
 slots are read from the game's chat line, so turn on the in-game setting
 *Collection log - New addition notification* (Settings, Chat).
 
-The **Who has it?** box at the top of the Build Guard panel searches members'
-last banks, inventories, equipment and group storage by item name (two
-letters or more). Under the holders it lists the newest three storage log
+The **Who has it?** box at the top of the GIM Utilities panel searches
+members' last banks, inventories, equipment and group storage by item name
+(two letters or more). Under the holders it lists the newest three storage log
 visits that took or deposited a matching item, e.g. `Alex took 1 x Dragon
 hunter wand from storage (3d ago)`.
 
-**`::find` in the chatbox** asks the same question without opening the panel:
+**`::find` in the chatbox** (turn on *::find chat command* first) asks the
+same question without opening the panel:
 
 ```
 ::find dragon hunter wand
@@ -94,215 +142,253 @@ hunter wand from storage (3d ago)`.
 answers, in your chatbox only:
 
 ```
-Build Guard: Dragon hunter wand: Sam bank 1 (2h ago)
-Build Guard: Alex took 1 x Dragon hunter wand from storage (3d ago)
+GIM Utilities: Dragon hunter wand: Sam bank 1 (2h ago)
+GIM Utilities: Alex took 1 x Dragon hunter wand from storage (3d ago)
 ```
 
-At most five lines; anything past that ends with `N more, see the Build
-Guard panel`. It matches any part of the name, ignoring case, like the panel.
+At most five lines; anything past that ends with `N more, see the GIM
+Utilities panel`. It matches any part of the name, ignoring case, like the
+panel.
 
 It is `::find`, not `!find`, on purpose. A `!` command is ordinary chat: the
 game sends the text to public (or clan) chat first, and RuneLite only acts on
 it once it comes back, so everyone around you would see what you searched for.
 RuneLite catches `::` text in the chatbox before it is sent and hands it to
 plugins instead (`ChatInputManager`, which posts a `CommandExecuted` event), so
-nothing leaves your client. It works in the normal client; developer mode is
-not needed. Turn it off with *::find chat command*.
+nothing leaves your client.
 
 What it can and cannot see:
 
-- **Only members running Build Guard** with the matching sharing switch on.
-  A member without it holds nothing as far as `::find` knows.
+- **Only members running GIM Utilities** with the matching sharing switch on.
 - **Only what each client saw, as of its last sync**: a bank as of its last
   close, storage as of the last logged visit, inventories while online.
 - **Storage history only covers members with *Share group storage changes*
-  on.** A visit by anyone else is not attributed to anybody.
+  on.** A visit by anyone else is not attributed to anybody; it just shows up
+  in the next logged visit's "before".
 - **Trades and drops between members are not tracked.** If Alex hands Sam the
   wand, `::find` still shows Alex's last bank until Sam's next sync.
 
-The storage log only has visits by members running Build Guard with *Share
-group storage changes* on. A change by anyone else is not attributed to
-anybody; it just shows up in the next logged visit's "before".
-
 Banks, the storage log, rune pouches, quivers, seed vaults, drops, last seen
 times and when you last played are saved in
-`.runelite/build-guard/group-cache.json`, so the storage log (still the last
-200 visits) and `::find`'s history survive a restart. It is one file per
-computer, not per group: if you switch groups, delete it to forget the old
-group's data.
+`.runelite/gim-utilities/group-cache.json`. It is one file per computer, not
+per group: if you switch groups, delete it to forget the old group's data.
+
+## Running it next to Build Guard
+
+GIM Utilities was split out of Build Guard. Both can be installed at once and
+never touch each other:
+
+- **Settings.** GIM Utilities' config group is `gimutilities`; Build Guard's
+  is `build-guard`. Turning a switch on in one does not turn it on in the
+  other, and nothing is copied across: set GIM Utilities up from scratch.
+- **Party messages.** GIM Utilities sends `VvgGroupIronmanMessage`; Build
+  Guard sends `BuildGuardGroupMessage`. RuneLite's party relay routes by that
+  name, so neither plugin receives or decodes the other's traffic. A member on
+  Build Guard's group features and a member on GIM Utilities do not see each
+  other: the whole group should use the same one.
+- **Saved data.** `.runelite/gim-utilities/` here, `.runelite/build-guard/`
+  there. Build Guard's saved banks and storage log are not imported.
 
 ## Testing with friends
 
-Until Build Guard is on the Plugin Hub, every member runs a **developer
+Until GIM Utilities is on the Plugin Hub, every member runs a **developer
 build**: a RuneLite window started from this source, with the plugin already
 loaded. It uses your normal RuneLite settings folder (`.runelite` in your
 user folder), so your other plugins and settings come along.
 
-### Testing with friends (Windows)
+1. Install a JDK between 11 and 21, then from the repo folder run
+   `./gradlew run`. On Windows, use the
+   [double-click launcher](#windows-double-click-launcher) instead.
+2. **Log in.** Jagex Accounts cannot type a password into a developer
+   client. Use RuneLite's Jagex account panel instead
+   ([RuneLite wiki: Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts)):
+   click the **Jagex account** icon on the sidebar, add your account, pick
+   your character, then click **Play Now**.
+3. **Share a group key, then turn sharing on in one click.** The GIM Utilities
+   panel (a green badge on the sidebar) is there whenever the plugin is on;
+   with every switch off it opens with *Everything is off. Turn on what you
+   want to share.* and an **Open GIM Utilities settings** button. One member
+   clicks **Create group key**, then **Copy group key**, and sends the key to
+   the group outside the game (Discord, a DM). The game chatbox takes no
+   paste, and plugins never type into it. Everyone else copies the key and
+   clicks **Paste group key** in the panel (or pastes it into *Group key* in
+   the settings). The panel then shows a **Share with your group?** card:
+   - **Turn on sharing** ticks *Sync with my group* and every *Share* switch
+     (bank, group storage changes, stats, inventory and equipment, pouch /
+     quiver / vault, drops and collection log, group events), and joins.
+   - **Post my events to Discord** shows only when you have a Discord webhook
+     set, and ticks *Post to Discord*.
+   - **Not now** hides the card until the group key changes.
+
+   Nothing turns on without your click; untick any switch later in settings.
+   The card also shows while sync is on but every Share switch is off. With
+   *Share group storage changes* off, your own storage visits still appear in
+   your Storage and Log tabs, marked *not shared: Share group storage changes
+   is off*; nothing is sent. The built-in **Party** plugin is not needed and
+   can stay off.
+4. **Check the key.** Pasting the key saves it and joins. **New key** replaces
+   a leaked one; everyone pastes the new key.
+5. **Join.** Each member clicks **Join group sync** in the panel header, once
+   per session. Joining on its own at login is a rejected Plugin Hub feature,
+   so it waits for the click. The header then reads *Connected, N members
+   online*. If you are already in a party you joined yourself (a raid party,
+   say), it reads *In another party; GIM sync paused* and nothing is sent to
+   that party; **Switch to group sync** moves you.
+
+Party data goes to everyone in the party, so the key is what keeps it inside
+the group. Only names on your in-game group roster are shown; anyone else in
+the party is ignored and listed as *Not in your group*. **New key** replaces a
+leaked key; share the new line and everyone joins again.
+
+### Windows: double-click launcher
 
 You need nothing installed. You do not need admin rights, and nothing on your
-system is changed: everything goes into `%LOCALAPPDATA%\BuildGuard`.
+system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
 
-1. **Download `Run-BuildGuard.cmd`** from the release page the group was sent
-   (or from `tools/windows/` in this repo).
+1. **Download `Run-GimUtilities.cmd`** from the release page the group was
+   sent (or from `tools/windows/` in this repo).
 2. **Double-click it.** A black window prints its progress:
-   - `[1/3]` finds Java 11 or newer. If you have none, it downloads Eclipse
+   - `[1/3]` finds Java 11 to 21. If you have none, it downloads Eclipse
      Temurin Java 11 (about 200 MB) and checks its SHA-256 fingerprint
      against the one written in the launcher before unpacking it. If the
      fingerprint does not match, it stops.
-   - `[2/3]` downloads the Build Guard source the release was made from.
+   - `[2/3]` downloads the GIM Utilities source at tag `gim-test-7` from
+     GitHub. Run from inside a checkout (`tools\windows\`), it uses that
+     checkout instead.
    - `[3/3]` builds and starts RuneLite. The first run takes a few minutes
      while it downloads Gradle and RuneLite. Later runs reuse all of it and
      start much faster.
 
    If something fails, the window stays open with the reason in red. Take a
-   screenshot of it.
+   screenshot of it. A 404 at `[2/3]` means the repo is not public yet or the
+   tag has not been pushed.
 3. **If Windows shows "Windows protected your PC"** (SmartScreen): the
    launcher is a plain text script, not a signed program, so Windows does not
    recognise it. Click **More info**, then **Run anyway**. You can open the
    `.cmd` in Notepad first to read exactly what it does. If you see "Windows
    cannot access the specified file", right-click the file, choose
    **Properties**, tick **Unblock**, click **OK**, and double-click again.
-4. **Log in, the first time only.** Jagex Accounts cannot type a password
-   into a developer client. Use RuneLite's Jagex account panel instead
-   ([RuneLite wiki: Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts)):
-   - in the RuneLite window that opened, click the **Jagex account** icon on
-     the right-hand sidebar;
-   - choose to add a Jagex account and log in in the window that opens;
-   - pick your character, then click **Play Now** on the login screen.
+   **If "Smart App Control blocked a file that may be unsafe"** (Windows 11):
+   Smart App Control blocks scripts marked as downloaded. Do not turn it off
+   (Windows only lets you turn it back on by reinstalling). Instead open
+   **PowerShell** from the Start menu and paste this one line; a file
+   PowerShell downloads carries no "from the internet" mark:
 
-   On later runs, pick your character and click **Play Now**.
+   ```
+   $f="$env:LOCALAPPDATA\Run-GimUtilities.cmd"; iwr -UseBasicParsing https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/gim-test-7/tools/windows/Run-GimUtilities.cmd -OutFile $f; cmd /c $f
+   ```
 
-   If you have an old `.runelite\credentials.properties` file from a
-   previous developer setup, the wiki recommends deleting it.
-5. **Join the same RuneLite Party.** One person opens the built-in **Party**
-   panel on the sidebar (if it is missing, turn on the **Party** plugin in
-   RuneLite's plugin list) and clicks **Create party**, then shares the
-   passphrase it shows. Everyone else clicks **Join party** and types that
-   passphrase. Then everyone turns on **Build Guard → Share build with party**
-   (and the other two switches if they want). The Build Guard party panel (an
-   orange shield on the sidebar) appears once sharing is on.
+   Next time, start it with `cmd /c "$env:LOCALAPPDATA\Run-GimUtilities.cmd"`.
+4. Carry on from step 2 above (log in, turn sharing on, share the key, join). To
+   stop, close the RuneLite window.
 
-To stop, close the RuneLite window.
+For whoever cuts the test release: the launcher downloads
+`github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-7.zip`
+with no login, so the repo has to be public and the `gim-test-7` tag pushed
+before friends run it. To test a different tag, change `$SourceRef` at the
+top of the launcher. The checksum step has its own tests:
+`pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1`.
 
-### Testing with friends (macOS / Linux, or from a checkout)
-
-Install a JDK between 11 and 21, then from the repo folder run:
-
-```sh
-./gradlew run
-```
-
-Log in and join a party exactly as in steps 4 and 5 above.
+The `windows-launcher` GitHub Actions workflow runs the launcher end to end
+on a clean Windows runner with `GU_BUILD_ONLY=1` set, which makes `[3/3]` run
+`gradlew build` instead of opening RuneLite. It runs both the `.cmd` in the
+commit and the `.cmd` attached to the `gim-test-7` release, byte for byte.
+**Whenever `tools/windows/Run-GimUtilities.cmd` changes, re-upload it to the
+release** (as committed, with CRLF line endings), or the `release-asset` leg
+fails and players keep downloading the old one.
 
 ### What to look at
 
-- With `Defence: 1` in your rules, switch your weapon to **Controlled** or
-  **Defensive**: a red Build Guard chat line should appear, once. Switch back
-  to Accurate or Aggressive: no message.
-- In a party with sharing on, your row in the Build Guard panel should read
-  like `Name: Defence capped at 1 (now 1)`, and so should each friend's.
-- With **Tell party when at risk** on, switching to Controlled should add an
-  "at risk" line in everyone's panel.
-- With **Share gear list** on, picking up or equipping an item should show it
-  under "Who has what" within a few seconds.
-- Turn **Share build with party** off: your friends' panels should stop
-  updating for you, and your own Build Guard panel disappears (unless a group
-  bank/storage/stats switch is on).
+Banks, storage and stats (two or more members with the same switch on):
 
-Group banks, storage and stats (two or more members with the same switch on):
-
-1. **Bank.** Open and close your bank. Within a few seconds a friend's panel
+1. **Fresh install.** Before turning anything on: no GIM Utilities panel
+   button, and `::find shark` gets no `GIM Utilities:` answer.
+2. **Bank.** Open and close your bank. Within a few seconds a friend's panel
    shows a "Banks (last seen)" line for you: kinds, item count, value, "last
-   seen just now". Check the value is roughly what the bank's own value
-   shows. Restart the friend's client: your line should still be there.
-2. **Group storage.** Open group storage, take 3 of a stack and deposit
+   seen just now". Restart the friend's client: your line should still be
+   there.
+3. **Group storage.** Open group storage, take 3 of a stack and deposit
    something, close it. Everyone's "Group storage log" should read like
-   `<your name> took 3 x Shark, deposited 100 x Coal (just now)`. Then open it and
-   only move a stack to another slot: no new log line. Deposit noted items:
-   the log should name the item, not "item 1234" or a second entry.
-3. **Minimums.** Set `Shark: 1000` (more than storage has), open and close
+   `<your name> took 3 x Shark, deposited 100 x Coal (just now)`. Moving a
+   stack to another slot adds no line.
+4. **Minimums.** Set `Shark: 1000` (more than storage has), open and close
    storage: one desktop notification. Close it again: no second one.
-4. **Stats.** Drink a stat-boosting potion: your Attack/Strength in friends'
+5. **Stats.** Drink a stat-boosting potion: your Attack/Strength in friends'
    panels reads like `90 (+8)` within a couple of seconds, and counts down as
-   it wears off. Pray for a bit: Prayer reads `70 (-3)`. Run energy and
-   special attack should follow too, and the world number should match.
-5. **Search.** Type `shark` in "Who has it?": every member's bank, inventory,
-   equipment and storage stack of sharks, with counts, then who last took or
-   deposited sharks in storage. Type `::find shark` in the chatbox: the same
-   answer as `Build Guard:` lines, and nothing appears in public chat (check
-   with a friend standing next to you). `::find s` asks for more letters;
-   `::find zzz` says nothing was found. Restart the client and `::find shark`
-   again: the storage history is still there.
-6. **Off means off.** Turn each switch off: your friends stop getting that
-   kind of update from you (check their panels), and the matching section
-   empties in yours.
+   it wears off.
+6. **Search.** Type `shark` in "Who has it?": every member's sharks, with
+   counts, then who last took or deposited sharks. Turn on *::find chat
+   command* and type `::find shark`: the same answer as `GIM Utilities:`
+   lines, and nothing appears in public chat.
+7. **Off means off.** Turn each switch off: your friends stop getting that
+   kind of update from you, and the matching section empties in yours.
 
-Members, items, drops and the map (two or more members with the same
-switches on):
+Members, items, drops and the map:
 
-7. **Online / last seen.** With *Share stats* on for both of you, your friend
-   reads `online, world 302, Lumbridge` (their world and place) in your
-   **Members** list. Walk into a dungeon or to a boss: the place updates
-   within a few seconds. Have them log out: within 3 minutes they read
-   `last seen just now`, then `last seen 5m ago`.
-8. **Items.** With *Share inventory and equipment*, the **Items** list shows
-   `<name> wearing: ...` and `<name> carrying: ...` and follows a gear swap
-   within a few seconds.
-9. **Rune pouch, quiver, seed vault.** With *Share rune pouch, quiver, seed
-   vault*: cast a spell from the pouch and the `rune pouch:` line drops by the
-   runes used. Equip Dizana's quiver with arrows in it: a `quiver:` line.
-   Open and close the seed vault: `seed vault: N kinds, M seeds (last seen just
-   now)`. Search a seed or rune name in "Who has it?": it is found there.
-   Check the rune names are right (not "item 1234") and the quiver count
-   matches the game.
-10. **Drops.** With *Share drops and collection log* on, kill something that
-    drops an item worth over 10,000 gp: your friend's **Since you last
-    played** (or **Drops and collection log** on a first run) gains
-    `<name>: <NPC> dropped ...`. Your own panel does not list your own drops.
-    Set *Drops worth at least* to 0: every drop shows.
-11. **Collection log.** With the in-game new-addition notification on, get a
-    new collection log slot: a `new collection log slot, <item>` line.
-12. **Since you last played.** Log out for a few minutes while your friend
-    gets a drop, log back in: the drop is listed under **Since you last
-    played** once your friend is online. Restart the client: the list is
-    still there.
-13. **World map.** Turn on *Show members on world map* (with *Share stats*):
-    open the world map, an orange dot with your friend's name sits where they
-    are, and disappears a few minutes after they log out.
+8. **Online / last seen.** With *Share stats* on for both of you, your friend
+   reads `online, world 302, Lumbridge` in your **Members** list. Have them
+   log out: within 3 minutes they read `last seen just now`.
+9. **Items.** With *Share inventory and equipment*, the **Items** list follows
+   a gear swap within a few seconds.
+10. **Rune pouch, quiver, seed vault.** Cast a spell from the pouch: the
+    `rune pouch:` line drops by the runes used. Open and close the seed vault:
+    a `seed vault:` line.
+11. **Drops and collection log.** Kill something that drops an item worth over
+    10,000 gp: your friend's **Since you last played** gains it.
+12. **World map.** Turn on *Show members on world map* (with *Share stats*):
+    an orange dot with your friend's name sits where they are.
+13. **Next to Build Guard.** With both plugins on and both sets of switches
+    on, each panel shows only its own plugin's members, and the chat shows no
+    errors.
+
+Shopping (two members on this build, both in group sync):
+
+14. **Mithril gloves.** Open the **Shopping** tab, pick *1 Defence pure:
+    Mithril gloves*, keep the five ticked subquests (Awowogei unticked), tick
+    both of you under *For*, press *Add list*. Within a tick your friend's
+    Shopping tab shows the same list, "Added by <you>". Each line reads
+    `need N, have N, get N`; Cook's Assistant's milk, egg and flour are on it
+    if you have not done Cook's Assistant.
+15. **Ticks off.** With *Share bank* on, put an item the list needs in your
+    bank and close it: its line's *have* goes up, and at the full count it
+    reads `done`. A noted stack counts the same as unnoted.
+16. **Quest progress.** Finish (or have finished) a quest on the list: within
+    about half a minute its items leave your share of the list. Before your
+    friend's client sends theirs, their card says *No quest progress from ...
+    yet*.
+17. **Custom list, rename, remove.** Make a custom list (search `rope`, add 2,
+    name it), rename it from your friend's client, then remove it from yours:
+    both panels follow, and the *Changes* list names who did each.
+18. **Shop alert.** Turn on *Shopping: shop alert* (In-game) and walk up to a
+    shop a line lists under *Get*: one chat line naming what the group still
+    needs there. Standing there says nothing more; walk away and back and it
+    says it again.
+19. **Old clients.** A member on gim-test-3 sees no Shopping tab and nothing
+    breaks for them: their banks, stats and storage still arrive.
 
 ## Limitations
 
-- **Quest and lamp warnings are not wired up yet.** The warning today is for
-  attack styles only. It does not see quest rewards, lamps or other XP
-  sources, and it does not stop XP you get anyway.
-- **"Who has what" is a list, not a pure-safety check.** The plugin has no
-  item-requirement data, so it cannot tell you whether an item needs more
-  Defence than you have. It lists only what members chose to share.
-- Party sharing needs everyone to run Build Guard with sharing on. A member
-  without it simply does not appear in the panel.
-- Quest data is bundled at build time, so it is as current as the release
-  and no more.
 - **Banks are as of the last close.** Items moved since then, or a bank never
   opened with *Share bank* on, are not known.
-- **The storage log only sees members running Build Guard** with storage
+- **The storage log only sees members running GIM Utilities** with storage
   sharing on. It is a record of what each client saw, not the game's own log.
 - **`::find` and "Who has it?" do not follow trades or drops between members.**
-  They know each member's holdings as of that member's last sync.
-- **Place names come from a bundled table** (about 970 map regions: cities,
-  bosses, raids, minigames, dungeons, areas). A region not in it shows as a
-  number rather than a guess.
+- **Place names come from a bundled table** (about 970 map regions). A region
+  not in it shows as a number rather than a guess.
 - **There is no server.** "Since you last played" only has what a member's
-  client resent while you were both online; a member who never comes online
-  again after you do cannot send you their drops. Drops are NPC drops only
-  (not chests, raids rewards or clue caskets), and collection log slots need
-  the in-game chat notification.
+  client resent while you were both online. Drops are NPC drops only (not
+  chests, raids rewards or clue caskets), and collection log slots need the
+  in-game chat notification.
 - **The seed vault is as of the last open.** The rune pouch and quiver are
   live.
-- **The world map shows members, not a map in the panel**: the client has no
-  map picture a plugin could draw without downloading it.
-- **Bank values use RuneLite's cached Grand Exchange prices**, which are what
-  the bank's own value display uses; untradeables count as 0.
+- **Bank values use RuneLite's cached Grand Exchange prices**; untradeables
+  count as 0.
+- **Group events are what this client saw.** Barrows set progress counts
+  pieces from chests opened with the plugin on, not the collection log.
+  "Every quest done" means every quest *and miniquest* RuneLite lists. A
+  Hardcore group death is reported as a life lost even in a safe minigame.
+  A member's online banner only arrives once they have pressed *Join group
+  sync*; their offline goes to Discord only.
 
 ## Building and tests
 
@@ -311,9 +397,18 @@ switches on):
 ./gradlew run       # launches a developer client with the plugin side-loaded
 ```
 
-The Windows launcher's checksum step has its own test, runnable with
-PowerShell 7 on any OS:
+Builds use the newest RuneLite client release and check for a new one on
+every run, so the developer client (and the Plugin Hub plugins it loads)
+always matches what players are on. Before `test` and `run`, the build prints
+which one it resolved, e.g. `RuneLite client 1.13.6 (requested latest.release)`.
+
+A RuneLite release can break the build on a day nothing here changed. To tell
+the two apart, pin one run to a known-good client:
 
 ```sh
-pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1
+./gradlew build -PruneLiteVersion=1.13.6
+./gradlew build --offline    # reuses the last client downloaded
 ```
+
+This only affects building here: the Plugin Hub replaces `build.gradle` at
+submission and builds against its own client.

@@ -1,0 +1,17 @@
+{
+  "name": "Group storage visit",
+  "description": "Open group storage, withdraw 14 Super restore(4), deposit 50K coins, close. Live: the Storage tab logs the visit (and posts it, if storage posts are on).",
+  "steps": [
+    {"kind": "widgetLoaded", "group": "SHARED_BANK", "note": "open group storage"},
+    {"kind": "container", "id": "INV_GROUP_TEMP", "items": {"SUPER_RESTORE_4": 20, "SHARK": 40}, "wait": 600, "note": "the game sends the contents"},
+    {"kind": "container", "id": "INV_GROUP_TEMP", "items": {"SUPER_RESTORE_4": 6, "SHARK": 40}, "wait": 1200, "note": "withdraw 14 restores"},
+    {"kind": "container", "id": "INV_GROUP_TEMP", "items": {"SUPER_RESTORE_4": 6, "SHARK": 40, "COINS": 50000}, "wait": 1200, "note": "deposit coins"},
+    {"kind": "widgetClosed", "group": "SHARED_BANK", "wait": 1200, "note": "close it"}
+  ],
+  "expect": [
+    {"probe": "storage.log", "count": 1},
+    {"probe": "storage.log", "contains": "You took 14 Super restore(4)"},
+    {"probe": "storage.log", "contains": "deposited 50K Coins"},
+    {"probe": "storage.log", "absent": "Shark"}
+  ]
+}

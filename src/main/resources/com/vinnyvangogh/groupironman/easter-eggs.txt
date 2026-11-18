@@ -1,0 +1,98 @@
+# Every Easter egg line, read by EasterEggLines. One phrasing per line: NAME=line. A name with several lines
+# offers several phrasings, picked by EasterEggs.pick; a new phrasing is one more line under its name.
+#
+# These post into shared Discord servers and go through Plugin Hub review: keep them light. No self-harm or
+# suicide wording, nothing aimed at a person. EasterEggsTest checks the length and a list of banned words.
+#
+# Community memes are each tied to one event the plugin already posts. Real people only in widely known,
+# affectionate memes (B0aty's 73, Zezima), and never aimed at the player in the group.
+
+# A death that cost 0 gp.
+FREE_TRIP=Free trip to Lumbridge, no charge.
+FREE_TRIP=Nothing to lose, nothing lost. Suspiciously intentional.
+FREE_TRIP=Ironman death insurance: own nothing.
+# A death where all that was lost is a spade, maybe with clue items.
+CLUE_HUNTERS=Those clue hunters again.
+PET=Congrats, you can stop now.
+PET=Look who followed you home.
+PET=Pet! Now pretend you were going for it.
+# A "valuable" drop that is only Bones: the drop threshold is set very low.
+BONES_ONLY=Bones. Truly valuable.
+BONES_ONLY=Someone check the valuable drop setting.
+# A group storage deposit worth at least the 'Legend at' value. U+1FAF6 heart hands.
+LEGEND=Feeding the group like a true ironmom/irondad. 🫶
+LEGEND=Gringotts thanks you for your service.
+LEGEND=Generosity level: 99.
+LEGEND=The group storage is eating good tonight.
+# A group storage withdrawal worth at least the 'Freeloader at' value. U+1F440 eyes.
+FREELOADER=Gringotts is watching you. 👀
+FREELOADER=Borrowing, not stealing. Right?
+FREELOADER=The group storage will remember this.
+FREELOADER=Taking from the pile like a true group ironman.
+# A level up to 73 in any skill: the B0aty 73 meme.
+LEVEL_73=73. B0aty would approve.
+LEVEL_73=Seventy-three. A B0aty classic.
+# A level up to 92: 92 is halfway to 99 in XP.
+LEVEL_92=92: halfway to 99.
+LEVEL_92=Halfway to 99. Only the other half to go.
+# The 67 and 69 lines also show in the in-game group box and banners, where the game font has no emoji: any
+# emoji goes last, after a space, so the in-game tag is the line with its emoji cut off (EasterEggs.overlayTag).
+# A level up to 67 in any skill, or combat level 67: the "six seven" meme. U+1F932 palms up together, U+1F937 shrug.
+LEVEL_67=SIX SEVEN! 🤲
+LEVEL_67=Six... seven. 🤷
+LEVEL_67=67. You know what it is.
+LEVEL_67=Hands up for SIX SEVEN.
+# A level up to 69 in any skill, or combat level 69. Kept to one word on purpose. U+1F44C OK hand.
+LEVEL_69=Nice.
+LEVEL_69=Nice. 👌
+# A 99 in one skill.
+SKILL_99=Cape on, emote out.
+SKILL_99=99! Time to stand in a bank and emote.
+# Maxed: every skill at 99.
+MAXED_TOTAL=Move over, Zezima.
+MAXED_TOTAL=Maxed. Zezima would be impressed.
+# Combat level 126, the highest there is.
+COMBAT_126=126. Max combat, max swagger.
+# Total level 2000.
+TOTAL_2000=Welcome to the 2K total club.
+# 200M XP in a skill, the most it can hold.
+XP_200M=200M. The XP counter has nowhere left to go.
+# Quest completions, keyed by the quest name as posted.
+COOKS_ASSISTANT=The Duke gets his birthday cake after all.
+DRAGON_SLAYER=Rune platebody unlocked. Elvarg had it coming.
+RECIPE_FOR_DISASTER=Barrows gloves! An ironman rite of passage.
+# A death to TzTok-Jad.
+JAD=Jad claims another fire cape hopeful.
+JAD=Pray mage, pray range, try again.
+# A dry streak post: the "sit" meme, kindly.
+SIT=Sit. (Affectionately.)
+SIT=The RNG says sit. Keep going.
+# A gold ring put in group storage: "buying gf".
+BUYING_GF=Buying gf, paying in gold rings.
+
+# Drops by item id, first id wins when a drop has several. Ids as on the OSRS Wiki item infobox and
+# static.runelite.net/cache/item/icon/<id>.png.
+# Twisted bow
+20997=Ok, you can log off now.
+20997=Somebody frame this one.
+# Scythe of vitur (uncharged)
+22486=The Theatre says thanks for playing.
+# Tumeken's shadow (uncharged)
+27277=The shadow has chosen you.
+# Dragon warhammer
+13576=Defence levels everywhere just got nervous.
+# Elder maul
+21003=Bonk.
+# Dragon pickaxe
+11920=Rocks across Gielinor fear you now.
+# Draconic visage
+11286=A face only a dragon could love.
+# Zenyte shard
+19529=One shard closer to a very shiny necklace.
+# Dragon chainbody
+3140=Chainbody? In this economy?
+# Abyssal whip
+4151=Whip it. Whip it good.
+# Dragon med helm
+1149=The legendary med helm.
+1149=Every adventurer's first big drop.

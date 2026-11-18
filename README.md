@@ -1,48 +1,237 @@
-# Build Guard
+# GIM Utilities
 
-Warns before a quest, lamp or activity gives XP that breaks a capped account's build
+Share banks, group storage changes, stats and drops with your Group Ironman
+team over RuneLite Party.
 
-> **Status: early test build.** Not on the Plugin Hub yet. Quest verdicts,
-> the quest-start warning and lamp advice are planned, not wired up.
+> **Version 1.0.0**, submitted to the Plugin Hub. Split out of Build Guard,
+> which keeps its build and XP warnings; the two can run side by side.
 
 ## Features
 
-- **Your build rules, per skill:** no XP, a hard cap, a soft cap or a goal.
-- **Attack-style warning:** a red chat line when your selected style trains a
-  skill you capped (Controlled or Defensive on a 1 Defence pure, for example).
-- **Group features over RuneLite Party**, opt-in and off by default, for a
-  Group Ironman team with pures:
-  - every member's caps and current levels in one side panel;
-  - an "at risk" line when a member's style is about to give them capped XP;
-  - a "who has what" list of the items members choose to share;
-  - each member's last bank ("last seen 2h ago", with value), kept across
-    restarts;
-  - a group storage log: who took or deposited what, last 200 changes;
-  - live group stats with boosts and drains (`90 (+8)`), HP, prayer, run,
-    special attack and world;
-  - a "Who has it?" search (in the panel or via `::find <item>` in chat) across
-    banks, inventories, equipment, rune pouches, quivers, seed vaults, storage
-    and recent storage history;
-  - storage minimums with a desktop notification when stock runs low;
-  - who is online, or when they were last seen, and where (world and place
-    name), optionally as markers on the world map;
-  - each member's inventory, equipment, rune pouch, quiver and seed vault;
-  - "Since you last played": members' drops and new collection log slots.
+Everything is opt-in and off by default. Each member turns on what they want
+to share, and only sees other members' data for what they share themselves.
 
-Build Guard only warns. It never blocks a click or acts for you, and it makes
-no network connections of its own; party data goes through RuneLite's Party
-service.
+- **Group:** a card per member with world and place, HP / Prayer / Run / Spec
+  orbs, skills, and worn gear and inventory laid out like the game's tabs.
+  Offline members keep what they had the last time you were both online.
+
+  ![Group tab showing member card with orbs, stats, equipment, and inventory](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/panel-group.png)
+  *Group tab: member card with world/location, vitals orbs, stats, worn gear, and inventory.*
+
+  A member who doesn't run the plugin still gets a card: online and world from
+  the game's Group channel, levels from the hiscores.
+
+  ![Group tab with a member without the plugin, levels from the hiscores](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/panel-group-hiscores.png)
+
+- **Banks:** each member's last bank with value and when it was seen.
+
+  ![Banks tab showing member bank with item counts and total value](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/member-bank.png)
+  *Banks tab: member's last seen bank contents and total value.*
+
+- **Storage:** the last group storage contents you saw, plus who took or
+  deposited what.
+
+  ![Storage tab showing group storage contents and change history](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/storage-snapshot.png)
+  *Storage tab: snapshot of group storage items and recent change history.*
+
+- **Find:** who has an item and where (bank, inventory, worn, pouches, group
+  storage), in the panel or with `::find <item>` in your own chatbox, with
+  colours you can change.
+
+  ![Find tab searching for items across banks and group storage](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/find-panel.png)
+  *Find tab: searching for an item across party members' banks and group storage.*
+
+  ![Chatbox output from ::find command with colour-coded results](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/find-chatbox.png)
+  *Chatbox `::find` command: instant, colour-coded item location lookup.*
+
+- **Log:** every group event, yours and your group's: drops, deaths, levels,
+  quests, slayer, diaries, storage visits, online and offline and the rest,
+  whether or not they go to Discord or the overlay. "Since you last played"
+  on top, then one section per day. Search by member, item, place or text;
+  filter by category, member and time (today, 7 days, all). Hover a row for
+  the full line and its value; right-click it to copy. The newest 2,000
+  events from the last 30 days are kept across restarts.
+
+  ![Log tab showing group storage changes and activity since last played](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/storage-log.png)
+  *Log tab: storage deposits/withdrawals and group activity since your last session.*
+
+- **Shopping:** shared shopping lists for the whole group. Anyone adds a list
+  for one or more members, and every member running GIM Utilities sees it:
+  - **Build presets**, starting with the 1 Defence pure: Mithril gloves
+    (Recipe for Disaster: pick 5 of the 6 subquests that give no Defence
+    experience), Ava's accumulator, Ancient Magicks, Dragon scimitar, Dragon
+    dagger and longsword, Climbing boots, Iban's staff, God books and
+    Waterfall Quest. A preset's list is the items for those quests and every
+    prerequisite the member has not done yet, read from the game. Optional
+    items are left out.
+  - **Custom lists:** your own name, items and quantities.
+
+  Each line reads *need, have, get*: what the members on the list need, less
+  what the group already holds (banks, group storage, inventories and
+  equipment; noted counts as the item), with who holds it and where to get
+  the rest: a shop you can be served at, with its price, or a monster that
+  drops it. A line ticks off as the items arrive. Remove a list, or rename a
+  custom one; every change says who made it. Optional: *Shopping: shop alert*
+  (under *In-game*, off by default) says in chat when you walk up to a shop
+  that sells something a list still needs.
+
+  Item data, shops and prerequisites come from
+  [Quest Path](https://github.com/VinnyVanGogh/questpath-plugin)'s bundled
+  quest data, copied in at build time (see `scripts/gen-quest-items.py`).
+
+- **Compare:** two members side by side (skills, bosses, quest points, who is
+  ahead), a leaderboard per stat with its best and worst holder, your group
+  against any group you type in on the public hiscores, and *who benefits
+  most* from an item (stat gain over what each member wears, and whether they
+  already own it). Member cards also show quest points, quests done, diary
+  tiers and boss bests, and Activities lists every member's personal bests
+  with the group best marked. Shared only with *Share group events* on. Item
+  level requirements are not in RuneLite's data, so that ranking says when it
+  does not know them.
+
+- **Group settings tab:** one set of thresholds and switches for the whole
+  group, saved by the leader or an editor and read-only for everyone else, with
+  the leader's editor list and a grid of who posts what.
+
+  <details><summary>As the leader</summary>
+
+  ![Settings tab as the leader: editors and the group's settings to edit](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-tab-leader.png)
+
+  </details>
+  <details><summary>As a member</summary>
+
+  ![Settings tab as a member: the group's settings, read-only](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-tab-member.png)
+
+  </details>
+  <details><summary>Who posts what</summary>
+
+  ![Who posts what: each member's own choice per event](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-who-posts.png)
+
+  </details>
+
+- Storage minimums with a desktop notification, and optional world map
+  markers.
+
+- **Group events** (new, every one its own switch): valuable drops, pets, new
+  collection log slots, untradeable uniques, deaths, big storage deposits and
+  withdrawals, storage visit summaries, storage minimums, "took the last one",
+  level ups, 99s and max total, XP milestones, combat and total level, quests
+  and quest points, online / offline, "back after a break", and Barrows
+  chests. Each can go to:
+  - **Discord**, through a webhook you set (one per category if you like,
+    see [Discord webhooks](#discord-webhooks)), as rich embeds or plain text,
+    with an optional screenshot, a mention for big events, and quiet hours.
+    Each member's client posts only that member's own events, so nothing is
+    posted twice.
+  - **In-game banners**, yours and your group's, plus an optional group box
+    with who is online and the latest events.
+
+  ![In-game chat showing group event broadcasts](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/group-events.png)
+  *Group events: in-game broadcasts for member level ups and achievements.*
+
+- **Settings:** granular opt-in toggles for every feature and sharing
+  category, in eight sections: *Group*, *Discord: connection*, *Discord: what
+  to post*, *Discord: how to post*, *Discord: daily digest*, *In-game*,
+  *Thresholds* and *Advanced* (all but *Group* start closed). See
+  [SETUP.md](SETUP.md#settings).
+
+  ![Settings panel with its eight sections closed](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-overview.png)
+  *Settings: eight sections, every switch off until you turn it on.*
+
+  <details><summary>Group</summary>
+
+  ![Group settings: sync, group key and what you share](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-group.png)
+
+  </details>
+  <details><summary>Discord: connection</summary>
+
+  ![Discord: connection, the webhooks and the poster name choices](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-connection.png)
+
+  </details>
+  <details><summary>Discord: what to post</summary>
+
+  ![Discord: what to post, one switch per event](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-what-to-post.png)
+
+  </details>
+  <details><summary>Discord: how to post</summary>
+
+  ![Discord: how to post, online status, combining level-ups, screenshots and quiet hours](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-how-to-post.png)
+
+  </details>
+  <details><summary>Discord: daily digest</summary>
+
+  ![Discord: daily digest, the hour and which categories it covers](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-daily-digest.png)
+
+  </details>
+  <details><summary>In-game</summary>
+
+  ![In-game settings: banners, group box, world map, ::find and one banner switch per event](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-in-game.png)
+
+  </details>
+  <details><summary>Thresholds and Advanced</summary>
+
+  ![Thresholds: gp values, level and kill count limits, untradeables to ignore; Advanced: the ::find colours](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-thresholds-advanced.png)
+
+  </details>
+
+No server of its own. Party data goes only through RuneLite's Party service,
+and only names on your in-game group roster are shown. **Only the optional
+Discord webhook you set** is a network call of the plugin's own: it is off
+until you turn on *Post to Discord* and paste a webhook URL, and it sends your
+own events and your IP address to Discord.
+
+## Discord webhooks
+
+*Discord: connection* has seven webhooks. Only **Main** is needed: leave any
+other one empty and its posts go to Main's webhook. Each webhook also has its
+own poster name, kept even when its posts go to Main's: *Webhook's own* (the
+name and avatar set on the webhook in Discord), *Default name* (below), or
+*Custom* (the box under it, which starts filled with the default name; left
+empty, the default name is used).
+
+| Webhook | What it posts | Default name |
+| --- | --- | --- |
+| Main | Anything not listed below: clue rewards, kill count milestones, personal bests, slayer tasks, farming and birdhouse runs, diaries, combat tasks, Wilderness, "back after a break", the weekly recap. Also every category left empty. | Town Crier |
+| Online status | The live board, or the online and offline posts. Changing this webhook starts a new board. | World Hopper |
+| Drops & loot | Valuable drops, pets, collection log slots, untradeable uniques, Barrows and raids chests, "took the last one". | Party Pete |
+| Progress | Level-ups, 99s and maxing, XP milestones, combat level, total level, quests and quest points. | Skillcape Seller |
+| Deaths & danger | Deaths and what they cost, a Hardcore group life lost, a gravestone about to expire. | Death's Office |
+| Group storage | Big deposits and withdrawals, storage visit summaries, storage minimums. | Gielinor Banker |
+| Daily digest | The once-a-day summaries ticked under *Discord: daily digest*. | Varrock Herald |
+
+Each webhook has its own queue and rate limit, so a busy Drops channel never
+holds up a death post.
 
 ## Quick start
 
-On Windows, double-click `tools/windows/Run-BuildGuard.cmd` (or the copy on
-the release page). It fetches Java if needed and starts RuneLite with Build
-Guard loaded. Elsewhere, run `./gradlew run`. Log in with RuneLite's Jagex
-account panel, type your rules into Build Guard's settings (e.g.
-`Defence: 1, Prayer: none`), and to use the group features join the same
-RuneLite Party as your friends and turn on *Share build with party*.
+1. Install *GIM Utilities* from the Plugin Hub. The panel (green badge on the
+   sidebar) shows as soon as the plugin is on; with every switch off it says
+   so and has a button to open the settings.
+2. One member opens the GIM Utilities panel, clicks **Create group key**, then
+   **Copy group key**, and sends the key to the group (Discord works).
+3. Everyone else copies it and clicks **Paste group key** (or pastes it into
+   *Group key* in the settings). The panel shows a **Share with your group?**
+   card: **Turn on sharing** ticks *Sync with my group* and every *Share*
+   switch in one click; **Post my events to Discord** appears if you have a
+   webhook set. Nothing turns on without the click.
+4. Each session, click **Join group sync**. The Party plugin is not needed.
 
-**Full steps, settings and what to test: [SETUP.md](SETUP.md).**
+![Panel showing group sync status and join button](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/group-sync.png)
+*Group sync: one-click party join without needing the Party plugin.*
+
+Anyone with the key can join your sync, so keep it inside your group.
+
+**Running from source, every setting, and what to test: [SETUP.md](SETUP.md).**
+
+## Coming later
+
+- **Joining on its own.** For now you click *Join group sync* each session:
+  RuneLite does not allow plugins to rejoin parties automatically (it would
+  load their party servers). We may add auto-join once we have our own
+  hosting for group sync; that would be optional, and the Plugin Hub would
+  mark the plugin as using a third-party service.
+- More group events (raids, clues, diaries, combat tasks and others), and
+  banners that only show where they matter.
 
 ## License
 

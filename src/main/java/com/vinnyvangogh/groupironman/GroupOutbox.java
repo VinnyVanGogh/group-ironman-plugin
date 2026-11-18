@@ -1,0 +1,162 @@
+package com.vinnyvangogh.groupironman;
+
+import com.google.gson.Gson;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Decides which group payloads this client is willing to send, and is the
+ * only place that decides it.
+ *
+ * <p>Each feature has its own switch and each is off by default. A switch that
+ * is off means nothing of that kind leaves this client: not an empty payload,
+ * no message at all.
+ */
+final class GroupOutbox
+{
+	static final class Switches
+	{
+		final boolean bank;
+		final boolean storage;
+		final boolean stats;
+		final boolean carried;
+		final boolean extras;
+		final boolean drops;
+
+		/** The part 2 switches, with the part 3 ones off. */
+		Switches(boolean bank, boolean storage, boolean stats, boolean carried)
+		{
+			this(bank, storage, stats, carried, false, false);
+		}
+
+		Switches(boolean bank, boolean storage, boolean stats, boolean carried, boolean extras, boolean drops)
+		{
+			this.bank = bank;
+			this.storage = storage;
+			this.stats = stats;
+			this.carried = carried;
+			this.extras = extras;
+			this.drops = drops;
+		}
+
+		boolean any()
+		{
+			return bank || storage || stats || carried || extras || drops;
+		}
+	}
+
+	private GroupOutbox()
+	{
+	}
+
+	static List<String> bank(Gson gson, Switches switches, BankSnapshot bank)
+	{
+		if (!switches.bank || bank == null)
+		{
+			return Collections.emptyList();
+		}
+		return GroupCodec.encodeBank(gson, bank);
+	}
+
+	/** Null when storage sharing is off or the visit changed nothing. */
+	static String storage(Gson gson, Switches switches, StorageChange change)
+	{
+		if (!switches.storage || change == null || change.isEmpty())
+		{
+			return null;
+		}
+		return GroupCodec.encodeStorage(gson, change);
+	}
+
+	/**
+	 * This player's own storage visit: always kept in {@code roster}'s log, so
+	 * the own Log and Storage tabs show it; marked not shared, and null
+	 * returned so nothing is sent, while storage sharing is off (Board
+	 * 2026-11-13: a withdrawal made before ticking the switch looked lost).
+	 */
+	static String ownStorage(Gson gson, Switches switches, StorageChange change, GroupRoster roster)
+	{
+		StorageChange kept = switches.storage ? change : change.notShared();
+		roster.putStorage(kept);
+		return storage(gson, switches, kept);
+	}
+
+	static String stats(Gson gson, Switches switches, MemberStats stats)
+	{
+		if (!switches.stats || stats == null)
+		{
+			return null;
+		}
+		return GroupCodec.encodeStats(gson, stats);
+	}
+
+	static String carried(Gson gson, Switches switches, GroupCodec.Carried carried)
+	{
+		if (!switches.carried)
+		{
+			return null;
+		}
+		return GroupCodec.encodeCarried(gson, carried);
+	}
+
+	static String extras(Gson gson, Switches switches, MemberExtras extras)
+	{
+		if (!switches.extras || extras == null)
+		{
+			return null;
+		}
+		return GroupCodec.encodeExtras(gson, extras);
+	}
+
+	/**
+	 * Pets, deaths, levels, quests, logins and Barrows chests: empty unless
+	 * "Share group events" is on. Drops and collection log slots never go
+	 * this way; they keep their own switch, {@link #events}.
+	 */
+	static List<String> groupEvents(Gson gson, boolean share, List<GroupEvent> events)
+	{
+		if (!share || events == null)
+		{
+			return Collections.emptyList();
+		}
+		List<GroupEvent> kept = new ArrayList<>();
+		for (GroupEvent e : events)
+		{
+			if (e.type.travels() && !e.type.logged())
+			{
+				kept.add(e);
+			}
+		}
+		return GroupCodec.encodeEvents(gson, kept);
+	}
+
+	/**
+	 * This player's live activity ({@code "k":"activity"}): null unless synced and "Share group events" is on.
+	 * With sharing off, the one exception is {@code clearOwed}: a clear frame, carrying nothing but "not in an
+	 * activity", so members stop showing a run this player stopped sharing mid-way.
+	 */
+	static String activity(Gson gson, boolean sync, boolean share, ActivityState state, boolean clearOwed)
+	{
+		if (!sync || state == null)
+		{
+			return null;
+		}
+		if (share)
+		{
+			return ActivityCodec.encode(gson, state);
+		}
+		return clearOwed ? ActivityCodec.encode(gson, new ActivityState.Builder("", state.at).build()) : null;
+	}
+
+	/** Empty when drop sharing is off or there is nothing to send. */
+	static List<String> events(Gson gson, Switches switches, List<GroupEvent> events)
+	{
+		if (!switches.drops || events == null)
+		{
+			return Collections.emptyList();
+		}
+		return GroupCodec.encodeEvents(gson, events);
+	}
+}
