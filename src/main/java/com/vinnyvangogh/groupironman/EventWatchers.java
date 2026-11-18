@@ -94,6 +94,12 @@ final class EventWatchers
 		this.wanted = wanted;
 	}
 
+	/** Every diary tier varbit with its label ("Ardougne easy"), for reading a member's full diary state. */
+	static Map<Integer, String> diaryVarbits()
+	{
+		return Collections.unmodifiableMap(DIARIES);
+	}
+
 	private static void tier(String area, int easy, int medium, int hard, int elite)
 	{
 		DIARIES.put(easy, area + " easy");

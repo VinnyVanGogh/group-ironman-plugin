@@ -49,6 +49,8 @@ final class EventThreads extends EditedThreads<EventThreads.Feed, EventThreads.E
 			case BACK:
 			case GRAVESTONE_EXPIRING:
 			case WEEKLY_RECAP:
+			case ANNOUNCEMENT:
+			case EVERYONE_ONLINE:
 				return null;
 			case SLAYER:
 				return "SLAYER";

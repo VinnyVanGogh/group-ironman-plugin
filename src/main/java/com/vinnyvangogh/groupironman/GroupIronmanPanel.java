@@ -69,7 +69,7 @@ import net.runelite.client.ui.components.IconTextField;
 class GroupIronmanPanel extends PluginPanel
 {
 	/** What the buttons in the header, and in the Settings tab, do. */
-	interface Actions extends GroupSettingsTab.Actions, ShoppingTab.Actions
+	interface Actions extends GroupSettingsTab.Actions, ShoppingTab.Actions, CompareTab.Actions
 	{
 		void join();
 
@@ -143,6 +143,11 @@ class GroupIronmanPanel extends PluginPanel
 			this.since = since;
 			this.self = self;
 		}
+
+		/** Members' shared boss bests, quests and diaries; set by the plugin, empty until it does. */
+		ProgressView progress = ProgressView.EMPTY;
+		/** The Compare tab's view, or null before the plugin has started. */
+		CompareTab.View compare;
 	}
 
 	private static final int GRID_COLUMNS = 5;
@@ -170,6 +175,7 @@ class GroupIronmanPanel extends PluginPanel
 	private final Actions actions;
 	private final GroupSettingsTab settingsTab;
 	private final ShoppingTab shoppingTab;
+	private final CompareTab compareTab;
 
 	private final JPanel header = new Column();
 	private final CardLayout cards = new CardLayout();
@@ -272,12 +278,13 @@ class GroupIronmanPanel extends PluginPanel
 		this.actions = actions;
 		this.settingsTab = new GroupSettingsTab(actions, this::redraw);
 		this.shoppingTab = new ShoppingTab(actions, itemManager, this::redraw);
+		this.compareTab = new CompareTab(actions, this::redraw);
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
 
 		JPanel top = new Column();
 		top.add(header);
-		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Activities", "Shopping", "Settings"));
+		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Activities", "Compare", "Shopping", "Settings"));
 		add(top, BorderLayout.NORTH);
 
 		addTab("Group", null);
@@ -286,6 +293,7 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Find", findControls());
 		addTab("Log", logControls());
 		addTab("Activities", activityFilters());
+		addTab("Compare", null);
 		addTab("Shopping", null);
 		addTab("Settings", null);
 		add(views, BorderLayout.CENTER);
@@ -488,6 +496,9 @@ class GroupIronmanPanel extends PluginPanel
 			case "Activities":
 				drawActivities(tab, v, now);
 				break;
+			case "Compare":
+				drawCompare(tab, v);
+				break;
 			case "Shopping":
 				drawShopping(tab, v);
 				break;
@@ -517,6 +528,16 @@ class GroupIronmanPanel extends PluginPanel
 			return false;
 		}
 		return v.settings == null || !settingsTab.changed(v.settings);
+	}
+
+	private void drawCompare(JPanel tab, View v)
+	{
+		if (v.compare == null)
+		{
+			empty(tab, "Compare is starting.", "Open this tab again in a moment.");
+			return;
+		}
+		compareTab.draw(tab, v.compare);
 	}
 
 	private void drawShopping(JPanel tab, View v)
@@ -785,6 +806,11 @@ class GroupIronmanPanel extends PluginPanel
 		addActivity(card, activity);
 
 		addStats(body, c);
+		View current = view;
+		if (current != null)
+		{
+			current.progress.cardLines(c.name, 3).forEach(line -> body.add(text(line, ACTIVITY)));
+		}
 		// Worn then inventory, small and side by side, in the game's own layouts.
 		PanelModel.ItemGroup worn = null;
 		PanelModel.ItemGroup inventory = null;
@@ -815,6 +841,10 @@ class GroupIronmanPanel extends PluginPanel
 			}
 			body.add(text(g.title, MUTED));
 			body.add(itemGrid(g.items));
+		}
+		if (c.charges != null)
+		{
+			body.add(text("Charges: " + c.charges, MUTED));
 		}
 		if (c.seedVault != null)
 		{
@@ -1458,6 +1488,29 @@ class GroupIronmanPanel extends PluginPanel
 				MUTED));
 		}
 		recent.forEach(line -> tab.add(text(line, Color.WHITE)));
+		drawPersonalBests(tab, v);
+	}
+
+	/** Each boss any member has shared a best for, the group best marked, then the newest bests set. */
+	private void drawPersonalBests(JPanel tab, View v)
+	{
+		tab.add(heading("Personal bests"));
+		List<ProgressView.BossRow> rows = v.progress.bossRows();
+		if (rows.isEmpty())
+		{
+			tab.add(text("Members' boss best times appear here once they share group events and kill a boss.",
+				MUTED));
+		}
+		for (ProgressView.BossRow r : rows)
+		{
+			tab.add(text(r.line(), Color.WHITE));
+		}
+		List<String> history = ProgressView.history(v.group.feed().entries(), 10);
+		if (!history.isEmpty())
+		{
+			tab.add(heading("New bests"));
+			history.forEach(line -> tab.add(text(line, ACTIVITY)));
+		}
 	}
 
 	private void drawLog(JPanel tab, View v, long now)

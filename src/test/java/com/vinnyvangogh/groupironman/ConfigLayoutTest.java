@@ -42,7 +42,7 @@ public class ConfigLayoutTest
 		"discordStorageLast", "discordLevelUp", "discordMaxed", "discordXpMilestone", "discordCombatLevel",
 		"discordTotalLevel", "discordQuest", "discordQuestPoints", "discordOnline", "discordOnlineStatus",
 		"discordOfflineGrace", "discordBack", "discordBarrows", "overlayDurationSeconds", "overlayPosition",
-		"overlayMaxStacked", "overlayGroupBox", "overlayGroupBoxEvents", "overlayValuableDrop", "overlayPet",
+		"overlayMaxStacked", "overlayGroupBox", "overlayGroupBoxEvents", "overlayPathStop", "overlayValuableDrop", "overlayPet",
 		"overlayCollectionLog", "overlayUntradeableUnique", "overlayDeath", "overlayStorageDeposit",
 		"overlayStorageWithdrawal", "overlayStorageSummary", "overlayStorageMinimum", "overlayStorageLast",
 		"overlayLevelUp", "overlayMaxed", "overlayXpMilestone", "overlayCombatLevel", "overlayTotalLevel",

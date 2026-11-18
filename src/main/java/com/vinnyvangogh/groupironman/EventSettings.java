@@ -77,6 +77,10 @@ final class EventSettings
 			GroupIronmanConfig::overlayActivityComplete);
 		both(GroupEvent.Type.ACTIVITY_DEATH, GroupIronmanConfig::discordActivityDeath,
 			GroupIronmanConfig::overlayActivityDeath);
+		both(GroupEvent.Type.ANNOUNCEMENT, GroupIronmanConfig::discordAnnouncement,
+			GroupIronmanConfig::overlayAnnouncement);
+		both(GroupEvent.Type.EVERYONE_ONLINE, GroupIronmanConfig::discordEveryoneOnline,
+			GroupIronmanConfig::overlayEveryoneOnline);
 
 		DIGEST.put(GroupEvent.Category.DROPS, GroupIronmanConfig::digestDrops);
 		DIGEST.put(GroupEvent.Category.DEATHS, GroupIronmanConfig::digestDeaths);

@@ -5,6 +5,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Keybind;
 import net.runelite.client.config.Range;
 import net.runelite.client.config.Units;
 
@@ -685,6 +686,21 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "discordAnnouncement", name = "Announcement",
+		description = "A note a member typed with ::announce.", section = discordEventsSection, position = 39)
+	default boolean discordAnnouncement()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordEveryoneOnline", name = "Everyone online",
+		description = "Everyone in the group is online. Posted by the group leader's client only.",
+		section = discordEventsSection, position = 40)
+	default boolean discordEveryoneOnline()
+	{
+		return false;
+	}
+
 	// ---- 4. Discord: how to post ----
 
 	@ConfigItem(keyName = "discordOnlineStatus", name = "Online status", description = "Posts: one per login and"
@@ -913,6 +929,14 @@ public interface GroupIronmanConfig extends Config
 	default int overlayGroupBoxEvents()
 	{
 		return 5;
+	}
+
+	@ConfigItem(keyName = "overlayPathStop", name = "Path stop card",
+		description = "On screen while you path from the Shopping tab: the stop, what to get there and for whom.",
+		section = inGameSection, position = 53)
+	default boolean overlayPathStop()
+	{
+		return false;
 	}
 
 	@ConfigItem(
@@ -1227,6 +1251,45 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "overlayAnnouncement", name = "Banner: Announcement",
+		description = "A note a member typed with ::announce. On by default.", section = inGameSection, position = 48)
+	default boolean overlayAnnouncement()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "overlayEveryoneOnline", name = "Banner: Everyone online",
+		description = "Everyone in the group is online at once.", section = inGameSection, position = 49)
+	default boolean overlayEveryoneOnline()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayDismissKey", name = "Dismiss banners key",
+		description = "Clears every banner on screen. Right-click a banner and choose Dismiss does the same.",
+		section = inGameSection, position = 50)
+	default Keybind overlayDismissKey()
+	{
+		return Keybind.NOT_SET;
+	}
+
+	@ConfigItem(keyName = "overlayQuietStart", name = "Banner quiet from",
+		description = "Hour banners stop showing (the Log still records them). Same as 'until' means no quiet hours.",
+		section = inGameSection, position = 51)
+	@Range(max = 23)
+	default int overlayQuietStart()
+	{
+		return 0;
+	}
+
+	@ConfigItem(keyName = "overlayQuietEnd", name = "Banner quiet until",
+		description = "Hour banners show again.", section = inGameSection, position = 52)
+	@Range(max = 23)
+	default int overlayQuietEnd()
+	{
+		return 0;
+	}
+
 	// ---- 7. Thresholds: what counts. Both Discord and the banners read these. ----
 
 	@ConfigItem(keyName = "eventDropMinValue", name = "Valuable drop (gp)",
@@ -1402,6 +1465,24 @@ public interface GroupIronmanConfig extends Config
 	@ConfigItem(keyName = KEY_MUTE_TYPES, name = "Kinds not to show", description = "Set in the Settings tab.",
 		hidden = true, section = advancedSection, position = 10)
 	default String overlayMuteTypes()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "compareStats", name = "Compare: stats that count",
+		description = "Compare tab, Item: which stats count when ranking who benefits. Comma separated, blank for all:"
+			+ " melee_attack, melee_strength, ranged_attack, ranged_strength, magic_attack, magic_damage, defence,"
+			+ " prayer.", section = advancedSection, position = 11)
+	default String compareStats()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "compareCategories", name = "Compare: item categories",
+		description = "Compare tab, Item: which kinds of item are ranked. Comma separated, blank for all: head, cape,"
+			+ " neck, ammo, weapon, body, shield, legs, hands, feet, ring, inventory.",
+		section = advancedSection, position = 12)
+	default String compareCategories()
 	{
 		return "";
 	}

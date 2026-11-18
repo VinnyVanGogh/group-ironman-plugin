@@ -6,9 +6,9 @@ import java.awt.Graphics2D;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import net.runelite.api.MenuAction;
+import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import net.runelite.client.ui.overlay.OverlayPanel;
-import net.runelite.client.ui.overlay.components.LineComponent;
-import net.runelite.client.ui.overlay.components.TitleComponent;
 
 /**
  * Event banners: one title and one line per event, newest on top, each for
@@ -17,6 +17,9 @@ import net.runelite.client.ui.overlay.components.TitleComponent;
  */
 final class EventToastOverlay extends OverlayPanel
 {
+	/** The right-click entry that clears every banner. */
+	static final String DISMISS = "Dismiss";
+
 	private final ToastQueue toasts;
 	private final GroupIronmanConfig config;
 	private final ItemLookup lookup;
@@ -30,6 +33,8 @@ final class EventToastOverlay extends OverlayPanel
 		this.lookup = lookup;
 		this.eggs = eggs;
 		setPosition(config.overlayPosition().position);
+		OverlayStyle.frame(panelComponent, OverlayStyle.BANNER_WIDTH);
+		getMenuEntries().add(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY, DISMISS, "Group banners"));
 	}
 
 	void reposition()
@@ -47,14 +52,18 @@ final class EventToastOverlay extends OverlayPanel
 			return null;
 		}
 		EasterEggs.Settings egg = eggs.get();
+		boolean first = true;
 		for (ToastQueue.Toast t : visible)
 		{
-			panelComponent.getChildren().add(TitleComponent.builder()
-				.text(t.event.member + ": " + EventText.title(t.event))
-				.color(new Color(t.event.type.category.colour))
-				.build());
-			panelComponent.getChildren().add(LineComponent.builder().left(EasterEggs.tagged(EventText.describe(t.event, lookup), t.event, egg))
-				.build());
+			if (!first)
+			{
+				panelComponent.getChildren().add(new OverlayStyle.Rule());
+			}
+			first = false;
+			Color colour = new Color(t.event.type.category.colour);
+			panelComponent.getChildren().add(new OverlayStyle.Header(EventText.title(t.event), t.event.member, colour));
+			panelComponent.getChildren().add(new OverlayStyle.Row(
+				EasterEggs.tagged(EventText.describe(t.event, lookup), t.event, egg), OverlayStyle.TEXT).lines(3));
 		}
 		return super.render(graphics);
 	}

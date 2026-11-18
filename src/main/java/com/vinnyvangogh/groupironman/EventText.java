@@ -98,6 +98,9 @@ final class EventText
 		line(GroupEvent.Type.FARMING, "Farming run", (e, l) -> ready(e));
 		line(GroupEvent.Type.BIRDHOUSE, "Bird houses and Hespori", (e, l) -> ready(e));
 		line(GroupEvent.Type.REQUEST, "Request", (e, l) -> RequestBoard.describe(e));
+		line(GroupEvent.Type.ANNOUNCEMENT, "Announcement", (e, l) -> e.text);
+		line(GroupEvent.Type.EVERYONE_ONLINE, "Everyone is online", (e, l) -> e.number > 0
+			? "all " + e.number + " members are online" : "everyone is online");
 		line(GroupEvent.Type.ACTIVITY_START, "Activity started", (e, l) -> "started " + e.text + extra(e));
 		line(GroupEvent.Type.ACTIVITY_WAVE, "Activity wave", (e, l) -> "reached " + e.detail + " in " + e.text);
 		line(GroupEvent.Type.ACTIVITY_COMPLETE, "Activity completed", EventText::activityDone);
