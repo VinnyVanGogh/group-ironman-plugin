@@ -393,6 +393,7 @@ class GroupService
 		cachedWebhooks = null;
 		cacheLoaded = false;
 		session = false;
+		forgetOwnBests();
 		hiscoresOnLogin = true;
 		seedVault = new TreeMap<>();
 		seedVaultAt = -1;
@@ -899,6 +900,13 @@ class GroupService
 		}
 	}
 
+	/** Logout or shutdown: the next login may be another account, whose bests must not start as these. */
+	private void forgetOwnBests()
+	{
+		pbCapture.load(Collections.emptyMap());
+		pbDirty = false;
+	}
+
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
@@ -906,6 +914,7 @@ class GroupService
 		{
 			// Logged out: remember when, so the next login knows what is new since.
 			session = false;
+			forgetOwnBests();
 			roster.markPlayed(System.currentTimeMillis());
 			saveCache();
 		}
