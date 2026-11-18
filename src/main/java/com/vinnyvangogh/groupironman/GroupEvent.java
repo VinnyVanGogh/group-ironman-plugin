@@ -98,7 +98,11 @@ final class GroupEvent
 		ACTIVITY_START("as", Category.ACTIVITIES, Need.TEXT, false),
 		ACTIVITY_WAVE("aw", Category.ACTIVITIES, Need.TEXT, false),
 		ACTIVITY_COMPLETE("ac", Category.ACTIVITIES, Need.TEXT, false),
-		ACTIVITY_DEATH("ad", Category.DEATHS, Need.TEXT, false);
+		ACTIVITY_DEATH("ad", Category.DEATHS, Need.TEXT, false),
+		/** A short note a member typed ({@code ::announce}) for the group: {@link #text} is that text. */
+		ANNOUNCEMENT("an", Category.GROUP, Need.TEXT, false),
+		/** Every member of the group is online at once. Worked out by each client; never sent. */
+		EVERYONE_ONLINE("eo", Category.GROUP, Need.NOTHING, false);
 
 		private static final Map<String, Type> BY_CODE = new HashMap<>();
 
@@ -133,7 +137,7 @@ final class GroupEvent
 		/** Storage kinds are derived on every client from the storage change; they never travel. */
 		boolean travels()
 		{
-			return category != Category.STORAGE;
+			return category != Category.STORAGE && this != EVERYONE_ONLINE;
 		}
 
 		/** The "since you last played" log keeps these two only, as 1.0.0 did. */
