@@ -59,6 +59,17 @@ public class AlertsTest
 	}
 
 	@Test
+	public void twoDropsInTheSameMillisecondBothShow()
+	{
+		AlertDedup d = new AlertDedup();
+		assertTrue(d.fresh(GroupEvent.drop(NOW, "Ann", "Dust devil", Collections.singletonMap(995, 5_000)), NOW));
+		assertTrue("a second kill in the same barrage", d.fresh(GroupEvent.drop(NOW, "Ann", "Dust devil",
+			Collections.singletonMap(1_319, 1)), NOW));
+		assertFalse("the party resends the first", d.fresh(GroupEvent.drop(NOW, "Ann", "Dust devil",
+			Collections.singletonMap(995, 5_000)), NOW + 60_000));
+	}
+
+	@Test
 	public void aLoginTwoSourcesReportIsOneAlert()
 	{
 		AlertDedup d = new AlertDedup();

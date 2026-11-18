@@ -28,7 +28,10 @@ final class AlertDedup
 	{
 		expire(now);
 		boolean windowed = e.type == GroupEvent.Type.ONLINE || e.type == GroupEvent.Type.EVERYONE_ONLINE;
-		String key = e.type.code + '|' + GroupMembers.key(e.member) + '|' + e.text + (windowed ? "" : "|" + e.at);
+		// A timestamped event is a resend only when everything it says matches: two drops in the same
+		// millisecond (one barrage, two kills) differ in their items and must both show.
+		String key = e.type.code + '|' + GroupMembers.key(e.member) + '|' + e.text + (windowed ? ""
+			: "|" + e.at + '|' + e.number + '|' + e.detail + '|' + e.items + '|' + e.taken);
 		Long before = seen.get(key);
 		if (before != null && (!windowed || now - before < WINDOW_MS))
 		{
