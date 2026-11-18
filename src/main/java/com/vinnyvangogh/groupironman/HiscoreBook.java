@@ -185,7 +185,7 @@ final class HiscoreBook
 		return clean(out);
 	}
 
-	private static String skillName(HiscoreSkill skill)
+	static String skillName(HiscoreSkill skill)
 	{
 		if (skill == null || skill.getType() != HiscoreSkillType.SKILL)
 		{

@@ -83,6 +83,29 @@ final class ItemBenefit
 			return new Settings(ALL_STATS, ALL_CATEGORIES);
 		}
 
+		/** From the two comma separated config strings: blank means all, and a name nobody knows is ignored. */
+		static Settings parse(String stats, String categories)
+		{
+			return new Settings(pick(stats, ALL_STATS), pick(categories, ALL_CATEGORIES));
+		}
+
+		private static Set<String> pick(String text, Set<String> all)
+		{
+			Set<String> out = new LinkedHashSet<>();
+			if (text != null)
+			{
+				for (String s : text.split(","))
+				{
+					String k = s.trim().toLowerCase(java.util.Locale.ROOT);
+					if (all.contains(k))
+					{
+						out.add(k);
+					}
+				}
+			}
+			return out.isEmpty() ? all : out;
+		}
+
 		Set<String> stats()
 		{
 			return stats;

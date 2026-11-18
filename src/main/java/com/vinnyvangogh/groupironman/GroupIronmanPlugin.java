@@ -288,6 +288,18 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public void benefit(String query, Consumer<BenefitFinder.Outcome> done)
+			{
+				group.benefit(query, done);
+			}
+
+			@Override
+			public void groupExperience(List<String> names, Consumer<Map<String, Long>> done)
+			{
+				group.groupExperience(names, done);
+			}
+
+			@Override
 			public boolean addRequest(String name, Map<Integer, Integer> items)
 			{
 				return group.addRequest(name, items);
@@ -495,6 +507,8 @@ public class GroupIronmanPlugin extends Plugin
 		GroupIronmanPanel.View view = new GroupIronmanPanel.View(group.syncState(), group.roster(), group.members(),
 			group.lookup, group.switches(), group.regions(), group.since(), group.self(),
 			group.presence(), settingsView(), group.anyOn(), group.sharingSettings(), shoppingView());
+		view.progress = group.progressView();
+		view.compare = group.compareView(view.progress);
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
 	}

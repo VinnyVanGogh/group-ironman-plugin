@@ -95,6 +95,11 @@ final class MemberProgressBook
 		return achievements.get(member);
 	}
 
+	synchronized java.util.Set<String> achievementMembers()
+	{
+		return new java.util.TreeSet<>(achievements.keySet());
+	}
+
 	synchronized Map<String, PersonalBests> allBests()
 	{
 		return Collections.unmodifiableMap(new HashMap<>(bests));

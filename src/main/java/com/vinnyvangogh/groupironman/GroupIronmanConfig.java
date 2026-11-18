@@ -1405,4 +1405,22 @@ public interface GroupIronmanConfig extends Config
 	{
 		return "";
 	}
+
+	@ConfigItem(keyName = "compareStats", name = "Compare: stats that count",
+		description = "Compare tab, Item: which stats count when ranking who benefits. Comma separated, blank for all:"
+			+ " melee_attack, melee_strength, ranged_attack, ranged_strength, magic_attack, magic_damage, defence,"
+			+ " prayer.", section = advancedSection, position = 11)
+	default String compareStats()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "compareCategories", name = "Compare: item categories",
+		description = "Compare tab, Item: which kinds of item are ranked. Comma separated, blank for all: head, cape,"
+			+ " neck, ammo, weapon, body, shield, legs, hands, feet, ring, inventory.",
+		section = advancedSection, position = 12)
+	default String compareCategories()
+	{
+		return "";
+	}
 }

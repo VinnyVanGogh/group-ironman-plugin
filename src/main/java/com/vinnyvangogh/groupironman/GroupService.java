@@ -2223,6 +2223,44 @@ class GroupService
 		return progress;
 	}
 
+	/** Everyone's shared bests and quests, this player's own included, for the panel. */
+	ProgressView progressView()
+	{
+		return ProgressView.of(progress, self, member() && config.groupShareEvents() ? pbCapture.bests() : null,
+			config.groupShareEvents() ? ownAchievements : null);
+	}
+
+	/** What the Compare tab shows. */
+	CompareTab.View compareView(ProgressView view)
+	{
+		List<String> names = new ArrayList<>(members.names());
+		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
+		{
+			names.add(self);
+		}
+		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names);
+	}
+
+	/** "Who benefits most" for a typed item; {@code done} runs on the client thread. */
+	void benefit(String query, Consumer<BenefitFinder.Outcome> done)
+	{
+		List<String> names = new ArrayList<>(members.names());
+		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
+		{
+			names.add(self);
+		}
+		ItemBenefit.Settings settings = ItemBenefit.Settings.parse(config.compareStats(), config.compareCategories());
+		clientThread.invokeLater(() -> done.accept(BenefitFinder.run(query, CompareSupport.source(itemManager),
+			CompareSupport.members(roster, names), settings)));
+	}
+
+	/** Summed hiscore experience per skill for up to a group's worth of players; null when none were read. */
+	void groupExperience(List<String> names, Consumer<Map<String, Long>> done)
+	{
+		CompareSupport.groupExperience(hiscoreClient,
+			names.size() > CompareTab.MAX_OTHER_NAMES ? names.subList(0, CompareTab.MAX_OTHER_NAMES) : names, done);
+	}
+
 	/** The shared lists, or null when not running. */
 	ShoppingSync shopping()
 	{
