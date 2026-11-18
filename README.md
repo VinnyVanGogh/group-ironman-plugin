@@ -79,6 +79,16 @@ to share, and only sees other members' data for what they share themselves.
   [Quest Path](https://github.com/VinnyVanGogh/questpath-plugin)'s bundled
   quest data, copied in at build time (see `scripts/gen-quest-items.py`).
 
+- **Compare:** two members side by side (skills, bosses, quest points, who is
+  ahead), a leaderboard per stat with its best and worst holder, your group
+  against any group you type in on the public hiscores, and *who benefits
+  most* from an item (stat gain over what each member wears, and whether they
+  already own it). Member cards also show quest points, quests done, diary
+  tiers and boss bests, and Activities lists every member's personal bests
+  with the group best marked. Shared only with *Share group events* on. Item
+  level requirements are not in RuneLite's data, so that ranking says when it
+  does not know them.
+
 - **Group settings tab:** one set of thresholds and switches for the whole
   group, saved by the leader or an editor and read-only for everyone else, with
   the leader's editor list and a grid of who posts what.

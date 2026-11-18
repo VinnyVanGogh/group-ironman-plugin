@@ -573,6 +573,50 @@ does not depend on the display name.
 
 ---
 
+### Phase 0 addendum — shared bests, quests and Compare (2026-11-17)
+
+Board, 2026-11-16 and 2026-11-17 (task-c3ec10ad): members' boss bests, quests,
+quest points and diaries visible to the group; a Compare tab; a Personal bests
+section under Activities. Our own design. The ideas were checked as examples
+only; nothing was taken from another plugin's code.
+
+**30. Sharing own boss bests, quests, quest points and diaries — allowed.**
+*Nearest rules:* Data & Privacy ("no sending identifying data to third
+parties"; here only to the player's own party, under the existing *Share group
+events* switch, off by default, the same switch the PB and quest events use).
+Read only from the player's own game chat ("Personal best:" lines), `Quest`
+states, the `QP` varp and diary varbits the client already exposes: no
+reflection, no widget scraping, no network. *Precedent:* the base Hiscore and
+Quest List plugins read the same states; this plugin's existing
+`PERSONAL_BEST`, `QUEST` and `DIARY` events read the same chat lines and
+varbits. Payloads are bounded and sanitised on receipt (`PersonalBests.of`,
+`AchievementState.of`, at most 100 members). A beaten best is posted to the
+group feed and Discord by the existing *New personal best* event, the member's
+own client posting it once, so nothing is posted twice.
+
+**31. Compare tab — allowed.** Reads only what members share and the public
+hiscores. *Nearest rules:* Data & Privacy, and "no automating input": nothing
+acts for the player. Players and Leaderboard use shared levels, QP and bests; a
+figure nobody shared reads "?", never a loss. *Group* looks up your members and
+up to five typed names with RuneLite's own `HiscoreClient` (precedent: the base
+Hiscore plugin, `HiscorePlugin`; and item 26 above for members), off the client
+thread, only when the button is pressed. RuneLite's `HiscoreEndpoint` has no
+group-ranking endpoint, so "where the group sits" and "the group one place
+above" are not available; the tab compares against any group the player types.
+
+**32. Who benefits most — allowed.** Reads item stats from `ItemManager`
+(`ItemStats`) and members' shared worn and carried items; nothing leaves the
+client. RuneLite carries no level requirements, so none are claimed: the tab
+says when requirements are unknown and "can use it now" then means only that
+nothing is known to block it. Stats and item categories are the *Compare:
+stats that count* and *Compare: item categories* settings.
+
+Not done here, on purpose: boss-page overlays (this plugin has no boss pages),
+and group-synced Compare settings (task-5760e864 owns the group settings
+schema; the two keys are per-player for now).
+
+---
+
 ## Phase 0.5 — measure before building
 
 Party message size: `GroupCodec` splits payloads to a budget of its own,

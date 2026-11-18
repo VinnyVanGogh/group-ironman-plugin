@@ -204,6 +204,8 @@ class GroupService
 	private volatile GroupEventEngine events;
 	/** The Shopping tab's shared lists and members' quest progress; null when not running. */
 	private volatile ShoppingSync shopping;
+	/** Members' boss bests and quests/diaries; null when not running. */
+	private volatile MemberProgressBook progress;
 	private volatile QuestData questData = QuestData.empty();
 	private volatile ShopPresets presets = new ShopPresets();
 	/** Whether each item can change hands, read with its name on the client thread. */
@@ -214,6 +216,11 @@ class GroupService
 	private volatile WorldPoint here;
 	// Client thread only.
 	private final ShopVisits shopVisits = new ShopVisits();
+	/** This player's own boss bests, read from their own chat; shared only under "Share group events". */
+	private final PbCapture pbCapture = new PbCapture();
+	private volatile boolean pbDirty;
+	/** This player's quests, quest points and diaries, read with their quest progress; null until read. */
+	private volatile AchievementState ownAchievements;
 	private int ticksSinceQuests = QUEST_INTERVAL_TICKS;
 	private int ticksSinceShopAlert;
 	private int ticksSinceSeal;
@@ -357,6 +364,7 @@ class GroupService
 			saveCache();
 			this.onChange.run();
 		});
+		progress = new MemberProgressBook(gson, this::send);
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
@@ -384,11 +392,13 @@ class GroupService
 		members = GroupMembers.UNKNOWN;
 		governance = null;
 		shopping = null;
+		progress = null;
 		tradeable.clear();
 		ownLevels = Collections.emptyMap();
 		cachedWebhooks = null;
 		cacheLoaded = false;
 		session = false;
+		forgetOwnBests();
 		hiscoresOnLogin = true;
 		seedVault = new TreeMap<>();
 		seedVaultAt = -1;
@@ -900,6 +910,14 @@ class GroupService
 		}
 	}
 
+	/** Logout or shutdown: the next login may be another account, whose bests must not start as these. */
+	private void forgetOwnBests()
+	{
+		pbCapture.load(Collections.emptyMap());
+		pbDirty = false;
+		ownAchievements = null;
+	}
+
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
@@ -907,6 +925,7 @@ class GroupService
 		{
 			// Logged out: remember when, so the next login knows what is new since.
 			session = false;
+			forgetOwnBests();
 			roster.markPlayed(System.currentTimeMillis());
 			saveCache();
 		}
@@ -959,6 +978,11 @@ class GroupService
 		if (event.getType() == ChatMessageType.GAMEMESSAGE || event.getType() == ChatMessageType.SPAM)
 		{
 			carriedDirty |= containers.chat(event.getMessage());
+		}
+		if (event.getType() == ChatMessageType.GAMEMESSAGE && member() && config.groupShareEvents()
+			&& pbCapture.chat(event.getMessage()))
+		{
+			pbDirty = true;
 		}
 		if (event.getType() != ChatMessageType.GAMEMESSAGE || !switches().drops)
 		{
@@ -1701,6 +1725,13 @@ class GroupService
 			roster.heard(name, System.currentTimeMillis());
 			return;
 		}
+		MemberProgressBook book = progress;
+		if (book != null && MemberProgressCodec.isProgress(payload) && book.receive(name, payload) != null)
+		{
+			roster.heard(name, System.currentTimeMillis());
+			onChange.run();
+			return;
+		}
 		ShoppingSync shop = shopping;
 		if (shop != null && ShoppingSync.isShopping(payload) && shop.receive(name, payload))
 		{
@@ -1723,6 +1754,20 @@ class GroupService
 	{
 		ifSet(governance, g -> g.flush(MemberPrefs.of(config)));
 		ifSet(shopping, shop -> shop.flush(self));
+		if (pbDirty && config.groupShareEvents())
+		{
+			pbDirty = false;
+			PersonalBests mine = pbCapture.bests();
+			if (!mine.isEmpty())
+			{
+				ifSet(progress, book -> book.publish(mine, null));
+			}
+		}
+		AchievementState ach = ownAchievements;
+		if (ach != null && config.groupShareEvents())
+		{
+			ifSet(progress, book -> book.publish(null, ach));
+		}
 	}
 
 	/**
@@ -2228,6 +2273,50 @@ class GroupService
 
 	// ---- The Shopping tab ----
 
+	/** Members' boss bests and quests, or null when not running. */
+	MemberProgressBook progress()
+	{
+		return progress;
+	}
+
+	/** Everyone's shared bests and quests, this player's own included, for the panel. */
+	ProgressView progressView()
+	{
+		return ProgressView.of(progress, self, member() && config.groupShareEvents() ? pbCapture.bests() : null,
+			config.groupShareEvents() ? ownAchievements : null);
+	}
+
+	/** What the Compare tab shows. */
+	CompareTab.View compareView(ProgressView view)
+	{
+		List<String> names = new ArrayList<>(members.names());
+		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
+		{
+			names.add(self);
+		}
+		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names);
+	}
+
+	/** "Who benefits most" for a typed item; {@code done} runs on the client thread. */
+	void benefit(String query, Consumer<BenefitFinder.Outcome> done)
+	{
+		List<String> names = new ArrayList<>(members.names());
+		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
+		{
+			names.add(self);
+		}
+		ItemBenefit.Settings settings = ItemBenefit.Settings.parse(config.compareStats(), config.compareCategories());
+		clientThread.invokeLater(() -> done.accept(BenefitFinder.run(query, CompareSupport.source(itemManager),
+			CompareSupport.members(roster, names), settings)));
+	}
+
+	/** Summed hiscore experience per skill for up to a group's worth of players; null when none were read. */
+	void groupExperience(List<String> names, Consumer<Map<String, Long>> done)
+	{
+		CompareSupport.groupExperience(hiscoreClient,
+			names.size() > CompareTab.MAX_OTHER_NAMES ? names.subList(0, CompareTab.MAX_OTHER_NAMES) : names, done);
+	}
+
 	/** The shared lists, or null when not running. */
 	ShoppingSync shopping()
 	{
@@ -2430,6 +2519,8 @@ class GroupService
 	{
 		ifSet(governance, GovernanceSync::resendAll);
 		ifSet(shopping, ShoppingSync::resendAll);
+		ifSet(progress, MemberProgressBook::resendAll);
+		pbDirty = true;
 	}
 
 	/** Every item any live list may show, for names and whether it can change hands. */
@@ -2480,7 +2571,29 @@ class GroupService
 		}
 		ownLevels = levels;
 		shop.ownProgress(self, QuestStates.read(QuestStates.wanted(questData), q -> q.getState(client)));
+		ownAchievements = readAchievements();
 		resolveNow(shoppingItemIds());
+	}
+
+	/** Client thread. Every quest the game reports, quest points and diary tiers. */
+	private AchievementState readAchievements()
+	{
+		List<String> finished = new ArrayList<>();
+		List<String> started = new ArrayList<>();
+		for (net.runelite.api.Quest q : net.runelite.api.Quest.values())
+		{
+			net.runelite.api.QuestState state = q.getState(client);
+			if (state == net.runelite.api.QuestState.FINISHED)
+			{
+				finished.add(q.getName());
+			}
+			else if (state == net.runelite.api.QuestState.IN_PROGRESS)
+			{
+				started.add(q.getName());
+			}
+		}
+		return AchievementCapture.state(client.getVarpValue(net.runelite.api.gameval.VarPlayerID.QP), finished,
+			started, EventWatchers.diaryVarbits(), client::getVarbitValue);
 	}
 
 	/** Client thread. "Shopping: shop alert": once per approach to a shop selling something still needed. */

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Compare, shared boss bests, quests and diaries
+
+- Members' boss personal bests, quest points, quests done and achievement
+  diary tiers are shared with the group under *Share group events* (off by
+  default) and shown on each member card.
+- New **Compare** tab: two members side by side, a leaderboard per stat (best
+  and worst holder, sortable), this group against any other group on the
+  public hiscores, and *who benefits most* from an item.
+- Activities gets a **Personal bests** section: each boss with the group best
+  marked, and the newest bests set. A beaten best posts through the existing
+  *New personal best* event, to the log and Discord.
+- New settings *Compare: stats that count* and *Compare: item categories*.
+- Level requirements are not in RuneLite's item data, so *who benefits most*
+  says when it does not know them.
+
 ### Discord: every kind of post groups per member, like level-ups
 
 - A member's posts of one kind within **Group posts (minutes)** (new
