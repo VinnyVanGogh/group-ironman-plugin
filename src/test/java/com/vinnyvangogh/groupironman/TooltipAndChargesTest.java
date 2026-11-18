@@ -87,7 +87,7 @@ public class TooltipAndChargesTest
 	{
 		GroupCodec.Carried c = carriedWith(LOOTING_BAG, SkillingContainer.LOOTING_BAG,
 			new GroupCodec.Held(2, counts(FakeItems.COINS, 1000, FakeItems.SHARK, 3)));
-		assertEquals("Looting bag (2 inside: 3 x Shark, 1000 x Coins, worth 3,400 gp)",
+		assertEquals("Looting bag (2 inside: 3 x Shark, 1,000 x Coins, worth 3,400 gp)",
 			PanelModel.slotCells(c, items()).get(0).tooltip());
 	}
 
