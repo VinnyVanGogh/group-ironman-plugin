@@ -1422,7 +1422,7 @@ public interface GroupIronmanConfig extends Config
 		return EventDetect.DEFAULT_UNTRADEABLE_IGNORE;
 	}
 
-	@ConfigItem(keyName = "eventWaveEvery", name = "Also post every N waves",
+	@ConfigItem(keyName = "eventWaveEvery", name = "Every N waves too",
 		description = "Extra milestones on top of each activity's own (Fight Caves 31, 37, 50, 62, 63; Inferno 30, 50,"
 			+ " 60, 66-69; Colosseum 4, 8, 11, 12). 0 adds none.", section = thresholdsSection, position = 10)
 	@Range(min = 0, max = 100)
