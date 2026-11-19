@@ -1196,11 +1196,7 @@ class GroupService
 			return;
 		}
 		here = position();
-		if (ItemPaths.movedFar(drawnFrom, here))
-		{
-			drawnFrom = here;
-			onChange.run();
-		}
+		redrawIfMoved();
 		long now = System.currentTimeMillis();
 		refreshRoster();
 		if (!member())
@@ -2371,6 +2367,15 @@ class GroupService
 	}
 
 	/** Where this player stood on the last game tick; null when logged out. Any thread. */
+	private void redrawIfMoved()
+	{
+		if (ItemPaths.movedFar(drawnFrom, here))
+		{
+			drawnFrom = here;
+			onChange.run();
+		}
+	}
+
 	WorldPoint here()
 	{
 		return here;
