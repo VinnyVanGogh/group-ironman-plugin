@@ -1,5 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
+import com.google.common.base.Charsets;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
 import com.google.gson.annotations.SerializedName;
@@ -7,7 +8,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -468,7 +468,7 @@ final class QuestData
 			{
 				return empty();
 			}
-			return parse(gson, new InputStreamReader(in, StandardCharsets.UTF_8));
+			return parse(gson, new InputStreamReader(in, Charsets.UTF_8));
 		}
 		catch (IOException e)
 		{
