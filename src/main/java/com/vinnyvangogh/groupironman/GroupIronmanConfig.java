@@ -772,7 +772,7 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = "discordPickupMinutes", name = "Picked-up wait (minutes)",
+	@ConfigItem(keyName = "discordPickupMinutes", name = "Pickup wait (minutes)",
 		description = "How long after a drop posts a pickup still adds the second screenshot.",
 		section = discordHowSection, position = 17)
 	@Range(min = 1, max = 30)
