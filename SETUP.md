@@ -253,9 +253,17 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
      Temurin Java 11 (about 200 MB) and checks its SHA-256 fingerprint
      against the one written in the launcher before unpacking it. If the
      fingerprint does not match, it stops.
-   - `[2/3]` downloads the GIM Utilities source at tag `gim-test-8` from
+   - `[2/3]` downloads the GIM Utilities source at tag `gim-test-9` from
      GitHub. Run from inside a checkout (`tools\windows\`), it uses that
-     checkout instead.
+     checkout instead. It then downloads `combat-vitals.jar` (Combat &
+     Skilling Vitals) from the same release, checks its SHA-256 against the
+     one written in the launcher, and puts it in
+     `%USERPROFILE%\.runelite\sideloaded-plugins`, creating the folder if
+     needed. A different `combat-vitals.jar` already there is kept as
+     `combat-vitals.jar.bak`. Only this test client loads that folder (it runs
+     in developer mode); your normal RuneLite does not. If the jar cannot be
+     fetched or does not match, it prints a warning and GIM Utilities starts
+     without it.
    - `[3/3]` builds and starts RuneLite. The first run takes a few minutes
      while it downloads Gradle and RuneLite. Later runs reuse all of it and
      start much faster.
@@ -276,27 +284,41 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
    PowerShell downloads carries no "from the internet" mark:
 
    ```
-   $f="$env:LOCALAPPDATA\Run-GimUtilities.cmd"; iwr -UseBasicParsing https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/gim-test-8/tools/windows/Run-GimUtilities.cmd -OutFile $f; cmd /c $f
+   $f="$env:LOCALAPPDATA\Run-GimUtilities.cmd"; iwr -UseBasicParsing https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/gim-test-9/tools/windows/Run-GimUtilities.cmd -OutFile $f; cmd /c $f
    ```
 
    Next time, start it with `cmd /c "$env:LOCALAPPDATA\Run-GimUtilities.cmd"`.
 4. Carry on from step 2 above (log in, turn sharing on, share the key, join). To
    stop, close the RuneLite window.
 
+**macOS, with Combat & Skilling Vitals:** there is no Mac launcher. Run the
+client from a checkout of the release tag (`git checkout gim-test-9`, then
+`./gradlew run`), and before starting it download `combat-vitals.jar` from
+the release into `~/.runelite/sideloaded-plugins/` (create the folder if it
+is missing). The dev client loads it alongside GIM Utilities.
+
 For whoever cuts the test release: the launcher downloads
-`github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-8.zip`
-with no login, so the repo has to be public and the `gim-test-8` tag pushed
+`github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-9.zip`
+with no login, so the repo has to be public and the `gim-test-9` tag pushed
 before friends run it. To test a different tag, change `$SourceRef` at the
 top of the launcher. The checksum step has its own tests:
 `pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1`.
 
+`combat-vitals.jar` is the plain `./gradlew jar` output of
+VinnyVanGogh/combat-vitals-plugin (only that plugin's own classes and
+sounds). Build it first, put its SHA-256 in `$CvJarSha256` at the top of the
+launcher in the same change that moves `$SourceRef`, and attach that exact
+jar to the release as `combat-vitals.jar`. A rebuilt jar has a different hash
+and the launcher refuses it.
+
 The `windows-launcher` GitHub Actions workflow runs the launcher end to end
 on a clean Windows runner with `GU_BUILD_ONLY=1` set, which makes `[3/3]` run
 `gradlew build` instead of opening RuneLite. It runs both the `.cmd` in the
-commit and the `.cmd` attached to the `gim-test-8` release, byte for byte.
-**Whenever `tools/windows/Run-GimUtilities.cmd` changes, re-upload it to the
-release** (as committed, with CRLF line endings), or the `release-asset` leg
-fails and players keep downloading the old one.
+commit and the `.cmd` attached to the `gim-test-9` release, byte for byte;
+the `release-asset` leg also requires `combat-vitals.jar` to install from the
+release. **Whenever `tools/windows/Run-GimUtilities.cmd` changes, re-upload
+it to the release** (as committed, with CRLF line endings), or the
+`release-asset` leg fails and players keep downloading the old one.
 
 ### What to look at
 
