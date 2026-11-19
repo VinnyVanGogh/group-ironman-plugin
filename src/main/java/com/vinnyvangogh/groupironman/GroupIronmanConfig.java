@@ -764,6 +764,16 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "discordChatShot", name = "Chat-only events: just the chat",
+		description = "Posts that are only a chat line (levels, quests, pets, collection log, deaths...) show a picture"
+			+ " of the chat box, not the whole screen. Drops keep the full screen. Falls back to the full screen when"
+			+ " the chat is hidden. Needs 'Attach a screenshot'.",
+		section = discordHowSection, position = 18)
+	default boolean discordChatShot()
+	{
+		return true;
+	}
+
 	@ConfigItem(keyName = "discordPickupShot", name = "Add picked-up screenshot",
 		description = "Your drop posts get a second screenshot once you pick the drop up, so the inventory shows it."
 			+ " The post goes on its own, not in a grouped message. Needs 'Attach a screenshot'.",
