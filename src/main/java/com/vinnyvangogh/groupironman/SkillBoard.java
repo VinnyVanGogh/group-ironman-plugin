@@ -122,40 +122,50 @@ final class SkillBoard
 		// Stable sort: ties keep the members' own order.
 		known.sort((a, b) -> Integer.compare(value(b, stat), value(a, stat)));
 		List<Entry> out = new ArrayList<>();
-		int rank = 0;
-		String above = null;
-		int aboveValue = 0;
-		for (int i = 0; i < known.size(); i++)
+		for (GroupCompare.Figures f : known)
 		{
-			GroupCompare.Figures f = known.get(i);
-			int v = value(f, stat);
-			if (i == 0 || v != value(known.get(i - 1), stat))
-			{
-				rank = i + 1;
-				// The member directly above is the first of the nearest higher figure.
-				above = i == 0 ? null : firstWith(known, stat, value(known.get(i - 1), stat));
-				aboveValue = i == 0 ? 0 : value(known.get(i - 1), stat);
-			}
-			int lead = 0;
-			if (rank == 1)
-			{
-				for (GroupCompare.Figures o : known)
-				{
-					if (value(o, stat) < v)
-					{
-						lead = v - value(o, stat);
-						break;
-					}
-				}
-			}
-			out.add(new Entry(f.name, v, rank, above, above == null ? 0 : aboveValue - v, lead,
-				tied(known, stat, f)));
+			out.add(entryFor(known, stat, f));
 		}
 		for (GroupCompare.Figures f : unknown)
 		{
 			out.add(new Entry(f.name, null, 0, null, 0, 0, Collections.emptyList()));
 		}
 		return out;
+	}
+
+	/** {@code f}'s place in {@code known}, which is sorted highest first. */
+	private static Entry entryFor(List<GroupCompare.Figures> known, String stat, GroupCompare.Figures f)
+	{
+		int v = value(f, stat);
+		int start = 0;
+		while (value(known.get(start), stat) != v)
+		{
+			start++;
+		}
+		// The member directly above is the first holder of the nearest higher figure.
+		String above = null;
+		int toPass = 0;
+		if (start > 0)
+		{
+			int higher = value(known.get(start - 1), stat);
+			above = firstWith(known, stat, higher);
+			toPass = higher - v;
+		}
+		return new Entry(f.name, v, start + 1, above, toPass, start == 0 ? leadOver(known, stat, v) : 0,
+			tied(known, stat, f));
+	}
+
+	/** How far {@code v}, the top figure, is ahead of the best figure below it; 0 when everyone ties. */
+	private static int leadOver(List<GroupCompare.Figures> known, String stat, int v)
+	{
+		for (GroupCompare.Figures o : known)
+		{
+			if (value(o, stat) < v)
+			{
+				return v - value(o, stat);
+			}
+		}
+		return 0;
 	}
 
 	private static String firstWith(List<GroupCompare.Figures> known, String stat, int v)
