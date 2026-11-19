@@ -29,6 +29,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.swing.BoxLayout;
@@ -278,7 +279,7 @@ class GroupIronmanPanel extends PluginPanel
 		this.actions = actions;
 		this.settingsTab = new GroupSettingsTab(actions, this::redraw);
 		this.shoppingTab = new ShoppingTab(actions, itemManager, this::redraw);
-		this.compareTab = new CompareTab(actions, this::redraw);
+		this.compareTab = new CompareTab(actions, skillIcons, this::redraw);
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
 
@@ -1480,6 +1481,7 @@ class GroupIronmanPanel extends PluginPanel
 			tab.add(text("Your own activity shows here either way; members see it only with 'Share group events'"
 				+ " on.", MUTED));
 		}
+		drawPersonalBests(tab, v);
 		tab.add(heading("Recent runs"));
 		List<String> recent = ActivityRows.recent(v.group.feed().entries(), activityFilter, v.items, now);
 		if (recent.isEmpty())
@@ -1488,13 +1490,21 @@ class GroupIronmanPanel extends PluginPanel
 				MUTED));
 		}
 		recent.forEach(line -> tab.add(text(line, Color.WHITE)));
-		drawPersonalBests(tab, v);
 	}
 
-	/** Each boss any member has shared a best for, the group best marked, then the newest bests set. */
+	/**
+	 * Its own section, above Recent runs: the newest bests first, in gold, then each boss any member has shared a
+	 * best for with every member's time and the group best marked. A boss with a new best is in gold too.
+	 */
 	private void drawPersonalBests(JPanel tab, View v)
 	{
 		tab.add(heading("Personal bests"));
+		List<String> history = ProgressView.history(v.group.feed().entries(), 10);
+		if (!history.isEmpty())
+		{
+			tab.add(text("New bests", MUTED));
+			history.forEach(line -> tab.add(text("NEW " + line, ACTIVITY)));
+		}
 		List<ProgressView.BossRow> rows = v.progress.bossRows();
 		if (rows.isEmpty())
 		{
@@ -1503,13 +1513,9 @@ class GroupIronmanPanel extends PluginPanel
 		}
 		for (ProgressView.BossRow r : rows)
 		{
-			tab.add(text(r.line(), Color.WHITE));
-		}
-		List<String> history = ProgressView.history(v.group.feed().entries(), 10);
-		if (!history.isEmpty())
-		{
-			tab.add(heading("New bests"));
-			history.forEach(line -> tab.add(text(line, ACTIVITY)));
+			boolean fresh = history.stream().anyMatch(h -> h.toLowerCase(Locale.ROOT)
+				.contains(r.boss.toLowerCase(Locale.ROOT)));
+			tab.add(text(r.line(), fresh ? ACTIVITY : Color.WHITE));
 		}
 	}
 
