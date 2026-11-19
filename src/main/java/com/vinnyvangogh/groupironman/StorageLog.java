@@ -72,6 +72,14 @@ final class StorageLog
 		entries.clear();
 	}
 
+	/** Removes every visit whose member {@code drop} says to; how many went. */
+	synchronized int removeMembers(java.util.function.Predicate<String> drop)
+	{
+		int before = entries.size();
+		entries.removeIf(e -> drop.test(e.member()));
+		return before - entries.size();
+	}
+
 	/** "5 x Shark, 40K x Coins", for {@code ::find}'s storage history; amounts in {@code items}' style. */
 	static String describe(Map<Integer, Integer> counts, ItemLookup items)
 	{

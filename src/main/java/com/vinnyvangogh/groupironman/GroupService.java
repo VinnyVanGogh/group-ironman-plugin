@@ -1249,6 +1249,34 @@ class GroupService
 		}
 	}
 
+	/** Names already reported as removed this session, so each is logged once. */
+	private final Set<String> purgeLogged = new HashSet<>();
+
+	/**
+	 * Removes every entry filed under a name that is not on the group roster from this client's Log, storage log,
+	 * banks and live data. Each client runs this on its own copy, so the entries go from everyone's, including the
+	 * client that recorded them (Board 2026-11-17). Never the local player or a roster member, and nothing while
+	 * the roster is unknown.
+	 */
+	private void purgeNonRoster(GroupMembers roster)
+	{
+		String self = localName();
+		Set<String> hit = this.roster.purge(name -> EventBackfill.offRoster(roster, self, name));
+		if (hit.isEmpty())
+		{
+			return;
+		}
+		for (String name : hit)
+		{
+			if (purgeLogged.add(GroupMembers.key(name)))
+			{
+				log.debug("removed entries from {}: not on the group roster", name);
+			}
+		}
+		saveCache();
+		onChange.run();
+	}
+
 	/**
 	 * Client thread. Re-reads the group roster from the game every few
 	 * ticks. The first time it is known while syncing, asks members to resend:
@@ -1268,6 +1296,11 @@ class GroupService
 		boolean wasMember = member();
 		checkMember(now);
 		boolean isMember = member();
+		if (isMember)
+		{
+			// Another group's roster must never clear this group's cache.
+			purgeNonRoster(now);
+		}
 		changed |= wasMember != isMember;
 		if (now.known() && isMember)
 		{
@@ -1587,8 +1620,7 @@ class GroupService
 				GroupOutbox.bank(gson, switches(), lastBank).forEach(this::send);
 			}
 			// The joiner may have been offline for these: this is how "since you last played" works with no server.
-			List<GroupEvent> mine = roster.events().recentBy(localName(), System.currentTimeMillis());
-			GroupOutbox.events(gson, switches(), mine).forEach(this::send);
+			uploadOwnEvents();
 			if (lastActivity.active())
 			{
 				// A joiner mid-run sees it now, not at the next wave.
@@ -1611,7 +1643,36 @@ class GroupService
 		assembler.clear();
 		roster.clearStrangers();
 		resendLive();
+		if (syncing())
+		{
+			// Joining the sync later: what this player did while not synced goes up now (Board 2026-11-17).
+			uploadOwnEvents();
+		}
 		onChange.run();
+	}
+
+	/**
+	 * Sends this player's recent events, drops and log slots under the drops switch and every other kind under
+	 * "Share group events". Receivers keep their original times and log each once ({@link EventBackfill}).
+	 */
+	private void uploadOwnEvents()
+	{
+		if (!syncing() || !member())
+		{
+			return;
+		}
+		long now = System.currentTimeMillis();
+		List<GroupEvent> mine = EventBackfill.upload(roster, localName(), now);
+		List<GroupEvent> drops = new ArrayList<>();
+		for (GroupEvent e : mine)
+		{
+			if (e.type.logged())
+			{
+				drops.add(e);
+			}
+		}
+		GroupOutbox.events(gson, switches(), drops).forEach(this::send);
+		GroupOutbox.groupEvents(gson, config.groupShareEvents(), mine).forEach(this::send);
 	}
 
 	/**
@@ -1811,6 +1872,7 @@ class GroupService
 		}
 		boolean added = false;
 		GroupEventEngine engine = events;
+		long now = System.currentTimeMillis();
 		for (GroupEvent e : received)
 		{
 			GroupEvent mine = e.withMember(name);
@@ -1819,11 +1881,24 @@ class GroupService
 			{
 				continue;
 			}
+			EventBackfill.Arrival arrival = EventBackfill.classify(roster.feed(), mine, now);
+			if (arrival == EventBackfill.Arrival.DUPLICATE)
+			{
+				continue;
+			}
 			resolve(e.items.keySet());
 			added |= logged;
 			if (engine != null)
 			{
-				engine.member(mine);
+				// Earlier events a member uploaded on joining the sync reach the Log only, never a toast.
+				if (arrival == EventBackfill.Arrival.BACKFILL)
+				{
+					engine.backfill(mine);
+				}
+				else
+				{
+					engine.member(mine);
+				}
 			}
 		}
 		if (added)

@@ -889,6 +889,12 @@ class GroupEventEngine
 		router.route(event, false, settings, group.lookup);
 	}
 
+	/** A member's earlier event, uploaded when they joined the sync: the Log only, no toast and no post. */
+	void backfill(GroupEvent event)
+	{
+		router.backfill(event, settings, group.lookup);
+	}
+
 	/** Client thread. A storage visit: this player's own, or a member's from the party. */
 	void storage(StorageChange change, boolean own)
 	{

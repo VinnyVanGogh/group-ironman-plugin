@@ -281,6 +281,51 @@ final class GroupRoster
 		lastPlayed = 0;
 	}
 
+	/**
+	 * Removes everything filed under a member name {@code drop} accepts: their events, storage visits, banks and
+	 * live data. Returns the names that had anything, for the one log line.
+	 */
+	Set<String> purge(java.util.function.Predicate<String> drop)
+	{
+		Set<String> hit = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+		for (GroupEvent e : events.entries())
+		{
+			if (drop.test(e.member))
+			{
+				hit.add(e.member);
+			}
+		}
+		for (GroupEvent e : feed.entries())
+		{
+			if (drop.test(e.member))
+			{
+				hit.add(e.member);
+			}
+		}
+		for (StorageChange c : log.entries())
+		{
+			if (drop.test(c.member()))
+			{
+				hit.add(c.member());
+			}
+		}
+		for (Map<String, ?> byMember : java.util.Arrays.asList(banks, carried, stats, extras, heard, seen, activities))
+		{
+			for (String name : new ArrayList<>(byMember.keySet()))
+			{
+				if (drop.test(name))
+				{
+					byMember.remove(name);
+					hit.add(name);
+				}
+			}
+		}
+		events.removeMembers(drop);
+		feed.removeMembers(drop);
+		log.removeMembers(drop);
+		return hit;
+	}
+
 	Map<String, BankSnapshot> banks()
 	{
 		return new TreeMap<>(banks);

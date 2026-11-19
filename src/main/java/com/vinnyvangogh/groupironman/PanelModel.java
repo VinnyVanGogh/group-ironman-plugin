@@ -484,6 +484,11 @@ final class PanelModel
 	{
 		String tag = heardAt > 0 || s != null ? "" : " (no plugin)";
 		boolean heard = Presence.online(heardAt, now);
+		if (game == GamePresence.State.ONLINE && !heard && heardAt > 0)
+		{
+			// In the game but not sending: their events stay on their client until they sync (Board 2026-11-17).
+			tag = " (not syncing, last synced " + BoostText.ago(now, heardAt) + ")";
+		}
 		if (game == GamePresence.State.ONLINE && !heard)
 		{
 			return (gameWorld > 0 ? "Online - W" + gameWorld : "Online") + tag;
