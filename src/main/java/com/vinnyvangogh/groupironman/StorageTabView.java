@@ -29,6 +29,9 @@ final class StorageTabView
 	private final JPanel rows = new GroupIronmanPanel.Column();
 	private final List<JLabel> rowLabels = new ArrayList<>();
 	private final ItemGridView grid;
+	private final JLabel logHeader = new JLabel("Changes");
+	private boolean collapsed;
+	private boolean lastLogEmpty = true;
 	private boolean built;
 
 	StorageTabView(JPanel tab, ItemGridView.CellPainter painter, int columns, int max)
@@ -64,8 +67,26 @@ final class StorageTabView
 			summary.setToolTipText(Amounts.EXACT.of(s.value) + " gp");
 			touched += grid.update(s.items);
 		}
-		noChanges.setVisible(s.log.isEmpty());
+		lastLogEmpty = s.log.isEmpty();
+		showLog();
 		return touched + updateRows(s.log);
+	}
+
+	/** The change log's lines are hidden while collapsed; the header stays, with how many lines it holds. */
+	private void showLog()
+	{
+		noChanges.setVisible(!collapsed && lastLogEmpty);
+		rows.setVisible(!collapsed);
+		logHeader.setText((collapsed ? "▶ " : "▼ ") + "Changes");
+		logHeader.setToolTipText(collapsed ? "Click to show the changes" : "Click to hide the changes");
+	}
+
+	private void toggleLog()
+	{
+		collapsed = !collapsed;
+		showLog();
+		tab.revalidate();
+		tab.repaint();
 	}
 
 	private void build()
@@ -82,7 +103,18 @@ final class StorageTabView
 		contents.add(grid.component());
 		tab.add(contents);
 		JPanel log = Ui.card();
-		log.add(Ui.label("Changes", FontManager.getRunescapeBoldFont(), null));
+		logHeader.setFont(FontManager.getRunescapeBoldFont());
+		logHeader.setForeground(Color.WHITE);
+		logHeader.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+		logHeader.addMouseListener(new java.awt.event.MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(java.awt.event.MouseEvent e)
+			{
+				toggleLog();
+			}
+		});
+		log.add(logHeader);
 		log.add(noChanges);
 		log.add(rows);
 		tab.add(log);

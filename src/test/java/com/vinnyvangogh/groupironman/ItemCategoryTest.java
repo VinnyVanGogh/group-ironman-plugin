@@ -149,6 +149,32 @@ public class ItemCategoryTest
 	}
 
 	@Test
+	public void foodAndPotionsAreToldApartByName()
+	{
+		Items i = items()
+			.put(30, "Prayer potion(4)", 0)
+			.put(31, "Super restore(3)", 0)
+			.put(32, "Ranging potion(unf)", 0)
+			.put(33, "Cooked karambwan", 0)
+			.put(34, "Trout", 0)
+			.put(35, "Burnt shark", 0)
+			.put(36, "Summer pie", 0);
+		assertTrue(ItemCategory.FOOD.matches(SHARK, i));
+		assertTrue(ItemCategory.FOOD.matches(33, i));
+		assertTrue(ItemCategory.FOOD.matches(34, i));
+		assertTrue(ItemCategory.FOOD.matches(36, i));
+		assertFalse(ItemCategory.FOOD.matches(RAW_SHARK, i));
+		assertFalse(ItemCategory.FOOD.matches(35, i));
+		assertFalse(ItemCategory.FOOD.matches(30, i));
+		assertFalse(ItemCategory.FOOD.matches(WHIP, i));
+		assertTrue(ItemCategory.POTIONS.matches(30, i));
+		assertTrue(ItemCategory.POTIONS.matches(31, i));
+		assertFalse("an unfinished potion is not drinkable", ItemCategory.POTIONS.matches(32, i));
+		assertFalse(ItemCategory.POTIONS.matches(SHARK, i));
+		assertFalse(ItemCategory.POTIONS.matches(UNKNOWN, i));
+	}
+
+	@Test
 	public void anItemWithNoStatsYetMatchesOnlyAll()
 	{
 		Items i = items();
