@@ -24,6 +24,7 @@ import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -94,6 +95,12 @@ class GroupIronmanPanel extends PluginPanel
 
 		/** Ticks Post to Discord. */
 		void postToDiscord();
+
+		/** The quick-settings switches' values now, in {@link QuickSettings#ITEMS} order. */
+		boolean[] quickValues();
+
+		/** A quick-settings click: writes that config key, so RuneLite's settings list follows. */
+		void setQuick(String key, boolean on);
 	}
 
 	/** Everything a redraw needs, captured on the client side. */
@@ -198,6 +205,8 @@ class GroupIronmanPanel extends PluginPanel
 	private List<String> logMembers = Collections.emptyList();
 	/** Set while the member picker is rebuilt, so its own events do not redraw mid-draw. */
 	private boolean updatingMembers;
+	/** Whether the header's quick-settings card is unfolded. */
+	private boolean quickOpen = true;
 	/** Member cards the player collapsed, by name. */
 	private final Set<String> collapsed = new HashSet<>();
 	/** Bank cards folded in the Banks tab, kept apart from the Group tab's. */
@@ -627,12 +636,13 @@ class GroupIronmanPanel extends PluginPanel
 		SyncHeader h = SyncHeader.of(v.sync, v.group.othersOnline(v.self, now), v.members);
 		String note = keyNote != null && now - keyNoteAt < 30_000 ? keyNote : null;
 		SharingPrompt.Card card = v.sharing == null ? null : sharing.card(v.sharing);
+		boolean[] quick = actions.quickValues();
 		// A header that would read the same is left alone: rebuilding its buttons on every member update was
 		// the lag with the Settings tab open (that tab is skipped when unchanged, the header was not).
 		String signature = String.join("|", String.valueOf(SidebarButton.offNotice(v.anyOn)), h.title,
 			String.valueOf(h.detail), String.valueOf(h.ok), String.valueOf(h.buttons), String.valueOf(note),
 			card == null ? "-" : card.sharing + "," + card.discord + "," + v.sharing.key,
-			String.valueOf(v.group.strangers()));
+			String.valueOf(v.group.strangers()), quickOpen + Arrays.toString(quick));
 		if (signature.equals(headerDrawn) && header.getComponentCount() > 0)
 		{
 			return;
@@ -662,12 +672,32 @@ class GroupIronmanPanel extends PluginPanel
 			header.add(text(note, Color.WHITE));
 		}
 		drawSharingCard(v.sharing);
+		drawQuickSettings(quick);
 		for (String stranger : v.group.strangers())
 		{
 			header.add(text("Not in your group: " + stranger + " (ignored)", ColorScheme.PROGRESS_ERROR_COLOR));
 		}
 		header.revalidate();
 		header.repaint();
+	}
+
+	/** A foldable card of the most-used switches and "All settings"; each click writes the real config key. */
+	private void drawQuickSettings(boolean[] values)
+	{
+		JPanel box = Ui.card();
+		box.add(Ui.wide(Ui.button((quickOpen ? "▾ " : "▸ ") + QuickSettings.TITLE,
+			"Show or hide the switches", () ->
+			{
+				quickOpen = !quickOpen;
+				redraw();
+			})));
+		if (quickOpen)
+		{
+			QuickSettings.draw(box, values, actions::setQuick);
+			box.add(Ui.wide(Ui.button(QuickSettings.ALL, "Opens GIM Utilities' page in RuneLite's settings",
+				actions::openSettings)));
+		}
+		header.add(box);
 	}
 
 	/** Every switch is off: say so first, with a way to the settings, so the panel never looks broken. */

@@ -237,6 +237,18 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public boolean[] quickValues()
+			{
+				return QuickSettings.read(config);
+			}
+
+			@Override
+			public void setQuick(String key, boolean on)
+			{
+				configManager.setConfiguration(GroupIronmanConfig.GROUP, key, on);
+			}
+
+			@Override
 			public boolean claim()
 			{
 				return group.claimLeadership();
