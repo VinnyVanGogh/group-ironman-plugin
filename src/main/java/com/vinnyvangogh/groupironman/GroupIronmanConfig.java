@@ -662,7 +662,7 @@ public interface GroupIronmanConfig extends Config
 		description = "Fight Caves, Inferno or Colosseum.", section = discordEventsSection, position = 35)
 	default boolean discordActivityStart()
 	{
-		return false;
+		return true;
 	}
 
 	@ConfigItem(keyName = "discordActivityWave", name = "Activity wave milestone",
@@ -1270,7 +1270,7 @@ public interface GroupIronmanConfig extends Config
 		description = "Fight Caves, Inferno or Colosseum.", section = inGameSection, position = 44)
 	default boolean overlayActivityStart()
 	{
-		return false;
+		return true;
 	}
 
 	@ConfigItem(keyName = "overlayActivityWave", name = "Banner: Activity wave",
@@ -1422,13 +1422,37 @@ public interface GroupIronmanConfig extends Config
 		return EventDetect.DEFAULT_UNTRADEABLE_IGNORE;
 	}
 
-	@ConfigItem(keyName = "eventWaveEvery", name = "Post every N waves",
-		description = "Waves per milestone; boss waves always count. 0 is boss waves only.", section = thresholdsSection,
-		position = 10)
+	@ConfigItem(keyName = "eventWaveEvery", name = "Also post every N waves",
+		description = "Extra milestones on top of each activity's own (Fight Caves 31, 37, 50, 62, 63; Inferno 30, 50,"
+			+ " 60, 66-69; Colosseum 4, 8, 11, 12). 0 adds none.", section = thresholdsSection, position = 10)
 	@Range(min = 0, max = 100)
 	default int eventWaveEvery()
 	{
-		return 10;
+		return 0;
+	}
+
+	@ConfigItem(keyName = "activityFightCaves", name = "Activity posts: Fight Caves",
+		description = "Post start, wave, death and completion events for the Fight Caves.", section = thresholdsSection,
+		position = 11)
+	default boolean activityFightCaves()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "activityInferno", name = "Activity posts: Inferno",
+		description = "Post start, wave, death and completion events for the Inferno.", section = thresholdsSection,
+		position = 12)
+	default boolean activityInferno()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "activityColosseum", name = "Activity posts: Colosseum",
+		description = "Post start, wave, death and completion events for the Fortis Colosseum.",
+		section = thresholdsSection, position = 13)
+	default boolean activityColosseum()
+	{
+		return true;
 	}
 
 	// ---- 8. Advanced: ::find colours ----
