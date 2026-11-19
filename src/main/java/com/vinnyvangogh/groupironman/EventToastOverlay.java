@@ -3,10 +3,13 @@ package com.vinnyvangogh.groupironman;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
+import net.runelite.api.Player;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import net.runelite.client.ui.overlay.OverlayPanel;
 
@@ -24,10 +27,14 @@ final class EventToastOverlay extends OverlayPanel
 	private final GroupIronmanConfig config;
 	private final ItemLookup lookup;
 	private final Supplier<EasterEggs.Settings> eggs;
+	private final Client client;
+	/** Height drawn last frame: "Above player" grows upward from the head, so it needs it before drawing. */
+	private int lastHeight;
 
 	EventToastOverlay(ToastQueue toasts, GroupIronmanConfig config, ItemLookup lookup,
-		Supplier<EasterEggs.Settings> eggs)
+		Supplier<EasterEggs.Settings> eggs, Client client)
 	{
+		this.client = client;
 		this.toasts = toasts;
 		this.config = config;
 		this.lookup = lookup;
@@ -65,6 +72,29 @@ final class EventToastOverlay extends OverlayPanel
 			panelComponent.getChildren().add(new OverlayStyle.Row(
 				EasterEggs.tagged(EventText.describe(t.event, lookup), t.event, egg), OverlayStyle.TEXT).lines(3));
 		}
-		return super.render(graphics);
+		if (config.overlayPosition() == ToastPosition.ABOVE_PLAYER)
+		{
+			panelComponent.setPreferredLocation(BannerAnchor.place(headPoint(graphics),
+				client.getCanvasWidth(), client.getCanvasHeight(), OverlayStyle.BANNER_WIDTH, lastHeight));
+		}
+		else
+		{
+			panelComponent.setPreferredLocation(new Point());
+		}
+		Dimension drawn = super.render(graphics);
+		lastHeight = drawn == null ? 0 : drawn.height;
+		return drawn;
+	}
+
+	/** Just above the overhead text, so the name and hitsplats stay clear; null while off screen. */
+	private Point headPoint(Graphics2D graphics)
+	{
+		Player me = client.getLocalPlayer();
+		if (me == null)
+		{
+			return null;
+		}
+		net.runelite.api.Point p = me.getCanvasTextLocation(graphics, " ", me.getLogicalHeight() + BannerAnchor.LIFT);
+		return p == null ? null : new Point(p.getX(), p.getY());
 	}
 }

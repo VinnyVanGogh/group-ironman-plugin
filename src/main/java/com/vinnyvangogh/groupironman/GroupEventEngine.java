@@ -274,7 +274,7 @@ class GroupEventEngine
 		chooseOnlineStatus();
 		reloadConfig();
 		restorePresence();
-		toastOverlay = new EventToastOverlay(toasts, config, group.lookup, this::eggSettings);
+		toastOverlay = new EventToastOverlay(toasts, config, group.lookup, this::eggSettings, client);
 		boxOverlay = new GroupBoxOverlay(toasts, config, group, this::eggSettings);
 		overlayManager.add(toastOverlay);
 		overlayManager.add(boxOverlay);
