@@ -252,9 +252,15 @@ final class CompareTab
 			{
 				image = ImageUtil.loadImageResource(SkillIconManager.class, "/skill_icons_small/combat.png");
 			}
+			else if (SkillBoard.TOTAL.equals(n))
+			{
+				// Skill.OVERALL is null in current RuneLite, so getSkillImage
+				// cannot draw the Total tile; load the client's own icon instead.
+				image = ImageUtil.loadImageResource(SkillIconManager.class, "/skill_icons_small/overall.png");
+			}
 			else
 			{
-				Skill s = SkillBoard.TOTAL.equals(n) ? Skill.OVERALL : skillOf(n);
+				Skill s = skillOf(n);
 				image = s == null ? null : skillIcons.getSkillImage(s, true);
 			}
 			return image == null ? null : new ImageIcon(image);
