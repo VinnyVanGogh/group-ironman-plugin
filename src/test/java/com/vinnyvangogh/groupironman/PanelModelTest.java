@@ -316,6 +316,22 @@ public class PanelModelTest
 	}
 
 	@Test
+	public void theChangeLogNarrowsWithTheSearchBox()
+	{
+		GroupRoster roster = new GroupRoster();
+		roster.putStorage(new StorageChange(NOW - 3 * MIN, "Sam", items(FakeItems.COINS, 40_000, FakeItems.SHARK, 2),
+			items(), items(FakeItems.COINS, 450_001)));
+		roster.putStorage(new StorageChange(NOW - 2 * MIN, "Sam", items(FakeItems.COINS, 5), items(),
+			items(FakeItems.COINS, 450_001)));
+		PanelModel.StorageView all = PanelModel.storage(roster, ITEMS, "Me", GridFilter.NONE, NOW);
+		PanelModel.StorageView sharks = PanelModel.storage(roster, ITEMS, "Me", GridFilter.of("shark"), NOW);
+		assertEquals(2, all.log.size());
+		assertEquals("only the visit that touched a shark, cut to the shark", 1, sharks.log.size());
+		assertEquals("Sam took 2 Shark", sharks.log.get(0).text);
+		assertEquals(0, PanelModel.storage(roster, ITEMS, "Me", GridFilter.of("zzzzz"), NOW).log.size());
+	}
+
+	@Test
 	public void headerSaysWhatToDoNextInEveryState()
 	{
 		GroupMembers group = GroupMembers.of("GroupShip", Arrays.asList("Alex", "Me"));
