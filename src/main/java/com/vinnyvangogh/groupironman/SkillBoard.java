@@ -3,44 +3,41 @@ package com.vinnyvangogh.groupironman;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
- * The maths behind the Compare and Leaderboard tabs ("what should I train"), with no Swing: one selected stat ranked
- * across the group, and one member against another sorted by the biggest gap. A figure nobody shared is unknown: it is
- * never ranked and never counts as a gap.
+ * The maths behind the Leaderboard and Compare tabs, with no Swing: one selected stat ranked across the group, and the
+ * figures two members put side by side. A figure nobody shared is unknown: it is never ranked and never counts as a
+ * loss.
  */
 final class SkillBoard
 {
 	static final String TOTAL = GroupCompare.TOTAL;
 	static final String QUEST_POINTS = GroupCompare.QUEST_POINTS;
+	static final String COMBAT = "Combat level";
 
-	/** The stats the dropdown offers: total level, the 24 skills, then quest points. */
+	/** The skill grid's tiles: the 24 skills read across three columns, then total level, quest points and combat. */
 	static final List<String> STATS;
+
+	/** The Compare table's rows: the skills, then total level, combat level and quest points. */
+	static final List<String> COMPARE_ROWS;
 
 	static
 	{
-		List<String> s = new ArrayList<>();
+		List<String> s = new ArrayList<>(PanelModel.SKILL_ORDER);
 		s.add(TOTAL);
-		s.addAll(PanelModel.SKILL_ORDER);
 		s.add(QUEST_POINTS);
+		s.add(COMBAT);
 		STATS = Collections.unmodifiableList(s);
+		List<String> rows = new ArrayList<>(PanelModel.SKILL_ORDER);
+		rows.add(TOTAL);
+		rows.add(COMBAT);
+		rows.add(QUEST_POINTS);
+		COMPARE_ROWS = Collections.unmodifiableList(rows);
 	}
 
 	private SkillBoard()
 	{
-	}
-
-	/** Which gaps the Compare tab lists. */
-	enum Filter
-	{
-		BEHIND("Behind"), AHEAD("Ahead"), ALL("All");
-
-		final String label;
-
-		Filter(String label)
-		{
-			this.label = label;
-		}
 	}
 
 	/** One member's place on the selected stat. {@code rank} is 0 when the figure is unknown. */
@@ -70,21 +67,27 @@ final class SkillBoard
 		}
 	}
 
-	/** One stat where you and another member differ or tie. {@code delta} is yours minus theirs. */
-	static final class Gap
+	/**
+	 * The OSRS combat level from the seven combat skills, or -1 when any of them is not known. Base is a quarter of
+	 * Defence + Hitpoints + half Prayer (rounded down); the best of melee, ranged and magic adds to it, ranged and
+	 * magic counting one and a half times their level (rounded down), each at 0.325.
+	 */
+	static int combat(Map<String, Integer> levels)
 	{
-		final String stat;
-		final int mine;
-		final int theirs;
-		final int delta;
-
-		Gap(String stat, int mine, int theirs)
+		String[] needed = {"Attack", "Strength", "Defence", "Hitpoints", "Prayer", "Ranged", "Magic"};
+		for (String s : needed)
 		{
-			this.stat = stat;
-			this.mine = mine;
-			this.theirs = theirs;
-			this.delta = mine - theirs;
+			Integer l = levels.get(s);
+			if (l == null || l < 1)
+			{
+				return -1;
+			}
 		}
+		double base = 0.25 * (levels.get("Defence") + levels.get("Hitpoints") + levels.get("Prayer") / 2);
+		double melee = 0.325 * (levels.get("Attack") + levels.get("Strength"));
+		double ranged = 0.325 * (levels.get("Ranged") * 3 / 2);
+		double magic = 0.325 * (levels.get("Magic") * 3 / 2);
+		return (int) Math.floor(base + Math.max(melee, Math.max(ranged, magic)));
 	}
 
 	/** The figure for one stat, or null when the member has not shared it. */
@@ -99,9 +102,14 @@ final class SkillBoard
 		{
 			v = f.questPoints;
 		}
+		else if (COMBAT.equals(stat))
+		{
+			v = combat(f.levels);
+		}
 		else
 		{
-			Integer l = f.levels.get(stat);
+			// A skill reads the shared level; anything else is a hiscore count (kills, clues, minigames).
+			Integer l = PanelModel.SKILL_ORDER.contains(stat) ? f.levels.get(stat) : f.score(stat);
 			return l == null || l < 0 ? null : l;
 		}
 		return v < 0 ? null : v;
@@ -221,41 +229,54 @@ final class SkillBoard
 		return n;
 	}
 
-	/**
-	 * Every stat both members shared, filtered, biggest gap first (ties and equal gaps in dropdown order). Behind
-	 * lists only where {@code me} is lower, Ahead only where higher, All also the ties.
-	 */
-	static List<Gap> compare(GroupCompare.Figures me, GroupCompare.Figures other, Filter filter)
+	/** The counts in {@code category} that at least one member has above zero, in the hiscores' order. */
+	static List<String> activeCounts(List<GroupCompare.Figures> members, StatCategory category)
 	{
-		List<Gap> out = new ArrayList<>();
-		for (String stat : STATS)
+		List<String> out = new ArrayList<>();
+		for (String name : category.names())
 		{
-			Integer a = value(me, stat);
-			Integer b = value(other, stat);
-			if (a == null || b == null)
+			for (GroupCompare.Figures f : members)
 			{
-				continue;
-			}
-			Gap g = new Gap(stat, a, b);
-			if (filter == Filter.ALL || filter == Filter.BEHIND && g.delta < 0 || filter == Filter.AHEAD && g.delta > 0)
-			{
-				out.add(g);
+				Integer n = f.score(name);
+				if (n != null && n > 0)
+				{
+					out.add(name);
+					break;
+				}
 			}
 		}
-		// Stable, so equal gaps stay in dropdown order.
-		out.sort((x, y) -> Integer.compare(Math.abs(y.delta), Math.abs(x.delta)));
 		return out;
 	}
 
-	/** The stat {@code steps} places on from {@code stat}, wrapping at both ends; an unknown stat starts at the top. */
-	static String step(String stat, int steps)
+	/** Whether {@code a} is above {@code b} for a Compare cell; false when either is unknown or they tie. */
+	static boolean higher(Integer a, Integer b)
 	{
-		int i = STATS.indexOf(stat);
-		if (i < 0)
+		return a != null && b != null && a > b;
+	}
+
+	/** The leader's index in {@code values} (null = unknown), or -1 when nobody has a figure or the top is tied. */
+	static int leader(List<Integer> values)
+	{
+		int best = -1;
+		boolean tied = false;
+		for (int i = 0; i < values.size(); i++)
 		{
-			return STATS.get(0);
+			Integer v = values.get(i);
+			if (v == null)
+			{
+				continue;
+			}
+			if (best < 0 || v > values.get(best))
+			{
+				best = i;
+				tied = false;
+			}
+			else if (v.equals(values.get(best)))
+			{
+				tied = true;
+			}
 		}
-		return STATS.get(Math.floorMod(i + steps, STATS.size()));
+		return tied ? -1 : best;
 	}
 
 	/** "3 to pass Member 1", "leading by 4", "tied with Member 2", or "" when nothing can be said. */
@@ -276,10 +297,18 @@ final class SkillBoard
 		return e.lead > 0 ? "leading by " + e.lead : "";
 	}
 
-	/** The bar's full scale: 99 for a skill, the best figure for total level and quest points. */
+	/** The bar's full scale: 99 for a skill, 126 for combat, all skills at 99 for total, else the best figure. */
 	static int scale(String stat, List<Entry> ranked)
 	{
-		if (!TOTAL.equals(stat) && !QUEST_POINTS.equals(stat))
+		if (COMBAT.equals(stat))
+		{
+			return 126;
+		}
+		if (TOTAL.equals(stat))
+		{
+			return PanelModel.SKILL_ORDER.size() * 99;
+		}
+		if (!QUEST_POINTS.equals(stat))
 		{
 			return 99;
 		}

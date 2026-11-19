@@ -38,13 +38,28 @@ final class GroupCompare
 		final Map<String, Integer> levels;
 		final PersonalBests bests;
 		final int questPoints;
+		/** Hiscore counts (kills, clues, minigames) by hiscore name; null until a lookup has read them. */
+		final Map<String, Integer> scores;
 
 		Figures(String name, Map<String, Integer> levels, PersonalBests bests, int questPoints)
+		{
+			this(name, levels, bests, questPoints, null);
+		}
+
+		Figures(String name, Map<String, Integer> levels, PersonalBests bests, int questPoints,
+			Map<String, Integer> scores)
 		{
 			this.name = name;
 			this.levels = levels == null ? Collections.emptyMap() : levels;
 			this.bests = bests == null ? PersonalBests.EMPTY : bests;
 			this.questPoints = questPoints;
+			this.scores = scores;
+		}
+
+		/** The count for a hiscore name: 0 when the hiscores were read and list none, null when never read. */
+		Integer score(String hiscoreName)
+		{
+			return scores == null ? null : scores.getOrDefault(hiscoreName, 0);
 		}
 
 		/** Sum of the shared skill levels, or -1 when none were shared. */

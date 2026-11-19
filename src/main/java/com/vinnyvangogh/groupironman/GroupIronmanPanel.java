@@ -279,7 +279,7 @@ class GroupIronmanPanel extends PluginPanel
 		this.actions = actions;
 		this.settingsTab = new GroupSettingsTab(actions, this::redraw);
 		this.shoppingTab = new ShoppingTab(actions, itemManager, this::redraw);
-		this.compareTab = new CompareTab(actions, this::redraw);
+		this.compareTab = new CompareTab(actions, skillIcons, this::redraw);
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
 

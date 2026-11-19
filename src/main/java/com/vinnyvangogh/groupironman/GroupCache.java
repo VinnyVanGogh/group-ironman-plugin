@@ -178,6 +178,12 @@ final class GroupCache
 			JsonObject levels = new JsonObject();
 			h.levels.forEach(levels::addProperty);
 			entry.add("l", levels);
+			JsonObject scores = new JsonObject();
+			if (h.scores != null)
+			{
+				h.scores.forEach(scores::addProperty);
+				entry.add("s", scores);
+			}
 			return entry;
 		}));
 		return out;
@@ -474,7 +480,9 @@ final class GroupCache
 			JsonElement l = entry.get("l");
 			if (ts != null && l != null && l.isJsonObject())
 			{
-				roster.hiscores().restore(name, ts, levelsFrom(l.getAsJsonObject()));
+				JsonElement s = entry.get("s");
+				roster.hiscores().restore(name, ts, levelsFrom(l.getAsJsonObject()),
+					s != null && s.isJsonObject() ? levelsFrom(s.getAsJsonObject()) : null);
 			}
 		});
 		return true;

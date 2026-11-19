@@ -26,22 +26,70 @@ public class SkillBoardTest
 	}
 
 	@Test
-	public void statsAreTotalThe24SkillsAndQuestPoints()
+	public void gridIsThe24SkillsThenTotalQuestPointsAndCombat()
 	{
-		assertEquals(26, SkillBoard.STATS.size());
-		assertEquals("Total level", SkillBoard.STATS.get(0));
+		assertEquals(27, SkillBoard.STATS.size());
+		assertEquals("Attack", SkillBoard.STATS.get(0));
 		assertTrue(SkillBoard.STATS.contains("Sailing"));
+		assertEquals("Total level", SkillBoard.STATS.get(24));
 		assertEquals("Quest points", SkillBoard.STATS.get(25));
+		assertEquals("Combat level", SkillBoard.STATS.get(26));
+		assertEquals("Combat level", SkillBoard.COMPARE_ROWS.get(25));
+		assertEquals("Quest points", SkillBoard.COMPARE_ROWS.get(26));
 		assertFalse(SkillBoard.STATS.toString().toLowerCase().contains("worst"));
 	}
 
 	@Test
-	public void stepWrapsAtBothEnds()
+	public void combatLevelFollowsTheOsrsFormulaAndIsUnknownWithoutAllSevenSkills()
 	{
-		assertEquals("Attack", SkillBoard.step("Total level", 1));
-		assertEquals("Quest points", SkillBoard.step("Total level", -1));
-		assertEquals("Total level", SkillBoard.step("Quest points", 1));
-		assertEquals("Total level", SkillBoard.step("nonsense", 1));
+		Map<String, Integer> l = new HashMap<>();
+		l.put("Attack", 40);
+		l.put("Strength", 37);
+		l.put("Defence", 1);
+		l.put("Hitpoints", 37);
+		l.put("Prayer", 26);
+		l.put("Ranged", 9);
+		l.put("Magic", 44);
+		// base 0.25*(1+37+13)=12.75, melee 25.025, magic 0.325*66=21.45
+		assertEquals(37, SkillBoard.combat(l));
+		l.remove("Magic");
+		assertEquals(-1, SkillBoard.combat(l));
+		assertNull(SkillBoard.value(fig("Member 1", 0), "Combat level"));
+	}
+
+	@Test
+	public void leaderIsTheTopMemberOrNoneOnATieOrNoFigures()
+	{
+		assertEquals(1, SkillBoard.leader(Arrays.asList(5, 9, null)));
+		assertEquals(-1, SkillBoard.leader(Arrays.asList(9, 9, 3)));
+		assertEquals(-1, SkillBoard.leader(Arrays.asList(null, null)));
+		assertTrue(SkillBoard.higher(3, 2));
+		assertFalse(SkillBoard.higher(2, 2));
+		assertFalse(SkillBoard.higher(null, 2));
+	}
+
+	@Test
+	public void countsRankFromHiscoreScoresAndUnreadScoresAreUnknown()
+	{
+		GroupCompare.Figures a = new GroupCompare.Figures("A", null, null, -1, Collections.singletonMap("Zulrah", 40));
+		GroupCompare.Figures b = new GroupCompare.Figures("B", null, null, -1, Collections.<String, Integer>emptyMap());
+		GroupCompare.Figures c = fig("C", -1);
+		assertEquals(40, (int) SkillBoard.value(a, "Zulrah"));
+		assertEquals("read but unranked is zero", 0, (int) SkillBoard.value(b, "Zulrah"));
+		assertNull("never read is unknown", SkillBoard.value(c, "Zulrah"));
+		assertEquals(Collections.singletonList("Zulrah"),
+			SkillBoard.activeCounts(Arrays.asList(a, b, c), StatCategory.BOSSING));
+		assertTrue(SkillBoard.activeCounts(Arrays.asList(a, b, c), StatCategory.MINIGAMES).isEmpty());
+	}
+
+	@Test
+	public void categoriesSplitTheHiscoreCounts()
+	{
+		assertTrue(StatCategory.BOSSING.names().contains("Zulrah"));
+		assertTrue(StatCategory.ACTIVITIES.names().contains("Clue Scrolls (all)"));
+		assertTrue(StatCategory.MINIGAMES.names().contains("Wintertodt"));
+		assertFalse(StatCategory.BOSSING.names().contains("Wintertodt"));
+		assertTrue(StatCategory.SKILLING.names().isEmpty());
 	}
 
 	@Test
@@ -95,7 +143,8 @@ public class SkillBoardTest
 			fig("Member 1", 10, "Magic", 50, "Attack", 40), fig("Member 2", 30, "Magic", 60)), "Total level");
 		assertEquals("Member 1", total.get(0).name);
 		assertEquals(90, (int) total.get(0).value);
-		assertEquals(90, SkillBoard.scale("Total level", total));
+		assertEquals("all 24 skills at 99", 2376, SkillBoard.scale("Total level", total));
+		assertEquals(126, SkillBoard.scale("Combat level", total));
 		assertEquals(99, SkillBoard.scale("Magic", total));
 		List<SkillBoard.Entry> qp = SkillBoard.rank(Arrays.asList(
 			fig("Member 1", 10), fig("Member 2", 30), fig("Member 3", -1)), "Quest points");
@@ -110,44 +159,4 @@ public class SkillBoardTest
 		assertTrue(SkillBoard.rank(Collections.<GroupCompare.Figures>emptyList(), "Magic").isEmpty());
 	}
 
-	@Test
-	public void compareListsTheBiggestGapFirstAndFiltersBehindAheadAll()
-	{
-		GroupCompare.Figures me = fig("Member 1", 100, "Magic", 70, "Attack", 90, "Mining", 50, "Slayer", 60);
-		GroupCompare.Figures them = fig("Member 2", 120, "Magic", 85, "Attack", 80, "Mining", 50, "Hunter", 20);
-		List<SkillBoard.Gap> behind = SkillBoard.compare(me, them, SkillBoard.Filter.BEHIND);
-		assertEquals("Quest points", behind.get(0).stat);
-		assertEquals(-20, behind.get(0).delta);
-		assertEquals("Magic", behind.get(1).stat);
-		assertEquals(2, behind.size());
-		List<SkillBoard.Gap> ahead = SkillBoard.compare(me, them, SkillBoard.Filter.AHEAD);
-		assertEquals("total level is summed from the shared skills", "Total level", ahead.get(0).stat);
-		assertEquals(35, ahead.get(0).delta);
-		assertEquals("Attack", ahead.get(1).stat);
-		assertEquals(10, ahead.get(1).delta);
-		List<SkillBoard.Gap> all = SkillBoard.compare(me, them, SkillBoard.Filter.ALL);
-		assertTrue("a tie is listed under All", all.stream().anyMatch(g -> g.stat.equals("Mining") && g.delta == 0));
-		assertEquals("ties come last", "Mining", all.get(all.size() - 1).stat);
-		assertFalse("Slayer and Hunter were shared by one side only", all.stream()
-			.anyMatch(g -> g.stat.equals("Slayer") || g.stat.equals("Hunter")));
-		assertFalse("a tie is neither behind nor ahead", behind.stream().anyMatch(g -> g.delta == 0)
-			|| ahead.stream().anyMatch(g -> g.delta == 0));
-	}
-
-	@Test
-	public void equalGapsKeepDropdownOrder()
-	{
-		GroupCompare.Figures me = fig("Member 1", -1, "Strength", 50, "Attack", 50);
-		GroupCompare.Figures them = fig("Member 2", -1, "Strength", 60, "Attack", 60);
-		List<SkillBoard.Gap> g = SkillBoard.compare(me, them, SkillBoard.Filter.BEHIND);
-		assertNotNull(g);
-		int attack = -1;
-		int strength = -1;
-		for (int i = 0; i < g.size(); i++)
-		{
-			attack = g.get(i).stat.equals("Attack") ? i : attack;
-			strength = g.get(i).stat.equals("Strength") ? i : strength;
-		}
-		assertTrue(attack < strength);
-	}
 }

@@ -38,14 +38,11 @@ public class CompareTabTest
 	}
 
 	@Test
-	public void gapAndHeaderTextNeverSaysWorst()
+	public void memberColoursFollowMemberOrderAndWrap()
 	{
-		assertEquals("Magic 70 vs 85: 15 behind Member 2", CompareTab.gapText(new SkillBoard.Gap("Magic", 70, 85),
-			"Member 2"));
-		assertEquals("Magic 90 vs 85: 5 ahead of Member 2", CompareTab.gapText(new SkillBoard.Gap("Magic", 90, 85),
-			"Member 2"));
-		assertEquals("Magic 85 vs 85: tied", CompareTab.gapText(new SkillBoard.Gap("Magic", 85, 85), "Member 2"));
-		assertEquals("you: not shared yet", CompareTab.youHeader(null, 0));
+		assertEquals(0xE69F00, MemberColors.of(0).getRGB() & 0xFFFFFF);
+		assertEquals(0xDD8CC0, MemberColors.of(4).getRGB() & 0xFFFFFF);
+		assertEquals(MemberColors.of(0), MemberColors.of(5));
 	}
 
 	@Test
