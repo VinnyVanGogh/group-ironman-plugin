@@ -1,9 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
+import com.google.common.base.Charsets;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,7 +51,7 @@ final class RegionNames
 			{
 				out.write(buf, 0, n);
 			}
-			return new String(out.toByteArray(), StandardCharsets.UTF_8);
+			return new String(out.toByteArray(), Charsets.UTF_8);
 		}
 		catch (IOException e)
 		{

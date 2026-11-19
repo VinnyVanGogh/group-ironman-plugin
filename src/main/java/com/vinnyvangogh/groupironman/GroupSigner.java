@@ -1,6 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.nio.charset.StandardCharsets;
+import com.google.common.base.Charsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -113,8 +113,8 @@ final class GroupSigner
 			{
 				Signature s = Signature.getInstance(ALGORITHM);
 				s.initSign(privateKey);
-				s.update(text.getBytes(StandardCharsets.UTF_8));
-				return b64(s.sign());
+				s.update(text.getBytes(Charsets.UTF_8));
+	return b64(s.sign());
 			}
 			catch (GeneralSecurityException e)
 			{
@@ -144,8 +144,8 @@ final class GroupSigner
 				.generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(publicKey)));
 			Signature s = Signature.getInstance(ALGORITHM);
 			s.initVerify(key);
-			s.update(text.getBytes(StandardCharsets.UTF_8));
-			return s.verify(Base64.getDecoder().decode(signature));
+			s.update(text.getBytes(Charsets.UTF_8));
+return s.verify(Base64.getDecoder().decode(signature));
 		}
 		catch (GeneralSecurityException | IllegalArgumentException e)
 		{
