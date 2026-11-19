@@ -99,6 +99,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="origin/main")
     parser.add_argument("--top", type=int, default=0)
+    parser.add_argument("--max", type=int, default=0,
+                        help="exit 1 when the bot estimate is above this")
     args = parser.parse_args()
 
     now = raw_tokens(worktree_files())
@@ -115,7 +117,11 @@ def main():
         print()
         for name, tok in sorted(now.items(), key=lambda kv: -kv[1])[:args.top]:
             print(f"{tok * CALIBRATION:9,.0f}  {os.path.basename(name)}")
+    if args.max and total * CALIBRATION > args.max:
+        print(f"FAIL: bot estimate {total * CALIBRATION:,.0f} is over {args.max:,}", file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
