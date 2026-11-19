@@ -65,6 +65,11 @@ public class ItemPathsTest
 		return new ItemPaths.Planner(d, viewer(), h, BANKS, here);
 	}
 
+	private static ItemPaths.Planner withdrawing(QuestData d, ShopAllocation.Holdings h, WorldPoint here)
+	{
+		return new ItemPaths.Planner(d, viewer(), h, BANKS, here, true);
+	}
+
 	/** One shopping row: Alice needs {@code need} of the item, holding {@code alice}, with {@code storage} in storage. */
 	private static ShoppingBoard.Row row(QuestData d, int itemId, long need, long alice, long storage)
 	{
@@ -109,20 +114,42 @@ public class ItemPathsTest
 			names(planner(d, holdings(ROPE, 0, 0), CATHERBY).shopping(row(d, ROPE, 1, 0, 0))));
 	}
 
-	/** Held in group storage: the nearest bank, since group storage opens from any bank. */
+	/** Gathering: an item held in group storage counts as had, so there is no withdraw stop. */
 	@Test
-	public void heldInGroupStorageGoesToTheNearestBank() throws IOException
+	public void whileGatheringStorageIsHadAndHasNoStop() throws IOException
 	{
 		QuestData d = data();
-		// Storage covers it all: the line is done, but someone still has to take it out.
 		ShoppingBoard.Row covered = row(d, SHARK, 5, 0, 5);
-		List<ItemPaths.Stop> stops = planner(d, holdings(SHARK, 0, 5), new WorldPoint(3200, 3430, 0)).shopping(covered);
+		assertTrue(planner(d, holdings(SHARK, 0, 5), new WorldPoint(3200, 3430, 0)).shopping(covered).isEmpty());
+		// Part in storage, part to buy: only the shop is a stop.
+		ShoppingBoard.Row partly = row(d, NET, 3, 0, 1);
+		for (ItemPaths.Stop s : planner(d, holdings(NET, 0, 1), CATHERBY).shopping(partly))
+		{
+			assertTrue(s.name, !s.bank);
+		}
+	}
+
+	/** Quest started: withdraw from the nearest bank, since group storage opens from any bank. */
+	@Test
+	public void withdrawingGoesToTheNearestBank() throws IOException
+	{
+		QuestData d = data();
+		ShoppingBoard.Row covered = row(d, SHARK, 5, 0, 5);
+		List<ItemPaths.Stop> stops = withdrawing(d, holdings(SHARK, 0, 5), new WorldPoint(3200, 3430, 0)).shopping(covered);
 		assertEquals("Varrock West bank", stops.get(0).name);
 		assertTrue(stops.get(0).bank);
 
 		// Part from storage, part to buy: banks and shops compete, nearest wins.
 		ShoppingBoard.Row partly = row(d, NET, 3, 0, 1);
-		assertEquals("Catherby bank", planner(d, holdings(NET, 0, 1), CATHERBY).shopping(partly).get(0).name);
+		assertEquals("Catherby bank", withdrawing(d, holdings(NET, 0, 1), CATHERBY).shopping(partly).get(0).name);
+	}
+
+	/** An item that moved from group storage into a member's inventory is still had: no stop either way. */
+	@Test
+	public void anItemInAnInventoryStillCounts() throws IOException
+	{
+		QuestData d = data();
+		assertTrue(withdrawing(d, holdings(SHARK, 5, 0), CATHERBY).shopping(row(d, SHARK, 5, 5, 0)).isEmpty());
 	}
 
 	@Test
@@ -168,9 +195,11 @@ public class ItemPathsTest
 		// A shop item, nothing held: the shop.
 		assertEquals("Harry's Fishing Shop",
 			planner(d, holdings(NET, 0, 0), CATHERBY).request(request(false, NET), requestRow(NET, 0)).get(0).name);
-		// No shop in the data, some in storage: a bank.
+		// No shop in the data, some in storage: a bank, but only when withdrawing.
 		assertEquals("Catherby bank",
-			planner(d, holdings(SHARK, 0, 2), CATHERBY).request(request(false, SHARK), requestRow(SHARK, 2)).get(0).name);
+			withdrawing(d, holdings(SHARK, 0, 2), CATHERBY).request(request(false, SHARK), requestRow(SHARK, 2)).get(0).name);
+		assertTrue(planner(d, holdings(SHARK, 0, 2), CATHERBY).request(request(false, SHARK), requestRow(SHARK, 2))
+			.isEmpty());
 		// No shop, nothing in storage: nowhere.
 		assertTrue(planner(d, holdings(SHARK, 2, 0), CATHERBY).request(request(false, SHARK), requestRow(SHARK, 2))
 			.isEmpty());
