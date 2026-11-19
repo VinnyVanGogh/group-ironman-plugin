@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
+import com.google.common.base.Charsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -367,7 +367,7 @@ final class ItemPaths
 			{
 				return Collections.emptyList();
 			}
-			BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+			BufferedReader reader = new BufferedReader(new InputStreamReader(in, Charsets.UTF_8));
 			return parseBanks(reader.lines().collect(Collectors.toList()));
 		}
 		catch (IOException | UncheckedIOException e)
