@@ -304,9 +304,9 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
-			public void benefit(String query, Consumer<BenefitFinder.Outcome> done)
+			public void benefit(int itemId, Consumer<BenefitFinder.Outcome> done)
 			{
-				group.benefit(query, done);
+				group.benefit(itemId, done);
 			}
 
 			@Override

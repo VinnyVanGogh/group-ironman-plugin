@@ -71,7 +71,7 @@ final class CompareSupport
 			GroupCodec.Carried c = carried.get(name);
 			out.add(new BenefitFinder.Member(name, levels,
 				c == null ? Collections.<Integer>emptySet() : c.worn.keySet(),
-				c == null ? Collections.<Integer>emptySet() : c.inventory.keySet()));
+				c == null ? Collections.<Integer>emptySet() : c.inventory.keySet(), c != null));
 		}
 		return out;
 	}
@@ -114,8 +114,8 @@ final class CompareSupport
 			@Override
 			public Map<String, Integer> requirements(int id)
 			{
-				// RuneLite carries no level requirements, so none are claimed: the tab says so.
-				return Collections.emptyMap();
+				// RuneLite carries no level requirements: they come from the bundled table, empty when not in it.
+				return ItemRequirements.bundled().of(id);
 			}
 		};
 	}
