@@ -114,7 +114,7 @@ final class GroupSigner
 				Signature s = Signature.getInstance(ALGORITHM);
 				s.initSign(privateKey);
 				s.update(text.getBytes(Charsets.UTF_8));
-	return b64(s.sign());
+				return b64(s.sign());
 			}
 			catch (GeneralSecurityException e)
 			{
@@ -145,7 +145,7 @@ final class GroupSigner
 			Signature s = Signature.getInstance(ALGORITHM);
 			s.initVerify(key);
 			s.update(text.getBytes(Charsets.UTF_8));
-return s.verify(Base64.getDecoder().decode(signature));
+			return s.verify(Base64.getDecoder().decode(signature));
 		}
 		catch (GeneralSecurityException | IllegalArgumentException e)
 		{

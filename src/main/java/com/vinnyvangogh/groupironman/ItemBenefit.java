@@ -56,13 +56,28 @@ final class ItemBenefit
 		final Map<String, Integer> levels;
 		final Map<String, Integer> currentStats;
 		final boolean owns;
+		/** What the member wears in the slot ("Dragon scimitar"), or null when unnamed. */
+		final String currentName;
+		/** False when the member's gear was never shared: nothing is compared. */
+		final boolean gearKnown;
+		/** False when the member's levels were never shared: nothing is checked against them. */
+		final boolean levelsKnown;
 
 		Candidate(String name, Map<String, Integer> levels, Map<String, Integer> currentStats, boolean owns)
+		{
+			this(name, levels, currentStats, owns, null, true, true);
+		}
+
+		Candidate(String name, Map<String, Integer> levels, Map<String, Integer> currentStats, boolean owns,
+			String currentName, boolean gearKnown, boolean levelsKnown)
 		{
 			this.name = name;
 			this.levels = levels;
 			this.currentStats = currentStats;
 			this.owns = owns;
+			this.currentName = currentName;
+			this.gearKnown = gearKnown;
+			this.levelsKnown = levelsKnown;
 		}
 	}
 
@@ -124,14 +139,30 @@ final class ItemBenefit
 		final int levelsShort;
 		final int upgrade;
 		final boolean alreadyOwned;
+		/** One "needs 70 Attack, has 40" per level the member lacks; empty when none or unknown. */
+		final List<String> missing;
+		/** What the upgrade is measured against ("Dragon scimitar", "an empty slot"); null when not compared. */
+		final String comparedTo;
+		final boolean gearKnown;
+		final boolean levelsKnown;
 
 		Result(String name, boolean usableNow, int levelsShort, int upgrade, boolean alreadyOwned)
+		{
+			this(name, usableNow, levelsShort, upgrade, alreadyOwned, Collections.emptyList(), null, true, true);
+		}
+
+		Result(String name, boolean usableNow, int levelsShort, int upgrade, boolean alreadyOwned,
+			List<String> missing, String comparedTo, boolean gearKnown, boolean levelsKnown)
 		{
 			this.name = name;
 			this.usableNow = usableNow;
 			this.levelsShort = levelsShort;
 			this.upgrade = upgrade;
 			this.alreadyOwned = alreadyOwned;
+			this.missing = missing;
+			this.comparedTo = comparedTo;
+			this.gearKnown = gearKnown;
+			this.levelsKnown = levelsKnown;
 		}
 	}
 
@@ -153,30 +184,78 @@ final class ItemBenefit
 
 	private static Result assess(Item item, Candidate c, Settings settings)
 	{
-		int short_ = 0;
+		boolean blindToLevels = !c.levelsKnown && !item.requirements.isEmpty();
+		List<String> missing = missing(item, c, blindToLevels);
+		int short_ = levelsShort(item, c, blindToLevels);
+		int upgrade = c.gearKnown ? upgrade(item, c, settings) : 0;
+		boolean owned = c.owns || covered(item, c, upgrade, settings);
+		return new Result(c.name, !blindToLevels && short_ == 0, short_, owned ? 0 : upgrade, owned, missing,
+			comparedTo(c), c.gearKnown, !blindToLevels);
+	}
+
+	/** "needs 70 Attack, has 40" per requirement the member does not meet. */
+	private static List<String> missing(Item item, Candidate c, boolean blind)
+	{
+		List<String> out = new ArrayList<>();
+		if (blind)
+		{
+			return out;
+		}
 		for (Map.Entry<String, Integer> r : item.requirements.entrySet())
 		{
-			short_ += Math.max(0, r.getValue() - c.levels.getOrDefault(r.getKey(), 1));
+			int has = c.levels.getOrDefault(r.getKey(), 1);
+			if (has < r.getValue())
+			{
+				out.add(String.format(java.util.Locale.ROOT, "needs %d %s, has %d", r.getValue(), r.getKey(), has));
+			}
 		}
-		int upgrade = 0;
-		boolean positive = false;
-		boolean covered = true;
+		return out;
+	}
+
+	private static int levelsShort(Item item, Candidate c, boolean blind)
+	{
+		int out = 0;
+		for (Map.Entry<String, Integer> r : item.requirements.entrySet())
+		{
+			out += blind ? 0 : Math.max(0, r.getValue() - c.levels.getOrDefault(r.getKey(), 1));
+		}
+		return out;
+	}
+
+	/** Known gear that already gives everything the item would: an equal or better item in the slot. */
+	private static boolean covered(Item item, Candidate c, int upgrade, Settings settings)
+	{
+		return c.gearKnown && upgrade == 0 && counts(item, settings);
+	}
+
+	/** Summed stat gain over what the member wears in the slot, for the stats that count. */
+	private static int upgrade(Item item, Candidate c, Settings settings)
+	{
+		int out = 0;
 		for (Map.Entry<String, Integer> s : item.stats.entrySet())
 		{
-			if (!settings.stats().contains(s.getKey()) || s.getValue() <= 0)
+			if (settings.stats().contains(s.getKey()) && s.getValue() > 0)
 			{
-				continue;
-			}
-			positive = true;
-			int gain = s.getValue() - c.currentStats.getOrDefault(s.getKey(), 0);
-			if (gain > 0)
-			{
-				upgrade += gain;
-				covered = false;
+				out += Math.max(0, s.getValue() - c.currentStats.getOrDefault(s.getKey(), 0));
 			}
 		}
-		boolean owned = c.owns || positive && covered;
-		return new Result(c.name, short_ == 0, short_, owned ? 0 : upgrade, owned);
+		return out;
+	}
+
+	/** Whether the item has any positive stat that counts. */
+	private static boolean counts(Item item, Settings settings)
+	{
+		return item.stats.entrySet().stream()
+			.anyMatch(s -> settings.stats().contains(s.getKey()) && s.getValue() > 0);
+	}
+
+	private static String comparedTo(Candidate c)
+	{
+		if (!c.gearKnown)
+		{
+			return null;
+		}
+		return c.currentName != null ? c.currentName : c.currentStats.isEmpty() ? "an empty slot" : null;
 	}
 
 	/** Usable and not owned, then not yet usable, then owned. */
@@ -185,13 +264,20 @@ final class ItemBenefit
 		return r.alreadyOwned ? 2 : r.usableNow ? 0 : 1;
 	}
 
-	/** Within a group: biggest upgrade first, or fewest levels short. Ties keep the caller's order (stable sort). */
+	/**
+	 * Within a group: biggest upgrade first, or fewest levels short, members whose levels are unknown last. Ties
+	 * keep the caller's order (stable sort).
+	 */
 	private static Integer within(Result r)
 	{
 		if (r.alreadyOwned)
 		{
 			return 0;
 		}
-		return r.usableNow ? -r.upgrade : r.levelsShort;
+		if (r.usableNow)
+		{
+			return -r.upgrade;
+		}
+		return r.levelsKnown ? r.levelsShort : Integer.MAX_VALUE;
 	}
 }

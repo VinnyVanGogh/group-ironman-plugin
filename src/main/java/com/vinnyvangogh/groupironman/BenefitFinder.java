@@ -61,13 +61,22 @@ final class BenefitFinder
 		final Map<String, Integer> levels;
 		final Collection<Integer> worn;
 		final Collection<Integer> carried;
+		/** False when the member never shared their worn and carried items, so an empty list means nothing. */
+		final boolean gearSynced;
 
 		Member(String name, Map<String, Integer> levels, Collection<Integer> worn, Collection<Integer> carried)
+		{
+			this(name, levels, worn, carried, true);
+		}
+
+		Member(String name, Map<String, Integer> levels, Collection<Integer> worn, Collection<Integer> carried,
+			boolean gearSynced)
 		{
 			this.name = name;
 			this.levels = levels;
 			this.worn = worn;
 			this.carried = carried;
+			this.gearSynced = gearSynced;
 		}
 	}
 
@@ -102,6 +111,12 @@ final class BenefitFinder
 			return new Outcome(query.trim(), Collections.emptyList(), "No item found for \"" + query.trim() + "\".",
 				false);
 		}
+		return runId(id, src, members, settings);
+	}
+
+	/** {@link #run} for an item already picked, from the item dropdown. */
+	static Outcome runId(int id, Source src, Collection<Member> members, ItemBenefit.Settings settings)
+	{
 		String name = src.name(id);
 		int slot = src.slot(id);
 		String category = slot < 0 ? "inventory" : CATEGORY.getOrDefault(slot, "inventory");
@@ -116,27 +131,29 @@ final class BenefitFinder
 		List<ItemBenefit.Candidate> candidates = new ArrayList<>();
 		for (Member m : members)
 		{
-			candidates.add(new ItemBenefit.Candidate(m.name, m.levels, currentStats(src, m, slot),
-				owns(m, id)));
+			int wornId = wornIn(src, m, slot);
+			candidates.add(new ItemBenefit.Candidate(m.name, m.levels,
+				wornId < 0 ? Collections.<String, Integer>emptyMap() : src.stats(wornId), owns(m, id),
+				wornId < 0 ? null : src.name(wornId), m.gearSynced, !m.levels.isEmpty()));
 		}
 		return new Outcome(name, ItemBenefit.rank(item, candidates, settings), "", reqs.isEmpty());
 	}
 
-	/** Stats of what the member wears in the same slot, empty for no slot or an empty one. */
-	private static Map<String, Integer> currentStats(Source src, Member m, int slot)
+	/** The item the member wears in the same slot, or -1 for no slot or an empty one. */
+	private static int wornIn(Source src, Member m, int slot)
 	{
 		if (slot < 0)
 		{
-			return Collections.emptyMap();
+			return -1;
 		}
 		for (int worn : m.worn)
 		{
 			if (src.slot(worn) == slot)
 			{
-				return src.stats(worn);
+				return worn;
 			}
 		}
-		return Collections.emptyMap();
+		return -1;
 	}
 
 	/** Whether the member holds this very item, worn or carried. An equal-or-better item is {@link ItemBenefit}'s. */

@@ -304,9 +304,9 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
-			public void benefit(String query, Consumer<BenefitFinder.Outcome> done)
+			public void benefit(int itemId, Consumer<BenefitFinder.Outcome> done)
 			{
-				group.benefit(query, done);
+				group.benefit(itemId, done);
 			}
 
 			@Override
@@ -519,7 +519,34 @@ public class GroupIronmanPlugin extends Plugin
 			self));
 	}
 
+	/** True while a redraw is already scheduled; further requests fold into it. */
+	private final java.util.concurrent.atomic.AtomicBoolean redrawQueued = new java.util.concurrent.atomic.AtomicBoolean();
+
+	/**
+	 * Coalesces redraw requests: a burst of group events yields one render about 100 ms later, built from the
+	 * state at that moment (latest wins).
+	 */
 	private void redraw()
+	{
+		if (!redrawQueued.compareAndSet(false, true))
+		{
+			return;
+		}
+		try
+		{
+			executor.schedule(() ->
+			{
+				redrawQueued.set(false);
+				buildAndRender();
+			}, 100, TimeUnit.MILLISECONDS);
+		}
+		catch (java.util.concurrent.RejectedExecutionException e)
+		{
+			redrawQueued.set(false);
+		}
+	}
+
+	private void buildAndRender()
 	{
 		GroupIronmanPanel p = panel;
 		if (p == null)

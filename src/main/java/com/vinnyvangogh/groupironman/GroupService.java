@@ -2340,8 +2340,8 @@ class GroupService
 		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names);
 	}
 
-	/** "Who benefits most" for a typed item; {@code done} runs on the client thread. */
-	void benefit(String query, Consumer<BenefitFinder.Outcome> done)
+	/** "Who benefits most" for an item picked from the dropdown; {@code done} runs on the client thread. */
+	void benefit(int itemId, Consumer<BenefitFinder.Outcome> done)
 	{
 		List<String> names = new ArrayList<>(members.names());
 		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
@@ -2349,7 +2349,7 @@ class GroupService
 			names.add(self);
 		}
 		ItemBenefit.Settings settings = ItemBenefit.Settings.parse(config.compareStats(), config.compareCategories());
-		clientThread.invokeLater(() -> done.accept(BenefitFinder.run(query, CompareSupport.source(itemManager),
+		clientThread.invokeLater(() -> done.accept(BenefitFinder.runId(itemId, CompareSupport.source(itemManager),
 			CompareSupport.members(roster, names), settings)));
 	}
 
