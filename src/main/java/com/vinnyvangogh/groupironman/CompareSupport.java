@@ -38,20 +38,18 @@ final class CompareSupport
 		{
 			Map<String, Integer> levels = new TreeMap<>();
 			MemberStats s = stats.get(name);
+			HiscoreBook.Entry h = roster.hiscores().entry(name);
 			if (s != null)
 			{
 				s.skills().forEach((skill, l) -> levels.put(skill, l.real));
 			}
-			else
+			else if (h != null)
 			{
-				HiscoreBook.Entry h = roster.hiscores().entry(name);
-				if (h != null)
-				{
-					levels.putAll(h.levels);
-				}
+				levels.putAll(h.levels);
 			}
 			AchievementState a = progress.achievements(name);
-			out.add(new GroupCompare.Figures(name, levels, progress.bests(name), a == null ? -1 : a.questPoints()));
+			out.add(new GroupCompare.Figures(name, levels, progress.bests(name), a == null ? -1 : a.questPoints(),
+				h == null ? null : h.scores));
 		}
 		return out;
 	}

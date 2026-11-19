@@ -931,6 +931,30 @@ public interface GroupIronmanConfig extends Config
 		return 5;
 	}
 
+	@ConfigItem(keyName = "overlayGroupBoxSize", name = "Group box size",
+		description = "Compact is the narrowest and shortest text; Medium is the usual width; Wide and Large are wider"
+			+ " with a bigger font.", section = inGameSection, position = 54)
+	default BoxSize overlayGroupBoxSize()
+	{
+		return BoxSize.MEDIUM;
+	}
+
+	@ConfigItem(keyName = "overlayGroupBoxIcons", name = "Group box icons",
+		description = "Skill and item pictures on the box's event lines. Off is short text only.",
+		section = inGameSection, position = 55)
+	default boolean overlayGroupBoxIcons()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "overlayGroupBoxTimes", name = "Group box times",
+		description = "How the box words when an event happened: 8m, 8m ago, or not at all.",
+		section = inGameSection, position = 56)
+	default BoxTimes overlayGroupBoxTimes()
+	{
+		return BoxTimes.SHORT;
+	}
+
 	@ConfigItem(keyName = "overlayPathStop", name = "Path stop card",
 		description = "On screen while you path from the Shopping tab: the stop, what to get there and for whom.",
 		section = inGameSection, position = 53)

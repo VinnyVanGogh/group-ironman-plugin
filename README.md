@@ -12,8 +12,10 @@ Everything is opt-in and off by default. Each member turns on what they want
 to share, and only sees other members' data for what they share themselves.
 
 - **Group:** a card per member with world and place, HP / Prayer / Run / Spec
-  orbs, skills, and worn gear and inventory laid out like the game's tabs.
-  Offline members keep what they had the last time you were both online.
+  orbs, skills, and worn gear and 28-slot inventory laid out like the game's
+  tabs (with jewellery charges, log basket / fish barrel / coal bag counts,
+  and log basket / looting bag tooltips). Offline members keep what they had
+  the last time you were both online.
 
   ![Group tab showing member card with orbs, stats, equipment, and inventory](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/panel-group.png)
   *Group tab: member card with world/location, vitals orbs, stats, worn gear, and inventory.*
@@ -23,20 +25,24 @@ to share, and only sees other members' data for what they share themselves.
 
   ![Group tab with a member without the plugin, levels from the hiscores](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/panel-group-hiscores.png)
 
-- **Banks:** each member's last bank with value and when it was seen.
+- **Banks:** each member's last bank with value, High Alchemy tooltips,
+  category filter pills, collapsible cards, a top-20 value preview (or show
+  all), and when it was seen.
 
   ![Banks tab showing member bank with item counts and total value](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/member-bank.png)
   *Banks tab: member's last seen bank contents and total value.*
 
-- **Storage:** the last group storage contents you saw, plus who took or
-  deposited what.
+- **Storage:** the last group storage contents you saw (with category filter
+  pills and a top-20 value preview), plus who took or deposited what when the
+  game saved.
 
   ![Storage tab showing group storage contents and change history](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/storage-snapshot.png)
   *Storage tab: snapshot of group storage items and recent change history.*
 
-- **Find:** who has an item and where (bank, inventory, worn, pouches, group
-  storage), in the panel or with `::find <item>` in your own chatbox, with
-  colours you can change.
+- **Find:** who has an item and where (bank, inventory, worn, pouches, log
+  basket / fish barrel / coal bag, group storage), with quick-find category,
+  combat-style and holder filter pills and one-click presets in the panel, or
+  with `::find <item>` in your own chatbox, with colours you can change.
 
   ![Find tab searching for items across banks and group storage](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/find-panel.png)
   *Find tab: searching for an item across party members' banks and group storage.*
@@ -55,8 +61,10 @@ to share, and only sees other members' data for what they share themselves.
   ![Log tab showing group storage changes and activity since last played](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/storage-log.png)
   *Log tab: storage deposits/withdrawals and group activity since your last session.*
 
-- **Shopping:** shared shopping lists for the whole group. Anyone adds a list
-  for one or more members, and every member running GIM Utilities sees it:
+- **Shopping:** shared shopping lists and item requests for the whole group.
+  Anyone adds a list for one or more members, or a personal request list that
+  group members can claim with **I'll get it**, and every member running GIM
+  Utilities sees it:
   - **Build presets**, starting with the 1 Defence pure: Mithril gloves
     (Recipe for Disaster: pick 5 of the 6 subquests that give no Defence
     experience), Ava's accumulator, Ancient Magicks, Dragon scimitar, Dragon
@@ -71,13 +79,22 @@ to share, and only sees other members' data for what they share themselves.
   equipment; noted counts as the item), with who holds it and where to get
   the rest: a shop you can be served at, with its price, or a monster that
   drops it. A line ticks off as the items arrive. Remove a list, or rename a
-  custom one; every change says who made it. Optional: *Shopping: shop alert*
-  (under *In-game*, off by default) says in chat when you walk up to a shop
-  that sells something a list still needs.
+  custom one; every change says who made it. **Path to** and **Path to next**
+  route to the nearest reachable shop or group-storage bank through the
+  Shortest Path plugin, with an optional in-game path-stop overlay card.
+  Optional: *Shopping: shop alert* (under *In-game*, off by default) says in
+  chat when you walk up to a shop that sells something a list still needs.
 
   Item data, shops and prerequisites come from
   [Quest Path](https://github.com/VinnyVanGogh/questpath-plugin)'s bundled
-  quest data, copied in at build time (see `scripts/gen-quest-items.py`).
+  quest data, copied in at build time (see `scripts/gen-quest-items.py`), plus
+  bundled OSRS Wiki monster drop rates (`item-drops.txt`).
+
+- **Activities:** live wave tracking for the **Fight Caves**, the **Inferno**
+  and the **Fortis Colosseum** (wave, elapsed time, solo or team summary, and
+  Colosseum glory and modifier tiers) shown on member cards, in the
+  **Activities** tab (live runs, recent completions and deaths, and boss
+  personal bests), in the in-game group box, and on the Discord live board.
 
 - **Compare:** two members side by side (skills, bosses, quest points, who is
   ahead), a leaderboard per stat with its best and worst holder, your group
@@ -91,7 +108,8 @@ to share, and only sees other members' data for what they share themselves.
 
 - **Group settings tab:** one set of thresholds and switches for the whole
   group, saved by the leader or an editor and read-only for everyone else, with
-  the leader's editor list and a grid of who posts what.
+  the leader's editor list, optional leader-shared Discord webhooks, and a
+  grid of who posts what.
 
   <details><summary>As the leader</summary>
 
@@ -113,18 +131,28 @@ to share, and only sees other members' data for what they share themselves.
   markers.
 
 - **Group events** (new, every one its own switch): valuable drops, pets, new
-  collection log slots, untradeable uniques, deaths, big storage deposits and
+  collection log slots, untradeable uniques, raid uniques, clue rewards, dry
+  streaks, deaths and value lost, gravestone expiring warnings, Hardcore group
+  lives lost, Wilderness / skulled alerts, big storage deposits and
   withdrawals, storage visit summaries, storage minimums, "took the last one",
   level ups, 99s and max total, XP milestones, combat and total level, quests
-  and quest points, online / offline, "back after a break", and Barrows
-  chests. Each can go to:
+  and quest points, diary tiers, combat tasks, kill count milestones, personal
+  bests, Slayer tasks, farming runs, bird houses and Hespori, activity waves /
+  completions / deaths, item requests, group announcements (`::announce`),
+  online / offline, everyone online, "back after a break", weekly recaps, and
+  Barrows chests. Each can go to:
   - **Discord**, through a webhook you set (one per category if you like,
     see [Discord webhooks](#discord-webhooks)), as rich embeds or plain text,
-    with an optional screenshot, a mention for big events, and quiet hours.
-    Each member's client posts only that member's own events, so nothing is
-    posted twice.
-  - **In-game banners**, yours and your group's, plus an optional group box
-    with who is online and the latest events.
+    with in-place per-member post grouping (*Combine level-ups* and *Group
+    posts (minutes)*), a persistent **Live board** for online status (reposted
+    daily at the bottom of the channel), an optional screenshot, a mention for
+    big events, optional RuneScape Easter egg lines, and quiet hours. Each
+    member's client posts only that member's own events (plus a single elected
+    poster for in-game Group channel broadcasts from members without the
+    plugin), so nothing is posted twice.
+  - **In-game banners**, yours and your group's (deduplicated and dismissable
+    by key or click), plus an optional group box with who is online and the
+    latest events.
 
   ![In-game chat showing group event broadcasts](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/group-events.png)
   *Group events: in-game broadcasts for member level ups and achievements.*

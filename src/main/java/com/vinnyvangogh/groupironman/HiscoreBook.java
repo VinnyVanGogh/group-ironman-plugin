@@ -33,17 +33,25 @@ final class HiscoreBook
 	/** More skills than the game has, so a hostile cache file cannot grow the map without limit. */
 	static final int MAX_SKILLS = 40;
 	static final int MAX_LEVEL = 126;
+	/** More boss, clue and minigame counts than the hiscores have, for the same reason. */
+	static final int MAX_SCORES = 120;
 
 	/** One successful lookup: when, and the level per skill as {@code Skill.getName()} spells it. */
 	static final class Entry
 	{
 		final long at;
 		final Map<String, Integer> levels;
+		/**
+		 * Kill counts, clue counts and the like by {@code HiscoreSkill.getName()}; a count of 0 is left out. Null for
+		 * a lookup kept by a build from before counts were read: those are unknown, not zero.
+		 */
+		final Map<String, Integer> scores;
 
-		Entry(long at, Map<String, Integer> levels)
+		Entry(long at, Map<String, Integer> levels, Map<String, Integer> scores)
 		{
 			this.at = at;
 			this.levels = Collections.unmodifiableMap(new LinkedHashMap<>(levels));
+			this.scores = scores == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(scores));
 		}
 	}
 
@@ -99,10 +107,15 @@ final class HiscoreBook
 
 	synchronized void succeeded(String name, Map<String, Integer> levels, long now)
 	{
+		succeeded(name, levels, null, now);
+	}
+
+	synchronized void succeeded(String name, Map<String, Integer> levels, Map<String, Integer> scores, long now)
+	{
 		String key = GroupMembers.key(name);
 		inFlight.remove(key);
 		failures.remove(key);
-		entries.put(key, new Entry(now, levels));
+		entries.put(key, new Entry(now, levels, scores));
 	}
 
 	/** The lookup failed or the member is not on the hiscores. A level already read stays shown. */
@@ -135,10 +148,19 @@ final class HiscoreBook
 	/** From the group cache. Levels out of range, and skills past {@link #MAX_SKILLS}, are dropped. */
 	synchronized void restore(String name, long at, Map<String, Integer> levels)
 	{
+		restore(name, at, levels, null);
+	}
+
+	/**
+	 * As above; counts that are not positive, and counts past {@link #MAX_SCORES}, are dropped too. {@code scores}
+	 * null: a lookup from before counts were kept, whose counts stay unknown.
+	 */
+	synchronized void restore(String name, long at, Map<String, Integer> levels, Map<String, Integer> scores)
+	{
 		String key = GroupMembers.key(name);
 		if (!key.isEmpty() && at > 0)
 		{
-			entries.put(key, new Entry(at, clean(levels)));
+			entries.put(key, new Entry(at, clean(levels), scores == null ? null : cleanScores(scores)));
 		}
 	}
 
@@ -161,6 +183,41 @@ final class HiscoreBook
 			}
 		}
 		return out;
+	}
+
+	static Map<String, Integer> cleanScores(Map<String, Integer> scores)
+	{
+		Map<String, Integer> out = new LinkedHashMap<>();
+		for (Map.Entry<String, Integer> e : scores.entrySet())
+		{
+			Integer n = e.getValue();
+			if (out.size() < MAX_SCORES && e.getKey() != null && n != null && n > 0)
+			{
+				out.put(e.getKey(), n);
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * The boss, clue and minigame counts in a hiscore result by hiscore name. Unranked entries (-1) and zeros are
+	 * left out, so a missing name means none, not unknown. Empty for a null result.
+	 */
+	static Map<String, Integer> scores(HiscoreResult result)
+	{
+		Map<String, Integer> out = new LinkedHashMap<>();
+		if (result == null || result.getSkills() == null)
+		{
+			return out;
+		}
+		for (Map.Entry<HiscoreSkill, net.runelite.client.hiscore.Skill> e : result.getSkills().entrySet())
+		{
+			if (StatCategory.of(e.getKey()) != null && e.getValue() != null)
+			{
+				out.put(e.getKey().getName(), e.getValue().getLevel());
+			}
+		}
+		return cleanScores(out);
 	}
 
 	/**
