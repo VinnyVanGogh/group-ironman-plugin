@@ -185,18 +185,22 @@ final class ItemBenefit
 	private static Result assess(Item item, Candidate c, Settings settings)
 	{
 		boolean blindToLevels = !c.levelsKnown && !item.requirements.isEmpty();
-		List<String> missing = blindToLevels ? Collections.<String>emptyList() : missing(item, c);
-		int short_ = blindToLevels ? 0 : levelsShort(item, c);
+		List<String> missing = missing(item, c, blindToLevels);
+		int short_ = levelsShort(item, c, blindToLevels);
 		int upgrade = c.gearKnown ? upgrade(item, c, settings) : 0;
-		boolean owned = c.owns || c.gearKnown && upgrade == 0 && counts(item, settings);
+		boolean owned = c.owns || covered(item, c, upgrade, settings);
 		return new Result(c.name, !blindToLevels && short_ == 0, short_, owned ? 0 : upgrade, owned, missing,
 			comparedTo(c), c.gearKnown, !blindToLevels);
 	}
 
 	/** "needs 70 Attack, has 40" per requirement the member does not meet. */
-	private static List<String> missing(Item item, Candidate c)
+	private static List<String> missing(Item item, Candidate c, boolean blind)
 	{
 		List<String> out = new ArrayList<>();
+		if (blind)
+		{
+			return out;
+		}
 		for (Map.Entry<String, Integer> r : item.requirements.entrySet())
 		{
 			int has = c.levels.getOrDefault(r.getKey(), 1);
@@ -208,14 +212,20 @@ final class ItemBenefit
 		return out;
 	}
 
-	private static int levelsShort(Item item, Candidate c)
+	private static int levelsShort(Item item, Candidate c, boolean blind)
 	{
 		int out = 0;
 		for (Map.Entry<String, Integer> r : item.requirements.entrySet())
 		{
-			out += Math.max(0, r.getValue() - c.levels.getOrDefault(r.getKey(), 1));
+			out += blind ? 0 : Math.max(0, r.getValue() - c.levels.getOrDefault(r.getKey(), 1));
 		}
 		return out;
+	}
+
+	/** Known gear that already gives everything the item would: an equal or better item in the slot. */
+	private static boolean covered(Item item, Candidate c, int upgrade, Settings settings)
+	{
+		return c.gearKnown && upgrade == 0 && counts(item, settings);
 	}
 
 	/** Summed stat gain over what the member wears in the slot, for the stats that count. */
