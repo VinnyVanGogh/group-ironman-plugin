@@ -200,11 +200,16 @@ class GroupIronmanPanel extends PluginPanel
 	private boolean updatingMembers;
 	/** Member cards the player collapsed, by name. */
 	private final Set<String> collapsed = new HashSet<>();
+	/** The Banks tab's banked-XP section, and the Compare view it last drew. */
+	private BankedXpPanel bankedXp;
+	private CompareTab.View xpShown;
 	/** Bank cards folded in the Banks tab, kept apart from the Group tab's. */
 	private final BankFolds bankFolds = new BankFolds();
 	private String current = "Group";
 	/** The Activities tab's All / Bossing / Minigames pill. */
 	private ActivityRows.Filter activityFilter = ActivityRows.Filter.ALL;
+	private static final String[] ACTIVITY_SECTIONS = {"Live", "Personal bests", "Recent runs"};
+	private String activitySection = ACTIVITY_SECTIONS[0];
 	/** A live activity's line on its member's card, in the soft gold the plugin uses for live status. */
 	private static final Color ACTIVITY = new Color(0xE0, 0xB0, 0x40);
 	/** What the last Copy/Paste key press did, shown under the buttons for a while. */
@@ -305,8 +310,9 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Shopping", null);
 		addTab("Settings", null);
 		add(views, BorderLayout.CENTER);
+		bankedXp = new BankedXpPanel(this::skillIcon, this::redraw);
 		banksView = new BanksTabView(tabs.get("Banks"), bankFolds, this::paintCell, GRID_COLUMNS, MAX_GRID_ITEMS,
-			() -> applyGrid("Banks", () -> drawBanks(lastBanks, view), 0));
+			() -> applyGrid("Banks", () -> drawBanks(lastBanks, view), 0), bankedXp.root);
 		storageView = new StorageTabView(tabs.get("Storage"), this::paintCell, GRID_COLUMNS, MAX_GRID_ITEMS);
 	}
 
@@ -1174,7 +1180,13 @@ class GroupIronmanPanel extends PluginPanel
 			tab.repaint();
 			return -1;
 		}
-		return banksView.apply(banks, v.self, bankQuery);
+		int touched = banksView.apply(banks, v.self, bankQuery);
+		if (v.compare != xpShown)
+		{
+			xpShown = v.compare;
+			bankedXp.update(v.compare);
+		}
+		return touched;
 	}
 
 	/** Banks cards built from scratch so far: tests check a sync updates in place instead. */
@@ -1488,10 +1500,49 @@ class GroupIronmanPanel extends PluginPanel
 			group.add(b);
 			pills.add(b);
 		}
-		return pills;
+		JPanel sections = new JPanel(new GridLayout(1, ACTIVITY_SECTIONS.length, 2, 0));
+		sections.setBorder(new EmptyBorder(0, 0, 4, 0));
+		ButtonGroup sectionGroup = new ButtonGroup();
+		for (String s : ACTIVITY_SECTIONS)
+		{
+			JToggleButton b = Ui.toggle(s, s.equals(activitySection), 2);
+			b.addActionListener(e ->
+			{
+				activitySection = s;
+				redraw();
+			});
+			sectionGroup.add(b);
+			sections.add(b);
+		}
+		JPanel both = new JPanel(new GridLayout(2, 1, 0, 2));
+		both.add(sections);
+		both.add(pills);
+		return both;
 	}
 
 	private void drawActivities(JPanel tab, View v, long now)
+	{
+		if ("Personal bests".equals(activitySection))
+		{
+			drawPersonalBests(tab, v);
+			return;
+		}
+		if ("Live".equals(activitySection))
+		{
+			drawLive(tab, v, now);
+			return;
+		}
+		tab.add(heading("Recent runs"));
+		List<String> recent = ActivityRows.recent(v.group.feed().entries(), activityFilter, v.items, now);
+		if (recent.isEmpty())
+		{
+			tab.add(text("Completions and deaths in the Fight Caves, the Inferno and the Colosseum appear here.",
+				MUTED));
+		}
+		recent.forEach(line -> tab.add(text(line, Color.WHITE)));
+	}
+
+	private void drawLive(JPanel tab, View v, long now)
 	{
 		tab.add(heading("Live now"));
 		List<ActivityRows.Card> live = ActivityRows.live(v.group.activities(now), activityFilter, v.self, now);
@@ -1511,19 +1562,10 @@ class GroupIronmanPanel extends PluginPanel
 			tab.add(text("Your own activity shows here either way; members see it only with 'Share group events'"
 				+ " on.", MUTED));
 		}
-		drawPersonalBests(tab, v);
-		tab.add(heading("Recent runs"));
-		List<String> recent = ActivityRows.recent(v.group.feed().entries(), activityFilter, v.items, now);
-		if (recent.isEmpty())
-		{
-			tab.add(text("Completions and deaths in the Fight Caves, the Inferno and the Colosseum appear here.",
-				MUTED));
-		}
-		recent.forEach(line -> tab.add(text(line, Color.WHITE)));
 	}
 
 	/**
-	 * Its own section, above Recent runs: the newest bests first, in gold, then each boss any member has shared a
+	 * Its own sub-tab: the newest bests first, in gold, then each boss any member has shared a
 	 * best for with every member's time and the group best marked. A boss with a new best is in gold too.
 	 */
 	private void drawPersonalBests(JPanel tab, View v)

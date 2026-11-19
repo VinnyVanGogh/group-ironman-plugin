@@ -35,8 +35,13 @@ final class BanksTabView
 	private boolean showing;
 	private int rebuilds;
 
-	BanksTabView(JPanel tab, BankFolds folds, ItemGridView.CellPainter painter, int columns, int max, Runnable refold)
+	/** Added under the cards each time they are built; null for none. */
+	private final javax.swing.JComponent extra;
+
+	BanksTabView(JPanel tab, BankFolds folds, ItemGridView.CellPainter painter, int columns, int max, Runnable refold,
+		javax.swing.JComponent extra)
 	{
+		this.extra = extra;
 		this.tab = tab;
 		this.folds = folds;
 		this.painter = painter;
@@ -109,6 +114,10 @@ final class BanksTabView
 			Card card = new Card(member);
 			cards.put(member, card);
 			tab.add(card.root);
+		}
+		if (extra != null)
+		{
+			tab.add(extra);
 		}
 		showing = true;
 		rebuilds++;

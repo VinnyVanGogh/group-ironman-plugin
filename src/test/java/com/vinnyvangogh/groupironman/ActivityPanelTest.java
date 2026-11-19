@@ -63,8 +63,13 @@ public class ActivityPanelTest
 			f.ui.assertShows("The Inferno - wave 42/69");
 			f.ui.assertShows("solo - 50m");
 			f.ui.assertShows(SELF + " (you)");
-			f.ui.assertShows("Recent runs");
 			shot(f, "activity-tab-inferno");
+			f.ui.click("Personal bests");
+			f.ui.layout(GimPanelFixture.PANEL_WIDTH);
+			f.ui.assertHides("The Inferno - wave 42/69");
+			f.ui.click("Recent runs");
+			f.ui.layout(GimPanelFixture.PANEL_WIDTH);
+			f.ui.assertHides("The Inferno - wave 42/69");
 		});
 	}
 
