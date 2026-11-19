@@ -101,4 +101,20 @@ public class CompareTabTest
 		assertEquals("C: already has an equal or better one", lines.get(3));
 		assertTrue(lines.get(4).contains("requirements"));
 	}
+
+	@Test
+	public void benefitLinesSayWhatIsMissingAndWhatTheGainIsAgainst()
+	{
+		List<ItemBenefit.Result> ranked = Arrays.asList(
+			new ItemBenefit.Result("A", true, 0, 15, false, Collections.<String>emptyList(), "Dragon scimitar", true,
+				true),
+			new ItemBenefit.Result("B", false, 30, 0, false, Collections.singletonList("needs 70 Attack, has 40"),
+				"Bronze scimitar", true, true),
+			new ItemBenefit.Result("C", false, 0, 0, false, Collections.<String>emptyList(), null, true, false));
+		List<String> lines = CompareTab.benefitLines(new BenefitFinder.Outcome("Whip", ranked, "", false));
+		assertEquals("A: can use it now, +15 vs Dragon scimitar", lines.get(1));
+		assertEquals("B: needs 70 Attack, has 40", lines.get(2));
+		assertEquals("C: levels unknown", lines.get(3));
+		assertEquals(4, lines.size());
+	}
 }
