@@ -360,8 +360,9 @@ class GroupEventEngine
 		GroupSettingsSchema.Resolved v = group == null ? new GroupSettingsSchema.Resolved(config, null)
 			: group.groupValues();
 		values = v;
-		settings = EventSettings.from(config, v, MemberPrefs.of(config));
-		broadcastSettings = EventSettings.from(config, v, MemberPrefs.NONE);
+		OnlineStatus online = StatusBoard.effective(config.discordOnlineStatus(), v, webhooks());
+		settings = EventSettings.from(config, v, MemberPrefs.of(config), online);
+		broadcastSettings = EventSettings.from(config, v, MemberPrefs.NONE, online);
 		if (sender != null)
 		{
 			sender.quietHours(v.intValue("discordQuietStart"), v.intValue("discordQuietEnd"));
@@ -547,7 +548,9 @@ class GroupEventEngine
 		// What Discord answered since the last tick is saved before the webhook can change.
 		saveBoard();
 		String url = webhookFor(Webhook.ONLINE);
-		if (!StatusBoard.keeps(config.discordOnlineStatus(), webhooks(), group.isLeader()))
+		GroupSettingsSchema.Resolved v = values != null ? values : new GroupSettingsSchema.Resolved(config, null);
+		if (!StatusBoard.keeps(StatusBoard.effective(config.discordOnlineStatus(), v, webhooks()), webhooks(),
+			group.isLeader()))
 		{
 			url = null;
 		}

@@ -704,7 +704,8 @@ public interface GroupIronmanConfig extends Config
 	// ---- 4. Discord: how to post ----
 
 	@ConfigItem(keyName = "discordOnlineStatus", name = "Online status", description = "Posts: one per login and"
-		+ " logout. Live board: one edited message of who is online; only one member per webhook should use it.",
+		+ " logout. Live board: one edited message of who is online; only one member per webhook should use it."
+		+ " On the webhook your leader shares, the leader's Online status setting for the group applies instead.",
 		section = discordHowSection, position = 0)
 	default OnlineStatus discordOnlineStatus()
 	{
