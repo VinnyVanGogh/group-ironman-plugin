@@ -75,6 +75,8 @@ public class OwnCardWithoutSyncTest
 		set(service, "containers", Mockito.mock(CarriedContainers.class));
 		set(service, "memberName", GroupMembers.key("Alice"));
 		set(service, "cacheLoaded", true);
+		// The mock client has no group roster, so a roster read would put the account back to waiting: hold the verdict above.
+		set(service, "ticksSinceRoster", 0);
 		return service;
 	}
 }
