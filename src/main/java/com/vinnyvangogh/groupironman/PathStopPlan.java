@@ -62,17 +62,31 @@ final class PathStopPlan
 		}
 		if (target.kind == ItemPaths.Target.Kind.REQUEST_ITEM)
 		{
-			return new PathStopPlan(stop.name, stop.bank, requestEntries(target, stop, requests), "");
+			return new PathStopPlan(stop.where(), stop.bank, requestEntries(target, stop, requests), "");
 		}
 		for (ShoppingBoard.Card c : lists)
 		{
 			if (c.list.id.equals(target.id))
 			{
-				return new PathStopPlan(stop.name, stop.bank, listEntries(target, stop, c, planner),
+				return new PathStopPlan(stop.where(), stop.bank, listEntries(target, stop, c, planner),
 					target.kind == ItemPaths.Target.Kind.LIST_NEXT ? following(planner.next(c), stop) : "");
 			}
 		}
 		return null;
+	}
+
+	/** The names of the list items {@code stop} supplies: what the stop is for. */
+	static List<String> supplies(ShoppingBoard.Card card, ItemPaths.Stop stop, ItemPaths.Planner planner)
+	{
+		List<String> out = new ArrayList<>();
+		for (ShoppingBoard.Row r : card.rows)
+		{
+			if (ItemPaths.named(planner.shopping(r), stop.name))
+			{
+				out.add(r.line.name);
+			}
+		}
+		return out;
 	}
 
 	private static List<Entry> listEntries(ItemPaths.Target target, ItemPaths.Stop stop, ShoppingBoard.Card card,
@@ -154,7 +168,7 @@ final class PathStopPlan
 		{
 			if (tour.get(i).name.equals(now.name))
 			{
-				return tour.get(i + 1).name;
+				return tour.get(i + 1).where();
 			}
 		}
 		return "";
