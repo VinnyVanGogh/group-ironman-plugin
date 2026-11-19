@@ -2371,7 +2371,7 @@ class GroupService
 		return presets;
 	}
 
-	/** Where this player stood on the last game tick; null when logged out. Any thread. */
+	/** Client thread. Redraws the panel once the player is far enough from where it last drew "Path to next". */
 	private void redrawIfMoved()
 	{
 		if (ItemPaths.movedFar(drawnFrom, here))
@@ -2381,6 +2381,7 @@ class GroupService
 		}
 	}
 
+	/** Where this player stood on the last game tick; null when logged out. Any thread. */
 	WorldPoint here()
 	{
 		return here;
