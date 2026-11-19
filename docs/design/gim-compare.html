@@ -1,0 +1,337 @@
+<title>GIM Compare Panel Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a narrow page frame around real-width RuneLite side panels; the page follows the viewer's theme, the panels stay RuneLite dark on purpose. */
+:root {
+  --bg: #f3f1ec; --surface: #ffffff; --line: #ddd8cf; --fg: #23201b; --muted: #6b645a;
+  --accent: #b5600a; --accent-soft: #fbead6; --stage: #e6e2da;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-rs: "RuneScape Small", "RuneScape", Tahoma, Verdana, system-ui, sans-serif;
+  /* RuneLite panel palette: fixed in both themes. */
+  --rl-bg: #282828; --rl-card: #1e1e1e; --rl-line: #3a3a3a; --rl-text: #c8c8c8; --rl-dim: #8a8a8a;
+  --rl-white: #ffffff; --rl-orange: #ff981f; --rl-orange-soft: #4a3418; --rl-blue: #4fb0ff; --rl-blue-soft: #1c3448;
+  --rl-bar: #3a3a3a; --rl-hover: #333333;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #16150f; --surface: #1f1d18; --line: #34312a; --fg: #ece7dc; --muted: #a59d8f;
+  --accent: #ffa94a; --accent-soft: #3a2a14; --stage: #0f0e0b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #16150f; --surface: #1f1d18; --line: #34312a; --fg: #ece7dc; --muted: #a59d8f;
+  --accent: #ffa94a; --accent-soft: #3a2a14; --stage: #0f0e0b; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-size: 1.5rem; margin: 0 0 4px; text-wrap: balance; letter-spacing: -.01em; }
+.lede { color: var(--muted); margin: 0 0 16px; max-width: 70ch; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 16px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--fg); padding: 6px 12px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.seg button:focus-visible, .rl button:focus-visible, .rl select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tlabel { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-right: 4px; }
+.opt-title { font-size: 1.1rem; margin: 8px 0 2px; }
+.opt-sum { color: var(--muted); margin: 0 0 12px; max-width: 70ch; }
+.stage { background: var(--stage); border: 1px solid var(--line); border-radius: 10px; padding: 20px 12px; overflow-x: auto; }
+.panels { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; }
+.zoom2 .panels { flex-wrap: nowrap; width: max-content; min-width: 100%; }
+.pcol { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.pcap { font-size: 12px; color: var(--muted); }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.note b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 2px; }
+.current { font-size: 13px; color: var(--muted); border-left: 3px solid var(--line); padding-left: 10px; margin: 0 0 16px; max-width: 75ch; }
+
+/* ---------- RuneLite panel ---------- */
+.rl { width: 225px; background: var(--rl-bg); color: var(--rl-text); font: 12px/1.3 var(--font-rs);
+  border: 1px solid #111; box-shadow: 0 6px 18px rgba(0,0,0,.35); display: flex; flex-direction: column; }
+.zoom2 .rl { zoom: 2; }
+.rl-head { display: flex; align-items: center; justify-content: space-between; padding: 7px 8px 5px; color: var(--rl-white); font-weight: 700; }
+.rl-head small { color: var(--rl-dim); font-weight: 400; }
+.rl-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--rl-line); }
+.rl-tabs button { font: inherit; background: none; border: 0; color: var(--rl-dim); padding: 5px 0; cursor: pointer; border-bottom: 2px solid transparent; }
+.rl-tabs button[aria-selected="true"] { color: var(--rl-orange); border-bottom-color: var(--rl-orange); }
+.rl-body { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.rl-lbl { font-size: 11px; color: var(--rl-dim); text-transform: uppercase; letter-spacing: .04em; }
+.rl-card { background: var(--rl-card); border-radius: 2px; padding: 6px; }
+.rl select { font: inherit; width: 100%; background: var(--rl-card); color: var(--rl-white); border: 1px solid var(--rl-line); border-radius: 2px; padding: 3px 4px; min-width: 0; }
+.rl .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.sw { display: inline-block; width: 7px; height: 7px; border-radius: 1px; margin-right: 3px; vertical-align: 1px; }
+.sw.a { background: var(--rl-orange); } .sw.b { background: var(--rl-blue); }
+.mono { font-variant-numeric: tabular-nums; }
+
+/* A: skill grid */
+.sgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.sgrid .wide2 { grid-column: span 1; }
+.stile { font: inherit; background: var(--rl-card); color: var(--rl-text); border: 1px solid #151515; border-radius: 2px; padding: 3px 4px; cursor: pointer; text-align: left; display: flex; justify-content: space-between; align-items: baseline; min-width: 0; }
+.stile:hover { background: var(--rl-hover); }
+.stile .ab { color: var(--rl-white); font-weight: 700; font-size: 11px; }
+.stile .lv { color: var(--rl-orange); font-size: 11px; }
+.stile[aria-pressed="true"] { border-color: var(--rl-orange); background: var(--rl-orange-soft); }
+.stile .vs { font-size: 10px; color: var(--rl-dim); white-space: nowrap; }
+.stile .vs .hi { color: var(--rl-white); font-weight: 700; }
+.stile .vs .hi.a { color: var(--rl-orange); } .stile .vs .hi.b { color: var(--rl-blue); }
+.stile.cmp { flex-direction: column; align-items: stretch; gap: 0; }
+.rank { display: grid; grid-template-columns: 14px 1fr auto; gap: 2px 6px; align-items: center; padding: 3px 0; border-bottom: 1px solid #262626; }
+.rank:last-child { border-bottom: 0; }
+.rank .n { color: var(--rl-dim); font-size: 11px; }
+.rank .nm { color: var(--rl-white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank .v { color: var(--rl-orange); font-weight: 700; }
+.rank .bar { grid-column: 2 / 4; height: 3px; background: var(--rl-bar); }
+.rank .bar i { display: block; height: 100%; background: var(--rl-orange); }
+.rank.me .nm::after { content: " (you)"; color: var(--rl-dim); font-weight: 400; }
+.rank .gap { grid-column: 2 / 4; font-size: 10px; color: var(--rl-dim); }
+.detail { font-size: 11px; color: var(--rl-text); }
+.detail b { color: var(--rl-white); }
+
+/* B: table */
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tbl th { font-weight: 400; color: var(--rl-dim); text-align: left; font-size: 10px; text-transform: uppercase; padding: 2px 3px; border-bottom: 1px solid var(--rl-line); }
+.tbl td { padding: 3px; border-bottom: 1px solid #262626; white-space: nowrap; }
+.tbl td.num, .tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl .nm { color: var(--rl-white); max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+.tbl .xb { width: 52px; }
+.tbl .xb span { display: block; height: 4px; background: var(--rl-bar); }
+.tbl .xb i { display: block; height: 100%; background: var(--rl-orange); }
+.tbl td.win { background: var(--rl-orange-soft); color: var(--rl-white); font-weight: 700; }
+.tbl td.win.b { background: var(--rl-blue-soft); }
+.tbl tr.sum td { border-top: 1px solid var(--rl-line); color: var(--rl-white); }
+.scroll { max-height: 330px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 var(--rl-card); }
+
+/* C: mirrored bars + leader chips */
+.mir { display: grid; grid-template-columns: 1fr 26px 1fr; align-items: center; gap: 1px 3px; font-size: 10px; }
+.mir .l, .mir .r { position: relative; height: 12px; background: #232323; }
+.mir .l i, .mir .r i { position: absolute; top: 0; bottom: 0; }
+.mir .l i { right: 0; background: #7a4a12; } .mir .r i { left: 0; background: #1d4f75; }
+.mir .l.hi i { background: var(--rl-orange); } .mir .r.hi i { background: var(--rl-blue); }
+.mir .l span, .mir .r span { position: absolute; top: 0; line-height: 12px; color: var(--rl-white); font-weight: 700; font-variant-numeric: tabular-nums; }
+.mir .l span { left: 2px; } .mir .r span { right: 2px; }
+.mir .c { text-align: center; color: var(--rl-dim); }
+.mir-legend { display: flex; justify-content: space-between; font-size: 11px; }
+.chips { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.chip { background: var(--rl-card); border-left: 2px solid var(--rl-orange); padding: 3px 5px; min-width: 0; }
+.chip .t { display: flex; justify-content: space-between; color: var(--rl-white); font-weight: 700; font-size: 11px; }
+.chip .t span:last-child { color: var(--rl-orange); }
+.chip .who { color: var(--rl-dim); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip.tie .who { color: var(--rl-text); }
+
+/* D: chip strip + gap list */
+.strip { display: flex; gap: 3px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; scroll-snap-type: x mandatory; }
+.strip::-webkit-scrollbar { display: none; }
+.strip button { font: inherit; font-size: 11px; flex: 0 0 auto; scroll-snap-align: start; background: var(--rl-card); color: var(--rl-text); border: 1px solid #151515; border-radius: 9px; padding: 2px 7px; cursor: pointer; }
+.strip button[aria-pressed="true"] { background: var(--rl-orange); color: #1e1e1e; font-weight: 700; border-color: var(--rl-orange); }
+.striprow { display: grid; grid-template-columns: 16px 1fr 16px; gap: 2px; align-items: center; }
+.arrow { font: inherit; background: none; border: 0; color: var(--rl-dim); cursor: pointer; padding: 0; }
+.big { display: flex; justify-content: space-between; align-items: baseline; color: var(--rl-white); font-weight: 700; }
+.big small { color: var(--rl-dim); font-weight: 400; }
+.filt { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--rl-line); border-radius: 2px; }
+.filt button { font: inherit; font-size: 11px; background: none; border: 0; color: var(--rl-dim); padding: 3px 0; cursor: pointer; border-right: 1px solid var(--rl-line); }
+.filt button:last-child { border-right: 0; }
+.filt button[aria-pressed="true"] { background: var(--rl-orange-soft); color: var(--rl-orange); }
+.drow { font: inherit; width: 100%; background: none; border: 0; border-bottom: 1px solid #262626; color: var(--rl-text); display: grid; grid-template-columns: 34px 1fr 1fr 34px; gap: 4px; align-items: center; padding: 3px 0; cursor: pointer; text-align: left; font-variant-numeric: tabular-nums; }
+.drow:hover { background: var(--rl-hover); }
+.drow .sk { color: var(--rl-white); font-weight: 700; font-size: 11px; }
+.drow .me { color: var(--rl-orange); }
+.drow .th { color: var(--rl-blue); }
+.drow .d { text-align: right; font-weight: 700; }
+.drow .d.neg { color: #ff6b6b; } .drow .d.pos { color: #5fd38a; } .drow .d.eq { color: var(--rl-dim); }
+.hint { font-size: 10px; color: var(--rl-dim); }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <h1>GIM Utilities: Leaderboard and Compare</h1>
+  <p class="lede">Four layouts for the plugin side panel, drawn at the real 225 px panel width. Every option lets you pick any stat, and none of them labels anyone "worst". Click around: skills, members and tabs all respond. Names are placeholders.</p>
+  <p class="current"><strong>Current:</strong> Leaderboard is a wrapped text line per skill ("Attack: best Member 1, Member 2 … worst Member 5") sorted by Name/Best/Worst; Compare prints "Agility 1 / 42 Member 2" lines with truncated names.</p>
+  <div class="toolbar">
+    <div><span class="tlabel">Option</span>
+      <div class="seg" id="optseg" role="group" aria-label="Option">
+        <button id="opt-A" data-opt="A" aria-pressed="true">A</button><button id="opt-B" data-opt="B" aria-pressed="false">B</button><button id="opt-C" data-opt="C" aria-pressed="false">C</button><button id="opt-D" data-opt="D" aria-pressed="false">D</button>
+      </div></div>
+    <div><span class="tlabel">Zoom</span>
+      <div class="seg" id="zoomseg" role="group" aria-label="Zoom">
+        <button id="zoom-1" data-zoom="1" aria-pressed="true">1x</button><button id="zoom-2" data-zoom="2" aria-pressed="false">2x</button>
+      </div></div>
+    <div><span class="tlabel">Page</span>
+      <div class="seg" id="themeseg" role="group" aria-label="Page theme">
+        <button id="theme-system" data-theme-set="" aria-pressed="true">System</button><button id="theme-light" data-theme-set="light" aria-pressed="false">Light</button><button id="theme-dark" data-theme-set="dark" aria-pressed="false">Dark</button>
+      </div></div>
+  </div>
+  <h2 class="opt-title" id="opt-title"></h2>
+  <p class="opt-sum" id="opt-sum"></p>
+  <div class="stage" id="stage">
+    <div class="panels" id="panels"></div>
+  </div>
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(function () {
+  var SK = [['Attack','Att'],['Hitpoints','HP'],['Mining','Min'],['Strength','Str'],['Agility','Agi'],['Smithing','Smi'],
+    ['Defence','Def'],['Herblore','Her'],['Fishing','Fis'],['Ranged','Rng'],['Thieving','Thi'],['Cooking','Coo'],
+    ['Prayer','Pra'],['Crafting','Cra'],['Firemaking','FM'],['Magic','Mag'],['Fletching','Fle'],['Woodcutting','WC'],
+    ['Runecraft','RC'],['Slayer','Sla'],['Farming','Far'],['Construction','Con'],['Hunter','Hun'],['Sailing','Sai'],
+    ['Total level','Tot'],['Quest points','QP']];
+  var MEM = ['Member 1','Member 2','Member 3','Member 4','Member 5'];
+  var YOU = 0;
+  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  var base = [82, 71, 64, 77, 52], qp = [278, 204, 167, 241, 118];
+  var LV = MEM.map(function (_, m) {
+    var r = rng(m * 97 + 13), row = [], tot = 0;
+    for (var s = 0; s < 24; s++) {
+      var v = Math.round(base[m] + (r() * 36 - 22));
+      if (s === 23) v = Math.round(base[m] * 0.42 + r() * 14);
+      if (s === 1) v = Math.max(v, 10);
+      v = Math.max(1, Math.min(99, v)); row.push(v); tot += v;
+    }
+    row.push(tot); row.push(qp[m]); return row;
+  });
+  function maxFor(s) { return s === 24 ? 2376 : s === 25 ? 310 : 99; }
+  var XP99 = xp(99);
+  function xp(l) { var p = 0; for (var i = 1; i < l; i++) p += Math.floor(i + 300 * Math.pow(2, i / 7)); return Math.floor(p / 4); }
+  function ranked(s) { return MEM.map(function (n, m) { return { m: m, v: LV[m][s] }; }).sort(function (a, b) { return b.v - a.v || a.m - b.m; }); }
+  function leaders(s) { var r = ranked(s); return r.filter(function (x) { return x.v === r[0].v; }); }
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function memSel(id, val) { return '<select id="' + id + '" data-k="' + id.split('-').pop() + '" aria-label="Member">' +
+    MEM.map(function (n, i) { return '<option value="' + i + '"' + (i === val ? ' selected' : '') + '>' + n + (i === YOU && id.charAt(0) === 'D' ? ' (you)' : '') + '</option>'; }).join('') + '</select>'; }
+  function skillSel(id, val) { return '<select id="' + id + '" data-k="skill" aria-label="Skill">' +
+    SK.map(function (s, i) { return '<option value="' + i + '"' + (i === val ? ' selected' : '') + '>' + s[0] + '</option>'; }).join('') + '</select>'; }
+  function rankRows(s, opts) {
+    var r = ranked(s), max = maxFor(s), out = '', prevV = null, place = 0;
+    r.forEach(function (x, i) {
+      if (x.v !== prevV) place = i + 1; prevV = x.v;
+      var g = '';
+      if (opts && opts.gap && place > 1) { var above = r.filter(function (y) { return y.v > x.v; }).pop(); g = '<span class="gap">' + (above.v - x.v) + ' to pass ' + esc(MEM[above.m]) + '</span>'; }
+      out += '<div class="rank' + (x.m === YOU && opts && opts.gap ? ' me' : '') + '"><span class="n mono">' + place + '</span><span class="nm">' + esc(MEM[x.m]) + '</span><span class="v mono">' + x.v + '</span>' +
+        '<span class="bar"><i style="width:' + (x.v / max * 100).toFixed(1) + '%"></i></span>' + g + '</div>';
+    });
+    return out;
+  }
+
+  var S = { A: { skill: 4, a: 0, b: 1, pick: 4 }, B: { skill: 0, a: 0, b: 1 }, C: { a: 0, b: 1 }, D: { skill: 4, b: 1, f: 'behind' } };
+
+  var OPT = {
+    A: { title: 'A. Skill picker grid', sum: 'The in-game skill tab layout as a grid of labelled squares. Tap one to rank everyone in that skill.',
+      good: 'Matches the skills tab players already know, so finding a stat takes one glance. One grid serves both tabs.',
+      cost: 'Grid is about 200 px tall before any result shows. Two clicks for a stat (tab, then tile); Compare tiles get tight at 1x.',
+      lb: function (st) {
+        var g = SK.map(function (s, i) { var top = ranked(i)[0].v;
+          return '<button class="stile" data-k="skill" data-v="' + i + '" aria-pressed="' + (i === st.skill) + '" title="' + s[0] + '"><span class="ab">' + s[1] + '</span><span class="lv mono">' + top + '</span></button>'; }).join('');
+        return '<div class="rl-lbl">Pick a skill</div><div class="sgrid">' + g + '</div>' +
+          '<div class="rl-card"><div class="rl-lbl" style="margin-bottom:3px">' + SK[st.skill][0] + '</div>' + rankRows(st.skill) + '</div>';
+      },
+      cmp: function (st) {
+        var g = SK.map(function (s, i) { var a = LV[st.a][i], b = LV[st.b][i];
+          return '<button class="stile cmp" data-k="pick" data-v="' + i + '" aria-pressed="' + (i === st.pick) + '" title="' + s[0] + '"><span class="ab">' + s[1] + '</span>' +
+            '<span class="vs mono"><span class="' + (a > b ? 'hi a' : '') + '">' + a + '</span> · <span class="' + (b > a ? 'hi b' : '') + '">' + b + '</span></span></button>'; }).join('');
+        var a = LV[st.a][st.pick], b = LV[st.b][st.pick], d = Math.abs(a - b);
+        return '<div class="pair">' + memSel('A-cmp-a', st.a) + memSel('A-cmp-b', st.b) + '</div>' +
+          '<div class="mir-legend"><span><span class="sw a"></span>first</span><span><span class="sw b"></span>second</span></div>' +
+          '<div class="sgrid">' + g + '</div>' +
+          '<div class="rl-card detail"><b>' + SK[st.pick][0] + '</b>: ' + esc(MEM[st.a]) + ' <b>' + a + '</b>, ' + esc(MEM[st.b]) + ' <b>' + b + '</b>' + (d ? ' (' + d + ' apart)' : ' (level)') + '</div>';
+      } },
+    B: { title: 'B. Dropdown + ranked table', sum: 'One skill dropdown above a ranked table with an XP bar. Compare is a plain two-column table that tints the higher value.',
+      good: 'Most compact: the leaderboard is about 150 px tall. Compare scans like a spreadsheet and shows every skill at once.',
+      cost: 'Dropdown hides the skill list, so browsing skills is one click plus scrolling 26 entries. Compare table is long (~430 px) and scrolls.',
+      lb: function (st) {
+        var r = ranked(st.skill), rows = '', place = 0, prev = null;
+        r.forEach(function (x, i) { if (x.v !== prev) place = i + 1; prev = x.v;
+          var pct = st.skill >= 24 ? x.v / maxFor(st.skill) : xp(x.v) / XP99;
+          rows += '<tr><td class="num">' + place + '</td><td class="nm">' + esc(MEM[x.m]) + '</td><td class="num">' + x.v + '</td><td class="xb"><span><i style="width:' + (pct * 100).toFixed(1) + '%"></i></span></td></tr>'; });
+        return '<div class="rl-lbl">Skill</div>' + skillSel('B-lb-skill', st.skill) +
+          '<table class="tbl"><thead><tr><th class="num">#</th><th>Member</th><th class="num">Lvl</th><th>' + (st.skill >= 24 ? 'of max' : 'XP to 99') + '</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      },
+      cmp: function (st) {
+        var rows = SK.map(function (s, i) { var a = LV[st.a][i], b = LV[st.b][i];
+          return '<tr' + (i === 24 ? ' class="sum"' : '') + '><td>' + s[0].replace(' level', '').replace('Quest points', 'Quests') + '</td><td class="num' + (a > b ? ' win' : '') + '">' + a + '</td><td class="num' + (b > a ? ' win b' : '') + '">' + b + '</td></tr>'; }).join('');
+        return '<div class="pair">' + memSel('B-cmp-a', st.a) + memSel('B-cmp-b', st.b) + '</div>' +
+          '<div class="scroll"><table class="tbl"><thead><tr><th>Skill</th><th class="num"><span class="sw a"></span>M' + (st.a + 1) + '</th><th class="num"><span class="sw b"></span>M' + (st.b + 1) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      } },
+    C: { title: 'C. Mirrored bars + leader chips', sum: 'Compare draws each skill as two bars growing out from the middle. Leaderboard shrinks to one chip per skill naming only the leader.',
+      good: 'Compare reads as a shape: you see where one member is ahead without reading numbers. Leaderboard never ranks anyone below first.',
+      cost: 'Leaderboard loses everyone but the leader (no "where am I" answer). Chip grid is ~390 px; bars need the 2x zoom for small numbers.',
+      lb: function () {
+        var c = SK.map(function (s, i) { var L = leaders(i), tie = L.length > 1;
+          return '<div class="chip' + (tie ? ' tie' : '') + '" title="' + s[0] + '"><div class="t"><span>' + s[1] + '</span><span class="mono">' + L[0].v + '</span></div><div class="who">' +
+            (tie ? 'Tied: ' + L.map(function (x) { return 'M' + (x.m + 1); }).join(', ') : esc(MEM[L[0].m])) + '</div></div>'; }).join('');
+        return '<div class="rl-lbl">Leader per skill</div><div class="chips">' + c + '</div>';
+      },
+      cmp: function (st) {
+        var rows = SK.map(function (s, i) { var a = LV[st.a][i], b = LV[st.b][i], mx = maxFor(i);
+          return '<div class="l' + (a > b ? ' hi' : '') + '"><i style="width:' + (a / mx * 100).toFixed(1) + '%"></i><span>' + a + '</span></div><div class="c" title="' + s[0] + '">' + s[1] + '</div>' +
+            '<div class="r' + (b > a ? ' hi' : '') + '"><i style="width:' + (b / mx * 100).toFixed(1) + '%"></i><span>' + b + '</span></div>'; }).join('');
+        return '<div class="pair">' + memSel('C-cmp-a', st.a) + memSel('C-cmp-b', st.b) + '</div>' +
+          '<div class="mir-legend"><span><span class="sw a"></span>' + esc(MEM[st.a]) + '</span><span>' + esc(MEM[st.b]) + '<span class="sw b" style="margin:0 0 0 3px"></span></span></div>' +
+          '<div class="scroll" style="max-height:300px"><div class="mir">' + rows + '</div></div>';
+      } },
+    D: { title: 'D. "What should I train"', sum: 'Pick a skill from a dropdown (or step with the arrows). Built around you. Leaderboard shows how many levels you need to pass the next member. Compare is you against one member, sorted by the biggest gap, filtered to where you are behind or ahead. Tap a compare row to open that skill on the leaderboard.',
+      good: 'Answers the question players actually have ("where am I behind?") and turns ranking into a next goal instead of a verdict. Both tabs share one selected skill.',
+      cost: 'Assumes the viewer is a group member (always true in GIM). About 280 px tall per tab; changing skill is one dropdown pick.',
+      lb: function (st) {
+        var strip = SK.map(function (s, i) { return '<button data-k="skill" data-v="' + i + '" aria-pressed="' + (i === st.skill) + '" title="' + s[0] + '">' + s[1] + '</button>'; }).join('');
+        var r = ranked(st.skill), me = r.findIndex(function (x) { return x.m === YOU; }), place = r.filter(function (x) { return x.v > LV[YOU][st.skill]; }).length + 1;
+        return '<div class="striprow"><button class="arrow" data-k="step" data-v="-1" aria-label="Previous skill">&lsaquo;</button>' + skillSel('D-lb-skill', st.skill) + '<button class="arrow" data-k="step" data-v="1" aria-label="Next skill">&rsaquo;</button></div>' +
+          '<div class="big"><span>' + SK[st.skill][0] + '</span><small>you: #' + place + ' of 5</small></div>' +
+          '<div class="rl-card">' + rankRows(st.skill, { gap: true }) + '</div>';
+      },
+      cmp: function (st) {
+        var rows = SK.map(function (s, i) { return { i: i, a: LV[YOU][i], b: LV[st.b][i], d: LV[YOU][i] - LV[st.b][i] }; })
+          .filter(function (x) { return x.i < 24 && (st.f === 'all' || (st.f === 'behind' ? x.d < 0 : x.d > 0)); })
+          .sort(function (x, y) { return st.f === 'ahead' ? y.d - x.d : x.d - y.d; });
+        var tot = LV[YOU][24] - LV[st.b][24];
+        var list = rows.map(function (x) { return '<button class="drow" data-k="jump" data-v="' + x.i + '" title="Open ' + SK[x.i][0] + ' on Leaderboard"><span class="sk">' + SK[x.i][1] + '</span><span class="me">' + x.a + '</span><span class="th">' + x.b + '</span><span class="d ' + (x.d < 0 ? 'neg' : x.d > 0 ? 'pos' : 'eq') + '">' + (x.d > 0 ? '+' : '') + x.d + '</span></button>'; }).join('') || '<div class="hint">Nothing here.</div>';
+        return '<div class="rl-lbl">You vs</div>' + memSel('D-cmp-b', st.b) +
+          '<div class="big"><span>Total ' + LV[YOU][24] + '</span><small>' + (tot >= 0 ? tot + ' ahead' : -tot + ' behind') + '</small></div>' +
+          '<div class="filt" role="group" aria-label="Filter"><button id="D-f-behind" data-k="f" data-v="behind" aria-pressed="' + (st.f === 'behind') + '">Behind</button><button id="D-f-ahead" data-k="f" data-v="ahead" aria-pressed="' + (st.f === 'ahead') + '">Ahead</button><button id="D-f-all" data-k="f" data-v="all" aria-pressed="' + (st.f === 'all') + '">All</button></div>' +
+          '<div class="drow" style="cursor:default;border-bottom-color:var(--rl-line)"><span class="hint">Skill</span><span class="hint">You</span><span class="hint">M' + (st.b + 1) + '</span><span class="hint" style="text-align:right">Gap</span></div>' +
+          '<div class="scroll" style="max-height:220px">' + list + '</div><div class="hint">Tap a row to see that skill\'s leaderboard.</div>';
+      } }
+  };
+
+  var cur = 'A', views = { A: ['lb', 'cmp'] };
+  function panel(id, view, opt) {
+    var o = OPT[opt], st = S[opt];
+    return '<div class="pcol"><div class="pcap">' + (id === 0 ? 'Opens on Leaderboard' : 'Opens on Compare') + '</div>' +
+      '<div class="rl" data-panel="' + id + '"><div class="rl-head">GIM Utilities <small>5 members</small></div>' +
+      '<div class="rl-tabs" role="tablist"><button role="tab" data-k="view" data-v="lb" aria-selected="' + (view === 'lb') + '">Leaderboard</button><button role="tab" data-k="view" data-v="cmp" aria-selected="' + (view === 'cmp') + '">Compare</button></div>' +
+      '<div class="rl-body">' + o[view](st) + '</div></div></div>';
+  }
+  function render() {
+    var o = OPT[cur], v = views[cur] || (views[cur] = ['lb', 'cmp']);
+    document.getElementById('opt-title').textContent = o.title;
+    document.getElementById('opt-sum').textContent = o.sum;
+    document.getElementById('panels').innerHTML = panel(0, v[0], cur) + panel(1, v[1], cur);
+    document.getElementById('notes').innerHTML = '<div class="note"><b>Does well</b>' + esc(o.good) + '</div><div class="note"><b>Costs</b>' + esc(o.cost) + '</div>';
+    var strip = document.querySelector('#D-strip [aria-pressed="true"]');
+    if (strip) strip.parentNode.scrollLeft = strip.offsetLeft - strip.parentNode.offsetLeft - 40;
+  }
+  document.getElementById('panels').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-k]'); if (!b || b.tagName === 'SELECT') return;
+    var k = b.dataset.k, v = b.dataset.v, st = S[cur], pid = +b.closest('[data-panel]').dataset.panel;
+    if (k === 'view') views[cur][pid] = v;
+    else if (k === 'skill' || k === 'pick') { st[k] = +v; }
+    else if (k === 'step') st.skill = (st.skill + +v + SK.length) % SK.length;
+    else if (k === 'f') st.f = v;
+    else if (k === 'jump') { st.skill = +v; views[cur][0] = 'lb'; }
+    render();
+  });
+  document.getElementById('panels').addEventListener('change', function (e) {
+    var s = e.target; if (s.tagName !== 'SELECT') return;
+    var k = s.dataset.k, st = S[cur];
+    if (k === 'skill') st.skill = +s.value; else st[k] = +s.value;
+    render();
+  });
+  function segs(id, attr, fn) {
+    var seg = document.getElementById(id);
+    seg.addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return;
+      seg.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); fn(b.getAttribute(attr)); });
+  }
+  segs('optseg', 'data-opt', function (v) { cur = v; render(); });
+  segs('zoomseg', 'data-zoom', function (v) { document.getElementById('stage').classList.toggle('zoom2', v === '2'); });
+  segs('themeseg', 'data-theme-set', function (v) { if (v) document.documentElement.setAttribute('data-theme', v); else document.documentElement.removeAttribute('data-theme'); });
+  render();
+})();
+</script>

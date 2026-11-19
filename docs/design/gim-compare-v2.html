@@ -1,0 +1,296 @@
+<title>GIM Leaderboard Mockup v2</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a narrow page frame around two real-width RuneLite side panels; the page follows the viewer's theme, the panels stay RuneLite dark on purpose. */
+:root {
+  --bg: #f3f1ec; --surface: #ffffff; --line: #ddd8cf; --fg: #23201b; --muted: #6b645a;
+  --accent: #b5600a; --accent-soft: #fbead6; --stage: #e6e2da;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-rs: "RuneScape Small", "RuneScape", Tahoma, Verdana, system-ui, sans-serif;
+  /* RuneLite panel palette: fixed in both themes. */
+  --rl-bg: #282828; --rl-card: #1e1e1e; --rl-line: #3a3a3a; --rl-text: #c8c8c8; --rl-dim: #8a8a8a;
+  --rl-white: #ffffff; --rl-orange: #ff981f; --rl-bar: #3a3a3a; --rl-hover: #333333; --rl-sel: #d8d8d8;
+  --rl-sample: #3b3220; --rl-sample-fg: #e8c77a;
+  /* Member colours (Okabe-Ito based, all >= 6:1 on #282828). */
+  --m0: #e69f00; --m0s: rgba(230,159,0,.22);
+  --m1: #56b4e9; --m1s: rgba(86,180,233,.22);
+  --m2: #2fbf8f; --m2s: rgba(47,191,143,.22);
+  --m3: #f0e442; --m3s: rgba(240,228,66,.18);
+  --m4: #dd8cc0; --m4s: rgba(221,140,192,.22);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #16150f; --surface: #1f1d18; --line: #34312a; --fg: #ece7dc; --muted: #a59d8f;
+  --accent: #ffa94a; --accent-soft: #3a2a14; --stage: #0f0e0b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #16150f; --surface: #1f1d18; --line: #34312a; --fg: #ece7dc; --muted: #a59d8f;
+  --accent: #ffa94a; --accent-soft: #3a2a14; --stage: #0f0e0b; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-size: 1.5rem; margin: 0 0 4px; text-wrap: balance; letter-spacing: -.01em; }
+.lede { color: var(--muted); margin: 0 0 16px; max-width: 70ch; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 16px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--fg); padding: 6px 12px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.seg button:focus-visible, .rl button:focus-visible, .rl select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tlabel { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-right: 4px; }
+.stage { background: var(--stage); border: 1px solid var(--line); border-radius: 10px; padding: 20px 12px; overflow-x: auto; }
+.panels { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; align-items: flex-start; }
+.zoom2 .panels { flex-wrap: nowrap; width: max-content; min-width: 100%; }
+.pcol { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.pcap { font-size: 12px; color: var(--muted); }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.note b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 2px; }
+.note p { margin: 0; }
+
+/* ---------- RuneLite panel ---------- */
+.rl { width: 225px; background: var(--rl-bg); color: var(--rl-text); font: 12px/1.3 var(--font-rs);
+  border: 1px solid #111; box-shadow: 0 6px 18px rgba(0,0,0,.35); display: flex; flex-direction: column; }
+.zoom2 .rl { zoom: 2; }
+.rl img { image-rendering: pixelated; image-rendering: crisp-edges; display: block; flex: 0 0 auto; }
+.rl-head { display: flex; align-items: center; justify-content: space-between; padding: 7px 8px 5px; color: var(--rl-white); font-weight: 700; }
+.rl-head small { color: var(--rl-dim); font-weight: 400; }
+.rl-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--rl-line); }
+.rl-tabs button { font: inherit; background: none; border: 0; color: var(--rl-dim); padding: 5px 0; cursor: pointer; border-bottom: 2px solid transparent; }
+.rl-tabs button[aria-selected="true"] { color: var(--rl-orange); border-bottom-color: var(--rl-orange); }
+.rl-body { padding: 8px; display: flex; flex-direction: column; gap: 7px; }
+.cats { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--rl-card); border: 1px solid #151515; border-radius: 2px; }
+.cats button { font: inherit; font-size: 10px; background: none; border: 0; border-right: 1px solid #151515; color: var(--rl-dim); padding: 4px 0; cursor: pointer; }
+.cats button:last-child { border-right: 0; }
+.cats button[aria-pressed="true"] { background: var(--rl-hover); color: var(--rl-white); font-weight: 700; box-shadow: inset 0 -2px 0 var(--rl-orange); }
+.legend { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 10px; }
+.legend span { white-space: nowrap; }
+.sw { display: inline-block; width: 7px; height: 7px; border-radius: 1px; margin-right: 3px; vertical-align: 0; }
+.rl-lbl { font-size: 11px; color: var(--rl-dim); text-transform: uppercase; letter-spacing: .04em; }
+.rl-card { background: var(--rl-card); border-radius: 2px; padding: 6px; }
+.rl select { font: inherit; width: 100%; background: var(--rl-card); color: var(--rl-white); border: 1px solid var(--rl-line); border-radius: 2px; padding: 3px 4px; min-width: 0; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.mono { font-variant-numeric: tabular-nums; }
+.sample { background: var(--rl-sample); color: var(--rl-sample-fg); font-size: 10px; padding: 3px 5px; border-radius: 2px; border: 1px dashed #6b5a32; }
+.sample b { text-transform: uppercase; letter-spacing: .05em; }
+.tag { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: var(--rl-sample-fg); background: var(--rl-sample); padding: 0 3px; border-radius: 2px; margin-left: 4px; font-weight: 400; vertical-align: 1px; }
+
+/* Hiscores-style skill grid */
+.sgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.stile { font: inherit; height: 24px; background: var(--rl-card); color: var(--rl-text); border: 1px solid #151515; border-radius: 2px; padding: 0 5px 0 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 3px; min-width: 0; }
+.stile:hover { background: var(--rl-hover); }
+.stile[aria-pressed="true"] { border-color: var(--rl-sel); background: var(--rl-hover); }
+.stile .lv { font-weight: 700; font-size: 12px; color: var(--rl-white); }
+.stile .qp { font-size: 10px; font-weight: 700; color: var(--rl-dim); width: 16px; text-align: center; }
+
+/* Ranking rows */
+.rank { display: grid; grid-template-columns: 12px 1fr auto; gap: 2px 5px; align-items: center; padding: 3px 0; border-bottom: 1px solid #262626; }
+.rank:last-child { border-bottom: 0; }
+.rank .n { color: var(--rl-dim); font-size: 11px; }
+.rank .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+.rank .v { color: var(--rl-white); font-weight: 700; }
+.rank .bar { grid-column: 2 / 4; height: 3px; background: var(--rl-bar); }
+.rank .bar i { display: block; height: 100%; }
+.you { color: var(--rl-dim); font-weight: 400; }
+.rhead { display: flex; align-items: center; gap: 5px; color: var(--rl-white); font-weight: 700; margin-bottom: 3px; }
+.rhead small { margin-left: auto; color: var(--rl-dim); font-weight: 400; }
+
+/* Activity list (bossing etc.) */
+.alist { display: flex; flex-direction: column; max-height: 360px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 var(--rl-card); }
+.arow { font: inherit; width: 100%; background: var(--rl-card); color: var(--rl-text); border: 1px solid #151515; border-radius: 2px; margin-bottom: 2px; padding: 4px 5px; display: flex; justify-content: space-between; align-items: center; gap: 4px; cursor: pointer; text-align: left; }
+.arow:hover { background: var(--rl-hover); }
+.arow[aria-expanded="true"] { border-color: var(--rl-sel); background: var(--rl-hover); margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.arow .t { color: var(--rl-white); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arow .lv { font-weight: 700; color: var(--rl-white); }
+.aexp { background: var(--rl-card); border: 1px solid var(--rl-sel); border-top: 0; padding: 2px 6px 4px; margin-bottom: 2px; }
+
+/* Compare table */
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+.tbl th { font-weight: 700; text-align: right; font-size: 10px; padding: 2px 3px; border-bottom: 1px solid var(--rl-line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tbl th:first-child { text-align: left; color: var(--rl-dim); font-weight: 400; text-transform: uppercase; }
+.tbl td { padding: 2px 3px; border-bottom: 1px solid #262626; white-space: nowrap; }
+.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--rl-text); }
+.tbl .sk { display: flex; align-items: center; gap: 4px; color: var(--rl-white); overflow: hidden; text-overflow: ellipsis; }
+.tbl .sk .qp { font-size: 9px; font-weight: 700; color: var(--rl-dim); width: 16px; text-align: center; flex: 0 0 auto; }
+.tbl td.hi { font-weight: 700; }
+.tbl tr.sum td { border-top: 1px solid var(--rl-line); }
+.tbl col.c1 { width: 52%; }
+.scroll { max-height: 400px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 var(--rl-card); }
+.hint { font-size: 10px; color: var(--rl-dim); }
+</style>
+
+<div class="wrap">
+  <h1>GIM Utilities: Leaderboard and Compare</h1>
+  <p class="lede">Revised side panel for the group's pick: a Hiscores-style skill grid for the leaderboard, and a two-column table for compare. Drawn at the real 225 px panel width with the group's real levels. Tap a skill, a category or a member; both panels respond.</p>
+  <div class="toolbar">
+    <div><span class="tlabel">Zoom</span>
+      <div class="seg" id="zoomseg" role="group" aria-label="Zoom">
+        <button id="zoom-1" data-zoom="1" aria-pressed="true">1x</button><button id="zoom-2" data-zoom="2" aria-pressed="false">2x</button>
+      </div></div>
+    <div><span class="tlabel">Page</span>
+      <div class="seg" id="themeseg" role="group" aria-label="Page theme">
+        <button id="theme-system" data-theme-set="" aria-pressed="true">System</button><button id="theme-light" data-theme-set="light" aria-pressed="false">Light</button><button id="theme-dark" data-theme-set="dark" aria-pressed="false">Dark</button>
+      </div></div>
+  </div>
+  <div class="stage" id="stage">
+    <div class="panels" id="panels"></div>
+  </div>
+  <div class="notes">
+    <div class="note"><b>Real data</b><p>Skilling levels are the group's own. Total level is the sum of all 24 skills (GroupShip comes to 452). Combat level uses the OSRS formula. Quest points are known only for GroupShip; the rest show "?".</p></div>
+    <div class="note"><b>Sample data</b><p>Bossing, Activities and Minigames show the layout with made-up kill counts, marked "Sample KC" on every view, until the real counts arrive.</p></div>
+    <div class="note"><b>Member colours</b><p>Each member keeps one colour on names, bars, tile levels and compare cells. The legend sits under the category switch. A tile's level takes the leader's colour; a tie shows white.</p></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var ICONS = {"attack": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA00lEQVQ4jZ3TvQrCMBSG4TcqQtFNcPMGXJwFcfJn9Upcz9DZIZckuugsuAm6ugluSqEocdCG/hrrgUJ6yPOlOVBF+TLxF/UPFhEAtNZU/sVlvyCDtdY/BxRiQLmuYHFD3TIY+DoDi1Vw4W6aGfwtwOLr+YDx2rm4KMDi83FHq9MtxGlkHxExs0nfiEi8n1tRohHfA2A0DFlv6/CY/3SyDQAQ32M0DAEYT59ODFCLFpNBj/0G4PTpBE4M7yEm7qcXgctkyqyW1cQQcQwuXiq1sezfyQv8Z1UY9uJ9sAAAAABJRU5ErkJggg==", "hitpoints": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAuElEQVQ4ja2TvQ0CMQxGnyOEmIAF6NiAghnYhwHYB90IFGxAxwIsABWmSHwJ+YGc4DWXc5zvcywHfkTCV+MyRS2ntS8hKnrdldurY1wPGwfAeTYH4HC6A4gD0VZ5XlSpiZuxtNxrXG5lFa7vqGe9fBaxSQI1/iOQdvsT1oNMQMVEagn54djAByB2BZU8sY9xkPyfTZsNTcq7c0j3gzQiaSXfnAlujQfgw/vtYgzmzolri9qI91Y4gReVmjZwdr6yJAAAAABJRU5ErkJggg==", "mining": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAs0lEQVQ4jY2TMQ7DIAxFP6j38QWQurH1OJmSMZlyo8y9QE/kLrUFsQ21xGLxnz98SLDFTk8qjRoqXNbNKM9jd4FpJvQgtRCu90cdsAiDKQZ+HrtCsmMxOcvAOgftmQIDXAsBAOj56gbm0aQf3E1ldl8qroW4FhKQrmXdGADnEUFsN2WcRoDOtlyYV49I3GbdTB8CdOpNHCVjHciZ/xULIPo84ZswjSCqSKwRAuD7S5zZNnu/yZNRZao4dHkAAAAASUVORK5CYII=", "strength": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA+ElEQVQ4jY2TsQ3CMBBFnxFVpsgEwACpaSLRkSYFG1BGoqCiQErJBhQ00CGxB9kgU6Q1BTnj2BfgpCjW+f7zv5NtUMPY998CGL3mHZMx8fN+6LXG9jn7CyCFnE87mrZjmc143g8eLIZ4AOOKL9cHAHW1drvLbKZCBOCSTdtRFjkAVX2jaTuq+kZZ5Cpk4p/etB2AcyBrAQ5nE88gEgNOHIIkpmHCF2jAxWrvdyAOLIvVnnmauE9AZZFrJ5sAgBHIWEtlkbPZHqN9fwbRjdN6BjuoC4b4cTFPk8iFFuEQDcFFERc+8IsDPcbEmoO/hRLaU1Vf3ad8OMQXY3Ja7nNYTNcAAAAASUVORK5CYII=", "agility": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAmklEQVQ4jYVTQQ7AIAgrZq/yC9595O77wr7lThjB1pEsc1CKUGbgNtK3CRyKCvRW0VtV4WnXT+Xs325iGaSq3s/L3OYtHJNzbD2X7GSV3MfmUhjoRKKKeBujtzrffhYPgKiCARiKHWIX8h5soKVnKjFdpDyoE0kmCIC1HUWyEtBduJ83KKRusCUfhhlsqqCS/0h96uonYhaU+gBWn0noLAp+NAAAAABJRU5ErkJggg==", "smithing": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA7klEQVQ4jZWTMY7CMBBF3yBOAU1EjZQqNaegWO05UqWm4hwrij0FNRUSdeRqrzFbTDzYTrywX7LkaPxfvicTAVFcKvxTK1D6YXCCLakstASs46YfBs6nk++XZHVVwJOuykNdu6nGtZrEpDkghNHNIYxVyPHzI4PMErwju6JBngke1+xQCGO2ypolmZoYD9zuP3/2AOD765I9C6Bdu3UA1BtpdY0+IOnBs6gOemV2QGKYTWKzP9DsD4tmsB5IOWDLVxDKIcquMEnTur0ZmmaXfboSm5m7duPGaE41jbN7E4BoGb0GmiAlYP6nvZAA/AKQw2PO1lyDaQAAAABJRU5ErkJggg==", "defence": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAk0lEQVQ4jcVTSQqAMAyM4icCnvxTT/lEb31Dbv2EJx9ZD9qQbopWcKAwhMwQJilAJwbFwxvtpCtERvg8L0k3Igq31gofa9a5+ApVgwhmBmZ+b9A9wVMEIhPg2Ebzee8j/2aCKS8QGdlCDNA5l6xR4/8QE4N13W4F+goB0r8AcKarc4hARC0eCnJl0hK3DMSkgqJ/B2VDJ1Ep2c6VAAAAAElFTkSuQmCC", "herblore": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAqElEQVQ4jdWRsRHCMAxFn3NZgIKGFZxjCYbIBt6NIVgil6xAQ5ERRIES24oTF9Dw73yS9aVvyYK/h6vwUsttCgXpgXDAFQTgnvjBWMurwEbVJu3EBRAHCDNwMomPgsAN6PNQu3qT2ouKBbbogRl46t1/flYygVHtXgcAXRRoqK/yEHEEr3ZK2AF4AWfgmr+8YFmjWzvxxDEsxqzYAa7UvhRiFl+N/Vu8AZCaI/XDjwKGAAAAAElFTkSuQmCC", "fishing": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA90lEQVQ4jY1TOw7CMAx9Rt05AlFXJE7AzA06lJ6jUxjbiXMgBm7AzAk4QJSbmCGfxklTYalK4vg9PzsuoTR2C627s4vkQDHicj6t8ALvz7cgFQQBWAaWpPvDEa/HU4hh+dXuwABxN1wZIM4L/cdEjzYIUhWpIAlptrKMWkfHfZ7F2fkm7CrZY7C1BtaagixYhWABpp221gAAuqH3e6qVwBHYDT2UaiM4rEq1Xqt7FgEGKAJTEIBEkWtsA5TNSjPk4FHrEENCQd7hpf7whE5V4hPvGSdt1Lc4ZXIW3F0+paGJ5Gtna42Xn2dh3OcJua38s7RsNyfV2Q9uF32qGmQWOAAAAABJRU5ErkJggg==", "ranged": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAACXBIWXMAAAsTAAALEwEAmpwYAAABTElEQVQ4ja2UMU7EMBBFnyMhbRp6sldASpUyiIaOS9CnQ2mSlCzNio5+L8EBEFtutRJXADpakJAYCsfOOPZCw0hRZM/3n/H/tuGfwgDif8F4Hj5/iMhIVy+43X6OYENXLyLglLdrVAEDkLmhXZwm0XnHlsLJuB1p+0G6Ohdb0YjOdXXuc20/aAyuI2M/O/d1dj2tn+UAqrJgvVo5jNdMiycAbT8AKPBkQFUWXBy/JzRTGrmJ9eoGS9gHBaqyYLd/PahZKgSQth+8FlW5VHrNNbNEWYLIAMZ1Nusk0szFnEhX5vFhw/nlVbTNVGgiAUPeZORNRlUu2e1flGYDkybxAQ86yhsLON2e8Fy/+fmEAVEoauPdcSQf998OExyNo6c7ID4ChGRG8ibTJ1ttPXSTXzQjvBpRBPZrsoT9MlqcfDIC+/XFPfi+/BHzbs0PYOmdkLWdp6oAAAAASUVORK5CYII=", "thieving": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAATUlEQVQ4jWNgGAWMWMT+k6IHmUNII1aDYAaQqhluCAsy7/9/VHMYGRnxijMwMDAw4TQaSREyG0MdzHICTsVtDxKHokDEBtANxKd2RAMA3r4MEzA9buEAAAAASUVORK5CYII=", "cooking": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAz0lEQVQ4jaVSIQ4CMRCcEhLuHKfqagiKz5wmOc0HcGgcH+AD/AhFzpw7h2tRxdBNu91CE0a1k53ZnW2BP6EEzlfUEJYSae0IAGjbTcmYTBff3Lk4GNcUe2tHH3WN70lEPgHP/5PjC/JD3yWE0Q677Srh9scnaYs7MNrBaAcAuD9epbJ8gnAIk8QTfDonWtFg6DvqHiCYZBFILCHEuF3WSX2yg5KY43Ro6Sz+RACY5iaLIS0z3kExAjc6Xy3p4wkU5E+DaW4YY6l58RkroADgDSEyRTk90LzcAAAAAElFTkSuQmCC", "prayer": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABSUlEQVQ4jaWTO0sDQRSFv9mNmd0lMZL4C2yt1EoQG7HQykIEsfBfCZaihVUQHyiksRIxGPwDgopgk4fuZiN57I5F3GQ3cWPEU92ZOedw7lyuIB4qVIs4kjbCgOJradTzSAO1f3EIwMnt+WCa8RJ4ng9Aq9X5cwK1d3qA8r0uQQiOr/OxKcIGKhDruoZhmugJndx0lqlMOmwSMRLBRSDstNsYpsnC3CxJmcR1GtQdl0q5iq+62q3ljZ5eAOr+7SEaS9OQRrJ3fq/Z+N8tBViaWewbAJwVrwBI6DrpyRRWysIwJdVKjU+nQblc64m3VzYjCQDI5dIK4KiQx7K6/WsJHffDoe40sG2b3fWdcOvRIvyZl6UCAJlshufHF1rNZiAe4v80RrE2v0rH6/ccJ44zAEDKCQAMKeMov0LdPN0NzX0QsVvGmNv4b3wBtDptb98HHsUAAAAASUVORK5CYII=", "crafting": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAu0lEQVQ4jb2SzQ0CIRBG3xhPbDXbAk1sH1yogYt92IQtWI1e8WDAAQb05CSbkPn5ePsxwm+R1Vl04aQa9DdEjNESqwIc+8axb2bTRCRrnFxEAK73R4+bOwFSSg2B6MGOZEkjXd4kCd4BcLk9m+GU0seDLyR1WONbBEsSOk+AgaAWg3cmiRISQM6z4RLq9lJvqKUrDoZZ2DqvN3E1DLzdn21kDt7l4N1qnWstxlh7LBOHm1VOwH5G8//+Ei+Cd1doTO6zOwAAAABJRU5ErkJggg==", "firemaking": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA00lEQVQ4jZ1TMQ6DMAy8RGRj7iNY2PlEpU70hWTKM7p36dYPdO5WVHcoRo5tqNSTEPbZd7EjCNgGOVz4RVSiktMan8aXq41aLEUA0E9zlYs6aQOUnCoBx5qThzS7o08zbo+I7vCuODl1lKJ+ETA41pycolqBG/tpNrvrnBFdFsD13JicTeRE6y4AqORE92MgADQOLQFw85ITsSYoEwDAOLQrmS9PkwuEAP+LM0aO+OuwjGcKstmrc0+zVZAH7JlFfZoS85sfswY36Xswf53A5p39hQ8/8nMWCSm02QAAAABJRU5ErkJggg==", "magic": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA1UlEQVQ4jY2S0Q0CIQyG/yoh7sAaJj65hAPoAJrweIlbXHJu5RoMIfFSHxC8SiH3J02AtF/LDwRdDJDcyoOijV5PcHYE7JyiIwVAnFcOUwGuBTCA1L2CrJxgWdyarAEgYVyIHiH6tOn4YLTuIfrWJIw/QwSgdNRkZyDWni9OmFLUPsjXkF5kAC9ClcOE+3GHXz4xQGwy0dkRIfpv0lAB9tc3ng8jDY0bEECsGXY5DKIYAE7nl0zKAO3eWQG31q2AuIVJxumfpFeYld+Ue/9dqvRaW9DXB3mOQDrfVSpNAAAAAElFTkSuQmCC", "fletching": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAnElEQVQ4jWNkIA78R2IzIkswEatZpZoTqyQxBqBr/o/sIhZiDGBgYGCQ3szEwAA16E7rd7jLmAno+8/AwMCg+5Gd4anvP2TNRIH/DAwM/+31uGFORsFI4kRrxic+qhmLImyhjTvEW/Q4UDSpVHP+V6nmJEozI7okLNlKb2ZieOr7D5ZwGDG1QgALmuR/eErDkXmwuQAbQHcyThcAAGDydlTXt4QEAAAAAElFTkSuQmCC", "woodcutting": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA6UlEQVQ4jYWSzQ2CQBCFvwEPol1YgkcTavCoRViBBViBReiRGkg8WoJdyHqB9QArLDPgJCRk3r6fnVlBlwcx2h00Ahf6kJCdBJc3GjpIEDEFZpx1jJBE+mbrDODyhqxM7BRxEkmGsYcVRLIy0QL3/hoGqiuIxIKtoTHEnrB/rgAotlXUK6hw3ShUgkCyysK6BB53bf9uvDmypthW0UF39bCD2+MNj5YzTCDgu0+7aWcvjNYYoSAcd+uouUlrLuWH8Wu0tqBEp8gwsYUh8Z+4leD3Sl51yqtOTWxGQN8f4JwvrQBTQ5ytiPMFoIlKa53OkFIAAAAASUVORK5CYII=", "runecraft": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABFElEQVQ4jaWTMW6DQBBF3xIicQWKpEgOgXKHFCnSOKfABeYMQGFOAQ2FbxG5yQUsubCLvYIbZ1IsC4vZIEX5EmIR8/6fkWZhWQJKzNuvYBmG3cvd5PtW6ndeiQPz9nkFZKF+TOkfJcYkHM7T/0bhFFbU9RaANF0DcPi+B67U9RatNQBFUQIigAp8sE8WBsjzDf300huMsNZ6UpztL15DaxK487hglURUSeQU+xXadBd2k6skIivKmdHpfASEAIQ0XRPH8azFPN+Q7S9DJxY0MMMI6rZ9q6IoTQd9NyM4yi6GgGL18c7jwxOn85G26Ybkr+fXGdg2nR3BGglt001SbLIpnsN4NvnPm/jvu7B0OXy3b1b/Aztyjyeh6POkAAAAAElFTkSuQmCC", "slayer": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAACc0lEQVQ4jZ2SXUjTARTFf9vUabrmRzq3ZI7SmLhyWmqYi/CDELJIesiECopKMygsCGxqRI8++Ohr9mBQRKZW1EMRfpD4NVBTlznR3CbTmdv0P6brQRya2kPn8d5zzr3nckXsDP8u9c0QAQTt1i0+E4fBMEdHp4zBATmqfXsJCYIR8ww2hzPAE/9rRES4hPKby6TpF5GKw3fkSHbR1o2NufEuZREctsC5syvslQuMjfsZGrdtcB7/HWFb7vGpGWKH89mvMpF/epKISDFfurdyRJvFOu2hQMO1vMyRtHSU8UpEwiKetU8UFc2zMC+motIX0AZtiK+UFFF2oQRpVBzv3r6hZ9SCTqdDEASGpyz09fjoH1jjUunWRcUAN0rPc+9OBRknCzFbZmhu+4her1/fZMkFwIeXTZzIuEhjY8IOBpdLSUg+jH1ylFfNz0nUHARAEATsc3aMtbWM2Nzcf1hNSpJ6u4EyWUe0Sk1S1iluV1ay5JjDteTCarViNBrxeDw8ravB5XIj8fm2HD0IYLy3AwBp6B6CvW6e1FWjPKDFZDLxY2KCRLWatKOZSEKk6FJTEcsVtLS0APglQF1xXi6/f02wuraK3lBASnoW9fX1vGh6xshgL5k5uWg0Glrb2im/fpWpsWFkMQrMZvN6hGmrnZ+zDpx2K16vF4BjmZlEKeIpu3aL49nZdHd1oQ4HWWQMhrwCfG5n4A/8DTVVAGhUcSTr9GhzCgNHmp34jsfpYGFNSrQsjMiYWB49uMvr1vfYHM51A4CGmirCQqUoouWkGwoJk8mxDPXS1z/A8opAilaLzWbl67c+pmdttH/u3P6J/wHRH2E36COdp58VAAAAAElFTkSuQmCC", "farming": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABWUlEQVQ4jX2Tv04CQRDGf7uzcz4BEE18GntbKawINWpvqYmFJoaQ0BATEgps7X0KH4GEgCgNjaCyFnccd3t3TnJ3k/nz3ffN7BrKzQN02s1csDsY71yzc2wFQNrcHYzTxgygDwF88IR/LAMBwGXphkWtqzd8lu/qtsDUlqECLKML1l8rNusVm+T7GXUKda4QSaz202PyfQ6AMeA9HMkQkXRsPkntJczfFzy/vNJpNxGxqCiRCi5SIqfMFh9Ya3Ai3PdHMXgGjbPTEwAa9RpiLeockTqcKpHuAUQEFeGuN0y3kM6pYGaX3XJ82GC79Tz0R4Dh+rJVfQ6y3GI3LI0TJh+JZTTqNUQsTpQDFTRS1AmzxRJrbTwfJziRHGxBhklePhf18eiBm8enQlO6kXgLDlWHarwNVWUynedOaCgsBfz93Qa0LJPpPKw1ZdNPGf9zG7MKK81XxHM9f+vwbHDCmqOwAAAAAElFTkSuQmCC", "construction": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAlUlEQVQ4jdWSsRXDIBBDP3l5zkC0mQcWYIwsAPO4oKFgnFSkiXnnwMUuE3WIk3TwBH8Pc3KufTNQLyWej/vA3cLKFSDnPBXVWgEopbCE1BOl4UVL3MRHmBqcES9hnRtoYu8cMH7YzkATW2vVTbpBrRXv/Zg84eQWBmgxxm2wn4XYAM29nyCRUtr1QJbqk9O6craIv4wXwmIxyee1L7cAAAAASUVORK5CYII=", "hunter": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAqklEQVQ4jaWSQQ6DIBREHw0n0JV6ATfsWHH/Q/QCrSu9Al1USP18UNNJTJzPzAQmH+qIJxyAR808j9OvSfJmQAzO0/XDYdj1A8H5IqR2g8tIAer7riLO4xRFiJypmvwTnNcOmzwF5g5EQWb/UPih5L9LtADbumhnsth8o21deL5fAMYIceb74mQkg9RamZ7McpH4Bkht0YFuBu6s8i1YbVgpVYVRZq21LvQfeHE+Ogq9Pl8AAAAASUVORK5CYII=", "sailing": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAAXNSR0IB2cksfwAAAARnQU1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAABVQTFRFMQAAAAAA////AAABdXt8VVxakpqVMIrewwAAAAF0Uk5TAEDm2GYAAABiSURBVBjTRY9JDgBBCAJJCvj/k+eg9ngwbiBIkiSYjLZvkbDDLLFBVOaWuLQOokYScZu5DkuzhV/v8ga0IR5I2Xumdjk8CSLt8Y2mtPNZv+yMgHVCE7fgeSsgse2kz+yFpA9qzgLA0nE+owAAAABJRU5ErkJggg==", "overall": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAACXBIWXMAAAsTAAALEwEAmpwYAAACIElEQVQokY2SO08UUQCFv3vv3HktsMACkcWgWCGGAhMTJRZKYaE0GDoLExMJha2NobSi8CeoiT/CwkpjbEA6JQEfBEGIsMw+Znd2ZmfuWEkCNJ7ynHw5xTlIqZZtbVuc1NTE7ckf1+ZuBHfn7gXloeFHp3IsrdRsoct/dRQk6wAFrzAz/2D+3Z3FWZmRsbu/w+raylPg5QkwSTtv46C6/s8ojZSWL9+flJtbGwyZft5vfiBO499nGoUQfp7nx0ajE1VXD9aISblqJigoHyXUaQ7L5AzoQmFxuq9vIW+n3p6jR5NmjrYs4iiiFtXomOws6EpRfjYx8eLh2JhHmPB45wtbu38Y9Bxa/iAHRxVMJxVnwJnyyPUn4+NyMwwJK0cEYYjj2FhKEdghjTBEIGsAjoXMDSQGY2VpWts+rPQFnQRNjjGGw/ohiSUpt3pwlUWcNHp6/Auvnf6Lt1ynQBxuvLEaUcT37W2qQjDqF5FSkmFIAVdKTBgyMHRzZuzSEtIvotll8/PzJUsKgdYaDSAEWZYR1ZrYWlLxGoRfm5ScK5jOJ+x2kXptg7D+Kzh+jJYW9U6LWtwkafi0VM5OfkCcJgRHK9QjQ+/ANNrtRdte0fKV6jnvujSlRpoEMNj9Lq4SZGMC1gRes4RXdBH2MEl4QJbG38Q5x/051d3dmyIQ5HxsVEhHu9BC4BVcwu0qut2PchRKD9IO9mgm+wtnhv1f/QUQjuRI6QEKhwAAAABJRU5ErkJggg==", "combat": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAACXBIWXMAAAsTAAALEwEAmpwYAAACkUlEQVQokW2QWUiUAQCE599/zdVdV3fz3v1bXdcjRQnRwgMffKiILLESy1BRUQoKygopkOh4qB7ELgMRMtektNIu1DLEiEJSVOjCa3U98Ng88jacXhSkmteZb2BG8DFIlpjYOGdBWIHZ/PgUgPv4V17x8dH1Xl6+0qC1D61tnSXIzMj4zTVVVVUQQO5fkDEzI2VsPfPhfSMBEIdTjpAkbRMjJMnqqnICyFqDpIz05F6SXFkYJUnWPH1FAKvQaDQ5FeVV5PI8RwY6SJIN9WVUKe3zEvfFtpLkzPQ4bWMWdn/vYmTEdjqr1Za1YiHr9o0ydn/r49RkD790NPLi+RzOTNu4ODvE4Z5PbG8ZpJ9PKGUy9PoYDL4bt+RWlNaxoqyax7L389fMBBfnx9nW/JDtH7sYHBBJmQxj/iaT8T/nIacg7zht4xauLIyyofYem1+30OTtRwB1G4MiIAQBwl4AIbvigtOLiu/6KF3c8KyyBAtzgah9VIgtBjk6un6Wc3VZJRdF91XSCgBH83aCn5/s4fTcJKcmh1hcmM/Sm7VM3BHFvOwk9k+Qbc3X+CJfSVdHO7p5GhJFAJ0DExjOjllI0AVtxtU7XyFbNMBceQur9ktwDTwAzdI7xHrW40xhPwZm3a1KhWAGAOhUQlGqH/jmNDj09gq3hScRQJ1a61nw8kExp2uMvBAFhrrICZliNwAgQCvUNqWJPBsh0N3ejk2XnBhuEqnSSkYAIc/PKXgwxolhLnK2ZsuY5IcfUGjCES2Bl+NAjUZLhbOuGMAJnauKer10CBCC1JsEOmmlZcAhLXkrbCcjQdHRZRYQ7a/LVB6TeoOxev1qDy996hZJHwYASrV7gtFojFiz/EUHZ6uk8577A/BrRzUYbl3iAAAAAElFTkSuQmCC"};
+  var SK = ['Attack','Hitpoints','Mining','Strength','Agility','Smithing','Defence','Herblore','Fishing','Ranged','Thieving','Cooking',
+    'Prayer','Crafting','Firemaking','Magic','Fletching','Woodcutting','Runecraft','Slayer','Farming','Construction','Hunter','Sailing'];
+  var MEM = ['GroupShip','GroupOtt','GroupTrashy','GroupArk','GroupPNK'];
+  var YOU = 0;
+  var LV = [
+    [40,37,44,48,1,4,1,1,25,9,2,16,26,27,50,44,1,70,1,1,1,1,1,1],
+    [60,67,42,68,34,44,1,23,55,70,53,50,48,41,70,54,60,62,42,37,20,32,75,38],
+    [60,56,55,58,50,73,1,39,47,50,51,53,45,73,60,55,45,58,48,32,41,53,60,62],
+    [60,65,49,63,42,60,1,20,59,62,29,45,45,40,63,67,75,59,11,54,10,41,9,1],
+    [32,58,75,39,26,60,1,24,36,66,31,31,44,42,50,60,29,66,1,48,1,8,9,5]];
+  var QP = [4, null, null, null, null];
+  function combat(r) {
+    var base = 0.25 * (r[6] + r[1] + Math.floor(r[12] / 2));
+    var melee = 0.325 * (r[0] + r[3]), rng = 0.325 * Math.floor(r[9] * 1.5), mag = 0.325 * Math.floor(r[15] * 1.5);
+    return Math.floor(base + Math.max(melee, rng, mag));
+  }
+  // Stat ids: 0-23 skills, 24 total, 25 quest points, 26 combat.
+  var STATS = SK.map(function (n, i) { return { name: n, icon: n.toLowerCase(), max: 99, val: function (m) { return LV[m][i]; } }; });
+  STATS.push({ name: 'Total level', icon: 'overall', max: 2376, val: function (m) { return LV[m].reduce(function (a, b) { return a + b; }, 0); } });
+  STATS.push({ name: 'Quest points', icon: null, max: 300, val: function (m) { return QP[m]; } });
+  STATS.push({ name: 'Combat level', icon: 'combat', max: 126, val: function (m) { return combat(LV[m]); } });
+  var GRID = []; for (var g = 0; g < 24; g++) GRID.push(g); GRID.push(24, 25, 26);
+  var CMP_ORDER = GRID.slice(0, 24).concat([24, 26, 25]);
+
+  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  var SAMPLE = {
+    bossing: ['Barrows Chests','Bryophyta','Obor','Scurrius','Giant Mole','Sarachnis','Kalphite Queen','King Black Dragon','Dagannoth Rex','Dagannoth Prime','Dagannoth Supreme','Zulrah','Vorkath','The Gauntlet'],
+    activities: ['Clue Scrolls (all)','Clue Scrolls (beginner)','Clue Scrolls (easy)','Clue Scrolls (medium)','Clue Scrolls (hard)','Clue Scrolls (elite)','Clue Scrolls (master)','LMS - Rank','Collections Logged','Colosseum Glory'],
+    minigames: ['Guardians of the Rift','Tempoross','Wintertodt','Soul Wars Zeal','Pest Control','Castle Wars','Barbarian Assault','Hespori']
+  };
+  var KC = {};
+  Object.keys(SAMPLE).forEach(function (cat, ci) {
+    KC[cat] = SAMPLE[cat].map(function (name, ai) {
+      var r = rng(ci * 131 + ai * 17 + 7), scale = name.indexOf('LMS') === 0 ? 900 : name.indexOf('Collections') === 0 ? 240 : name.indexOf('(master)') > 0 || name.indexOf('(elite)') > 0 ? 6 : 80;
+      return MEM.map(function () { var v = Math.round(Math.pow(r(), 1.6) * scale); return r() < 0.18 ? 0 : v; });
+    });
+  });
+
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function col(m) { return 'var(--m' + m + ')'; }
+  function soft(m) { return 'var(--m' + m + 's)'; }
+  function icon(id) { var s = STATS[id]; return s.icon ? '<img src="' + ICONS[s.icon] + '" alt="" width="16" height="16" style="width:auto;height:16px">' : '<span class="qp">QP</span>'; }
+  function nameSpan(m) { return '<span style="color:' + col(m) + '">' + esc(MEM[m]) + '</span>' + (m === YOU ? ' <span class="you">(you)</span>' : ''); }
+  function fmt(v) { return v === null || v === undefined ? '?' : String(v); }
+
+  // vals: array per member (null = unknown). Unknown members sort last, unranked.
+  function rankRows(vals, max) {
+    var known = [], unk = [];
+    vals.forEach(function (v, m) { (v === null ? unk : known).push({ m: m, v: v }); });
+    known.sort(function (a, b) { return b.v - a.v || a.m - b.m; });
+    var top = known.length ? Math.max(known[0].v, 1) : 1, scale = max || top, out = '', place = 0, prev = null;
+    known.forEach(function (x, i) {
+      if (x.v !== prev) place = i + 1; prev = x.v;
+      out += '<div class="rank"><span class="n mono">' + place + '</span><span class="nm">' + nameSpan(x.m) + '</span><span class="v mono">' + x.v + '</span>' +
+        '<span class="bar"><i style="width:' + Math.min(100, x.v / scale * 100).toFixed(1) + '%;background:' + col(x.m) + '"></i></span></div>';
+    });
+    unk.forEach(function (x) {
+      out += '<div class="rank"><span class="n mono">&ndash;</span><span class="nm">' + nameSpan(x.m) + '</span><span class="v mono" style="color:var(--rl-dim)">?</span>' +
+        '<span class="bar"></span></div>';
+    });
+    return out;
+  }
+  function leaderColor(vals) {
+    var k = vals.filter(function (v) { return v !== null; }); if (!k.length) return 'var(--rl-white)';
+    var mx = Math.max.apply(null, k), who = []; vals.forEach(function (v, m) { if (v === mx) who.push(m); });
+    return who.length === 1 ? col(who[0]) : 'var(--rl-white)';
+  }
+  function topVal(vals) { var k = vals.filter(function (v) { return v !== null; }); return k.length ? Math.max.apply(null, k) : null; }
+  function statVals(id) { return MEM.map(function (_, m) { var v = STATS[id].val(m); return v === undefined ? null : v; }); }
+
+  function legend() { return '<div class="legend" aria-label="Member colours">' + MEM.map(function (n, m) { return '<span><span class="sw" style="background:' + col(m) + '"></span><span style="color:' + col(m) + '">' + esc(n) + '</span></span>'; }).join('') + '</div>'; }
+  var CATS = [['skilling','Skilling'],['bossing','Bossing'],['activities','Activities'],['minigames','Minigames']];
+  function cats(st) { return '<div class="cats" role="group" aria-label="Category">' + CATS.map(function (c) { return '<button data-k="cat" data-v="' + c[0] + '" aria-pressed="' + (st.cat === c[0]) + '">' + c[1] + '</button>'; }).join('') + '</div>'; }
+  function sampleBanner() { return '<div class="sample"><b>Sample KC</b> &middot; made-up counts to show the layout. Real counts not loaded yet.</div>'; }
+
+  function lbSkilling(st) {
+    var tiles = GRID.map(function (id) { var vals = statVals(id), t = topVal(vals);
+      return '<button class="stile" data-k="stat" data-v="' + id + '" aria-pressed="' + (id === st.stat) + '" title="' + STATS[id].name + '" aria-label="' + STATS[id].name + ', top ' + fmt(t) + '">' + icon(id) +
+        '<span class="lv mono" style="color:' + leaderColor(vals) + '">' + fmt(t) + '</span></button>'; }).join('');
+    var s = STATS[st.stat];
+    return '<div class="sgrid">' + tiles + '</div>' +
+      '<div class="rl-card"><div class="rhead">' + icon(st.stat) + '<span>' + s.name + '</span><small>' + (st.stat === 24 ? 'of 2,376' : st.stat === 25 ? 'quest points' : st.stat === 26 ? 'of 126' : 'level') + '</small></div>' + rankRows(statVals(st.stat), s.max) + '</div>';
+  }
+  function lbSample(st) {
+    var list = SAMPLE[st.cat], open = st.act[st.cat];
+    var rows = list.map(function (name, i) { var vals = KC[st.cat][i], t = topVal(vals), ex = open === i;
+      return '<button class="arow" data-k="act" data-v="' + i + '" aria-expanded="' + ex + '"><span class="t">' + esc(name) + '</span><span class="lv mono" style="color:' + leaderColor(vals) + '">' + t + '</span></button>' +
+        (ex ? '<div class="aexp">' + rankRows(vals, null) + '</div>' : ''); }).join('');
+    return sampleBanner() + '<div class="hint">Tap a row to rank the group.</div><div class="alist">' + rows + '</div>';
+  }
+  function memSel(id, val) { return '<select id="' + id + '" data-k="' + id.slice(-1) + '" aria-label="Member">' +
+    MEM.map(function (n, i) { return '<option value="' + i + '"' + (i === val ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select>'; }
+  function cell(v, other, m) {
+    var hi = v !== null && other !== null && v > other;
+    return '<td class="num' + (hi ? ' hi' : '') + '"' + (hi ? ' style="background:' + soft(m) + ';color:' + col(m) + '"' : '') + '>' + fmt(v) + '</td>';
+  }
+  function cmp(st, pid) {
+    var a = st.a, b = st.b, rows = '';
+    if (st.cat === 'skilling') {
+      rows = CMP_ORDER.map(function (id) { var va = STATS[id].val(a), vb = STATS[id].val(b);
+        return '<tr' + (id === 24 ? ' class="sum"' : '') + '><td><span class="sk">' + icon(id) + '<span>' + STATS[id].name.replace(' level', '').replace('Quest points', 'Quests') + '</span></span></td>' + cell(va, vb, a) + cell(vb, va, b) + '</tr>'; }).join('');
+    } else {
+      rows = SAMPLE[st.cat].map(function (name, i) { var va = KC[st.cat][i][a], vb = KC[st.cat][i][b];
+        return '<tr><td><span class="sk" title="' + esc(name) + '"><span style="overflow:hidden;text-overflow:ellipsis">' + esc(name) + '</span></span></td>' + cell(va, vb, a) + cell(vb, va, b) + '</tr>'; }).join('');
+    }
+    return (st.cat === 'skilling' ? '' : sampleBanner()) +
+      '<div class="pair">' + memSel('p' + pid + '-a', a) + memSel('p' + pid + '-b', b) + '</div>' +
+      '<div class="scroll"><table class="tbl"><colgroup><col class="c1"><col><col></colgroup><thead><tr><th>' + (st.cat === 'skilling' ? 'Skill' : 'KC') + '</th>' +
+      '<th style="color:' + col(a) + '" title="' + MEM[a] + '">' + esc(MEM[a].replace('Group', '')) + '</th><th style="color:' + col(b) + '" title="' + MEM[b] + '">' + esc(MEM[b].replace('Group', '')) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="hint">The higher value is tinted in that member\'s colour.</div>';
+  }
+
+  var P = [ { view: 'lb', cat: 'skilling', stat: 4, act: { bossing: 0, activities: 0, minigames: 0 }, a: 0, b: 1 },
+            { view: 'cmp', cat: 'skilling', stat: 24, act: { bossing: 0, activities: 0, minigames: 0 }, a: 0, b: 2 } ];
+  function panel(pid) {
+    var st = P[pid];
+    var body = st.view === 'lb' ? (st.cat === 'skilling' ? lbSkilling(st) : lbSample(st)) : cmp(st, pid);
+    return '<div class="pcol"><div class="pcap">' + (pid === 0 ? 'Opens on Leaderboard' : 'Opens on Compare') + '</div>' +
+      '<div class="rl" data-panel="' + pid + '"><div class="rl-head">GIM Utilities <small>5 members</small></div>' +
+      '<div class="rl-tabs" role="tablist"><button role="tab" data-k="view" data-v="lb" aria-selected="' + (st.view === 'lb') + '">Leaderboard</button><button role="tab" data-k="view" data-v="cmp" aria-selected="' + (st.view === 'cmp') + '">Compare</button></div>' +
+      '<div class="rl-body">' + cats(st) + legend() + body + '</div></div></div>';
+  }
+  function render() { document.getElementById('panels').innerHTML = panel(0) + panel(1); }
+  var panels = document.getElementById('panels');
+  panels.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-k]'); if (!el || el.tagName === 'SELECT') return;
+    var st = P[+el.closest('[data-panel]').dataset.panel], k = el.dataset.k, v = el.dataset.v;
+    if (k === 'view') st.view = v;
+    else if (k === 'cat') st.cat = v;
+    else if (k === 'stat') st.stat = +v;
+    else if (k === 'act') st.act[st.cat] = st.act[st.cat] === +v ? -1 : +v;
+    render();
+  });
+  panels.addEventListener('change', function (e) {
+    var s = e.target; if (s.tagName !== 'SELECT') return;
+    P[+s.closest('[data-panel]').dataset.panel][s.dataset.k] = +s.value; render();
+    var again = document.getElementById(s.id); if (again) again.focus();
+  });
+  function segs(id, attr, fn) {
+    var seg = document.getElementById(id);
+    seg.addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return;
+      seg.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); fn(b.getAttribute(attr)); });
+  }
+  segs('zoomseg', 'data-zoom', function (v) { document.getElementById('stage').classList.toggle('zoom2', v === '2'); });
+  segs('themeseg', 'data-theme-set', function (v) { if (v) document.documentElement.setAttribute('data-theme', v); else document.documentElement.removeAttribute('data-theme'); });
+  render();
+})();
+</script>
