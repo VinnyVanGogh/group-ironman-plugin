@@ -2,9 +2,8 @@ package com.vinnyvangogh.groupironman;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
-import java.awt.Font;
-import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.Polygon;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.IdentityHashMap;
@@ -65,8 +64,8 @@ final class BoxIcons
 		}
 		else if (icon.skill != null)
 		{
-			// The sprite is not ready: the skill's first letter keeps the slot meaningful.
-			badge(g, new Color(0x6A, 0x8C, 0xC8), icon.skill.substring(0, 1).toUpperCase(java.util.Locale.ROOT), x, y, size);
+			// The sprite is not ready: a drawn star keeps the slot filled; never a letter.
+			star(g, x, y, size);
 		}
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 			old == null ? RenderingHints.VALUE_ANTIALIAS_DEFAULT : old);
@@ -133,7 +132,8 @@ final class BoxIcons
 		return out;
 	}
 
-	private static void glyph(Graphics2D g, BoxText.Glyph glyph, int x, int y, int size)
+	/** Draws one built-in glyph; every glyph is a drawn picture, never a letter. */
+	static void glyph(Graphics2D g, BoxText.Glyph glyph, int x, int y, int size)
 	{
 		switch (glyph)
 		{
@@ -146,8 +146,26 @@ final class BoxIcons
 			case DEATH:
 				cross(g, x, y, size);
 				break;
+			case COMBAT:
+				swords(g, x, y, size);
+				break;
+			case QUEST:
+				scroll(g, x, y, size);
+				break;
+			case DIARY:
+				book(g, x, y, size);
+				break;
+			case CLOG:
+				grid(g, x, y, size);
+				break;
+			case PET:
+				paw(g, x, y, size);
+				break;
+			case KILLS:
+				skull(g, x, y, size);
+				break;
 			default:
-				badge(g, glyph, x, y, size);
+				star(g, x, y, size);
 				break;
 		}
 	}
@@ -172,60 +190,141 @@ final class BoxIcons
 		g.setStroke(new BasicStroke(1f));
 	}
 
-	/** A rounded square in the glyph's colour with its letters, for events without a skill or item. */
-	private static void badge(Graphics2D g, BoxText.Glyph glyph, int x, int y, int size)
-	{
-		badge(g, colour(glyph), label(glyph), x, y, size);
-	}
+	private static final Color STEEL = new Color(0xD8, 0xDC, 0xE4);
+	private static final Color HILT = new Color(0xB0, 0x7A, 0x30);
+	private static final Color GOLD = new Color(0xE0, 0xB0, 0x40);
+	private static final Color PAPER = new Color(0xE8, 0xDC, 0xB8);
+	private static final Color TEAL = new Color(0x4F, 0xC3, 0xA1);
+	private static final Color BONE = new Color(0xE6, 0xE2, 0xD6);
 
-	private static void badge(Graphics2D g, Color fill, String label, int x, int y, int size)
+	private static void line(Graphics2D g, Color colour, float width, int x1, int y1, int x2, int y2)
 	{
-		g.setColor(fill);
-		g.fillRoundRect(x, y, size, size, 4, 4);
-		Font old = g.getFont();
-		g.setFont(old.deriveFont(Font.BOLD, Math.max(7f, size * 0.62f)));
-		FontMetrics fm = g.getFontMetrics();
+		g.setStroke(new BasicStroke(width, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 		g.setColor(Color.BLACK);
-		g.drawString(label, x + (size - fm.stringWidth(label)) / 2, y + (size + fm.getAscent() - fm.getDescent()) / 2);
-		g.setFont(old);
+		g.drawLine(x1 + 1, y1 + 1, x2 + 1, y2 + 1);
+		g.setColor(colour);
+		g.drawLine(x1, y1, x2, y2);
+		g.setStroke(new BasicStroke(1f));
 	}
 
-	static String label(BoxText.Glyph glyph)
+	/** Two crossed swords: the combat level. */
+	private static void swords(Graphics2D g, int x, int y, int size)
 	{
-		switch (glyph)
+		int m = Math.max(1, size / 8);
+		float w = Math.max(2f, size / 6f);
+		line(g, STEEL, w, x + m, y + m, x + size - m - 2, y + size - m - 2);
+		line(g, STEEL, w, x + size - m, y + m, x + m + 2, y + size - m - 2);
+		int h = size * 5 / 8;
+		line(g, HILT, w, x + h - 2, y + h + 2, x + h + 2, y + h - 2);
+		line(g, HILT, w, x + size - h - 2, y + h - 2, x + size - h + 2, y + h + 2);
+	}
+
+	/** A rolled scroll: quests. */
+	private static void scroll(Graphics2D g, int x, int y, int size)
+	{
+		int w = size * 2 / 3;
+		int o = (size - w) / 2;
+		g.setColor(Color.BLACK);
+		g.fillRoundRect(x + o + 1, y + 2, w, size - 3, 3, 3);
+		g.setColor(PAPER);
+		g.fillRoundRect(x + o, y + 1, w, size - 3, 3, 3);
+		g.setColor(HILT);
+		g.fillRect(x + o - 1, y + 1, w + 2, 2);
+		g.fillRect(x + o - 1, y + size - 4, w + 2, 2);
+		g.setColor(HILT.darker());
+		for (int row = y + size / 3; row < y + size - 5; row += 2)
 		{
-			case QUEST:
-				return "Q";
-			case DIARY:
-				return "D";
-			case CLOG:
-				return "L";
-			case PET:
-				return "P";
-			case BEST:
-				return "B";
-			case KILLS:
-				return "K";
-			case COMBAT:
-				return "C";
-			default:
-				return "";
+			g.drawLine(x + o + 2, row, x + o + w - 3, row);
 		}
 	}
 
-	private static Color colour(BoxText.Glyph glyph)
+	/** A closed book: achievement diaries. */
+	private static void book(Graphics2D g, int x, int y, int size)
 	{
-		switch (glyph)
+		int w = size * 3 / 4;
+		int o = (size - w) / 2;
+		g.setColor(Color.BLACK);
+		g.fillRoundRect(x + o + 1, y + 2, w, size - 3, 2, 2);
+		g.setColor(TEAL);
+		g.fillRoundRect(x + o, y + 1, w, size - 3, 2, 2);
+		g.setColor(PAPER);
+		g.fillRect(x + o + 3, y + 3, w - 5, size - 7);
+		g.setColor(TEAL.darker());
+		g.drawLine(x + o + 2, y + 1, x + o + 2, y + size - 3);
+	}
+
+	/** A grid of slots: the collection log. */
+	private static void grid(Graphics2D g, int x, int y, int size)
+	{
+		int cell = Math.max(2, (size - 2) / 3);
+		for (int r = 0; r < 3; r++)
 		{
-			case QUEST:
-			case DIARY:
-			case COMBAT:
-				return new Color(0x4F, 0xC3, 0xA1);
-			case PET:
-			case CLOG:
-				return new Color(0xE0, 0xB0, 0x40);
-			default:
-				return new Color(0xB0, 0x8A, 0xE0);
+			for (int c = 0; c < 3; c++)
+			{
+				g.setColor(Color.BLACK);
+				g.fillRect(x + c * (cell + 1) + 1, y + r * (cell + 1) + 1, cell, cell);
+				g.setColor((r + c) % 2 == 0 ? GOLD : GOLD.darker());
+				g.fillRect(x + c * (cell + 1), y + r * (cell + 1), cell, cell);
+			}
 		}
+	}
+
+	/** A paw print: pets. */
+	private static void paw(Graphics2D g, int x, int y, int size)
+	{
+		int toe = Math.max(2, size / 4);
+		int[][] toes = {{size / 8, size / 3}, {size / 3 - 1, size / 8}, {size / 2 + 1, size / 8}, {size - size / 8 - toe, size / 3}};
+		for (int[] t : toes)
+		{
+			g.setColor(Color.BLACK);
+			g.fillOval(x + t[0] + 1, y + t[1] + 1, toe, toe + 1);
+			g.setColor(GOLD);
+			g.fillOval(x + t[0], y + t[1], toe, toe + 1);
+		}
+		int pw = size * 5 / 8;
+		int ph = size * 7 / 20 + 1;
+		g.setColor(Color.BLACK);
+		g.fillOval(x + (size - pw) / 2 + 1, y + size - ph - 1, pw, ph);
+		g.setColor(GOLD);
+		g.fillOval(x + (size - pw) / 2, y + size - ph - 2, pw, ph);
+	}
+
+	/** A skull: kill counts. */
+	private static void skull(Graphics2D g, int x, int y, int size)
+	{
+		int w = size * 3 / 4;
+		int o = (size - w) / 2;
+		g.setColor(Color.BLACK);
+		g.fillOval(x + o + 1, y + 1, w, w);
+		g.fillRect(x + o + w / 4 + 1, y + w - 2, w / 2, size - w + 1);
+		g.setColor(BONE);
+		g.fillOval(x + o, y, w, w);
+		g.fillRect(x + o + w / 4, y + w - 3, w / 2, size - w + 1);
+		g.setColor(Color.BLACK);
+		int eye = Math.max(2, w / 4);
+		g.fillOval(x + o + w / 5, y + w / 3, eye, eye);
+		g.fillOval(x + o + w - w / 5 - eye, y + w / 3, eye, eye);
+	}
+
+	/** A five-point star: personal bests, and a skill whose sprite has not loaded. */
+	private static void star(Graphics2D g, int x, int y, int size)
+	{
+		double cx = x + size / 2.0;
+		double cy = y + size / 2.0 + 0.5;
+		double outer = size / 2.0;
+		double inner = outer * 0.42;
+		Polygon p = new Polygon();
+		for (int i = 0; i < 10; i++)
+		{
+			double r = i % 2 == 0 ? outer : inner;
+			double a = -Math.PI / 2 + i * Math.PI / 5;
+			p.addPoint((int) Math.round(cx + r * Math.cos(a)), (int) Math.round(cy + r * Math.sin(a)));
+		}
+		g.setColor(Color.BLACK);
+		g.translate(1, 1);
+		g.fillPolygon(p);
+		g.translate(-1, -1);
+		g.setColor(GOLD);
+		g.fillPolygon(p);
 	}
 }
