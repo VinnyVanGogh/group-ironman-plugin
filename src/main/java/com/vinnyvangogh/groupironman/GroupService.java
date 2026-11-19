@@ -1208,6 +1208,9 @@ class GroupService
 		if (!session)
 		{
 			session = true;
+			// Fill your card now: turning the plugin on while logged in fires no container or stat events.
+			statsDirty = true;
+			carriedDirty = true;
 			extrasDirty = true;
 			Player player = client.getLocalPlayer();
 			if (player != null && player.getName() != null)
@@ -1552,9 +1555,10 @@ class GroupService
 			lastPlane = plane;
 			statsDirty = true;
 		}
-		if (syncing() && ticksSinceStats >= STATS_HEARTBEAT_TICKS)
+		if (ticksSinceStats >= STATS_HEARTBEAT_TICKS)
 		{
-			// Nothing changed for a minute: send the same again so members still see us online.
+			// Nothing changed for a minute: recapture so your own card stays online, and while syncing send the
+			// same again so members still see us online.
 			lastStatsSent = null;
 			statsDirty = true;
 		}

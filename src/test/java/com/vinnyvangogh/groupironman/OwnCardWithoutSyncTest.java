@@ -26,7 +26,33 @@ public class OwnCardWithoutSyncTest
 	}
 
 	@Test
+	public void syncOffKeepsYouOnlineWhileIdle() throws Exception
+	{
+		GroupService service = service();
+		service.onGameTick(new GameTick());
+		long first = service.roster().lastHeard().get("Alice");
+		// Nothing about you changed for a minute, and you were last heard long ago.
+		service.roster().heard("Alice", 1L);
+		set(service, "ticksSinceStats", GroupService.STATS_HEARTBEAT_TICKS);
+		service.onGameTick(new GameTick());
+		assertTrue("idle with sync off still refreshes you", service.roster().lastHeard().get("Alice") >= first);
+	}
+
+	@Test
 	public void syncOffStillFillsYourOwnCard() throws Exception
+	{
+		GroupService service = service();
+		assertFalse("sync is off", service.syncing());
+		service.onGameTick(new GameTick());
+
+		MemberStats mine = service.roster().allStats().get("Alice");
+		assertNotNull("own card has stats with sync off", mine);
+		assertFalse(mine.skills().isEmpty());
+		assertEquals(301, mine.world());
+		assertTrue("own card is online", service.roster().lastHeard().containsKey("Alice"));
+	}
+
+	private static GroupService service() throws Exception
 	{
 		Client client = Mockito.mock(Client.class);
 		Player player = Mockito.mock(Player.class);
@@ -49,14 +75,6 @@ public class OwnCardWithoutSyncTest
 		set(service, "containers", Mockito.mock(CarriedContainers.class));
 		set(service, "memberName", GroupMembers.key("Alice"));
 		set(service, "cacheLoaded", true);
-
-		assertFalse("sync is off", service.syncing());
-		service.onGameTick(new GameTick());
-
-		MemberStats mine = service.roster().allStats().get("Alice");
-		assertNotNull("own card has stats with sync off", mine);
-		assertFalse(mine.skills().isEmpty());
-		assertEquals(301, mine.world());
-		assertTrue("own card is online", service.roster().lastHeard().containsKey("Alice"));
+		return service;
 	}
 }
