@@ -1231,18 +1231,14 @@ class GroupService
 		carriedDirty |= containers.tick();
 		GroupOutbox.Switches s = switches();
 		updateCarried(s);
-		if (!syncing())
+		if (syncing())
 		{
-			return;
+			flushGovernance();
 		}
-		flushGovernance();
+		// Your own card is filled from this client, synced or not; only the party send waits on syncing.
+		pollStats(s);
 
-		if (s.stats)
-		{
-			pollStats(s);
-		}
-
-		if (s.extras && extrasDirty && ticksSinceExtras >= EXTRAS_INTERVAL_TICKS)
+		if (extrasDirty && ticksSinceExtras >= EXTRAS_INTERVAL_TICKS)
 		{
 			extrasDirty = false;
 			sendExtras(s);
@@ -1556,7 +1552,7 @@ class GroupService
 			lastPlane = plane;
 			statsDirty = true;
 		}
-		if (ticksSinceStats >= STATS_HEARTBEAT_TICKS)
+		if (syncing() && ticksSinceStats >= STATS_HEARTBEAT_TICKS)
 		{
 			// Nothing changed for a minute: send the same again so members still see us online.
 			lastStatsSent = null;
@@ -1936,7 +1932,20 @@ class GroupService
 				client.getBoostedSkillLevel(skill)));
 		}
 		MemberStats stats = new MemberStats(skills, lastRun, lastSpec, lastWorld, lastRegion, lastX, lastY, lastPlane);
-		String payload = GroupOutbox.stats(gson, s, stats);
+		String me = localName();
+		boolean changed = !stats.equals(roster.allStats().get(me));
+		roster.putStats(me, stats);
+		roster.heard(me, System.currentTimeMillis());
+		if (changed)
+		{
+			onChange.run();
+		}
+		String payload = syncing() ? GroupOutbox.stats(gson, s, stats) : null;
+		if (!syncing())
+		{
+			// Nothing goes out; this still paces the next local capture.
+			ticksSinceStats = 0;
+		}
 		if (payload == null || Objects.equals(payload, lastStatsSent))
 		{
 			return;
@@ -1944,16 +1953,26 @@ class GroupService
 		send(payload);
 		lastStatsSent = payload;
 		ticksSinceStats = 0;
-		roster.putStats(localName(), stats);
-		roster.heard(localName(), System.currentTimeMillis());
-		onChange.run();
 	}
 
 	/** Client thread. */
 	private void sendExtras(GroupOutbox.Switches s)
 	{
 		MemberExtras extras = new MemberExtras(runePouch(), quiver(), seedVault, seedVaultAt);
-		String payload = GroupOutbox.extras(gson, s, extras);
+		String me = localName();
+		boolean changed = !extras.equals(roster.extras().get(me));
+		if (changed)
+		{
+			// Names first: a changed card redraws straight away.
+			resolveNow(ItemCounts.ids(extras.runePouch, extras.quiver, extras.seedVault));
+			roster.putExtras(me, extras);
+			onChange.run();
+		}
+		String payload = syncing() ? GroupOutbox.extras(gson, s, extras) : null;
+		if (!syncing())
+		{
+			ticksSinceExtras = 0;
+		}
 		if (payload == null || Objects.equals(payload, lastExtrasSent))
 		{
 			return;
@@ -1961,9 +1980,6 @@ class GroupService
 		send(payload);
 		lastExtrasSent = payload;
 		ticksSinceExtras = 0;
-		resolveNow(ItemCounts.ids(extras.runePouch, extras.quiver, extras.seedVault));
-		roster.putExtras(localName(), extras);
-		onChange.run();
 	}
 
 	/** Client thread. Rune type varbits index the RUNEPOUCH_RUNE enum, the way the base rune pouch plugin reads them. */
