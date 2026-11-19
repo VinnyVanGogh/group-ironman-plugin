@@ -184,41 +184,68 @@ final class ItemBenefit
 
 	private static Result assess(Item item, Candidate c, Settings settings)
 	{
-		List<String> missing = new ArrayList<>();
-		int short_ = 0;
 		boolean blindToLevels = !c.levelsKnown && !item.requirements.isEmpty();
+		List<String> missing = blindToLevels ? Collections.<String>emptyList() : missing(item, c);
+		int short_ = blindToLevels ? 0 : levelsShort(item, c);
+		int upgrade = c.gearKnown ? upgrade(item, c, settings) : 0;
+		boolean owned = c.owns || c.gearKnown && upgrade == 0 && counts(item, settings);
+		return new Result(c.name, !blindToLevels && short_ == 0, short_, owned ? 0 : upgrade, owned, missing,
+			comparedTo(c), c.gearKnown, !blindToLevels);
+	}
+
+	/** "needs 70 Attack, has 40" per requirement the member does not meet. */
+	private static List<String> missing(Item item, Candidate c)
+	{
+		List<String> out = new ArrayList<>();
 		for (Map.Entry<String, Integer> r : item.requirements.entrySet())
 		{
 			int has = c.levels.getOrDefault(r.getKey(), 1);
-			if (!blindToLevels && has < r.getValue())
+			if (has < r.getValue())
 			{
-				short_ += r.getValue() - has;
-				missing.add(String.format(java.util.Locale.ROOT, "needs %d %s, has %d", r.getValue(), r.getKey(), has));
+				out.add(String.format(java.util.Locale.ROOT, "needs %d %s, has %d", r.getValue(), r.getKey(), has));
 			}
 		}
-		boolean usable = !blindToLevels && short_ == 0;
-		int upgrade = 0;
-		boolean positive = false;
-		boolean covered = true;
+		return out;
+	}
+
+	private static int levelsShort(Item item, Candidate c)
+	{
+		int out = 0;
+		for (Map.Entry<String, Integer> r : item.requirements.entrySet())
+		{
+			out += Math.max(0, r.getValue() - c.levels.getOrDefault(r.getKey(), 1));
+		}
+		return out;
+	}
+
+	/** Summed stat gain over what the member wears in the slot, for the stats that count. */
+	private static int upgrade(Item item, Candidate c, Settings settings)
+	{
+		int out = 0;
 		for (Map.Entry<String, Integer> s : item.stats.entrySet())
 		{
-			if (!c.gearKnown || !settings.stats().contains(s.getKey()) || s.getValue() <= 0)
+			if (settings.stats().contains(s.getKey()) && s.getValue() > 0)
 			{
-				continue;
-			}
-			positive = true;
-			int gain = s.getValue() - c.currentStats.getOrDefault(s.getKey(), 0);
-			if (gain > 0)
-			{
-				upgrade += gain;
-				covered = false;
+				out += Math.max(0, s.getValue() - c.currentStats.getOrDefault(s.getKey(), 0));
 			}
 		}
-		boolean owned = c.owns || positive && covered;
-		String against = !c.gearKnown ? null : c.currentName != null ? c.currentName
-			: c.currentStats.isEmpty() ? "an empty slot" : null;
-		return new Result(c.name, usable, short_, owned ? 0 : upgrade, owned, missing, against, c.gearKnown,
-			c.levelsKnown || item.requirements.isEmpty());
+		return out;
+	}
+
+	/** Whether the item has any positive stat that counts. */
+	private static boolean counts(Item item, Settings settings)
+	{
+		return item.stats.entrySet().stream()
+			.anyMatch(s -> settings.stats().contains(s.getKey()) && s.getValue() > 0);
+	}
+
+	private static String comparedTo(Candidate c)
+	{
+		if (!c.gearKnown)
+		{
+			return null;
+		}
+		return c.currentName != null ? c.currentName : c.currentStats.isEmpty() ? "an empty slot" : null;
 	}
 
 	/** Usable and not owned, then not yet usable, then owned. */
