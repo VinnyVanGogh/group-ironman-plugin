@@ -82,6 +82,48 @@ try {
         if ($cmd -notmatch "gradlew\.bat'\) --console=plain \`$gradleTask") { throw 'gradlew.bat is not given $gradleTask' }
     }
 
+    # Combat & Skilling Vitals goes into sideloaded-plugins only once it
+    # matches its pin; an earlier jar is kept as .bak.
+    $jarBlock = [regex]::Match((Get-Content -Raw $launcher), '(?s)# BEGIN Install-SideloadedJar.*?# END Install-SideloadedJar').Value
+    if ($jarBlock) { Invoke-Expression $jarBlock }
+    Check 'Install-SideloadedJar is marked in the .cmd' { if (-not $jarBlock) { throw 'BEGIN/END Install-SideloadedJar markers missing' } }
+    $side = Join-Path $dir 'sideloaded-plugins'
+    $jar = Join-Path $side 'combat-vitals.jar'
+    function New-Download([string]$text) {
+        $p = Join-Path $dir 'combat-vitals.jar.part'
+        [IO.File]::WriteAllText($p, $text)
+        return $p
+    }
+    Check 'a matching jar is installed into a new folder' {
+        $r = Install-SideloadedJar -Downloaded (New-Download 'abc') -Folder $side -Name 'combat-vitals.jar' -Expected $abc
+        if ($r -ne 'installed') { throw "got $r" }
+        if ([IO.File]::ReadAllText($jar) -ne 'abc') { throw 'jar content wrong' }
+        if (Test-Path -LiteralPath "$jar.bak") { throw 'unexpected .bak' }
+    }
+    Check 'an earlier jar is kept as .bak' {
+        [IO.File]::WriteAllText($jar, 'old')
+        $r = Install-SideloadedJar -Downloaded (New-Download 'abc') -Folder $side -Name 'combat-vitals.jar' -Expected $abc
+        if ($r -ne 'replaced') { throw "got $r" }
+        if ([IO.File]::ReadAllText("$jar.bak") -ne 'old') { throw '.bak does not hold the old jar' }
+        if ([IO.File]::ReadAllText($jar) -ne 'abc') { throw 'jar content wrong' }
+    }
+    Check 'a jar that does not match its pin is refused and nothing is touched' {
+        [IO.File]::WriteAllText($jar, 'old')
+        Remove-Item -LiteralPath "$jar.bak" -Force
+        Expect-Throw { Install-SideloadedJar -Downloaded (New-Download 'abd') -Folder $side -Name 'combat-vitals.jar' -Expected $abc } '*Checksum mismatch*refused*'
+        if ([IO.File]::ReadAllText($jar) -ne 'old') { throw 'installed jar was changed' }
+        if (Test-Path -LiteralPath "$jar.bak") { throw 'a .bak was made for a refused jar' }
+    }
+    Check 'the pinned Combat Vitals hash in the .cmd is well-formed' {
+        $m = [regex]::Match((Get-Content -Raw $launcher), "\`$CvJarSha256\s*=\s*'([^']*)'")
+        if (-not $m.Success) { throw 'no $CvJarSha256 pin found' }
+        if ($m.Groups[1].Value -notmatch '^[0-9a-f]{64}$') { throw "bad pin $($m.Groups[1].Value)" }
+    }
+    Check 'the .cmd fetches combat-vitals.jar from the same release' {
+        $cmd = Get-Content -Raw $launcher
+        if ($cmd -notmatch '/VinnyVanGogh/group-ironman-plugin/releases/download/\$SourceRef/combat-vitals\.jar') { throw 'CvJarUrl does not point at this release' }
+    }
+
     # Started from a PowerShell 7 window, powershell.exe inherits pwsh's
     # PSModulePath and cannot load Get-FileHash (seen on windows-latest).
     Check 'the .cmd clears PSModulePath before starting powershell' {

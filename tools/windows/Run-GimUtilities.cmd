@@ -34,8 +34,15 @@ $JdkUrl    = 'https://github.com/adoptium/temurin11-binaries/releases/download/j
 $JdkSha256 = 'd5008f02174c1ad21c10407cbf104815cb390ec4c263d53946e8d0507d7a77f9'
 # The tagged commit of this repo the launcher builds when it is run on its own.
 # GitHub's tag archive needs no login only while the repo is public.
-$SourceRef = 'gim-test-8'
+$SourceRef = 'gim-test-9'
 $SourceUrl = "https://github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/$SourceRef.zip"
+# Combat & Skilling Vitals, attached to the same release as combat-vitals.jar
+# (the plain `./gradlew jar` of VinnyVanGogh/combat-vitals-plugin 084f6e5).
+# The dev client this launcher starts runs with --developer-mode, which loads
+# every *.jar in %USERPROFILE%\.runelite\sideloaded-plugins. A normal RuneLite
+# never loads that folder.
+$CvJarUrl    = "https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/$SourceRef/combat-vitals.jar"
+$CvJarSha256 = '6156ad6ca1dd134cd78b2169a4c726997bf42feeb32f8d1ef0a6ec6856408081'
 
 $GuHome = Join-Path $env:LOCALAPPDATA 'GimUtilities'
 
@@ -68,6 +75,64 @@ function Get-GradleTask([string]$buildOnly) {
     return 'run'
 }
 # END Get-GradleTask
+
+# BEGIN Install-SideloadedJar
+# Moves a downloaded jar into the sideloaded-plugins folder once its SHA-256
+# matches the pin; a mismatch throws and leaves the folder alone. A different
+# jar already there under the same name is kept as <name>.bak (RuneLite loads
+# only *.jar files, so the backup is never loaded). Returns 'installed', or
+# 'replaced' when an earlier jar was backed up.
+function Install-SideloadedJar {
+    param(
+        [Parameter(Mandatory = $true)][string]$Downloaded,
+        [Parameter(Mandatory = $true)][string]$Folder,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Expected
+    )
+    Assert-Sha256 -Path $Downloaded -Expected $Expected
+    New-Item -ItemType Directory -Force -Path $Folder | Out-Null
+    $target = Join-Path $Folder $Name
+    $result = 'installed'
+    if (Test-Path -LiteralPath $target -PathType Leaf) {
+        Copy-Item -LiteralPath $target -Destination "$target.bak" -Force
+        $result = 'replaced'
+    }
+    Move-Item -LiteralPath $Downloaded -Destination $target -Force
+    return $result
+}
+# END Install-SideloadedJar
+
+# Installs Combat & Skilling Vitals for the test client. Never fatal: if it
+# cannot be fetched or does not match its pin, GIM Utilities starts without it.
+function Install-CombatVitals {
+    $folder = Join-Path $env:USERPROFILE '.runelite\sideloaded-plugins'
+    $target = Join-Path $folder 'combat-vitals.jar'
+    if (Test-Path -LiteralPath $target -PathType Leaf) {
+        $have = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($have -eq $CvJarSha256.ToLowerInvariant()) {
+            Say "      Combat & Skilling Vitals ($SourceRef) is already in $folder"
+            return
+        }
+    }
+    Say "      Downloading Combat & Skilling Vitals ($SourceRef) into $folder..."
+    $downloads = Join-Path $GuHome 'downloads'
+    New-Item -ItemType Directory -Force -Path $downloads | Out-Null
+    $part = Join-Path $downloads 'combat-vitals.jar.part'
+    if (Test-Path -LiteralPath $part) { Remove-Item -LiteralPath $part -Force }
+    try {
+        Invoke-WebRequest -UseBasicParsing -Uri $CvJarUrl -OutFile $part
+        $result = Install-SideloadedJar -Downloaded $part -Folder $folder -Name 'combat-vitals.jar' -Expected $CvJarSha256
+    } catch {
+        if (Test-Path -LiteralPath $part) { Remove-Item -LiteralPath $part -Force }
+        Say "      WARNING: Combat & Skilling Vitals was not installed ($($_.Exception.Message))."
+        Say '      GIM Utilities still starts without it.'
+        return
+    }
+    if ($result -eq 'replaced') {
+        Say '      Your earlier combat-vitals.jar is kept next to it as combat-vitals.jar.bak.'
+    }
+    Say '      Combat & Skilling Vitals installed. Only this test client loads it, not your normal RuneLite.'
+}
 
 # The Java major version of a JDK home, or 0 when it is not a usable JDK.
 # Both java.exe and javac.exe must exist: Gradle compiles the plugin.
@@ -206,6 +271,7 @@ try {
 
     Say '[2/3] Getting the plugin source...'
     $src = Find-Source
+    Install-CombatVitals
 
     $gradleTask = Get-GradleTask $env:GU_BUILD_ONLY
     if ($gradleTask -eq 'build') {
