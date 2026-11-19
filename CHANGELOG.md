@@ -1,649 +1,113 @@
 # Changelog
 
-## Unreleased
-
-### Compare, shared boss bests, quests and diaries
-
-- Members' boss personal bests, quest points, quests done and achievement
-  diary tiers are shared with the group under *Share group events* (off by
-  default) and shown on each member card.
-- New **Compare** tab: two members side by side, a leaderboard per stat (best
-  and worst holder, sortable), this group against any other group on the
-  public hiscores, and *who benefits most* from an item.
-- Activities gets a **Personal bests** section: each boss with the group best
-  marked, and the newest bests set. A beaten best posts through the existing
-  *New personal best* event, to the log and Discord.
-- New settings *Compare: stats that count* and *Compare: item categories*.
-- Level requirements are not in RuneLite's item data, so *who benefits most*
-  says when it does not know them.
-
-### Discord: every kind of post groups per member, like level-ups
-
-- A member's posts of one kind within **Group posts (minutes)** (new
-  setting under *Discord: how to post*, default 30, 0 turns it off) of
-  the first go into that one message, edited in place, instead of a new
-  post each time. Kinds: group storage, drops, deaths, quests and diaries
-  (and the rest of progress), activities, slayer, group.
-- Group storage adds up: took 2 Rope, then deposited 10 Rope, reads
-  "deposited 8 x Rope", with the value of what moved overall and each
-  visit listed under it.
-- Every other kind adds a card per event, newest first; past 10 cards a
-  new message starts. The picture is the newest event's.
-- A post that pings your mention (a pet, a 99) still starts its own
-  message, so the ping goes. Online and offline, gravestone warnings and
-  the weekly recap post on their own as before.
-- Level-ups are unchanged and keep *Combine level-ups*.
-- Grouped messages survive a client restart inside the window, as
-  level-ups do. Discord does not move an edited message to the bottom.
-### Fix: switching accounts no longer posts old achievements
-
-- Logging into another account (or hopping, reconnecting, or changing
-  profile) used to be able to post that account's long-done diaries and
-  levels to Discord as if new. Every login now starts fresh: for its first
-  few seconds skills, total, combat level, quest points and diaries are only
-  recorded, never posted.
-- Safety net: a login's first minute of achievements (and of game
-  broadcasts posted for members without the plugin) is held. Up to three
-  post as usual once the minute is over; more than that is treated as a
-  backlog and nothing is posted.
-
-### Fix: an account that isn't in your group does nothing
-
-- Logging into an account that is not in the group this client is set up
-  for (an account in another group, or not on a Group Ironman at all) used
-  to post its achievements to your group's Discord, put them in the Log and
-  share its data. Now nothing runs for it: no Discord posts, no group
-  events, no Log entries, no live board or online posts, nothing sent to or
-  taken from the group, and its group storage and bank are not recorded. A
-  chat line says so once per login. Switching back to a member picks up as
-  usual, without posting anything old.
-- The client remembers which group it is for the first time a member logs
-  in (or, for a client set up before this update, from the group's saved
-  leader roles or the members it already has data for). Setting a new group
-  key ties it to the next member's group.
-- A group key shared in another group's chat no longer replaces yours.
-
-### Live activities: Fight Caves, Inferno and Fortis Colosseum waves
-
-- The group sees who is in the **Fight Caves** (63 waves), the **Inferno**
-  (69) or the **Fortis Colosseum** (12, Sol Heredit), on which wave, solo or
-  with whom, and for how long. Colosseum runs also show glory and the
-  modifiers already chosen, with their tier.
-- Shown on the member's card in the **Group** tab ("Fight Caves - wave
-  37/63 - solo"), in a new **Activities** tab (live cards, then recent
-  completions and deaths, filtered All / Bossing / Minigames), under the
-  member in the in-game **Group box**, and on the Discord **live board**
-  ("in Fight Caves, wave 35": it moves every 5 waves, so the message is not
-  edited every wave).
-- Four new Discord posts and banners, each its own switch, all off by
-  default: **Activity started**, **Activity wave milestone** (every N waves,
-  new *Thresholds* setting **Post every N waves**, default 10, plus Jad,
-  Triple Jads, Zuk and Sol Heredit), **Activity completed** (with the kill
-  count and time, or an early Colosseum loot claim) and **Activity death**
-  (with the wave; posted instead of 'Died' for that death).
-- A logout mid-run resumes on the next wave with the time kept.
-- Shared only with *Share group events* on; your own run always shows on your
-  own screen. "Don't post my events" and per-kind opt-outs keep a member off
-  Discord and off the live board. Members on an older build ignore the new
-  messages and kinds; nothing changes for them.
-- Only where-and-how-far: no boss attack, prayer, spawn or hazard is ever
-  read or shown.
-
-### Shopping: "Path to" with Shortest Path
-
-- Each line still to get, and each requested item, has a **Path to** button
-  naming where it goes ("Path to: Harry's Fishing Shop"): the nearest shop
-  you can be served at, or the nearest bank when the group holds some in
-  group storage. Needs the Shortest Path plugin, which draws the way; you
-  walk it.
-- **Path to next** on each list walks its stops in order, nearest first,
-  and moves on by itself once a stop has nothing left to get.
-- The path clears when the item is done, the list is removed or the request
-  closes, or with **Stop path**. Without Shortest Path the button says so.
-
-### Shopping: shared lists for the group, with 1 Defence pure presets
-
-- New **Shopping** tab. Anyone adds a list for one or more members; it goes
-  to the whole group over group sync and is kept across restarts.
-- **Presets** for the 1 Defence pure's quest milestones: Mithril gloves
-  (Recipe for Disaster with 5 of the 6 subquests that give no Defence
-  experience, Goblin generals, Mountain Dwarf, Evil Dave, Pirate Pete and
-  Skrach Uglogwee ticked by default, Awowogei to swap in), Ava's accumulator,
-  Ancient Magicks, Dragon scimitar (pick Attack or Strength, never Defence),
-  Dragon dagger and longsword, Climbing boots, Iban's staff, God books and
-  Waterfall Quest. Each counts the quests and prerequisites the member has
-  not done, read from the game; optional items are left out.
-- **Custom lists**: search items, set quantities, rename them later.
-- Every line: what the members need, less what the group holds (banks, group
-  storage, inventories, equipment, pouches; noted counted as the item), who
-  holds it, and where you can get the rest: shops you can be served at, with
-  the price, or the monsters that drop it. Lines tick off as items arrive.
-- Removing or renaming a list shows who did it, on the list and under
-  *Changes*.
-- New setting under *In-game*: **Shopping: shop alert**, off by default. A
-  chat line as you walk up to a shop selling something still needed.
-- Members on an older build ignore the new messages; nothing changes for them.
-- Lists and requests start **folded**: the name, "3 of 39 done" with a bar,
-  and the first few items still needed. Open one and it stays open for that
-  character. Open lists show still-needed items first; finished ones fold into
-  "N done".
-- Each item is one short line, "Air rune  12 / 30" with a bar and "Need 18
-  more". Click it for who holds it, where to get it and whether it can be
-  traded. A member who shares no items is named instead of "not judged".
-- Text no longer runs past the panel's right edge.
-- Common drops that no quest names (Dragon warhammer, Abyssal whip, the
-  Dagannoth rings, god wars items and more) now say which monster drops them,
-  from the OSRS Wiki.
-### Discord posts for members without the plugin
-
-- Members who are online without GIM Utilities still get their level-ups,
-  quests, drops, collection log slots, pets, deaths, 99s, XP milestones,
-  combat tasks, diaries and personal bests posted: they are read from the
-  game's own Group channel broadcast.
-- One plugin user posts each one: the group leader while online, otherwise
-  the first by name. Members who run the plugin are never posted twice, and
-  a restart never posts a line again.
-- The same event switches, "Post every N levels", the valuable drop minimum
-  and quiet hours apply. The footer says "from the game's group broadcast".
-- Their level-ups group like a plugin user's: with "Combine level-ups" on,
-  one message per member, edited in place, and kept across a restart. If
-  the poster changes mid-streak (the leader logs out), the new poster starts
-  a new message.
-- Level-ups now group per member for everyone: within *Combine level-ups*,
-  a member's levels go into one Discord message holding a card per skill
-  (combat level gets its own card). Each card is edited as its skill levels
-  ("Thieving 44 → 46 (+2) in 10 min"), a new skill adds a card, and the
-  skill that levelled most recently is on top. Past 10 skills (Discord's
-  limit) a new message starts. The screenshot, when on, is the latest
-  level-up's, on the top card.
-- *Combine level-ups* now defaults to 60 minutes for new installs. An
-  existing install keeps 30 unless you changed it yourself.
-- A streak saved by an earlier build starts a new message.
-- New group setting "Post events for members without the plugin" (on). A
-  group's leader or editors can turn it off for everyone.
-
-### Log basket counts and the worn-equipment slot icons
-
-- A carried log basket, fish barrel or coal bag shows how many items are
-  inside on its inventory slot (yellow, like the game's stack number), once
-  the game has said: a Check, an empty, or logs, fish or coal gathered into an
-  open one. Until then it shows no number, never a guess. Counts are kept per
-  account across logins.
-- Where every item inside is known (after a Check, then logs or coal that
-  name themselves), Find and `::find` count them too: "Yew logs: Alex log
-  basket 14". After a Fill the count stays but Find leaves the basket out.
-- The counts reach the group with the inventory. A member on an older build
-  simply shows no number; nothing else about their messages changes.
-- The worn grid shows the game's own empty-slot icons (head, cape, neck,
-  ammo, weapon, body, shield, legs, hands, feet, ring) wherever nothing is
-  worn, so it reads like the Worn Equipment tab.
-- Your own card shows your inventory, worn items and counts before you join
-  a group too.
-### One live board per channel, through restarts
-
-- Restarting RuneLite no longer posts a second "Group status" board and
-  leaves the old one behind. The board's message id is now saved to the
-  plugin's own folder the moment it changes; before, it sat in RuneLite's
-  settings, which are written to disk every few minutes, so a client closed
-  quickly forgot its board.
-- The board is tied to the webhook itself, so the same webhook pasted with
-  a `thread_id` or a trailing slash is still the same board.
-- After logging in, the board waits about 20 seconds for the group's
-  leader and shared webhooks to load before it sends anything.
-- Whenever a new board is posted, the ones before it that this client knows
-  about are deleted. Boards left over from before this update are not known
-  and need deleting by hand once.
-
-### Inventories look like the game's, and online members come first
-
-- A member's inventory in the Group tab now shows their real 28 slots: each
-  item in the slot it is in, 14 potions as 14 slots (not one cell with
-  "14"), coins and runes as one stack, empty slots kept, and noted items
-  drawn noted. Find, `::find` and bank and storage totals still count noted
-  items as the item. A member on an older build still shows the old view
-  (one cell per item) until they update; their client keeps reading this
-  build's messages as before.
-- Member cards are ordered you first, then members online, then offline and
-  not-yet-seen members, each group by name.
-### Every member location shows a place, never "region 13470"
-
-- A member in the Wilderness Slayer Cave read "region 13470"; it now reads
-  *Wilderness Slayer Cave*.
-- More places are named, from RuneLite's own minigame, agility course,
-  runecrafting altar, teleport and hot-cold area lists.
-- Anywhere still unnamed is described from where it is: *Wilderness lvl
-  17-24 (underground)*, *near Lumbridge*, *under Lumbridge*, *Underground*,
-  *Instance* or *Unmapped area*. The region number is never shown.
-### The live board comes back to the bottom of the channel once a day
-
-- New setting under *Discord: how to post*: **Repost board daily**, on by
-  default. With *Online status* on *Live board*, the first board update after
-  your midnight posts the board again at the bottom of the channel and then
-  deletes yesterday's, so the channel still holds one board. The rest of the
-  day it is edited in place, as before.
-- The new board goes first; yesterday's is deleted only once the new one is
-  saved, so a failed post never leaves the channel without a board. Quiet
-  hours hold the repost until the first update they allow.
-- Only the client that keeps the board reposts it (the leader's, on a shared
-  webhook). Off: the board is only ever edited.
-### Group storage only logs what the game saved
-
-- Closing group storage without pressing Save no longer logs or posts
-  anything: the game throws those changes away, and so does the plugin.
-- A save is the Save button or the game's "Saving..." message, including a
-  save the game makes as the window closes. Each save still posts only what
-  moved since the last one.
-- When the storage next opens, its contents replace the stored snapshot if
-  they differ (for example a save that failed). That correction is never
-  posted.
-### Dev builds follow the newest RuneLite
-
-- `./gradlew build`, `test` and `run` now use the newest RuneLite client
-  release, checked on every run, and print which one they resolved. Pin a run
-  with `-PruneLiteVersion=1.13.6` to compare. Plugin Hub builds are unaffected.
-
-### Built against RuneLite 1.13.6
-
-- Was 1.13.5. The test client now loads the Plugin Hub index for the Hub's
-  current RuneLite, so other Hub plugins run at their newest versions
-  (e.g. Combat Vitals) alongside this one.
-
-### The leader can share the Discord webhooks with the group
-
-- New in the panel's *Settings* tab, for the group leader only: *Share
-  webhooks with the group*. On, the leader's seven webhooks and their poster
-  names reach every member, so a member only ticks *Post to Discord*.
-- A webhook a member pastes themselves still wins for that category.
-- Members see "Using the group's webhooks (set by ...)" and never the links.
-  They are kept with the group's cache file, not in RuneLite's settings.
-- Anyone with the group key can read shared webhooks. Turning sharing off
-  clears members' copies; a leaked webhook is replaced by deleting it in
-  Discord and pasting a new one, which members pick up.
-- On a shared *Online status* webhook only the leader's client keeps the live
-  board, so the channel gets one board.
-
-### One click to share after joining
-
-- After a group key is saved, the panel shows a *Share with your group?*
-  card. **Turn on sharing** ticks *Sync with my group* and every *Share*
-  switch; **Post my events to Discord** (only with a webhook set) ticks
-  *Post to Discord*; **Not now** hides it until the key changes. Nothing
-  turns on without the click. The panel button now also shows while a group
-  key is saved.
-- With *Share group storage changes* off, your own storage visits are still
-  kept in your Storage and Log tabs, marked *not shared: Share group storage
-  changes is off*. Nothing is sent.
-
-### Seven Discord webhooks, each with its own poster name
-
-- *Discord: connection* now lists seven webhooks in order: Main, Online
-  status, Drops & loot, Progress, Deaths & danger, Group storage and Daily
-  digest. Leave any but Main empty and its posts go to Main's webhook. See
-  the table in the README for what each one carries.
-- Each webhook has its own *name* choice: *Webhook's own*, *Default name* or
-  *Custom*. The default names: Town Crier, World Hopper, Party Pete,
-  Skillcape Seller, Death's Office, Gielinor Banker, Varrock Herald. A
-  category posting to Main's webhook keeps its own name.
-- Each *Custom name* box starts filled with that webhook's default name, and
-  an empty or refused box uses the default name (it used to use the
-  webhook's own).
-- The daily digest now goes to the *Daily digest* webhook (or Main), not to
-  each category's webhook.
-- The *Activities* webhook is retired: clue, kill count, personal best,
-  slayer, farming and birdhouse posts go to Main, Barrows chests to Drops &
-  loot. *Back after a break* moves from the Group webhook to Main.
-- Each webhook has its own send queue and rate limit, so one busy or
-  rate-limited webhook never holds up another.
-- Kept: the main webhook, its poster name and its custom name use the same
-  keys, so they carry over. The old Drops, Deaths, Storage, Progress and
-  Group webhook fields and their custom names carry over too (Group is now
-  *Online status*). The one *Poster name* choice now applies to Main only;
-  the other webhooks start on *Webhook's own*.
-
-### Welcome and update notes in the game chat
-
-- A fresh install says hello in the game chat once: four short lines on
-  joining your group, connecting Discord, and what you get.
-- After a later update, the first login lists what is new, once per version.
-- New setting *Show update notes* (in *Advanced*, on by default) turns both
-  off. The version is still marked as seen with it off, so turning it back on
-  never brings back old notes.
-
-### Settings open on a short list
-
-- Every settings section but *Group* starts closed, so a first install shows
-  all eight section names at once.
-- *Offline grace (minutes)* is now *Offline grace*, with *mins* in the box,
-  so its name is no longer cut off. Same key, same value.
-
-### Settings names that fit
-
-- Long setting names no longer get cut off with "..." in the settings panel.
-  Shorter names: *Combine level-ups*, *Grave picture*, *Valuable drop (gp)*,
-  *Big storage (gp)*, *Clue reward (gp)*, *Shared drops (gp)*, *KC milestone
-  every*, *Gravestone warning*, *Share pouch, quiver, vault*, *Banner:
-  Gravestone expiring*, and the `::find` colours (*Search colour*, *Your bank
-  colour* and so on). The full meaning is in each setting's tooltip.
-- *Poster name*'s first choice is now *Webhook's own*, and *Grave picture*'s
-  is *Where I died*: a long choice made the dropdown squeeze the name to
-  "P...".
-- gp boxes show plain digits, so 1,000,000 shows as `1000000` instead of
-  being cut to `1,000,00`. *Gravestone warning* shows `5 mins`.
-- Nothing resets: every setting keeps its saved value.
-
-### Hiscore levels for members without the plugin
-
-- Group tab cards for members who never ran GIM Utilities, online or never
-  seen, now show their skill levels from the OSRS hiscores, read with
-  RuneLite's own hiscore lookup, marked *From hiscores, 2h ago*.
-- Online, such a member also shows HP and Prayer at their hiscore level, and
-  Run and Spec at 100%, dimmed, with the tooltip *assumed, not shared*.
-- Looked up when you log in and when a member comes online, at most once
-  every 6 hours per member, and kept across restarts. A failed lookup shows
-  *Hiscores unavailable* and retries later, backing off up to 6 hours.
-- Shared plugin data always wins. Inventory and worn items are never made
-  up: a member who never shared them shows none.
-
-### Live board: last seen for everyone
-
-- Offline members read *last seen 2 hours ago on world 302* (Discord's own
-  relative time, so it stays current without edits) instead of just
-  *offline*. Members without the plugin get theirs from when a plugin user
-  last saw them online in the Group channel.
-- When the last plugin user logs out, the board's final edit keeps every
-  member's last seen and ends with *Nobody with GIM Utilities is online, so
-  these may be out of date (as of ...)*.
-- Last seen is kept in the group cache, so it survives a restart.
-
-### Online status for members without the plugin
-
-- Who is online, and on which world, now comes from the game's own Ironman
-  Group channel (the in-game Group tab), so members who don't run the plugin
-  show too. The Friends list is the fallback before the channel loads.
-- Live board: *online (world 615)* or *offline* for every member, with a
-  subtle *(no plugin)* tag for members whose client never reported. *unknown*
-  only before the game has said.
-- The Group overlay no longer says *Nobody else online* while the game shows
-  others online. Sidebar cards show *Online - W615 (no plugin)* or *Offline*.
-- Online posts: logins and logouts of members without the plugin are posted
-  too, with the same offline grace, by one plugin user only (the first by name
-  of those online in the group's party).
-
-### One Discord post per skill's level streak
-
-- New setting **Combine level-ups within (minutes)**, default 30, 0 turns it
-  off. The first level-up in a skill posts as before; more levels in that
-  skill within the window edit that same post in place: *Prayer 23 → 25 (+2)
-  in 4 min*, with a fresh screenshot when screenshots are on.
-- A 99, a total-level milestone, maxing and a combat level still get their own
-  post. The overlay and the Log still show every level.
-- At most one edit every 10 seconds per post; quicker levels fold into the
-  next edit. A logout or the window running out starts a new post.
-- If the post was deleted or the webhook changed, the next update is posted as
-  a new message, and that one is edited from then on. Message ids are kept in
-  memory only.
-- One action that gains several levels (low Prayer from bones) reads from the
-  level before it: *Prayer 3 → 6 (+3)*, not *5 → 6*.
-- After three edits in a row lost to Discord or the network, or a post pushed
-  out of a full queue, the streak ends and the next level posts fresh.
-- Level-up posts use the Progress poster name.
-
-### The Log shows every group event
-
-- The sidebar Log lists every event the overlay and Discord know about,
-  yours and members', from the same events: an event is logged even when its
-  Discord and overlay switches are off. Every kind is detected while the
-  plugin runs, for the Log.
-- Search (member, item, place, text), category chips (Drops, Deaths,
-  Storage, Progress, Group, Activities), a member picker and a time range.
-- "Since you last played" stays on top; the rest is grouped by day. Each row
-  has the item or skill icon, member, short line and time; hover for the
-  full line and value (*1.5M (1,501,600) gp*); right-click to copy.
-- Kept in the group cache file under a new `feed` key: the newest 2,000
-  events, none older than 30 days. A cache from before starts the feed from
-  its drops and storage logs.
-
-### Group settings, a leader and editors
-
-- New **Settings** tab in the panel. Thresholds, which events post to
-  Discord and show as overlays, the daily digest, Easter eggs, quiet hours
-  and the offline grace can now be the group's: the leader (or an editor)
-  saves them once and every member's client uses them.
-- The member who creates the group key leads a group that has no leader; a
-  group made before this update gets a **Claim leadership** button. The
-  leader makes and removes editors. Roles and settings are signed, so a
-  member cannot promote themselves or send settings of their own.
-- Each save is a new version; who changed what, and when, is listed under
-  *Recent changes*. A member who was offline picks up the latest when they
-  join.
-- The first save copies the leader's own current settings. Until then each
-  member keeps using their own, as before.
-- Yours alone, whatever the group says: **Don't post my events**, and per
-  event kind *Post* and *Show*. The leader and editors see a read-only grid
-  of who posts what.
-- Webhook URLs, the mention, *Post to Discord*, *Online status* and every
-  *Share* switch stay each member's own and are never sent to the group. So
-  the group can never turn login posts on beside a member's live board.
-- New group setting **Post every N levels** (default 1, under *Thresholds*):
-  from *Level ups from level*, only every Nth level posts or shows (5: 60,
-  65, 70). 99s, max total, total level milestones and combat levels always
-  do. One action that jumps past a multiple (Prayer 3 → 7 with 5) still
-  counts.
-- With *Combine level-ups* on, every N applies first: one post for 60, edited
-  in place to "59 → 65" when 65 comes, not at each level in between.
-- *Don't post my events* is the last setting under *Discord: connection*.
-
-### Amounts read like the game
-
-- Quantities and gp values use the game's stack text everywhere: *Coins -
-  450K in group storage*, *took 40K Coins*, *13.2K*, *10M* (RuneLite's
-  `QuantityFormatter.quantityToStackSize`). The panel, chat lines, `::find`,
-  overlays and storage alerts all read this way.
-- The panel shows the exact amount in a tooltip (*450,001*) on item icons,
-  Find rows, storage and log lines, and bank and storage totals.
-- Discord keeps every digit after the short form: *450K (450,001)*, in
-  descriptions, plain posts, the Value field and daily digests (titles carry
-  no amounts).
-- Item icons show the stack's own picture: a big coin pile for big stacks.
-  The panel's Find rows now draw the stack too, and Discord thumbnails use
-  the coin pile for the amount.
-
-### Online status: a live board
-
-- New setting **Online status**: *Posts*, *Live board* or *Off*. It replaces
-  the "Online and offline" switch; an install that had it ticked stays on
-  *Posts*, one that used Discord without it is *Off*, and a new install starts
-  on *Posts*: a member opts into *Live board*.
-- *Live board* keeps one message in the Group channel listing each member:
-  online (with the world) or offline (last seen, kept current by Discord). It
-  is edited on each login, logout and hop, at most once every 10 seconds and
-  never in quiet hours. If the message is deleted, the next change posts a new
-  one. Only members whose clients run the plugin are reported; the others show
-  *unknown*. The webhook and the message id stay on your client: neither is
-  sent to the group.
-- Each member with *Live board* and a Group webhook keeps their own board, so
-  only one member sharing a Group webhook should turn it on.
-- The board's posts and edits share the Discord queue with every other post
-  (at most 20 a minute) and use the Group poster name.
-
-### Slayer posts fixed
-
-- Checking the enchanted gem no longer posts *task done*: a task is done only
-  on the line that sends you back to a Slayer master (RuneLite's own rule).
-- A task from a master's dialogue now posts (it posted nothing), as does a
-  partner's: *New Slayer task: 19 x Icefiends (Turael)*. The gem's check never
-  posts the task you already have.
-- A finished task reads *Slayer task done: Icefiends (streak 1, 2 points)*.
-
-### Online and offline posts
-
-- New setting **Offline grace (minutes)**, 0 to 10, default 2. A logout waits
-  that long; logging back in within it (a disconnect, a quick relog) posts
-  nothing for either. A world hop is never a logout, whatever the grace.
-- The offline post says *Offline* with your name, how long you played and
-  when you logged off: *GroupShip: Offline* / *offline, played 1h 12m on
-  world 303, logged off at 1:35 PM*. It used to say *You: Online*.
-- At most one online and offline pair per 10 minutes: a flaky connection
-  posts nothing until it settles.
-- A client closed during the grace posts the offline on the next start only
-  when that is within 15 minutes; never a stale one hours later.
-
-### Daily digest is in addition to instant posts
-
-- Ticking a daily digest category no longer holds that category's posts.
-  Instant posts follow "Discord: which events" exactly as set; each ticked
-  digest category adds one summary a day at the digest hour, listing every
-  event of that category since the last digest, ticked for instant posts or
-  not. Untick a category's instant events to make it digest-only.
-- The digest switches are now "Include in daily digest: Drops" and so on.
-  Setting keys are unchanged.
-- A webhook field that is set but is not a Discord webhook link now gets one
-  game chat line naming the field (never the link), on login or a settings
-  change. Surrounding whitespace and quotes are stripped before checking, so
-  a link pasted with its quotes works.
-
-### Discord Easter eggs
-
-- New **Easter eggs** switch in the Discord section, off by default. When on,
-  some posts get one short funny line under the facts: a 0 gp death, a death
-  that lost only a spade (and clue items), a pet, a Bones-only "valuable"
-  drop, about ten well-known drops, and big group storage visits.
-- **Legend at (gp)** and **Freeloader at (gp)** (default 1M each, 0 turns it
-  off) set when a deposit or withdrawal gets its line. Both fire at exactly
-  the value: 10K taken with Freeloader at 10K gets a line. Each has four
-  rotating phrasings, picked the same way on every client.
-- A death that cost 0 gp no longer posts "lost about 0 gp". In a death's post
-  the line is left out; on its own it posts nothing with Easter eggs off, and
-  only the egg line with them on. The daily digest follows the same rule.
-- The lines are all in `EasterEggLines.java`; a new egg is one table row.
-
-### One Discord post per moment
-
-- A group storage visit is one Discord post. With a big deposit or withdrawal
-  it is titled "Big storage withdrawal", "Big storage deposit" or "Big storage
-  visit" (both), lists every item moved with the big stacks marked, and shows
-  the visit's total value. With nothing big it is the "Group storage visit"
-  summary, when that is switched on. "Storage minimum hit" and "Took the last
-  one" from the same visit are lines in that post, not posts of their own.
-- The same rule elsewhere: a kill's drop, untradeable unique, collection log
-  slot and pet; a tick's level up, 99, XP milestone, total level and combat
-  level; a death, its Hardcore group life and the value it cost. Each is one
-  post, titled after the biggest of them, with the rest as fields and one
-  screenshot taken when the moment began.
-- Discord only: banners, the group box and chat are unchanged.
-
-### Windows launcher in CI
-
-- `Run-GimUtilities.cmd` takes an opt-in `GU_BUILD_ONLY=1` that builds
-  without opening RuneLite. Unset, it behaves exactly as before.
-- New `windows-launcher` workflow runs the launcher on `windows-latest` the
-  way a player would (no Java, no checkout, both the committed `.cmd` and the
-  `gim-test-1` release asset) and runs the launcher tests on Windows
-  PowerShell 5.1 and PowerShell 7.
-
-### Group events, part A
-
-- One event model (`GroupEvent`, now typed) feeds two outputs, each with its
-  own switch per event, all off by default: a **Discord webhook** and
-  **in-game banners** plus an optional **group box**.
-- Events: valuable drop (with kill count), pet, new collection log slot,
-  untradeable unique, death (where, killer, world, Hardcore group life lost),
-  big storage deposit / withdrawal, storage visit summary, storage minimum
-  hit, took the last one, level up, 99s and max total, XP milestones (1M, 10M,
-  200M), combat level, total level every 100, quest complete, quest points
-  every 25 and every quest done, online / offline (a hop or quick relog is
-  not posted), back after N days, Barrows chest with set progress.
-- Discord: main webhook plus optional per-category webhooks, embeds or plain
-  text, optional screenshot, mention string for big events, quiet hours.
-  At most 20 posts a minute, 50 waiting, Retry-After honoured; the URL is a
-  secret field and never logged.
-- *Share group events* sends members your non-drop events for their banners;
-  a 1.0.0 client ignores them.
-
-## 1.0.0 - 2026-11-04
-
-First Plugin Hub release.
-
-### From the in-game test (2026-11-04)
-
-- **Copy group key / Paste group key.** The key travels outside the game (e.g.
-  Discord): *Copy group key* puts it on the computer's clipboard, *Paste group
-  key* saves one and joins. Nothing writes to the game chatbox.
-- **Joining stays a click.** *Join group sync* once per session (and a paste
-  joins once). "Auto-rejoin for parties" is a rejected RuneLite feature.
-- Member cards: HP / Prayer / Run / Spec as minimap-style orbs with the
-  game's icons; worn items in the equipment tab's layout beside a 4x7
-  inventory; a drawn collapse arrow; the header's online count includes you.
-- `::find` answers name the search, read from your side ("15 in your bank",
-  "140 in group storage", "1 equipped by Sam") and colour each kind of place;
-  new *::find colours* settings (item names uncoloured unless turned on). The
-  Find tab reads the same way.
-- Log tab: group storage changes by member, yours included, above drops.
-- Banks tab: each card says whose bank it is, and a filtered result stays at
-  the top.
-- Fixes: text past the panel's right edge (column alignment), the Group tab
-  drawing blank (item stats read off the client thread), the Leave button cut
-  off; a tab that fails to draw now says so.
-
-### Round 2 (Board in-game test, 2026-11-04)
-
-- **No Party panel step.** GIM Utilities joins the group's RuneLite party
-  itself through the core `PartyService` when you click **Join group sync**;
-  the Party plugin can stay off (and its overlays hidden). It asks for member
-  names itself (`PartyDataService`, `CHARACTER_NAME`), which nothing did with
-  the Party plugin off. Joining waits for the click: auto-joining parties is
-  a rejected Plugin Hub feature.
-- **Group key.** 128 random bits, never derived from public facts, shared
-  with *Copy group key* / *Paste group key* (see 1.0.0 above). A `[GIMU] <key>`
-  line someone types in group chat is still read from group chat only, saved
-  and hidden. *Group key* in the settings (a password field) is another way
-  to paste it; *New key* rotates it. New settings: *Sync with my group* (on),
-  *Group key*.
-- A party you joined yourself is never replaced (*In another party; GIM sync
-  paused*, with a *Switch* button), and on shutdown only a party GIM
-  Utilities joined is left. Nothing is sent to any other party.
-- Only names on the in-game group roster (`ClanSettings` for
-  `ClanID.GROUP_IRONMAN`) are shown; anyone else is ignored and listed as
-  *Not in your group*.
-- Offline members keep their last world, place, stats and items, saved across
-  restarts: *Offline - last seen W303, Draynor, 2h ago*.
-- Group storage: the last contents are shown as a snapshot with when and by
-  whom, even when nothing moved; changes are logged on each Save and on close
-  ("You deposited 5 Trout"), whether or not sync is on.
-- One search engine for the Find tab and `::find`: any word or part of the
-  name, any case, with shorthands (`ppot`, `dwh`, `brew`, ...). `::find guam`
-  now finds Grimy guam leaf, Guam leaf and Guam potion (unf).
-- Side panel redesign: a sync header and five tabs (Group, Banks, Storage,
-  Find, Log). Member cards with HP / Prayer / Run / Spec bars, a skills icon
-  grid in the skills tab's order and item icon grids; banks and storage as
-  filterable icon grids with value; Find as icon rows. Every empty state says
-  what to do next.
-
-Split out of Build Guard (VinnyVanGogh/build-guard-plugin, up to its PR #5)
-as a plugin of its own, so a group can use the group features without Build
-Guard's build and XP warnings.
-
-- New identity: plugin name *GIM Utilities*, package
-  `com.vinnyvangogh.groupironman`, config group `gimutilities`, party message
-  `VvgGroupIronmanMessage`, saved data in `.runelite/gim-utilities/`. None of
-  these overlap Build Guard's, so both plugins run side by side without
-  reading each other's settings or decoding each other's messages. Settings
-  and saved data are not carried over from Build Guard.
-- Not named "Group Ironman" and not config group `groupironman`: the Hub
-  plugin *Group Iron Man* (slug `group-ironman`) already has that name and
-  uses that group.
-- Kept from Build Guard: member banks, the group storage log, live stats with
-  boosts, online / last seen and place names, inventories and equipment, rune
-  pouch, quiver and seed vault, drops and collection log ("Since you last
-  played"), "Who has it?", `::find`, storage minimums and world map markers.
-- Removed, staying in Build Guard: build rules, the attack-style warning,
-  sharing build rules / at-risk lines / the gear-name list with the party,
-  and the quest and lamp engine with its bundled quest and lamp data.
-- `::find chat command` is now **off by default**, like every other switch:
-  a fresh install does nothing until it is turned on.
-- Windows double-click launcher `tools/windows/Run-GimUtilities.cmd`, ported
-  from Build Guard's: finds or installs a SHA-256-pinned Java 11, downloads
-  this repo's `gim-test-1` tag (or uses the checkout it sits in), and runs
-  the client. Keeps everything in `%LOCALAPPDATA%\GimUtilities`.
-- Built against RuneLite 1.13.5 (was 1.12.39, inherited from Build Guard).
-  On 1.12.39 `./gradlew run` exited with code 255 about 12 seconds in.
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+### Added
+
+- Category filter pills and a top-20 value-ranked preview (with *Show all*) on the `Banks` and `Storage` tabs, quick-find category/combat-style/holder filter pills and one-click search presets on the `Find` tab, and High Alchemy values in item grid tooltips (#90).
+- `Compare` tab (`GroupCompare`, `BenefitFinder`, `ProgressView`) for side-by-side member comparisons, sortable per-stat leaderboards, public group hiscore comparisons, and *who benefits most* item upgrade rankings, plus shared boss personal bests (`PbCapture`, `PersonalBests`), quest progress, quest points, and achievement diary tiers (`AchievementState`, `MemberProgressBook`) under *Share group events* (#89).
+- Group announcements (`::announce <text>`), everyone-online transition alerts (`EveryoneOnline`), per-event banner switches, quiet hours, and banner dismissal via hotkey or click (#87).
+- Shared overlay visual style (`OverlayStyle`) for the group box and event toast banners, plus an optional in-game Shopping path-stop card overlay (`PathStopOverlay`, `PathStopPlan`) showing destination, needed items, recipients, pricing, and next stop (#86).
+- Per-member jewellery charge tracking and display (`jc` on member cards) and rich tooltips showing open log basket contents and looting bag contents and value from container ID 516 (#85).
+- RuneLite `in_review` sweep disposition report in `docs/research/in-review-sweep-2026-11-18.md` (#91).
+- Research documentation on celebratory Discord webhook posts for pets and major milestones and a three-layer notable collection-log filter in `docs/research/discord-celebration-posts.md` (#84).
+- Research documentation on wave, rotation, and game-tick split detection for Fight Caves, Inferno, Fortis Colosseum, and staged activities in `docs/research/activity-detection.md` (#83).
+- Feature matrix and gap comparison of GIM Utilities against 22 RuneLite Plugin Hub Group Ironman, shared-bank, and storage plugins in `docs/research/gim-competitor-comparison.md` (#82).
+- Per-member Discord message grouping across all event families (*Group posts (minutes)*, `discordGroupPosts`, default 30 minutes; `EventThreads`, `EditedThreads`, persisted in `grouped-posts.txt`), stacking up to 10 event cards newest-first and netting group storage movements per item (#76).
+- Live wave tracking (`WaveTracker`, `TeamSummary`, new `Activities` tab) for the TzHaar Fight Caves, the Inferno, and the Fortis Colosseum (wave, elapsed time, solo/team context, and Colosseum glory and modifier tiers) across member cards, the `Activities` tab, the in-game group box, and the Discord live board, plus opt-in start, wave-milestone (*Post every N waves*), completion, and death notifications (#74).
+- Bundled OSRS Wiki monster drop rates (`item-drops.txt`) for common non-quest items in the `Shopping` tab (#73).
+- **Path to** and **Path to next** buttons on shopping-list lines and open item requests that route to the nearest reachable shop or group-storage bank via the Shortest Path plugin (`ShortestPathBridge`, `ItemPaths`, `PathSession`, `banks.tsv`) (#72).
+- Member item request lists (*Request: ask the group*, synced via `req` and `rqc`) in the `Shopping` tab with **I'll get it** member claims, automatic completion when group holdings meet the target, owner-only controls, and optional *Request* Discord and banner notifications (#69).
+- Multi-skill per-member Discord level-up grouping (one message per member with an embed card per skill, including broadcast level-ups and combat levels for members without the plugin, defaulting *Combine level-ups* to 60 minutes on new installs) (#68).
+- Single-poster Discord relaying for members without the plugin by parsing in-game Ironman Group channel broadcasts (`ChatMessageType.CLAN_GIM_MESSAGE` in `GroupBroadcasts`) with 24-hour per-profile deduplication, party `posted` claims, and the *Post events for members without the plugin* group setting (#66).
+- `Shopping` tab with group-synchronized shopping lists (`shop` and `qstate`), nine 1 Defence pure quest-milestone presets generated from Quest Path data (`scripts/gen-quest-items.py`, `quest-items.json`), custom lists, live group-holding subtraction, reachable shop and drop sources, and an opt-in proximity *Shopping: shop alert* (#65).
+- Verified item counts on carried log basket, fish barrel, and coal bag inventory slots (`ContainerContents`, synced via `cc` and searchable in `Find` and `::find` when all items inside are known), empty worn-equipment slot silhouettes (`SpriteID.EQUIPMENT_SLOT_*`), and local member-card rendering before joining group sync (#64).
+- Opt-in level 67 (*"six seven"*) and level 69 (*"nice"*) Easter egg lines and emoji-free in-game banner and group-box tags for skill and combat level-ups (#61).
+- Daily live-board reposting (*Repost board daily*, `discordRepostBoard`, on by default) that posts a fresh status board at the bottom of the Discord channel after midnight and deletes the previous day's message once the new message ID is saved (#59).
+- Headless Swing UI test driver and RuneLite `ConfigPanel` test harness (`SwingDriver`, `ConfigPanelHarness`, `GimPanelUiTest`, `GimConfigPanelUiTest`, `docs/testing-ui.md`, `scripts/add-ui-driver.sh`) plus `./gradlew screenshots` (`ReadmeShots`) for deterministic README screenshot rendering (#55).
+- Safe computer-use test rig boundary and five-slice build plan in `docs/plans/computer-use-rig.md` (#54).
+- JSON-driven fake game-event scenario testing harness (`src/test/java/com/vinnyvangogh/scenarios`, `GimScenarioRig`, `GimScenariosTest`, developer-only `ScenariosPlugin` sidebar, `TESTING.md`, and `scripts/add-test-harness.sh`) (#53).
+- Compliance review, wire/UI design, and four-slice implementation plan for live bossing and minigame activity tracking in `docs/plans/activities.md` (#52).
+- Real 28-slot inventory layout (`is` field in `carried` messages, preserving empty slots, stack positions, and noted item appearances while keeping canonical counts for search and totals) and online-first member card ordering in the `Group` tab (#51).
+- Leader-signed Discord webhook sharing (`GroupWebhooks`, party kind `gweb`) allowing the group leader to share all seven webhooks and poster names with members without exposing URLs in member configs or UI (#48).
+- One-click *"Share with your group?"* onboarding card (`SharingPrompt`) after saving a group key (#47).
+- Collapsible member bank cards (`BankFolds`) with **Collapse all** / **Expand all** controls and automatic filter expansion in the `Banks` tab (#46).
+- Windows 11 Smart App Control PowerShell download workaround in `SETUP.md` (#44).
+- `Settings` panel tab with ECDSA-signed group leadership and editor roles (`GroupGovernance`, `GovernanceSync`), group-synchronized thresholds and event switches with version history, per-member posting and banner opt-outs with a read-only *"Who posts what"* grid, and *Post every N levels* (`eventLevelEvery`) (#42).
+- Seven independently configurable Discord webhooks (*Main*, *Online status*, *Drops & loot*, *Progress*, *Deaths & danger*, *Group storage*, *Daily digest*), each with its own poster-name mode, RuneScape-themed default persona, and isolated rate-limited send queue (`Webhooks`) (#41).
+- One-time first-install welcome lines and per-version update notes in the game chat (`UpdateNotes`), controlled by *Show update notes* (`showUpdateNotes` in *Advanced*) (#39).
+- Retaken README screenshots for *Discord: connection* and *Thresholds and Advanced* settings (`docs/images/settings-discord-connection.png`, `docs/images/settings-thresholds-advanced.png`) (#37).
+- Source-verified RuneScape meme Easter egg research documentation in `docs/research/runescape-easter-eggs.md` (#35).
+- Cached, rate-limited OSRS hiscore skill level lookups (`HiscoreBook`, via RuneLite's `HiscoreClient.lookupAsync`, max once per 6 hours with exponential retry backoff) and dimmed assumed Run/Spec orbs for group members without the plugin (#34).
+- Fifteen curated RuneScape community meme Easter egg triggers (level 73, level 92, skill 99, max total, combat 126, 2000 total, 200M XP, Cook's Assistant, Dragon Slayer I, Recipe for Disaster, TzTok-Jad death, dry streak, gold ring deposit, pet, and 0 gp death) in `EasterEggs` (#33).
+- Durable last-seen timestamps and worlds (`LastSeen`, persisted under `seen` in `group-cache.json`) for offline members on the Discord live board, plus a staleness footer when no plugin user is online (#32).
+- Online status and world detection for group members without the plugin from the in-game Ironman Group channel (`ClanID.GROUP_IRONMAN`) with Friends list fallback (`GamePresence`), displayed across the live board, Group overlay, sidebar cards, and single-poster login/logout posts (`ChannelPosts`) (#30).
+- Design and phased build plan for an optional GIM Utilities sync server in `docs/plans/gim-server.md` (#28).
+- Per-webhook poster name choices (*Webhook's own*, *Default name*, *Custom*), editable Discord *Live board* online-status mode (`StatusBoard`), and an expanded sidebar `Log` tab recording all group events across restarts (`feed` in `group-cache.json`, up to 2,000 events / 30 days) with search and category/member/time filters (#27).
+- Research documentation on OSRS group game modes, bingo plugins, and content formats in `docs/research/game-modes-and-channel-2026-11.md` (#25).
+- In-place Discord message editing (`LevelThreads`, `LevelPosts`, `?wait=true` + `PATCH /messages/{id}`) to combine consecutive level-ups in the same skill within a configurable window (*Combine level-ups*, `discordCombineLevels`) into a single message (#23).
+- *Grave picture* setting (*Where I died*, *Current view*, *None*) and `GraveShot` frame holder so *"Gravestone expiring"* Discord warnings reuse the death-moment screenshot and list the top items left in the grave (#20).
+- Additive daily Discord digests alongside instant posts, game-chat warnings for invalid webhook URLs, single-post merging (`DiscordMerge`) for same-moment storage visits, drops, level-ups, and deaths, and optional Discord Easter egg lines (`EasterEggs`, `EasterEggLines`) with configurable Legend and Freeloader GP thresholds (#16).
+- Game-style quantity and GP formatting (`Amounts` wrapping `QuantityFormatter.quantityToStackSize`, with exact numbers in panel tooltips and Discord posts) and stack-size coin pile icons (`StackIcons`) in `Find` rows and Discord thumbnails (#15).
+- Configurable *Offline grace* (`discordOfflineGrace`, 0–10 minutes, default 2), world-hop suppression, 10-minute online/offline pair throttling, and pending-logout restart recovery (`PresenceDebounce`) (#11).
+- Opt-in `GU_BUILD_ONLY=1` build-only mode in `tools/windows/Run-GimUtilities.cmd` and the `.github/workflows/windows-launcher.yml` end-to-end CI workflow on `windows-latest` (#10).
+- StayPoint test suite definition (`.staypoint/test.toml`) requiring the Gradle `test` task (#8).
+- Sixteen opt-in medium group event types (raid uniques, clue rewards, dry streaks, death value lost, gravestone expiring warnings, Hardcore group life lost, Wilderness/skulled alerts, diary tiers, combat tasks, kill count milestones, personal bests, weekly recaps, daily category digests, Slayer tasks, farming runs, and bird house / Hespori timers) (#7).
+- Nine privacy-redacted feature screenshots (`docs/images/*.png`) in `README.md` (#6).
+- Group events engine part A (`GroupEvent`, `EventRouter`, `DiscordWebhook`, `DiscordQueue`, `DiscordSender`, `EventToastOverlay`, `GroupBoxOverlay`) covering 20 opt-in event types routed to rate-limited Discord webhooks and in-game banners / group box overlay (#4).
+- Standalone RuneLite Party group sync via a 128-bit random group key (`PartyService` / `PartyDataService`) and in-game `ClanID.GROUP_IRONMAN` roster allow-list, last-seen group storage snapshot and save-diff log, unified `Find` tab and `::find` item search with shorthands and custom colours, and a five-tab sidebar panel (`Group`, `Banks`, `Storage`, `Find`, `Log`) with offline member persistence (#3).
+- Windows double-click test launcher (`tools/windows/Run-GimUtilities.cmd`) with SHA-256-pinned Eclipse Temurin JDK 11 bootstrap and PowerShell checksum tests (`tools/windows/tests/Checksum.Tests.ps1`) (#2).
+- Split GIM Utilities out of Build Guard as a standalone plugin (`com.vinnyvangogh.groupironman`, `@ConfigGroup("gimutilities")`, party message `VvgGroupIronmanMessage`, cache directory `gim-utilities`) with all sharing features and `::find` disabled by default (#1).
+
+### Changed
+
+- Updated the Windows launcher, `SETUP.md`, and CI validation workflow across test release tags `gim-test-2` (#43), `gim-test-3` (#50), `gim-test-4` (#62), `gim-test-5` (#70), `gim-test-6` (#77), and `gim-test-7` (#80).
+- Reduced plugin source token count below the Plugin Hub's 200,000-token auto-review limit (~204k to ~198k) by extracting shared UI builders (`Ui.java`), moving Easter egg lines and item aliases to resource files (`easter-eggs.txt`, `item-aliases.txt`), shortening config tooltips, folding repeated cache/codec helpers, and adding `tools/tokens.py` (#79).
+- Folded shopping lists and requests by default with progress bars and item previews (`ShopFolds`), and compacted item rows with expandable ownership, source, quest, and tradeability details (#73).
+- Configured development builds in `build.gradle` to track `latest.release` from `repo.runelite.net` with zero dynamic-version cache TTL and print the resolved RuneLite client version (`printRuneLiteVersion`), while still supporting `-PruneLiteVersion=...` pinning (#58).
+- Bumped the baseline RuneLite build target from `1.13.5` to `1.13.6` so the developer client loads current Plugin Hub plugins (#56).
+- Set all configuration sections except *Group* to start collapsed by default (`closedByDefault = true`) (#38).
+- Regrouped the RuneLite configuration panel from 12 sections into 8 ordered sections (*Group*, *Discord: connection*, *Discord: what to post*, *Discord: how to post*, *Discord: daily digest*, *In-game*, *Thresholds*, *Advanced*) without changing any published `keyName` (`ConfigLayoutTest`) (#29).
+- Merged the historical living-docs branch into `main` to align the documentation baseline (#93).
+
+### Fixed
+
+- Prevented `Banks` and `Storage` tab flicker and dropped game clicks during member syncs by building tab models off the Swing EDT on `ScheduledExecutorService`, coalescing redraws to at most once per second (`RedrawCoalescer`), skipping unchanged models, updating item cells and cards in place (`ItemGridView`, `BanksTabView`, `StorageTabView`), and ignoring stale-timestamp bank snapshots (#81, #90).
+- Reset captured boss personal bests (`PbCapture`) on logout so personal bests from different accounts on the same client are never mixed (#89).
+- Prevented duplicate banners when the same event arrives from multiple sources while keeping distinct drops that land on the same millisecond tick (`AlertDedup`) (#87).
+- Assigned the Shopping path-stop card overlay setting a unique `@ConfigItem` position in `inGameSection`, defaulted it to off, and used `net.runelite.api.Point` for overlay text rendering (#86).
+- Canonicalized noted and placeholder item IDs via `ItemManager#canonicalize` when resolving display names and formatted held-item quantities with `Amounts` in container tooltips (#85).
+- Calculated Discord group storage post `Value` fields (`DiscordMerge.visit`, `EventPosts.net`) as net value (`deposited minus taken`, showing both sides when items move both ways) instead of summing deposits and withdrawals together (#78).
+- Prevented account switches, world hops, reconnects, and non-group logins from posting old achievements as new (`LoginGate` re-baselining on out-of-game states and account-hash/profile changes with a 9-second settle window, `LoginBurst` dropping first-minute achievement backlogs > 3, and `GroupMembers` suppressing all posts, logs, and sync for accounts outside the bound group) (#75).
+- Measured Shopping tab HTML label heights at exact container pixel widths (`ShopCards.Wrap`) so text no longer clips at the panel's right edge (#73).
+- Persisted full carried-item slot data (`is` and `cc`) in `group-cache.json` so noted stacks in member inventories keep their noted icons after a client restart, lightened empty worn-slot silhouettes and cell backgrounds for contrast, and skipped caching null sprites (#71).
+- Persisted active level-up streaks keyed by webhook ID to `plugin-data/gim-utilities/level-streaks.txt` so subsequent level-ups within the combine window continue editing the same Discord message across client restarts (#67).
+- Prevented duplicate `"Group status"` live boards across rapid client restarts by persisting webhook-ID-keyed board state immediately to `plugin-data/gim-utilities/status-board.txt` (`PluginFiles`), waiting 20 seconds after login for group roles and shared webhooks to settle, and deleting replaced board messages (#63).
+- Committed and posted group storage changes in `StorageSession` only when the game actually saves (via the Save button or the `"Saving..."` loading modal, with a truth-check reconciliation on the next open) rather than when closing the window with unsaved changes (#60).
+- Added the Wilderness Slayer Cave (`13470`, `13726`) and a RuneLite-derived supplemental region table (`regions-generated.txt` via `tools/regions/gen_regions.py`), and replaced raw `"region N"` fallbacks in `RegionNames.describe` with human-readable descriptions (*Wilderness lvl A-B*, *near X*, *under X*, *Underground*, *Instance*, *Unmapped area*) (#57).
+- Kept the GIM Utilities sidebar panel button visible whenever the plugin is enabled (`SidebarButton`), showing an *"Everything is off. Turn on what you want to share."* notice and settings shortcut when all switches are disabled (#49).
+- Kept local group storage visits visible in the `Storage` and `Log` tabs with a `*(not shared: Share group storage changes is off)*` marker when storage sharing is disabled (#47).
+- Preserved unsaved leader/editor group-settings drafts (`SettingsDraft`) and uncommitted `JSpinner` text across redraws triggered by other members' presence or preference updates, with version-conflict notices and explicit `SaveResult` feedback (#45).
+- Showed the first-install welcome message in `UpdateNotes` on any fresh profile's first login, even when the plugin was enabled at the login screen before logging in (#40).
+- Shortened truncated setting display names and dropdown choices to fit RuneLite's config panel width, formatted GP threshold spinners as plain digits (`1000000`) so 7-digit values fit in 6 columns, and added font-metrics layout assertions (`ConfigFitTest`) (#36, #38).
+- Delayed level-up Discord screenshots (`LevelShot`) up to 2 seconds (3-second cap across rapid levels) until the in-game level-up chat confirmation line renders (#31).
+- Fixed Slayer task completion and dialogue assignment detection (`SlayerMessage`), pre-action level tracking (`GroupEvent.previous`) for multi-level single-action jumps, 3-edit failure caps, and queue-drop recovery (#27).
+- Migrated on-disk group cache persistence to RuneLite's Filepath API (`getPluginDirectory()` / `net.runelite.client.util.Filepath`) with `internalName = "gim-utilities"` and `legacyDataDirectory = "gim-utilities"` on `@PluginDescriptor` (#26).
+- Preserved existing webhook query parameters (`thread_id`) when building Discord `?wait=true` and `/messages/<id>` URLs, logged 2xx replies missing a message ID, added `FakeDiscordTest` over real `OkHttpClient` calls, and added Wilderness region names to `regions.txt` (#24).
+- Suppressed *"Gravestone expiring"* Discord and overlay warnings when nothing left inventory/equipment or no gravestone was spawned (`GRAVESTONE_VISIBLE`) (#20).
+- Triggered the Freeloader group-storage Easter egg at the exact configured GP threshold (`took >= freeloaderAt`, matching Legend) and added four deterministic rotating phrasings each for Legend and Freeloader (#17).
+- Suppressed `"lost about 0 gp"` death loss lines unless an Easter egg applies (#16).
+- Fixed offline Discord embeds showing `"You: Online"` instead of the player's login name and `"Offline"` (#11).
+- Cleared `PSModulePath` before starting Windows PowerShell 5.1 in `tools/windows/Run-GimUtilities.cmd` so invoking the launcher from PowerShell 7 does not break `Get-FileHash` (#10).
+- Preserved held daily digest lines when no webhook is set and held dry-streak alerts for 10 seconds so unique drops arriving in either message order cancel the call-out (#7).
+- Resolved item equipment slots on the client thread so the `Group` tab never renders blank, custom-painted the member-card collapse arrow, prevented panel text and `Leave` button clipping, and updated `::find` wording to `"equipped"` (#3).
+- Bumped `runeLiteVersion` from `1.12.39` to `1.13.5` to fix `./gradlew run` exiting with code 255 after startup (#1).
+
+### Removed
+
+- Build Guard build rules, attack-style XP warnings, party build-rule/at-risk/gear-name sharing, and the quest/lamp classifier engine (`QuestGraph`, `QuestClassifier`, `Lamp*`, `XpTable`) when splitting GIM Utilities into its own repository (#1).
+- Retired the standalone *Activities* Discord webhook (`discordActivitiesUrl` and `discordNameActivities` kept hidden for config compatibility), routing Barrows chests to *Drops & loot* and clues, kill counts, personal bests, Slayer, farming, and birdhouses to *Main* (#41).
