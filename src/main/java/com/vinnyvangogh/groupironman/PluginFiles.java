@@ -1,10 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
+import com.google.common.base.Charsets;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.StandardCopyOption;
 import net.runelite.client.util.Filepath;
 
 /**
@@ -27,7 +26,7 @@ final class PluginFiles
 		}
 		try (InputStream in = file.openInputStream())
 		{
-			return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+			return new String(in.readAllBytes(), Charsets.UTF_8);
 		}
 	}
 
@@ -41,9 +40,10 @@ final class PluginFiles
 		{
 			try (OutputStream out = tmp.openOutputStream())
 			{
-				out.write(text.getBytes(StandardCharsets.UTF_8));
+				out.write(text.getBytes(Charsets.UTF_8));
 			}
-			tmp.moveTo(file, StandardCopyOption.REPLACE_EXISTING);
+			file.deleteIfExists();
+			tmp.moveTo(file);
 		}
 		finally
 		{
