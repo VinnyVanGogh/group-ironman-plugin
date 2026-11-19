@@ -79,7 +79,8 @@ Every event switch is off by default:
 - **Thresholds**: when something counts. *Valuable drop (gp)* (1M gp,
   per item stack), *Big storage (gp)* (1M gp), *Level ups from level*
   (1), *Back after (days)* (7), and *Untradeables to ignore* (clue scrolls,
-  keys, totems and the like, by name).
+  scroll boxes and the looting bag by default, by name; keys, totems and
+  shards are announced).
 - **Discord: connection** and **Discord: how to post**: *Post to Discord* (shows RuneLite's third-party
   warning), the *Main webhook* (must be
   `https://discord.com/api/webhooks/...`; a password field), six optional
