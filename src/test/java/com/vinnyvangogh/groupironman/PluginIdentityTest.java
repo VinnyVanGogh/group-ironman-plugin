@@ -102,13 +102,14 @@ public class PluginIdentityTest
 		// Live activities Slice A adds four kinds (start, wave, completion, death): eight more switches, all off.
 		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1
 			+ 1 + 1 + 1 + 1 + 1, switches);
+		// "Add picked-up screenshot" (Discord, Board 2026-11-18) is one more switch, off.
 		// "Group box icons" (In-game, Board 2026-11-18) is on by default: it only picks pictures for the box's
 		// event lines, and the box itself stays off.
 		// "Path stop card" (In-game) is off: the on-screen card while pathing from Shopping.
 		// Group announcements (Board 2026-11-18) add two kinds (Announcement, Everyone online), so four switches.
 		// "Banner: Announcement" is on by default: a note a member typed for the group, shown like any banner; the
 		// login alert ("Banner: Online") and "Banner: Everyone online" stay off.
-		assertEquals(112, switches);
+		assertEquals(113, switches);
 		List<String> expectedOn = Arrays.asList("discordNoPluginEvents", "discordRepostBoard", "groupSync",
 			"overlayAnnouncement", "overlayGroupBoxIcons", "showUpdateNotes");
 		Collections.sort(on);

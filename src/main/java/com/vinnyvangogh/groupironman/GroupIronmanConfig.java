@@ -763,7 +763,26 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = "discordGravestoneScreenshot", name = "Grave picture",
+	@ConfigItem(keyName = "discordPickupShot", name = "Add picked-up screenshot",
+		description = "Your drop posts get a second screenshot once you pick the drop up, so the inventory shows it."
+			+ " The post goes on its own, not in a grouped message. Needs 'Attach a screenshot'.",
+		section = discordHowSection, position = 16)
+	default boolean discordPickupShot()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordPickupMinutes", name = "Picked-up wait (minutes)",
+		description = "How long after a drop posts a pickup still adds the second screenshot.",
+		section = discordHowSection, position = 17)
+	@Range(min = 1, max = 30)
+	@Units(Units.MINUTES)
+	default int discordPickupMinutes()
+	{
+		return 5;
+	}
+
+	@ConfigItem(keyName = "discordGravestoneScreenshot",name = "Grave picture",
 		description = "For gravestone posts: where you died, where you stand, or none. Needs 'Attach a screenshot'.",
 		section = discordHowSection, position = 5)
 	default GraveScreenshot discordGravestoneScreenshot()

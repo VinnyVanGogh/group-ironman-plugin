@@ -28,6 +28,8 @@ final class DiscordWebhook
 		+ " verified by RuneLite developers";
 	static final String USERNAME = "GIM Utilities";
 	static final String SCREENSHOT = "screenshot.png";
+	/** The second picture of a drop's post: the inventory once it was picked up. */
+	static final String PICKUP = "pickup.png";
 	/** Discord refuses {@code content} over 2,000 characters; lines past this wait out the day and are dropped. */
 	static final int MAX_DIGEST = 1_900;
 	private static final String ICON = "https://static.runelite.net/cache/item/icon/%d.png";
@@ -256,6 +258,61 @@ final class DiscordWebhook
 	{
 		return asEdit(gson, gson.fromJson(levels(gson, member, cards, style, screenshot, null), JsonObject.class),
 			screenshot);
+	}
+
+	/**
+	 * A drop post's body ({@code json}, with its screenshot) as the edit that adds the picked-up screenshot: a last
+	 * embed "Picked up" showing {@link #PICKUP}, and an {@code attachments} list naming both uploads (the edit sends
+	 * both files again, so ids 0 and 1 are the new ones). Plain posts have no embeds, so they get that one embed
+	 * alone. Null when {@code json} is unreadable.
+	 */
+	static String pickupEdit(Gson gson, String json)
+	{
+		JsonObject o;
+		try
+		{
+			o = gson.fromJson(json, JsonObject.class);
+		}
+		catch (com.google.gson.JsonParseException e)
+		{
+			return null;
+		}
+		if (o == null)
+		{
+			return null;
+		}
+		JsonArray embeds = o.has("embeds") && o.get("embeds").isJsonArray() ? o.getAsJsonArray("embeds")
+			: new JsonArray();
+		if (embeds.size() == 0 && o.has("content"))
+		{
+			// Plain style: the screenshot has no embed to sit in, so it gets one of its own.
+			JsonObject first = new JsonObject();
+			JsonObject firstImage = new JsonObject();
+			firstImage.addProperty("url", "attachment://" + SCREENSHOT);
+			first.add("image", firstImage);
+			embeds.add(first);
+		}
+		JsonObject card = new JsonObject();
+		card.addProperty("title", "Picked up");
+		JsonObject image = new JsonObject();
+		image.addProperty("url", "attachment://" + PICKUP);
+		card.add("image", image);
+		embeds.add(card);
+		o.add("embeds", embeds);
+		JsonArray attachments = new JsonArray();
+		attachments.add(upload(0, SCREENSHOT));
+		attachments.add(upload(1, PICKUP));
+		o.add("attachments", attachments);
+		o.remove("username");
+		return gson.toJson(o);
+	}
+
+	private static JsonObject upload(int id, String filename)
+	{
+		JsonObject upload = new JsonObject();
+		upload.addProperty("id", id);
+		upload.addProperty("filename", filename);
+		return upload;
 	}
 
 	/**

@@ -109,6 +109,15 @@ final class DiscordSender
 		}
 	}
 
+	/** An edit of {@code messageId} that uploads {@code first} and {@code second} (a drop's picked-up screenshot). */
+	void edit(String url, String messageId, String json, byte[] first, byte[] second, DiscordQueue.Result result)
+	{
+		if (url != null && json != null && messageId != null)
+		{
+			offer(new DiscordQueue.Post(url, json, first, second, messageId, result));
+		}
+	}
+
 	/**
 	 * Queues deleting {@code messageId}, sent by {@code url}'s webhook (Discord "Delete Webhook Message",
 	 * {@code DELETE /webhooks/{id}/{token}/messages/{message.id}}: "Deletes a message that was created by the
@@ -249,10 +258,14 @@ final class DiscordSender
 		}
 		else
 		{
-			body = new MultipartBody.Builder().setType(MultipartBody.FORM)
+			MultipartBody.Builder form = new MultipartBody.Builder().setType(MultipartBody.FORM)
 				.addFormDataPart("payload_json", post.json)
-				.addFormDataPart("files[0]", DiscordWebhook.SCREENSHOT, RequestBody.create(PNG, post.png))
-				.build();
+				.addFormDataPart("files[0]", DiscordWebhook.SCREENSHOT, RequestBody.create(PNG, post.png));
+			if (post.second != null)
+			{
+				form.addFormDataPart("files[1]", DiscordWebhook.PICKUP, RequestBody.create(PNG, post.second));
+			}
+			body = form.build();
 		}
 		return (post.edit == null ? builder.post(body) : builder.patch(body)).build();
 	}
