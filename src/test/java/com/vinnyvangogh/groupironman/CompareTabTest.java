@@ -27,23 +27,25 @@ public class CompareTabTest
 		b.put("Attack", 70);
 		List<String> lines = CompareTab.playerLines(GroupCompare.players(
 			fig("GIM1", -1, a, Collections.singletonMap("Zulrah", 70.0)),
-			fig("GIM2", 100, b, Collections.singletonMap("Zulrah", 65.0))), "GIM1", "GIM2");
+			fig("GIM2", 100, b, Collections.singletonMap("Zulrah", 65.0))), "GIM1", "GIM2", false);
 		assertTrue(lines.contains("Magic 50 / 60  GIM2"));
 		assertTrue("an unshared level is unknown, not a loss", lines.contains("Attack ? / 70"));
 		assertTrue(lines.contains("Zulrah 1:10.0 / 1:05.0  GIM2"));
 		assertTrue(lines.contains("Quest points ? / 100"));
+		assertEquals(Collections.singletonList("Zulrah 1:10.0 / 1:05.0  GIM2"), CompareTab.playerLines(
+			GroupCompare.players(fig("GIM1", -1, a, Collections.singletonMap("Zulrah", 70.0)),
+				fig("GIM2", 100, b, Collections.singletonMap("Zulrah", 65.0))), "GIM1", "GIM2", true));
 	}
 
 	@Test
-	public void leaderboardLinesCanBeSortedByBestHolder()
+	public void gapAndHeaderTextNeverSaysWorst()
 	{
-		List<GroupCompare.Leader> leaders = GroupCompare.leaderboard(Arrays.asList(
-			fig("Zed", 10, Collections.singletonMap("Magic", 90), null),
-			fig("Amy", 20, Collections.singletonMap("Magic", 50), null)));
-		List<String> byName = CompareTab.leaderboardLines(leaders, "Name");
-		assertTrue(byName.contains("Magic: best Zed, worst Amy"));
-		List<String> byBest = CompareTab.leaderboardLines(leaders, "Best");
-		assertEquals(leaders.size(), byBest.size());
+		assertEquals("Magic 70 vs 85: 15 behind Member 2", CompareTab.gapText(new SkillBoard.Gap("Magic", 70, 85),
+			"Member 2"));
+		assertEquals("Magic 90 vs 85: 5 ahead of Member 2", CompareTab.gapText(new SkillBoard.Gap("Magic", 90, 85),
+			"Member 2"));
+		assertEquals("Magic 85 vs 85: tied", CompareTab.gapText(new SkillBoard.Gap("Magic", 85, 85), "Member 2"));
+		assertEquals("you: not shared yet", CompareTab.youHeader(null, 0));
 	}
 
 	@Test

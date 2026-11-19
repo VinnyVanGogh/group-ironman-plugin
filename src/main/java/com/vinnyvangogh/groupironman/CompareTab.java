@@ -5,7 +5,6 @@ import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -30,6 +29,9 @@ import net.runelite.client.ui.FontManager;
 final class CompareTab
 {
 	private static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR;
+	private static final Color ACCENT = ColorScheme.BRAND_ORANGE;
+	private static final Color BEHIND = new Color(0xE0, 0x80, 0x60);
+	private static final Color AHEAD = new Color(0x70, 0xC0, 0x70);
 	/** A GIM group has at most five members; more names than this typed in is a mistake, not a group. */
 	static final int MAX_OTHER_NAMES = 5;
 
@@ -67,12 +69,14 @@ final class CompareTab
 	private final JPanel root = new GroupIronmanPanel.Column();
 	private final javax.swing.ButtonGroup bar = new javax.swing.ButtonGroup();
 	private final JPanel results = new GroupIronmanPanel.Column();
-	private final JComboBox<String> memberA = new JComboBox<>();
+	private final JComboBox<String> statBox = new JComboBox<>(SkillBoard.STATS.toArray(new String[0]));
+	private final Map<String, javax.swing.JToggleButton> modeButtons = new java.util.HashMap<>();
+	private boolean selectingStat;
+	private SkillBoard.Filter filter = SkillBoard.Filter.BEHIND;
 	private final JComboBox<String> memberB = new JComboBox<>();
 	private final JTextField other = new JTextField();
 	private final JTextField item = new JTextField();
-	private String mode = "Players";
-	private String sort = "Name";
+	private String mode = "Compare";
 	private boolean built;
 	private View view;
 	private List<String> lastNames = new ArrayList<>();
@@ -102,7 +106,7 @@ final class CompareTab
 	{
 		JPanel modes = new JPanel(new GridLayout(0, 2, 2, 2));
 		modes.setBorder(new EmptyBorder(0, 0, 6, 0));
-		for (String m : Arrays.asList("Players", "Leaderboard", "Group", "Item"))
+		for (String m : Arrays.asList("Compare", "Leaderboard", "Group", "Item"))
 		{
 			javax.swing.JToggleButton b = Ui.toggle(m, m.equals(mode), 2);
 			b.addActionListener(e ->
@@ -111,10 +115,20 @@ final class CompareTab
 				showResults();
 			});
 			modes.add(b);
+			modeButtons.put(m, b);
 			bar.add(b);
 		}
 		root.add(modes);
 		root.add(results);
+		statBox.setFont(FontManager.getRunescapeSmallFont());
+		statBox.setMaximumRowCount(14);
+		statBox.addActionListener(e ->
+		{
+			if (!selectingStat)
+			{
+				showResults();
+			}
+		});
 	}
 
 	private void fillMembers(View v)
@@ -126,23 +140,12 @@ final class CompareTab
 			return;
 		}
 		lastNames = names;
-		Object a = memberA.getSelectedItem();
 		Object b = memberB.getSelectedItem();
-		memberA.removeAllItems();
 		memberB.removeAllItems();
-		names.forEach(n ->
-		{
-			memberA.addItem(n);
-			memberB.addItem(n);
-		});
-		memberA.setSelectedItem(a != null && names.contains(a) ? a : v.self);
-		if (b != null && names.contains(b))
+		names.stream().filter(n -> !n.equals(v.self)).forEach(memberB::addItem);
+		if (b != null && names.contains(b) && !b.equals(v.self))
 		{
 			memberB.setSelectedItem(b);
-		}
-		else if (names.size() > 1)
-		{
-			memberB.setSelectedIndex(names.get(0).equals(memberA.getSelectedItem()) ? 1 : 0);
 		}
 	}
 
@@ -180,20 +183,76 @@ final class CompareTab
 
 	private void players(View v)
 	{
-		results.add(Ui.wide(memberA));
 		results.add(Ui.wide(memberB));
-		results.add(Ui.button("Compare", "Side by side, skill by skill and boss by boss", this::showResults));
-		GroupCompare.Figures a = figures(v, (String) memberA.getSelectedItem());
-		GroupCompare.Figures b = figures(v, (String) memberB.getSelectedItem());
-		if (a == null || b == null)
+		JPanel filters = new JPanel(new GridLayout(1, SkillBoard.Filter.values().length, 2, 2));
+		javax.swing.ButtonGroup group = new javax.swing.ButtonGroup();
+		for (SkillBoard.Filter f : SkillBoard.Filter.values())
 		{
+			javax.swing.JToggleButton b = Ui.toggle(f.label, f == filter, 2);
+			b.addActionListener(e ->
+			{
+				filter = f;
+				showResults();
+			});
+			group.add(b);
+			filters.add(b);
+		}
+		results.add(filters);
+		GroupCompare.Figures me = figures(v, v.self);
+		GroupCompare.Figures them = figures(v, (String) memberB.getSelectedItem());
+		if (me == null || them == null)
+		{
+			results.add(line("Nothing to compare yet: your stats or the other member's have not been shared.",
+				MUTED));
 			return;
 		}
-		results.add(line(a.name + " vs " + b.name, Color.WHITE));
-		for (String s : playerLines(GroupCompare.players(a, b), a.name, b.name))
+		results.add(line("Biggest gap first. Tap a row to see it on the Leaderboard.", MUTED));
+		List<SkillBoard.Gap> gaps = SkillBoard.compare(me, them, filter);
+		if (gaps.isEmpty())
+		{
+			results.add(line("Nothing here.", MUTED));
+		}
+		for (SkillBoard.Gap g : gaps)
+		{
+			JLabel row = line(gapText(g, them.name), g.delta < 0 ? BEHIND : g.delta > 0 ? AHEAD : Color.WHITE);
+			row.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+			row.addMouseListener(new java.awt.event.MouseAdapter()
+			{
+				@Override
+				public void mouseClicked(java.awt.event.MouseEvent e)
+				{
+					openOnLeaderboard(g.stat);
+				}
+			});
+			results.add(row);
+		}
+		for (String s : playerLines(GroupCompare.players(me, them), me.name, them.name, true))
 		{
 			results.add(line(s, Color.WHITE));
 		}
+	}
+
+	/** "Magic 70 vs 85: 15 behind Member 2". */
+	static String gapText(SkillBoard.Gap g, String other)
+	{
+		String tail = g.delta < 0 ? -g.delta + " behind " + other : g.delta > 0 ? g.delta + " ahead of " + other
+			: "tied";
+		return g.stat + " " + g.mine + " vs " + g.theirs + ": " + tail;
+	}
+
+	private void openOnLeaderboard(String stat)
+	{
+		selectStat(stat);
+		mode = "Leaderboard";
+		modeButtons.get(mode).setSelected(true);
+		showResults();
+	}
+
+	private void selectStat(String stat)
+	{
+		selectingStat = true;
+		statBox.setSelectedItem(stat);
+		selectingStat = false;
 	}
 
 	private static GroupCompare.Figures figures(View v, String name)
@@ -209,12 +268,12 @@ final class CompareTab
 	}
 
 	/** One line per stat both or either shared: "Magic 50 / 60  GIM2", or "?" for a figure nobody shared. */
-	static List<String> playerLines(List<GroupCompare.Row> rows, String a, String b)
+	static List<String> playerLines(List<GroupCompare.Row> rows, String a, String b, boolean bossesOnly)
 	{
 		List<String> out = new ArrayList<>();
 		for (GroupCompare.Row r : rows)
 		{
-			if (r.a == null && r.b == null)
+			if (r.a == null && r.b == null || bossesOnly && r.category != GroupCompare.Category.BOSS)
 			{
 				continue;
 			}
@@ -238,43 +297,66 @@ final class CompareTab
 
 	private void leaderboard(View v)
 	{
-		JPanel sorts = new JPanel(new GridLayout(1, 3, 2, 2));
-		for (String s : Arrays.asList("Name", "Best", "Worst"))
+		JPanel arrows = new JPanel(new java.awt.BorderLayout(2, 0));
+		arrows.add(Ui.button("<", "Previous skill", () -> stepStat(-1)), java.awt.BorderLayout.WEST);
+		arrows.add(statBox, java.awt.BorderLayout.CENTER);
+		arrows.add(Ui.button(">", "Next skill", () -> stepStat(1)), java.awt.BorderLayout.EAST);
+		results.add(arrows);
+		String stat = (String) statBox.getSelectedItem();
+		List<SkillBoard.Entry> ranked = SkillBoard.rank(v.figures, stat);
+		results.add(line(youHeader(SkillBoard.entry(ranked, v.self), SkillBoard.rankedCount(ranked)), Color.WHITE));
+		int scale = SkillBoard.scale(stat, ranked);
+		for (SkillBoard.Entry e : ranked)
 		{
-			javax.swing.JToggleButton b = Ui.toggle(s, s.equals(sort), 2);
-			b.addActionListener(e ->
+			boolean self = e.name.equals(v.self);
+			results.add(line((e.rank == 0 ? "-" : "#" + e.rank) + " " + e.name + (self ? " (you)" : "") + "  "
+				+ (e.value == null ? "?" : e.value), self ? ACCENT : Color.WHITE));
+			if (e.value != null)
 			{
-				sort = s;
-				showResults();
-			});
-			sorts.add(b);
-		}
-		results.add(sorts);
-		for (String s : leaderboardLines(GroupCompare.leaderboard(v.figures), sort))
-		{
-			results.add(line(s, Color.WHITE));
+				results.add(new LevelBar(e.value, scale, self));
+			}
+			String hint = SkillBoard.hint(e);
+			if (!hint.isEmpty())
+			{
+				results.add(line(hint, MUTED));
+			}
 		}
 	}
 
-	/** "Magic: best GIM2, worst GIM1", ordered by {@code sort}: "Name" (as built) or by best or worst holder. */
-	static List<String> leaderboardLines(List<GroupCompare.Leader> leaders, String sort)
+	/** "you: #2 of 4", or that you have not shared the stat. */
+	static String youHeader(SkillBoard.Entry mine, int of)
 	{
-		List<GroupCompare.Leader> ordered = new ArrayList<>(leaders);
-		if ("Best".equals(sort))
+		return mine == null || mine.rank == 0 ? "you: not shared yet" : "you: #" + mine.rank + " of " + of;
+	}
+
+	private void stepStat(int steps)
+	{
+		selectStat(SkillBoard.step((String) statBox.getSelectedItem(), steps));
+		showResults();
+	}
+
+	/** A thin horizontal bar, filled to {@code value} out of {@code scale}. */
+	static final class LevelBar extends javax.swing.JComponent
+	{
+		private final double fill;
+		private final boolean self;
+
+		LevelBar(int value, int scale, boolean self)
 		{
-			ordered.sort(Comparator.comparing((GroupCompare.Leader l) -> String.join(",", l.best)));
+			this.fill = Math.max(0, Math.min(1, value / (double) Math.max(1, scale)));
+			this.self = self;
+			setPreferredSize(new java.awt.Dimension(10, 5));
+			setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 5));
 		}
-		else if ("Worst".equals(sort))
+
+		@Override
+		protected void paintComponent(java.awt.Graphics g)
 		{
-			ordered.sort(Comparator.comparing((GroupCompare.Leader l) -> String.join(",", l.worst)));
+			g.setColor(ColorScheme.DARKER_GRAY_COLOR);
+			g.fillRect(0, 0, getWidth(), getHeight());
+			g.setColor(self ? ACCENT : ColorScheme.PROGRESS_COMPLETE_COLOR);
+			g.fillRect(0, 0, (int) Math.round(getWidth() * fill), getHeight());
 		}
-		List<String> out = new ArrayList<>();
-		for (GroupCompare.Leader l : ordered)
-		{
-			String worst = l.worst.isEmpty() ? "all equal" : "worst " + String.join(", ", l.worst);
-			out.add(l.label + ": best " + String.join(", ", l.best) + ", " + worst);
-		}
-		return out;
 	}
 
 	// ---- Group against group ----
