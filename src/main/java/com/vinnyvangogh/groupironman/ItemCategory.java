@@ -15,6 +15,8 @@ enum ItemCategory
 {
 	ALL("All"),
 	RESOURCES("Resources"),
+	FOOD("Food"),
+	POTIONS("Potions"),
 	COMBAT("Combat"),
 	MELEE("Melee"),
 	RANGED("Ranged"),
@@ -30,6 +32,17 @@ enum ItemCategory
 		"(^| )(ore|bar|bars|logs|plank|planks|coal|essence|hide|leather|bones|bone|seed|seeds|feather|feathers|"
 			+ "clay|flax|limestone|sandstone|bowstring|sapling|nest|bird nest)$|^(raw|uncut|grimy|clean) |"
 			+ "^(dragon|green|blue|red|black) dragonhide|(^| )(hide|hard leather|soft leather)( |$)");
+
+	/** Cooked food by name; raw and burnt versions are excluded in {@link #isFood}. */
+	private static final Pattern FOOD_NAME = Pattern.compile(
+		"(^| )(shrimps|anchovies|sardine|herring|trout|salmon|tuna|bass|pike|cod|lobster|swordfish|monkfish|"
+			+ "karambwan|shark|manta ray|sea turtle|anglerfish|dark crab|bread|cake|pie|pizza|stew|cheese|"
+			+ "potato|chocolate bar|chocolate slice|jug of wine|wine|cooked [a-z ]+|meat|chicken|"
+			+ "kebab|bagel|sandwich|tea|curry|wrap|crab meat|cave eel|eel)( |$)");
+
+	/** A potion: a dose in brackets, or named like one. Vials and unfinished potions are not potions to drink. */
+	private static final Pattern POTION_NAME = Pattern.compile(
+		"\\([1-6]\\)$|(^| )(potion|brew|restore|antidote\\+*|antipoison|antifire|serum)( |$)");
 
 	final String label;
 
@@ -47,6 +60,10 @@ enum ItemCategory
 				return true;
 			case RUNES:
 				return isRune(items.name(id));
+			case FOOD:
+				return isFood(id, items);
+			case POTIONS:
+				return isPotion(id, items);
 			case COMBAT:
 				return (items.combatStyles(id) & ItemStyles.COMBAT) != 0;
 			case MELEE:
@@ -64,6 +81,20 @@ enum ItemCategory
 	{
 		String n = name == null ? "" : name.toLowerCase(Locale.ROOT);
 		return n.endsWith(" rune") && RUNE_NAMES.contains(n.substring(0, n.length() - " rune".length()));
+	}
+
+	private static boolean isFood(int id, ItemLookup items)
+	{
+		String name = items.name(id).toLowerCase(Locale.ROOT);
+		return items.combatStyles(id) == 0 && !name.startsWith("raw ") && !name.startsWith("burnt ")
+			&& !name.startsWith("uncooked ") && !name.contains("(unf)") && !POTION_NAME.matcher(name).find()
+			&& FOOD_NAME.matcher(name).find();
+	}
+
+	private static boolean isPotion(int id, ItemLookup items)
+	{
+		String name = items.name(id).toLowerCase(Locale.ROOT);
+		return items.combatStyles(id) == 0 && !name.contains("(unf)") && POTION_NAME.matcher(name).find();
 	}
 
 	private static boolean isResource(int id, ItemLookup items)

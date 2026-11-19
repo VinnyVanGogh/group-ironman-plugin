@@ -71,11 +71,13 @@ public class ActivityPrivacyTest
 		for (GroupEvent.Type t : EnumSet.of(GroupEvent.Type.ACTIVITY_START, GroupEvent.Type.ACTIVITY_WAVE,
 			GroupEvent.Type.ACTIVITY_COMPLETE, GroupEvent.Type.ACTIVITY_DEATH))
 		{
-			assertFalse(t + " to Discord", s.discord.contains(t));
-			assertFalse(t + " as a banner", s.overlay.contains(t));
+			boolean entered = t == GroupEvent.Type.ACTIVITY_START;
+			assertEquals(t + " to Discord", entered, s.discord.contains(t));
+			assertEquals(t + " as a banner", entered, s.overlay.contains(t));
 		}
-		assertEquals(10, defaults.eventWaveEvery());
-		assertEquals(10, new GroupSettingsSchema.Resolved(defaults, null).intValue(GroupSettingsSchema.WAVE_EVERY));
+		assertEquals(0, defaults.eventWaveEvery());
+		assertEquals(0, new GroupSettingsSchema.Resolved(defaults, null).intValue(GroupSettingsSchema.WAVE_EVERY));
+		assertTrue(defaults.activityFightCaves() && defaults.activityInferno() && defaults.activityColosseum());
 	}
 
 	@Test
