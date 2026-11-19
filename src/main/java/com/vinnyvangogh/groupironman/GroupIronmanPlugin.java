@@ -19,6 +19,7 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.MenuAction;
+import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatColorType;
@@ -427,13 +428,27 @@ public class GroupIronmanPlugin extends Plugin
 	private void postUpdateNotes()
 	{
 		final String lastSeen = config.lastSeenVersion();
-		if (!UpdateNotes.needsRecord(lastSeen))
+		final String current = UpdateNotes.current();
+		if (!UpdateNotes.needsRecord(lastSeen, current))
 		{
 			return;
 		}
-		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_LAST_SEEN_VERSION,
-			UpdateNotes.VERSION);
-		final List<String> lines = UpdateNotes.toShow(lastSeen, config.showUpdateNotes());
+		configManager.setConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_LAST_SEEN_VERSION, current);
+		postLines(UpdateNotes.toShow(lastSeen, config.showUpdateNotes(), current));
+	}
+
+	/** {@code ::whatsnew}: the update notes again, whatever the setting. */
+	@Subscribe
+	public void onCommandExecuted(CommandExecuted event)
+	{
+		if ("whatsnew".equalsIgnoreCase(event.getCommand()))
+		{
+			postLines(UpdateNotes.replay());
+		}
+	}
+
+	private void postLines(List<String> lines)
+	{
 		for (int i = 0; i < lines.size(); i++)
 		{
 			final String message = new ChatMessageBuilder()

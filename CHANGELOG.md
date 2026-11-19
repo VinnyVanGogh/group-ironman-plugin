@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- First "what's new" notes, a `::whatsnew` chat command to replay them, and dev builds that show them again whenever the build commit changes (`generateBuildInfo` in `build.gradle`; stored in `lastSeenVersion` as `version+commit`).
 - Short Group box event lines with a skill or item icon and a short time, plus *Group box size*, *Group box icons* and *Group box times* settings (#98).
 - Shopping *Path to* / *Path to next* names the stop's town, lists what the next stop supplies, and re-picks the nearest stop as the player moves (#97).
 - *Above player* banner position for event toasts (#94).

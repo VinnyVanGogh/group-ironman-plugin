@@ -76,12 +76,36 @@ public class UpdateNotesTest
 	}
 
 	@Test
-	public void anUpdateWithNoNotesShowsNothing()
+	public void anUpdateShowsTheTitleThenTheNotes()
 	{
-		// This first release has no notes: an update from an older stored version says nothing.
-		assertTrue(UpdateNotes.NOTES.isEmpty());
-		assertTrue(UpdateNotes.toShow("0.9.0", true).isEmpty());
+		final List<String> shown = UpdateNotes.toShow("0.9.0", true);
+		assertEquals(UpdateNotes.TITLE, shown.get(0));
+		assertEquals(UpdateNotes.NOTES, shown.subList(1, shown.size()));
+		assertEquals(shown, UpdateNotes.replay());
 		assertTrue(UpdateNotes.needsRecord("0.9.0"));
+	}
+
+	@Test
+	public void aDevBuildShowsTheNotesAgainWhenTheCommitChanges()
+	{
+		final String first = UpdateNotes.VERSION + "+abc1234";
+		final String second = UpdateNotes.VERSION + "+def5678";
+		assertFalse(UpdateNotes.needsRecord(first, first));
+		assertTrue(UpdateNotes.needsRecord(first, second));
+		assertEquals(UpdateNotes.replay(), UpdateNotes.toShow(first, true, second));
+		assertTrue(UpdateNotes.toShow(first, false, second).isEmpty());
+		// A fresh dev install still gets the welcome, not the notes.
+		assertEquals(UpdateNotes.WELCOME, UpdateNotes.toShow("", true, second));
+		assertTrue(UpdateNotes.current().startsWith(UpdateNotes.VERSION));
+	}
+
+	@Test
+	public void everyNoteFitsOneChatLine()
+	{
+		for (String note : UpdateNotes.NOTES)
+		{
+			assertTrue(note, note.length() <= 110);
+		}
 	}
 
 	@Test
