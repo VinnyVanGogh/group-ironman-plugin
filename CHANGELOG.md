@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Group box: whole messages, sizes and icons
+
+- Event lines in the on-screen Group box are short: a skill or item icon, the
+  member, a few words and a short time ("now", "8m", "2h", "3d"), so the whole
+  message fits. When a line is still too long only the detail is cut.
+- New In-game settings: **Group box size** (Compact, Small, Medium, Wide,
+  Large; Medium is the old width), **Group box icons** and **Group box times**
+  (Short, Full, Off).
+
 ### Compare, shared boss bests, quests and diaries
 
 - Members' boss personal bests, quest points, quests done and achievement
