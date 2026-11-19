@@ -1399,7 +1399,7 @@ public interface GroupIronmanConfig extends Config
 	}
 
 	@ConfigItem(keyName = "eventBackAfterDays", name = "Back after (days)",
-		description = "Days away that count as 'Back after a break'.", section = thresholdsSection, position = 7)
+		description = "Full 24-hour periods away that count as 'Back after a break'.", section = thresholdsSection, position = 7)
 	@Range(min = 1, max = 365)
 	default int eventBackAfterDays()
 	{
