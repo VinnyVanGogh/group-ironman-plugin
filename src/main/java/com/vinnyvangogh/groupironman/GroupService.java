@@ -219,6 +219,8 @@ class GroupService
 	private volatile Map<String, Integer> ownLevels = Collections.emptyMap();
 	/** Where this player stood on the last tick, for "Path to"; null when logged out. */
 	private volatile WorldPoint here;
+	/** Where the panel last drew from: "Path to next" is nearest-first from here, so it is redrawn when the player has moved well away. */
+	private WorldPoint drawnFrom;
 	// Client thread only.
 	private final ShopVisits shopVisits = new ShopVisits();
 	/** This player's own boss bests, read from their own chat; shared only under "Share group events". */
@@ -1190,9 +1192,11 @@ class GroupService
 		if (client.getGameState() != GameState.LOGGED_IN)
 		{
 			here = null;
+			drawnFrom = null;
 			return;
 		}
 		here = position();
+		redrawIfMoved();
 		long now = System.currentTimeMillis();
 		refreshRoster();
 		if (!member())
@@ -2365,6 +2369,16 @@ class GroupService
 	ShopPresets presets()
 	{
 		return presets;
+	}
+
+	/** Client thread. Redraws the panel once the player is far enough from where it last drew "Path to next". */
+	private void redrawIfMoved()
+	{
+		if (ItemPaths.movedFar(drawnFrom, here))
+		{
+			drawnFrom = here;
+			onChange.run();
+		}
 	}
 
 	/** Where this player stood on the last game tick; null when logged out. Any thread. */

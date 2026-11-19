@@ -314,6 +314,8 @@ final class ShoppingTab
 		if (!tour.isEmpty())
 		{
 			box.add(pathButton(nextLabel(tour), tour.get(0), ItemPaths.Target.next(c.list.id)));
+			box.add(new ShopCards.Wrap("For: " + String.join(", ", PathStopPlan.supplies(c, tour.get(0), paths)),
+				MUTED, ShopCards.CARD_TEXT));
 		}
 		for (String line : warnings(c))
 		{
@@ -351,7 +353,7 @@ final class ShoppingTab
 	/** "Path to next: Harry's Fishing Shop (1 of 3 stops)". */
 	static String nextLabel(List<ItemPaths.Stop> tour)
 	{
-		return "Path to next: " + tour.get(0).name + (tour.size() > 1 ? " (1 of " + tour.size() + " stops)" : "");
+		return "Path to next: " + tour.get(0).where() + (tour.size() > 1 ? " (1 of " + tour.size() + " stops)" : "");
 	}
 
 	private JPanel pathButton(String label, ItemPaths.Stop to, ItemPaths.Target why)
