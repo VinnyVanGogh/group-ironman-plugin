@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Member cards show whether a member's prayer is switched on (gold ring on the Prayer orb), and poison, venom and disease chips. Poison time left is estimated from the poison varp's remaining hits (18 s each); venom and disease show the state only because the game exposes no duration. Shared with the existing stats switch; older senders show nothing (RUNELITE-229).
 - Short Group box event lines with a skill or item icon and a short time, plus *Group box size*, *Group box icons* and *Group box times* settings (#98).
 - Shopping *Path to* / *Path to next* names the stop's town, lists what the next stop supplies, and re-picks the nearest stop as the player moves (#97).
 - *Above player* banner position for event toasts (#94).
