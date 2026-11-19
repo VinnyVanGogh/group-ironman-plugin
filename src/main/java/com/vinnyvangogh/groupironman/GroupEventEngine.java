@@ -551,6 +551,8 @@ class GroupEventEngine
 		{
 			url = null;
 		}
+		// Tells the party this client keeps the board, so the others post no separate online/offline messages.
+		group.keepingBoard(url != null);
 		// Board 2026-11-14: nothing goes out until the leader's role, the shared webhooks and the saved boards are in.
 		board.settle(StatusBoard.settled(boardLoginAt, now, boardSaved != null && group.cacheLoaded()));
 		board.target(url, () -> boardSaved);
@@ -1911,6 +1913,11 @@ class GroupEventEngine
 		String url = webhookFor(Webhook.of(event.type));
 		if (url == null)
 		{
+			return;
+		}
+		if (event.type == GroupEvent.Type.ONLINE && group.boardKeptByOthers(System.currentTimeMillis()))
+		{
+			// Another member's client keeps the live board: it already shows who is online, so no separate post.
 			return;
 		}
 		if (event.broadcast)
