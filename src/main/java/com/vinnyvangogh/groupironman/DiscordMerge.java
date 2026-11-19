@@ -24,7 +24,9 @@ final class DiscordMerge
 	enum Family
 	{
 		DROP(1_800, GroupEvent.Type.PET, GroupEvent.Type.CLOG, GroupEvent.Type.UNIQUE, GroupEvent.Type.DROP),
-		LEVEL(1_200, GroupEvent.Type.MAXED, GroupEvent.Type.TOTAL_LEVEL, GroupEvent.Type.COMBAT_LEVEL,
+		// Six ticks: the client's combat level follows a level-up by a tick or two, and a window of two ticks let it
+		// land after the level-up's post had gone out, as a second post (Board 2026-11-16).
+		LEVEL(3_600, GroupEvent.Type.MAXED, GroupEvent.Type.TOTAL_LEVEL, GroupEvent.Type.COMBAT_LEVEL,
 			GroupEvent.Type.LEVEL_UP, GroupEvent.Type.XP_MILESTONE),
 		DEATH(1_200, GroupEvent.Type.DEATH, GroupEvent.Type.HC_LIFE_LOST, GroupEvent.Type.DEATH_VALUE),
 		// The minimum and the visit reach the engine in one client-thread call: the next tick has them all.
