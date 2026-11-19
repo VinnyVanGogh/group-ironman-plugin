@@ -45,10 +45,13 @@ final class CompareTab
 	/** What the tab's buttons do. Callbacks may arrive on another thread. */
 	interface Actions
 	{
-		/** Rank the group for a typed item. */
-		default void benefit(String query, Consumer<BenefitFinder.Outcome> done)
+		/** Rank the group for an item picked from the dropdown. */
+		default void benefit(int itemId, Consumer<BenefitFinder.Outcome> done)
 		{
 		}
+
+		/** Items matching typed text, best first, for the dropdown (same method the Shopping tab uses). */
+		void searchItems(String query, Consumer<List<ShoppingTab.Hit>> done);
 
 		/** Summed hiscore experience per skill for these players; null when none could be looked up. */
 		default void groupExperience(List<String> names, Consumer<Map<String, Long>> done)
@@ -81,6 +84,7 @@ final class CompareTab
 	private final JComboBox<String> memberB = new JComboBox<>();
 	private final JTextField other = new JTextField();
 	private final JTextField item = new JTextField();
+	private final JComboBox<ShoppingTab.Hit> hits = new JComboBox<>();
 	private final Map<StatCategory, String> openCount = new java.util.EnumMap<>(StatCategory.class);
 	private final Map<String, Icon> iconCache = new java.util.HashMap<>();
 	private StatCategory category = StatCategory.SKILLING;
@@ -689,22 +693,54 @@ final class CompareTab
 
 	private void item(View v)
 	{
-		results.add(line("An item, for example Dragon defender or Abyssal whip:", MUTED));
+		results.add(line("Search an item, then pick it from the list:", MUTED));
 		results.add(Ui.wide(item));
-		results.add(Ui.button("Who benefits most?", "Ranks members by what it does for them", () ->
-		{
-			benefitLines = Collections.singletonList("Looking the item up...");
-			showResults();
-			actions.benefit(item.getText(), o -> SwingUtilities.invokeLater(() ->
-			{
-				benefitLines = benefitLines(o);
-				showResults();
-			}));
-		}));
+		results.add(Ui.button("Search", "Finds items matching the text, for example whip or dragon defender",
+			this::searchItems));
+		results.add(Ui.wide(hits));
+		results.add(Ui.button("Who benefits most?", "Ranks members by what it does for them", this::rank));
 		for (String s : benefitLines)
 		{
 			results.add(line(s, Color.WHITE));
 		}
+	}
+
+	/** Looks the typed text up on the client thread and fills the dropdown with the matches. */
+	private void searchItems()
+	{
+		String q = item.getText().trim();
+		if (q.length() < 2)
+		{
+			benefitLines = Collections.singletonList("Type at least two letters of an item name, then press Search.");
+			showResults();
+			return;
+		}
+		actions.searchItems(q, found -> SwingUtilities.invokeLater(() ->
+		{
+			hits.removeAllItems();
+			found.forEach(hits::addItem);
+			benefitLines = found.isEmpty() ? Collections.singletonList("No item found for \"" + q + "\".")
+				: Collections.<String>emptyList();
+			showResults();
+		}));
+	}
+
+	private void rank()
+	{
+		ShoppingTab.Hit picked = (ShoppingTab.Hit) hits.getSelectedItem();
+		if (picked == null)
+		{
+			benefitLines = Collections.singletonList("Search for an item and pick it from the list first.");
+			showResults();
+			return;
+		}
+		benefitLines = Collections.singletonList("Looking the item up...");
+		showResults();
+		actions.benefit(picked.id, o -> SwingUtilities.invokeLater(() ->
+		{
+			benefitLines = benefitLines(o);
+			showResults();
+		}));
 	}
 
 	static List<String> benefitLines(BenefitFinder.Outcome o)
@@ -717,10 +753,7 @@ final class CompareTab
 		out.add(o.item + ", best first:");
 		for (ItemBenefit.Result r : o.ranked)
 		{
-			String what = r.alreadyOwned ? "already has an equal or better one"
-				: r.usableNow ? "can use it now, +" + r.upgrade + " over current gear"
-				: r.levelsShort + " level" + (r.levelsShort == 1 ? "" : "s") + " short";
-			out.add(r.name + ": " + what);
+			out.add(r.name + ": " + what(r));
 		}
 		if (o.requirementsUnknown)
 		{
@@ -728,6 +761,25 @@ final class CompareTab
 				+ " known to block it.");
 		}
 		return out;
+	}
+
+	/** One member's verdict: what blocks them, or what the item gains over what they wear in that slot. */
+	private static String what(ItemBenefit.Result r)
+	{
+		if (r.alreadyOwned)
+		{
+			return "already has an equal or better one";
+		}
+		if (!r.usableNow)
+		{
+			return !r.levelsKnown ? "levels unknown" : r.missing.isEmpty()
+				? r.levelsShort + " level" + (r.levelsShort == 1 ? "" : "s") + " short" : String.join("; ", r.missing);
+		}
+		if (!r.gearKnown)
+		{
+			return "can use it now, gear unknown";
+		}
+		return "can use it now, +" + r.upgrade + (r.comparedTo == null ? " over current gear" : " vs " + r.comparedTo);
 	}
 
 	private static JLabel line(String text, Color color)
