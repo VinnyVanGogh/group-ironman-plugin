@@ -90,7 +90,7 @@ final class BoxText
 
 	static
 	{
-		FORMS.put(GroupEvent.Type.LEVEL_UP, (e, l, t) -> skill(e.text, Long.toString(e.number), e.text + " " + e.number));
+		FORMS.put(GroupEvent.Type.LEVEL_UP, BoxText::level);
 		FORMS.put(GroupEvent.Type.MAXED, (e, l, t) -> "total".equalsIgnoreCase(e.text)
 			? skill("Overall", "maxed", "maxed") : skill(e.text, "99", "99 " + e.text));
 		FORMS.put(GroupEvent.Type.XP_MILESTONE, (e, l, t) -> skill(e.text, l.amount(e.number) + " xp",
@@ -133,6 +133,49 @@ final class BoxText
 		boolean pictured = icons && part.icon != null;
 		return new Line(pictured ? part.icon : null, e.member, pictured ? part.withIcon : part.textOnly,
 			times.of(now, e.at));
+	}
+
+	/** The level before a level-up's first: what it knew, or one below. */
+	private static long from(GroupEvent e)
+	{
+		return e.previous > 0 && e.previous < e.number ? e.previous : e.number - 1;
+	}
+
+	/**
+	 * Consecutive level-ups of one skill by one member (newest first, as {@link ToastQueue#recent} gives them)
+	 * become one event: the newest level, from the level before the oldest, at the newest time. Anything else,
+	 * including a level-up with another event between, is kept as it is.
+	 */
+	static java.util.List<GroupEvent> stack(java.util.List<GroupEvent> newestFirst)
+	{
+		java.util.List<GroupEvent> out = new java.util.ArrayList<>();
+		for (GroupEvent e : newestFirst)
+		{
+			GroupEvent last = out.isEmpty() ? null : out.get(out.size() - 1);
+			if (last != null && e.type == GroupEvent.Type.LEVEL_UP && last.type == GroupEvent.Type.LEVEL_UP
+				&& e.member.equals(last.member) && e.text.equals(last.text) && e.number <= from(last) + 1)
+			{
+				out.set(out.size() - 1, last.toBuilder().previous(Math.min(from(e), from(last))).build());
+			}
+			else
+			{
+				out.add(e);
+			}
+		}
+		return out;
+	}
+
+	/** "Thieving 44": one level; "44 → 46" (compact: "+2") for a stack. */
+	private static Part level(GroupEvent e, ItemLookup lookup, int tier)
+	{
+		long gained = e.number - from(e);
+		if (gained <= 1)
+		{
+			return skill(e.text, Long.toString(e.number), e.text + " " + e.number);
+		}
+		String span = (from(e) + 1) + " → " + e.number;
+		String plus = "+" + gained;
+		return skill(e.text, tier == 0 ? plus : span, e.text + " " + (tier == 0 ? plus : span));
 	}
 
 	private static Part skill(String name, String withIcon, String textOnly)
