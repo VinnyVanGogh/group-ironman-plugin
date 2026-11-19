@@ -2353,7 +2353,8 @@ class GroupService
 		{
 			names.add(self);
 		}
-		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names);
+		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names,
+			CompareSupport.banked(roster, names), CompareSupport.storageBanked(roster));
 	}
 
 	/** "Who benefits most" for an item picked from the dropdown; {@code done} runs on the client thread. */
