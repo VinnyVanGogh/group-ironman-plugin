@@ -935,6 +935,14 @@ public interface GroupIronmanConfig extends Config
 		return 3;
 	}
 
+	@ConfigItem(keyName = "overlayEffects", name = "Banner fireworks",
+		description = "Fireworks behind level-up banners, and a bigger show for milestones.",
+		section = inGameSection, position = 57)
+	default boolean overlayEffects()
+	{
+		return true;
+	}
+
 	@ConfigItem(keyName = "overlayGroupBox", name = "Group box",
 		description = "On screen: who is online, their worlds, and the latest events.", section = inGameSection,
 		position = 3)

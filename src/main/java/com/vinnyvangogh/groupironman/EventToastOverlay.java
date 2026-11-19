@@ -83,6 +83,19 @@ final class EventToastOverlay extends OverlayPanel
 		}
 		Dimension drawn = super.render(graphics);
 		lastHeight = drawn == null ? 0 : drawn.height;
+		if (drawn != null && config.overlayEffects())
+		{
+			long now = System.currentTimeMillis();
+			for (ToastQueue.Toast t : visible)
+			{
+				BannerEffects.Kind kind = BannerEffects.kindOf(t.event.type);
+				if (kind != BannerEffects.Kind.NONE)
+				{
+					BannerEffects.draw(graphics, kind, t.event.at, now - t.shownAt, panelComponent.getBounds());
+					break;
+				}
+			}
+		}
 		return drawn;
 	}
 
