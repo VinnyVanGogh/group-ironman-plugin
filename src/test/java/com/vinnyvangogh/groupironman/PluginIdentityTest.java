@@ -108,7 +108,8 @@ public class PluginIdentityTest
 		// Group announcements (Board 2026-11-18) add two kinds (Announcement, Everyone online), so four switches.
 		// "Banner: Announcement" is on by default: a note a member typed for the group, shown like any banner; the
 		// login alert ("Banner: Online") and "Banner: Everyone online" stay off.
-		assertEquals(112, switches);
+		// Lamp or book received and used (Board 2026-11-18) add two kinds, so four switches, all off.
+		assertEquals(116, switches);
 		List<String> expectedOn = Arrays.asList("discordNoPluginEvents", "discordRepostBoard", "groupSync",
 			"overlayAnnouncement", "overlayGroupBoxIcons", "showUpdateNotes");
 		Collections.sort(on);

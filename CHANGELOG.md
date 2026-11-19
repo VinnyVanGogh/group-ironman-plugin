@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- *Lamp or book received* and *Lamp or book used* events (`LampBook`) for XP lamps and skilling books, each with its own Discord and banner switch (all off by default); the Group box shows the item's icon for a receipt and the skill's for a use.
 - Short Group box event lines with a skill or item icon and a short time, plus *Group box size*, *Group box icons* and *Group box times* settings (#98).
 - Shopping *Path to* / *Path to next* names the stop's town, lists what the next stop supplies, and re-picks the nearest stop as the player moves (#97).
 - *Above player* banner position for event toasts (#94).
