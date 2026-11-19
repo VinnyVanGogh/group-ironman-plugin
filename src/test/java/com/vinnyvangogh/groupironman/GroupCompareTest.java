@@ -54,22 +54,6 @@ public class GroupCompareTest
 	}
 
 	@Test
-	public void leaderboardHasHighestAndLowestPerStat()
-	{
-		GroupCompare.Figures a = fig("GIM1", 100, lv("Attack", 70), Collections.singletonMap("Zulrah", 70.0));
-		GroupCompare.Figures b = fig("GIM2", 120, lv("Attack", 70), Collections.singletonMap("Zulrah", 65.0));
-		GroupCompare.Figures c = fig("GIM3", 80, lv("Attack", 40), Collections.emptyMap());
-		List<GroupCompare.Leader> board = GroupCompare.leaderboard(Arrays.asList(a, b, c));
-		GroupCompare.Leader atk = leader(board, "Attack");
-		assertEquals(Arrays.asList("GIM1", "GIM2"), atk.best);
-		assertEquals(Collections.singletonList("GIM3"), atk.worst);
-		GroupCompare.Leader z = leader(board, "Zulrah");
-		assertEquals(Collections.singletonList("GIM2"), z.best);
-		assertEquals(Collections.singletonList("GIM1"), z.worst);
-		assertEquals(Collections.singletonList("GIM2"), leader(board, "Quest points").best);
-	}
-
-	@Test
 	public void groupAgainstGroupIsSkillBySkillGap()
 	{
 		Map<String, Long> mine = new HashMap<>();
@@ -88,11 +72,6 @@ public class GroupCompareTest
 	private static GroupCompare.Row row(List<GroupCompare.Row> rows, String label)
 	{
 		return rows.stream().filter(r -> r.label.equals(label)).findFirst().get();
-	}
-
-	private static GroupCompare.Leader leader(List<GroupCompare.Leader> l, String label)
-	{
-		return l.stream().filter(r -> r.label.equals(label)).findFirst().get();
 	}
 
 	private static GroupCompare.Gap gap(List<GroupCompare.Gap> l, String label)

@@ -2,15 +2,13 @@ package com.vinnyvangogh.groupironman;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * The maths behind Compare, with no Swing and no game: two players side by side, the per-stat leaderboard, and a
+ * The maths behind Compare, with no Swing and no game: two players side by side (boss times; the skill ranking is {@link SkillBoard}), and a
  * group's skill totals against another group's (the figures come from the hiscores, looked up with RuneLite's own
  * {@code HiscoreClient}). A figure nobody has shared is unknown, never a loss.
  */
@@ -40,13 +38,28 @@ final class GroupCompare
 		final Map<String, Integer> levels;
 		final PersonalBests bests;
 		final int questPoints;
+		/** Hiscore counts (kills, clues, minigames) by hiscore name; null until a lookup has read them. */
+		final Map<String, Integer> scores;
 
 		Figures(String name, Map<String, Integer> levels, PersonalBests bests, int questPoints)
+		{
+			this(name, levels, bests, questPoints, null);
+		}
+
+		Figures(String name, Map<String, Integer> levels, PersonalBests bests, int questPoints,
+			Map<String, Integer> scores)
 		{
 			this.name = name;
 			this.levels = levels == null ? Collections.emptyMap() : levels;
 			this.bests = bests == null ? PersonalBests.EMPTY : bests;
 			this.questPoints = questPoints;
+			this.scores = scores;
+		}
+
+		/** The count for a hiscore name: 0 when the hiscores were read and list none, null when never read. */
+		Integer score(String hiscoreName)
+		{
+			return scores == null ? null : scores.getOrDefault(hiscoreName, 0);
 		}
 
 		/** Sum of the shared skill levels, or -1 when none were shared. */
@@ -81,23 +94,6 @@ final class GroupCompare
 			this.a = a;
 			this.b = b;
 			this.verdict = verdict(a, b, lowerWins);
-		}
-	}
-
-	/** Highest and lowest holders of one stat; {@code worst} is empty when everyone ties. */
-	static final class Leader
-	{
-		final String label;
-		final Category category;
-		final List<String> best;
-		final List<String> worst;
-
-		Leader(String label, Category category, List<String> best, List<String> worst)
-		{
-			this.label = label;
-			this.category = category;
-			this.best = best;
-			this.worst = worst;
 		}
 	}
 
@@ -178,51 +174,6 @@ final class GroupCompare
 		{
 			out.add(new Row(e.getKey(), e.getValue(), value(a, e.getKey(), e.getValue()),
 				value(b, e.getKey(), e.getValue()), e.getValue() == Category.BOSS));
-		}
-		return out;
-	}
-
-	static List<Leader> leaderboard(List<Figures> members)
-	{
-		List<Leader> out = new ArrayList<>();
-		for (Map.Entry<String, Category> e : labels(members).entrySet())
-		{
-			boolean lowerWins = e.getValue() == Category.BOSS;
-			Map<String, Double> held = new TreeMap<>();
-			for (Figures f : members)
-			{
-				Double v = value(f, e.getKey(), e.getValue());
-				if (v != null)
-				{
-					held.put(f.name, v);
-				}
-			}
-			if (held.isEmpty())
-			{
-				continue;
-			}
-			Comparator<Double> better = lowerWins ? Comparator.<Double>naturalOrder()
-				: Comparator.<Double>reverseOrder();
-			double top = held.values().stream().min(better).get();
-			double bottom = held.values().stream().max(better).get();
-			List<String> best = holders(members, held, top);
-			List<String> worst = top == bottom ? Collections.emptyList() : holders(members, held, bottom);
-			out.add(new Leader(e.getKey(), e.getValue(), best, worst));
-		}
-		return out;
-	}
-
-	/** Names in the members' own order, so a tie reads the same every time. */
-	private static List<String> holders(List<Figures> members, Map<String, Double> held, double v)
-	{
-		List<String> out = new ArrayList<>();
-		for (Figures f : members)
-		{
-			Double x = held.get(f.name);
-			if (x != null && x == v)
-			{
-				out.add(f.name);
-			}
 		}
 		return out;
 	}

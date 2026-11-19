@@ -219,6 +219,8 @@ class GroupService
 	private volatile Map<String, Integer> ownLevels = Collections.emptyMap();
 	/** Where this player stood on the last tick, for "Path to"; null when logged out. */
 	private volatile WorldPoint here;
+	/** Where the panel last drew from: "Path to next" is nearest-first from here, so it is redrawn when the player has moved well away. */
+	private WorldPoint drawnFrom;
 	// Client thread only.
 	private final ShopVisits shopVisits = new ShopVisits();
 	/** This player's own boss bests, read from their own chat; shared only under "Share group events". */
@@ -1190,9 +1192,11 @@ class GroupService
 		if (client.getGameState() != GameState.LOGGED_IN)
 		{
 			here = null;
+			drawnFrom = null;
 			return;
 		}
 		here = position();
+		redrawIfMoved();
 		long now = System.currentTimeMillis();
 		refreshRoster();
 		if (!member())
@@ -1356,8 +1360,9 @@ class GroupService
 	}
 
 	/**
-	 * Client thread. Starts a hiscore lookup, on OkHttp's threads, for each of {@code names} that is not this
-	 * player, shares no stats (shared data always wins) and is due ({@link HiscoreBook#begin}). {@code asked}:
+	 * Client thread. Starts a hiscore lookup, on OkHttp's threads, for each of {@code names} and for this
+	 * player, when it is due ({@link HiscoreBook#begin}); shared stats still win over the
+	 * looked-up levels wherever both exist. {@code asked}:
 	 * this player just logged in or these members just came online.
 	 */
 	private void lookUpHiscores(Collection<String> names, boolean asked)
@@ -1366,13 +1371,17 @@ class GroupService
 		{
 			return;
 		}
-		Set<String> shared = new HashSet<>();
-		roster.allStats().keySet().forEach(n -> shared.add(GroupMembers.key(n)));
-		shared.add(GroupMembers.key(self));
-		long now = System.currentTimeMillis();
-		for (String name : names)
+		// Everyone, this player too: members who share stats still need their boss, clue and minigame counts for
+		// the Leaderboard. Shared levels still win wherever both exist.
+		List<String> everyone = new ArrayList<>(names);
+		if (!self.isEmpty())
 		{
-			if (!shared.contains(GroupMembers.key(name)) && roster.hiscores().begin(name, now, asked))
+			everyone.add(self);
+		}
+		long now = System.currentTimeMillis();
+		for (String name : everyone)
+		{
+			if (roster.hiscores().begin(name, now, asked))
 			{
 				hiscoreClient.lookupAsync(name, HiscoreEndpoint.NORMAL)
 					.whenComplete((result, error) -> hiscoreDone(name, result, error));
@@ -1392,7 +1401,7 @@ class GroupService
 		}
 		else
 		{
-			roster.hiscores().succeeded(name, levels, now);
+			roster.hiscores().succeeded(name, levels, HiscoreBook.scores(result), now);
 			saveCache();
 		}
 		onChange.run();
@@ -2360,6 +2369,16 @@ class GroupService
 	ShopPresets presets()
 	{
 		return presets;
+	}
+
+	/** Client thread. Redraws the panel once the player is far enough from where it last drew "Path to next". */
+	private void redrawIfMoved()
+	{
+		if (ItemPaths.movedFar(drawnFrom, here))
+		{
+			drawnFrom = here;
+			onChange.run();
+		}
 	}
 
 	/** Where this player stood on the last game tick; null when logged out. Any thread. */

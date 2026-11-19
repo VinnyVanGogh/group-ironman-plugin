@@ -46,17 +46,40 @@ final class ItemPaths
 		/** A bank, for an item in group storage. */
 		final boolean bank;
 
+		/** The town or area the quest data puts it in, tidied for display; empty when unknown. */
+		final String town;
+
 		Stop(String name, WorldPoint at, boolean bank)
+		{
+			this(name, at, bank, "");
+		}
+
+		Stop(String name, WorldPoint at, boolean bank, String town)
 		{
 			this.name = name;
 			this.at = at;
 			this.bank = bank;
+			this.town = tidyTown(town);
+		}
+
+		/** The wiki's "Shilo Village (location)" is just "Shilo Village". */
+		private static String tidyTown(String town)
+		{
+			String t = town == null ? "" : town.trim();
+			return t.endsWith(" (location)") ? t.substring(0, t.length() - " (location)".length()) : t;
+		}
+
+		/** "Obli's General Store (Shilo Village)": the name as a player says it, and where it is. */
+		String where()
+		{
+			String shown = name.endsWith(".") ? name.substring(0, name.length() - 1) : name;
+			return town.isEmpty() ? shown : shown + " (" + town + ")";
 		}
 
 		/** "Path to: Varrock West bank". */
 		String label()
 		{
-			return "Path to: " + name;
+			return "Path to: " + where();
 		}
 	}
 
@@ -191,7 +214,7 @@ final class ItemPaths
 				// A shop the data gives no tile (0, 0) cannot be walked to.
 				if (shop != null && (shop.x != 0 || shop.y != 0))
 				{
-					out.add(new Stop(s.name, new WorldPoint(shop.x, shop.y, shop.plane), false));
+					out.add(new Stop(s.name, new WorldPoint(shop.x, shop.y, shop.plane), false, shop.town()));
 				}
 			}
 			return out;
@@ -256,6 +279,20 @@ final class ItemPaths
 		}
 		int steps = Math.max(Math.abs(from.getX() - to.getX()), Math.abs(from.getY() - to.getY()));
 		return steps + (from.getPlane() == to.getPlane() ? 0 : PLANE_COST);
+	}
+
+	/** Tiles the player walks before the "nearest stop" is worked out again. */
+	static final int REDRAW_TILES = 8;
+
+	/** True when the position last drawn from is unknown, or the player is on another floor or {@link #REDRAW_TILES} away. */
+	static boolean movedFar(WorldPoint drawn, WorldPoint now)
+	{
+		if (now == null)
+		{
+			return false;
+		}
+		return drawn == null || drawn.getPlane() != now.getPlane()
+			|| Math.max(Math.abs(drawn.getX() - now.getX()), Math.abs(drawn.getY() - now.getY())) >= REDRAW_TILES;
 	}
 
 	/** Nearest first, each name once; the data's order breaks ties (and is all there is without a position). */

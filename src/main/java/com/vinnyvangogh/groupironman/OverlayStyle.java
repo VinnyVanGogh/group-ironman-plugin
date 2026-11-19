@@ -192,6 +192,72 @@ final class OverlayStyle
 		}
 	}
 
+	/**
+	 * One Group box event: [icon] member detail ... time. The time is kept and so is the member; only the detail
+	 * is cut, with "..", when the line is too long. The font is the box size's scale of the overlay font, and the
+	 * time is a little smaller and dimmer.
+	 */
+	static final class EventRow extends Block
+	{
+		private static final int NAME_GAP = 4;
+		private static final int ICON_GAP = 3;
+		private static final float TIME_SCALE = 0.85f;
+		private static final Color DIM = new Color(0x80, 0x80, 0x88);
+
+		private final BoxText.Line line;
+		private final Color colour;
+		private final float scale;
+		private final BoxIcons.Source icons;
+
+		EventRow(BoxText.Line line, Color colour, float scale, BoxIcons.Source icons)
+		{
+			this.line = line;
+			this.colour = colour;
+			this.scale = scale;
+			this.icons = icons;
+		}
+
+		/** Pixels left for the detail once the icon, the member and the time have theirs; zero or less means none. */
+		static int detailRoom(int width, int iconSlot, int nameWidth, int timeWidth)
+		{
+			return width - iconSlot - nameWidth - NAME_GAP - (timeWidth == 0 ? 0 : timeWidth + GAP);
+		}
+
+		@Override
+		int draw(Graphics2D g, int x, int y, int w)
+		{
+			Font base = g.getFont();
+			Font font = base.deriveFont(base.getSize2D() * scale);
+			g.setFont(font);
+			FontMetrics fm = g.getFontMetrics();
+			Font small = font.deriveFont(font.getSize2D() * TIME_SCALE);
+			int timeW = line.ago.isEmpty() ? 0 : g.getFontMetrics(small).stringWidth(line.ago);
+			int size = Math.max(8, fm.getHeight() - 2);
+			int slot = line.icon == null ? 0 : size + ICON_GAP;
+			int nameW = fm.stringWidth(line.member);
+			int room = detailRoom(w, slot, nameW, timeW);
+			int baseline = y + fm.getAscent();
+			if (line.icon != null)
+			{
+				BoxIcons.draw(g, line.icon, icons, x, y + (fm.getHeight() - size) / 2, size);
+			}
+			OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + slot, baseline), line.member, colour);
+			if (room > fm.stringWidth("..") && !line.detail.isEmpty())
+			{
+				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + slot + nameW + NAME_GAP, baseline),
+					fit(line.detail, fm, room), TEXT);
+			}
+			if (timeW > 0)
+			{
+				g.setFont(small);
+				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + w - timeW, baseline), line.ago, DIM);
+			}
+			int h = fm.getHeight();
+			g.setFont(base);
+			return h;
+		}
+	}
+
 	/** One row: optional state dot, text (wrapped), and a value on the right. */
 	static final class Row extends Block
 	{
@@ -202,6 +268,7 @@ final class OverlayStyle
 		private Color dot;
 		private int indent;
 		private int maxLines = 1;
+		private float scale = 1f;
 
 		Row(String text, Color color)
 		{
@@ -234,8 +301,27 @@ final class OverlayStyle
 			return this;
 		}
 
+		/** Draws in this multiple of the overlay font (the Group box size's font). */
+		Row scale(float factor)
+		{
+			this.scale = factor;
+			return this;
+		}
+
 		@Override
 		int draw(Graphics2D g, int x, int y, int w)
+		{
+			Font base = g.getFont();
+			if (scale != 1f)
+			{
+				g.setFont(base.deriveFont(base.getSize2D() * scale));
+			}
+			int h = drawRow(g, x, y, w);
+			g.setFont(base);
+			return h;
+		}
+
+		private int drawRow(Graphics2D g, int x, int y, int w)
 		{
 			FontMetrics fm = g.getFontMetrics();
 			int left = x + indent + (dot == null ? 0 : DOT_SLOT);

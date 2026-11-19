@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Short Group box event lines with a skill or item icon and a short time, plus *Group box size*, *Group box icons* and *Group box times* settings (#98).
+- Shopping *Path to* / *Path to next* names the stop's town, lists what the next stop supplies, and re-picks the nearest stop as the player moves (#97).
+- *Above player* banner position for event toasts (#94).
+- Hiscores-style `Leaderboard` skill grid with per-member colours and Skilling / Bossing / Activities / Minigames categories, a two-column `Compare` table, and a *Personal bests* section above *Recent runs* on the `Activities` tab (#95).
 - Category filter pills and a top-20 value-ranked preview (with *Show all*) on the `Banks` and `Storage` tabs, quick-find category/combat-style/holder filter pills and one-click search presets on the `Find` tab, and High Alchemy values in item grid tooltips (#90).
 - `Compare` tab (`GroupCompare`, `BenefitFinder`, `ProgressView`) for side-by-side member comparisons, sortable per-stat leaderboards, public group hiscore comparisons, and *who benefits most* item upgrade rankings, plus shared boss personal bests (`PbCapture`, `PersonalBests`), quest progress, quest points, and achievement diary tiers (`AchievementState`, `MemberProgressBook`) under *Share group events* (#89).
 - Group announcements (`::announce <text>`), everyone-online transition alerts (`EveryoneOnline`), per-event banner switches, quiet hours, and banner dismissal via hotkey or click (#87).
