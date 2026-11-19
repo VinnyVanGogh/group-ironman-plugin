@@ -47,6 +47,7 @@ final class MemberStats
 	private final int x;
 	private final int y;
 	private final int plane;
+	private final MemberStatus status;
 
 	/** Without a position: what a part 2 sender sends. */
 	MemberStats(Map<String, Level> skills, int runEnergy, int specialAttack, int world, int region)
@@ -63,6 +64,14 @@ final class MemberStats
 	MemberStats(Map<String, Level> skills, int runEnergy, int specialAttack, int world, int region, int x, int y,
 		int plane)
 	{
+		this(skills, runEnergy, specialAttack, world, region, x, y, plane, MemberStatus.UNKNOWN);
+	}
+
+	/** With the member's prayer switch and poison, venom and disease. */
+	MemberStats(Map<String, Level> skills, int runEnergy, int specialAttack, int world, int region, int x, int y,
+		int plane, MemberStatus status)
+	{
+		this.status = status == null ? MemberStatus.UNKNOWN : status;
 		this.skills = Collections.unmodifiableMap(new LinkedHashMap<>(skills));
 		this.runEnergy = runEnergy;
 		this.specialAttack = specialAttack;
@@ -71,6 +80,11 @@ final class MemberStats
 		this.x = x;
 		this.y = y;
 		this.plane = plane;
+	}
+
+	MemberStatus status()
+	{
+		return status;
 	}
 
 	int x()
@@ -127,13 +141,14 @@ final class MemberStats
 		}
 		MemberStats m = (MemberStats) o;
 		return skills.equals(m.skills) && runEnergy == m.runEnergy && specialAttack == m.specialAttack
-			&& world == m.world && region == m.region && x == m.x && y == m.y && plane == m.plane;
+			&& world == m.world && region == m.region && x == m.x && y == m.y && plane == m.plane
+			&& status.equals(m.status);
 	}
 
 	@Override
 	public int hashCode()
 	{
 		return skills.hashCode() * 31 + runEnergy * 7 + specialAttack * 13 + world * 17 + region + x * 19 + y * 23
-			+ plane;
+			+ plane + status.hashCode() * 29;
 	}
 }

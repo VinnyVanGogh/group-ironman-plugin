@@ -623,6 +623,20 @@ Party message size: `GroupCodec` splits payloads to a budget of its own,
 because RuneLite 1.12.39's `WSClient` imposes no limit and the relay's is not
 published (see `GroupCodec`'s javadoc for what was read).
 
+**Prayer on/off, poison / venom / disease (RUNELITE-229, 2026-11-18) —
+allowed, with precedent.** Each member's own client sends its own prayer switch
+and poison state under the existing stats switch, to their own party. *Nearest
+rule:* Data & Privacy, no crowdsourcing about other players; nothing is read
+about anyone who has not opted in, and it is teammates' status, not PvP
+scouting. *Precedent:* the base `party` plugin shares prayer and HP between
+party members; the base `poison` plugin reads the same `VarPlayerID.POISON`
+varp. Read via `net.runelite.api.gameval` only (`VarbitID.PRAYER_ALLACTIVE`,
+`VarPlayerID.POISON`, `VarPlayerID.DISEASE`). Time left: poison is estimated
+(varp counts down one per 30-tick hit, so hits x 18 s; not verified in game);
+venom and disease have no duration in the client, so state only and the
+tooltip says so. Log basket per-log counts and looting bag contents were
+already shipped in RUNELITE-222 (#85) and render in the slot tooltip.
+
 ---
 
 ## Phase 3 — quality bar
