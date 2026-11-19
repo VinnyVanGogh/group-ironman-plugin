@@ -156,6 +156,11 @@ class GroupIronmanPanel extends PluginPanel
 	private static final int MAX_GRID_ITEMS = 200;
 	private static final Color HP = new Color(0xB0, 0x2E, 0x26);
 	private static final Color PRAYER = new Color(0x2E, 0x8B, 0xB0);
+	/** The ring and "ON" label of a member whose prayer is switched on. */
+	private static final Color PRAYER_ON = new Color(0xFF, 0xE0, 0x4A);
+	private static final Color POISON = new Color(0x3C, 0xC8, 0x3C);
+	private static final Color VENOM = new Color(0xB0, 0x5C, 0xE0);
+	private static final Color DISEASE = new Color(0xD8, 0xB0, 0x40);
 	private static final Color RUN = new Color(0xC8, 0xA0, 0x2A);
 	private static final Color SPEC = new Color(0x3A, 0x9A, 0x4A);
 	static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR.darker();
@@ -901,6 +906,15 @@ class GroupIronmanPanel extends PluginPanel
 				bars.add(new Orb(b, barColor(b.label), live && !b.assumed, orbIcons.get(b.label)));
 			}
 			body.add(bars);
+		}
+		for (int i = 0; i < c.effects.size(); i++)
+		{
+			String chip = c.effects.get(i);
+			JLabel label = new JLabel(chip);
+			label.setFont(FontManager.getRunescapeSmallFont());
+			label.setForeground(chip.startsWith("Venom") ? VENOM : chip.startsWith("Disease") ? DISEASE : POISON);
+			label.setToolTipText(i < c.effectNotes.size() ? c.effectNotes.get(i) : chip);
+			body.add(label);
 		}
 		if (c.source != null)
 		{
@@ -1688,6 +1702,12 @@ class GroupIronmanPanel extends PluginPanel
 			int textWidth = g2.getFontMetrics().stringWidth(number);
 			g2.drawString(number, x - textWidth - 3, y + SIZE - 4);
 			// Ring, empty part, then the fill rising from the bottom like the game's orbs.
+			// Prayer switched on: a bright gold ring around the orb; off or unshared: plain.
+			if (live && bar.on > 0)
+			{
+				g2.setColor(PRAYER_ON);
+				g2.fillOval(x - 2, y - 2, SIZE + 4, SIZE + 4);
+			}
 			g2.setColor(Color.BLACK);
 			g2.fillOval(x - 1, y - 1, SIZE + 2, SIZE + 2);
 			g2.setColor(ColorScheme.DARK_GRAY_COLOR);

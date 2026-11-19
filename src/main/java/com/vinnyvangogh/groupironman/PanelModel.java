@@ -39,14 +39,27 @@ final class PanelModel
 		final boolean assumed;
 		/** Where the number came from when it was not shared, or null: "from hiscores". */
 		final String note;
+		/** Prayer only: 1 when a prayer is switched on, 0 when off, -1 when the member does not share it. */
+		final int on;
 
 		Bar(String label, int current, int max)
 		{
 			this(label, current, max, false, null);
 		}
 
+		Bar(String label, int current, int max, int on)
+		{
+			this(label, current, max, false, null, on);
+		}
+
 		Bar(String label, int current, int max, boolean assumed, String note)
 		{
+			this(label, current, max, assumed, note, -1);
+		}
+
+		Bar(String label, int current, int max, boolean assumed, String note, int on)
+		{
+			this.on = on;
 			this.label = label;
 			this.current = current;
 			this.max = max;
@@ -62,7 +75,8 @@ final class PanelModel
 		/** "HP 72/99", "HP 99/99 (from hiscores)", "Run 100/100 (assumed, not shared)". */
 		String tooltip()
 		{
-			return label + " " + text() + (note == null ? "" : " (" + note + ")");
+			String state = on < 0 ? "" : on > 0 ? " - prayer ON" : " - prayer off";
+			return label + " " + text() + state + (note == null ? "" : " (" + note + ")");
 		}
 	}
 
@@ -213,6 +227,10 @@ final class PanelModel
 		final String source;
 		/** "Ring of dueling 6, Games necklace 3": jewellery charges the member shares, or null. */
 		final String charges;
+		/** Short chips for poison, venom and disease ("Poisoned ~2m10s"); empty when clear or not shared. */
+		List<String> effects = Collections.emptyList();
+		/** The chips' tooltip lines, with what the game does not say about time left. */
+		List<String> effectNotes = Collections.emptyList();
 
 		MemberCard(String name, boolean you, boolean online, String status, List<Bar> bars, List<SkillCell> skills,
 			List<ItemGroup> items, String seedVault, String source)
@@ -410,9 +428,15 @@ final class PanelModel
 			String vault = seedVault(extras.get(name), now);
 			GroupCodec.Carried worn = carried.get(name);
 			String charges = worn == null || worn.charges.isEmpty() ? null : JewelleryCharges.text(worn.charges);
-			out.add(s != null
+			MemberCard card = s != null
 				? new MemberCard(name, you, online, st, bars(s), skills(s), held, vault, null, charges)
-				: fromHiscores(name, you, online, st, held, vault, group.hiscores(), now, charges));
+				: fromHiscores(name, you, online, st, held, vault, group.hiscores(), now, charges);
+			if (s != null && online)
+			{
+				card.effects = s.status().chips();
+				card.effectNotes = s.status().lines();
+			}
+			out.add(card);
 		}
 		out.sort(MEMBER_ORDER);
 		return out;
@@ -544,7 +568,9 @@ final class PanelModel
 		}
 		if (prayer != null)
 		{
-			out.add(new Bar("Prayer", prayer.boosted, prayer.real));
+			MemberStatus status = s.status();
+			out.add(new Bar("Prayer", prayer.boosted, prayer.real,
+				!status.known() ? -1 : status.prayerOn() ? 1 : 0));
 		}
 		out.add(new Bar("Run", s.runEnergy(), 100));
 		out.add(new Bar("Spec", s.specialAttack(), 100));

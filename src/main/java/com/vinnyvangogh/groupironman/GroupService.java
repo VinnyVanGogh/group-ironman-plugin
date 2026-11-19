@@ -267,6 +267,7 @@ class GroupService
 	private int lastX;
 	private int lastY;
 	private int lastPlane;
+	private MemberStatus lastStatus = MemberStatus.UNKNOWN;
 	private String lastStatsSent;
 	private String lastCarriedSent;
 	/** This player's carried items as last put on their own card, sent or not. */
@@ -1544,9 +1545,13 @@ class GroupService
 		int x = at == null ? 0 : at.getX();
 		int y = at == null ? 0 : at.getY();
 		int plane = at == null ? 0 : at.getPlane();
+		MemberStatus status = MemberStatus.fromGame(client.getVarbitValue(VarbitID.PRAYER_ALLACTIVE),
+			client.getVarpValue(VarPlayerID.POISON), client.getVarpValue(VarPlayerID.DISEASE));
 		if (run != lastRun || spec != lastSpec || world != lastWorld || region != lastRegion
-			|| plane != lastPlane || Math.abs(x - lastX) + Math.abs(y - lastY) >= MOVE_TILES)
+			|| plane != lastPlane || Math.abs(x - lastX) + Math.abs(y - lastY) >= MOVE_TILES
+			|| !status.equals(lastStatus))
 		{
+			lastStatus = status;
 			lastRun = run;
 			lastSpec = spec;
 			lastWorld = world;
@@ -1935,7 +1940,8 @@ class GroupService
 			skills.put(skill.getName(), new MemberStats.Level(client.getRealSkillLevel(skill),
 				client.getBoostedSkillLevel(skill)));
 		}
-		MemberStats stats = new MemberStats(skills, lastRun, lastSpec, lastWorld, lastRegion, lastX, lastY, lastPlane);
+		MemberStats stats = new MemberStats(skills, lastRun, lastSpec, lastWorld, lastRegion, lastX, lastY, lastPlane,
+			lastStatus);
 		String payload = GroupOutbox.stats(gson, s, stats);
 		if (payload == null || Objects.equals(payload, lastStatsSent))
 		{
