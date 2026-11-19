@@ -2,6 +2,7 @@ package com.vinnyvangogh.groupironman;
 
 import java.util.Locale;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,9 +27,9 @@ final class WaveTracker
 {
 	enum Arena
 	{
-		FIGHT_CAVES("fight_caves", "Fight Caves", 9551, 63, "TzTok-Jad", 63),
-		INFERNO("inferno", "The Inferno", 9043, 69, "TzKal-Zuk", 68),
-		COLOSSEUM("colosseum", "Fortis Colosseum", 7216, 12, "Sol Heredit", 12);
+		FIGHT_CAVES("fight_caves", "Fight Caves", 9551, 63, "TzTok-Jad", 63, 31, 37, 50, 62, 63),
+		INFERNO("inferno", "The Inferno", 9043, 69, "TzKal-Zuk", 68, 30, 50, 60, 66, 67, 68, 69),
+		COLOSSEUM("colosseum", "Fortis Colosseum", 7216, 12, "Sol Heredit", 12, 4, 8, 11, 12);
 
 		final String id;
 		final String title;
@@ -40,8 +41,12 @@ final class WaveTracker
 		/** From this wave on, every wave is a boss wave and always a milestone: Jad 63, Triple Jads 68, Sol 12. */
 		final int bossFrom;
 
-		Arena(String id, String title, int region, int max, String boss, int bossFrom)
+		/** The waves that always post a milestone (Board, 2026-11-18). */
+		final int[] milestones;
+
+		Arena(String id, String title, int region, int max, String boss, int bossFrom, int... milestones)
 		{
+			this.milestones = milestones;
 			this.id = id;
 			this.title = title;
 			this.region = region;
@@ -78,6 +83,18 @@ final class WaveTracker
 		{
 			return wave >= bossFrom;
 		}
+
+		boolean milestone(int wave)
+		{
+			for (int m : milestones)
+			{
+				if (m == wave)
+				{
+					return true;
+				}
+			}
+			return false;
+		}
 	}
 
 	static final Pattern WAVE = Pattern.compile("^Wave: (\\d+)$");
@@ -110,7 +127,8 @@ final class WaveTracker
 	private long defeatedAt;
 	private int region = -1;
 	private int world;
-	private int every = 10;
+	private int every;
+	private Predicate<Arena> enabled = a -> true;
 	private boolean changed;
 
 	/** {@code emit} takes the activity events; {@code mode} is "solo" or the team, read when a run starts. */
@@ -156,7 +174,7 @@ final class WaveTracker
 	{
 		if (arena == Arena.COLOSSEUM && completed > 0 && resumedAt > 0)
 		{
-			emit.accept(event(GroupEvent.Type.ACTIVITY_COMPLETE, now, me).number(0)
+			post(event(GroupEvent.Type.ACTIVITY_COMPLETE, now, me).number(0)
 				.detail("claimed loot after wave " + completed).build());
 		}
 		clear();
@@ -229,14 +247,28 @@ final class WaveTracker
 		changed = true;
 		if (fresh && milestone(here, n))
 		{
-			emit.accept(event(GroupEvent.Type.ACTIVITY_WAVE, now, me).number(n).detail(phase()).build());
+			post(event(GroupEvent.Type.ACTIVITY_WAVE, now, me).number(n).detail(phase()).build());
 		}
 	}
 
-	/** Every {@link #every} waves, and every boss wave; never wave 1, which is the start. */
+	/** The arena's own milestone waves, plus every {@link #every} waves if set; never wave 1, which is the start. */
 	private boolean milestone(Arena a, int n)
 	{
-		return n > 1 && (a.bossWave(n) || every > 0 && n % every == 0);
+		return n > 1 && (a.milestone(n) || every > 0 && n % every == 0);
+	}
+
+	/** Which arenas post events at all; the run itself is still tracked and shown. Default: all. */
+	void enabled(Predicate<Arena> on)
+	{
+		enabled = on == null ? a -> true : on;
+	}
+
+	private void post(GroupEvent e)
+	{
+		if (arena != null && enabled.test(arena))
+		{
+			emit.accept(e);
+		}
 	}
 
 	private void start(Arena a, int n, long now, String me)
@@ -249,7 +281,7 @@ final class WaveTracker
 		runMode = m == null ? "" : m;
 		if (n == 1)
 		{
-			emit.accept(event(GroupEvent.Type.ACTIVITY_START, now, me).number(1).detail(runMode).build());
+			post(event(GroupEvent.Type.ACTIVITY_START, now, me).number(1).detail(runMode).build());
 		}
 	}
 
@@ -261,8 +293,9 @@ final class WaveTracker
 	{
 		if (arena != null)
 		{
+			boolean posts = enabled.test(arena);
 			defeat(now, me);
-			return true;
+			return posts;
 		}
 		return defeatedAt > 0 && now - defeatedAt <= SAME_DEATH_MS;
 	}
@@ -273,7 +306,7 @@ final class WaveTracker
 		{
 			return;
 		}
-		emit.accept(event(GroupEvent.Type.ACTIVITY_DEATH, now, me).number(wave)
+		post(event(GroupEvent.Type.ACTIVITY_DEATH, now, me).number(wave)
 			.detail(join(phase(), ActivityState.duration(elapsed(now)), mods)).world(world).location(arena.title)
 			.build());
 		defeatedAt = now;
@@ -288,7 +321,7 @@ final class WaveTracker
 			return;
 		}
 		String time = duration != null ? duration : ActivityState.duration(elapsed(now));
-		emit.accept(event(GroupEvent.Type.ACTIVITY_COMPLETE, now, me).number(pendingKc)
+		post(event(GroupEvent.Type.ACTIVITY_COMPLETE, now, me).number(pendingKc)
 			.detail(join(time, stats(), mods)).build());
 		clear();
 	}

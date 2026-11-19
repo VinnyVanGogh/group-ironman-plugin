@@ -1540,6 +1540,8 @@ class GroupEventEngine
 	{
 		String name = me.getName();
 		waves.every(resolved().intValue(GroupSettingsSchema.WAVE_EVERY));
+		waves.enabled(a -> a == WaveTracker.Arena.FIGHT_CAVES ? config.activityFightCaves()
+			: a == WaveTracker.Arena.INFERNO ? config.activityInferno() : config.activityColosseum());
 		waves.tick(now, name);
 		waves.region(templateRegion(me), client.getWorld(), now, name);
 		if (waves.active())
