@@ -294,4 +294,17 @@ public class PresenceDebounceTest
 		assertEquals(GroupEvent.Type.BACK, back.type);
 		assertEquals(9, back.number);
 	}
+
+	@Test
+	public void backAfterCountsFull24HourPeriodsNotCalendarDays()
+	{
+		long day = TimeUnit.DAYS.toMillis(1);
+		long hour = TimeUnit.HOURS.toMillis(1);
+		// 6 days 23 hours is across 7 calendar dates' worth of midnights, but is not 7 full days.
+		assertNull(PresenceDebounce.back(NOW - 7 * day + hour, NOW, 7, "Alex"));
+		// Exactly 7 x 24h counts.
+		assertEquals(7, PresenceDebounce.back(NOW - 7 * day, NOW, 7, "Alex").number);
+		// 7 days 23 hours is still 7 (rounded down), not 8.
+		assertEquals(7, PresenceDebounce.back(NOW - 8 * day + hour, NOW, 7, "Alex").number);
+	}
 }

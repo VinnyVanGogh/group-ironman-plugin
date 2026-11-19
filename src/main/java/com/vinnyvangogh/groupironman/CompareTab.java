@@ -42,6 +42,9 @@ final class CompareTab
 	/** A GIM group has at most five members; more names than this typed in is a mistake, not a group. */
 	static final int MAX_OTHER_NAMES = 5;
 
+	/** The mode that shows what each member's bank would give in experience. */
+	static final String BANKED = "Banked XP";
+
 	/** What the tab's buttons do. Callbacks may arrive on another thread. */
 	interface Actions
 	{
@@ -66,11 +69,23 @@ final class CompareTab
 		final List<GroupCompare.Figures> figures;
 		final List<String> groupNames;
 
+		/** Banked experience per member (bank plus inventory), and the group storage's, counted once. */
+		final Map<String, Map<String, Double>> banked;
+		final Map<String, Double> storageBanked;
+
 		View(String self, List<GroupCompare.Figures> figures, List<String> groupNames)
+		{
+			this(self, figures, groupNames, Collections.emptyMap(), Collections.emptyMap());
+		}
+
+		View(String self, List<GroupCompare.Figures> figures, List<String> groupNames,
+			Map<String, Map<String, Double>> banked, Map<String, Double> storageBanked)
 		{
 			this.self = self;
 			this.figures = figures;
 			this.groupNames = groupNames;
+			this.banked = banked;
+			this.storageBanked = storageBanked;
 		}
 	}
 
@@ -90,6 +105,7 @@ final class CompareTab
 	private StatCategory category = StatCategory.SKILLING;
 	private String stat = Skill.AGILITY.getName();
 	private String mode = "Leaderboard";
+	private boolean withStorage = true;
 	private boolean built;
 	private boolean fillingMembers;
 	private View view;
@@ -121,7 +137,7 @@ final class CompareTab
 	{
 		JPanel modes = new JPanel(new GridLayout(0, 2, 2, 2));
 		modes.setBorder(new EmptyBorder(0, 0, 6, 0));
-		for (String m : Arrays.asList("Leaderboard", "Compare", "Group", "Item"))
+		for (String m : Arrays.asList("Leaderboard", "Compare", "Group", "Item", BANKED))
 		{
 			javax.swing.JToggleButton b = Ui.toggle(m, m.equals(mode), 2);
 			b.addActionListener(e ->
@@ -191,6 +207,9 @@ final class CompareTab
 					break;
 				case "Item":
 					item(v);
+					break;
+				case BANKED:
+					banked(v);
 					break;
 				case "Compare":
 					categories();
@@ -617,6 +636,30 @@ final class CompareTab
 			return "?";
 		}
 		return r.category == GroupCompare.Category.BOSS ? PersonalBests.format(v) : String.valueOf(v.longValue());
+	}
+
+	// ---- Banked experience ----
+
+	private void banked(View v)
+	{
+		results.add(line("Experience the items in each member's bank and inventory would give if used. "
+			+ "Levels shown are at least what they would reach.", MUTED));
+		javax.swing.JCheckBox storage = new javax.swing.JCheckBox("Count group storage once in the total",
+			withStorage);
+		storage.setFont(FontManager.getRunescapeSmallFont());
+		storage.setOpaque(false);
+		storage.addActionListener(e ->
+		{
+			withStorage = storage.isSelected();
+			showResults();
+		});
+		results.add(storage);
+		Map<String, Map<String, Integer>> levels = new java.util.HashMap<>();
+		v.figures.forEach(f -> levels.put(f.name, f.levels));
+		for (String s : BankedXp.lines(v.banked, v.storageBanked, levels, withStorage))
+		{
+			results.add(line(s, s.endsWith(":") ? Color.WHITE : MUTED));
+		}
 	}
 
 	// ---- Group against group ----
