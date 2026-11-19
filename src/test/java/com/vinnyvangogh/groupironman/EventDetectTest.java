@@ -77,6 +77,20 @@ public class EventDetectTest
 	}
 
 	@Test
+	public void theDefaultIgnoreListShowsKeysTotemsAndShards()
+	{
+		String ignore = EventDetect.DEFAULT_UNTRADEABLE_IGNORE.toLowerCase();
+		for (String shown : new String[] {"key", "totem", "shard"})
+		{
+			assertFalse(shown, ignore.contains(shown));
+		}
+		for (String junk : new String[] {"clue scroll", "scroll box", "looting bag"})
+		{
+			assertTrue(junk, ignore.contains(junk));
+		}
+	}
+
+	@Test
 	public void petMessagesAreRead()
 	{
 		assertTrue(EventText.isPet("You have a funny feeling like you're being followed."));

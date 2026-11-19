@@ -737,8 +737,13 @@ final class PanelModel
 	static StorageView storage(GroupRoster group, ItemLookup items, String self, GridFilter filter, long now)
 	{
 		List<LogRow> log = new ArrayList<>();
-		for (StorageChange c : group.log().entries())
+		for (StorageChange entry : group.log().entries())
 		{
+			StorageChange c = filtered(entry, items, filter);
+			if (c == null)
+			{
+				continue;
+			}
 			log.add(new LogRow(change(c, items, self), change(c, Amounts.EXACT.words(items), self),
 				BoostText.ago(now, c.at())));
 		}
@@ -752,6 +757,40 @@ final class PanelModel
 			+ (by.isEmpty() ? "" : ", by " + (by.equalsIgnoreCase(self) ? "you" : by));
 		Map<Integer, Integer> contents = group.storageItems();
 		return new StorageView(snapshot, total(contents, items), cells(contents, items, filter, true), log);
+	}
+
+	/**
+	 * {@code c} cut down to the items the search box and category pill keep; null when none of the visit's items
+	 * match, so the change log narrows with the grid. An unfiltered view returns {@code c} itself.
+	 */
+	static StorageChange filtered(StorageChange c, ItemLookup items, GridFilter filter)
+	{
+		if (!filter.searching() && filter.category == ItemCategory.ALL)
+		{
+			return c;
+		}
+		ItemQuery q = ItemQuery.parse(filter.query);
+		Map<Integer, Integer> took = keep(c.took(), items, q, filter.category);
+		Map<Integer, Integer> deposited = keep(c.deposited(), items, q, filter.category);
+		if (took.isEmpty() && deposited.isEmpty())
+		{
+			return null;
+		}
+		return new StorageChange(c.at(), c.member(), took, deposited, c.after(), c.shared());
+	}
+
+	private static Map<Integer, Integer> keep(Map<Integer, Integer> counts, ItemLookup items, ItemQuery q,
+		ItemCategory category)
+	{
+		Map<Integer, Integer> out = new java.util.LinkedHashMap<>();
+		for (Map.Entry<Integer, Integer> e : counts.entrySet())
+		{
+			if ((q == null || q.matches(items.name(e.getKey()))) && category.matches(e.getKey(), items))
+			{
+				out.put(e.getKey(), e.getValue());
+			}
+		}
+		return out;
 	}
 
 	/**

@@ -7,6 +7,8 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.util.IdentityHashMap;
+import java.util.Map;
 
 /** Draws a {@link BoxText.Icon} in a square: RuneLite's skill and item pictures, or a small built-in glyph. */
 final class BoxIcons
@@ -55,8 +57,7 @@ final class BoxIcons
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		if (image != null)
 		{
-			g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-			g.drawImage(image, x, y, size, size, null);
+			g.drawImage(scaled(image, size), x, y, null);
 		}
 		else if (icon.glyph != null)
 		{
@@ -69,6 +70,67 @@ final class BoxIcons
 		}
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 			old == null ? RenderingHints.VALUE_ANTIALIAS_DEFAULT : old);
+	}
+
+	/** How long a scaled picture is re-checked: an item's image fills in after it loads, so a blank one must not stick. */
+	private static final long SETTLE_MS = 5_000;
+	private static final long RECHECK_MS = 250;
+	private static final int MAX_CACHED = 256;
+
+	private static final class Scaled
+	{
+		final BufferedImage source;
+		final int size;
+		final long born;
+		long checked;
+		BufferedImage image;
+
+		Scaled(BufferedImage source, int size, long now)
+		{
+			this.source = source;
+			this.size = size;
+			this.born = now;
+			this.checked = now;
+			this.image = render(source, size);
+		}
+	}
+
+	/** Picture scaled once, not per frame; keyed by the source image itself. Only the render thread draws. */
+	private static final Map<BufferedImage, Scaled> SCALED = new IdentityHashMap<>();
+
+	/** {@code image} at size x size: the Group box asks every frame, so the scaling is done once per picture and size. */
+	static BufferedImage scaled(BufferedImage image, int size)
+	{
+		long now = System.currentTimeMillis();
+		synchronized (SCALED)
+		{
+			Scaled hit = SCALED.get(image);
+			if (hit == null || hit.size != size)
+			{
+				if (SCALED.size() >= MAX_CACHED)
+				{
+					SCALED.clear();
+				}
+				hit = new Scaled(image, size, now);
+				SCALED.put(image, hit);
+			}
+			else if (now - hit.born < SETTLE_MS && now - hit.checked >= RECHECK_MS)
+			{
+				hit.checked = now;
+				hit.image = render(image, size);
+			}
+			return hit.image;
+		}
+	}
+
+	private static BufferedImage render(BufferedImage source, int size)
+	{
+		BufferedImage out = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g = out.createGraphics();
+		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+		g.drawImage(source, 0, 0, size, size, null);
+		g.dispose();
+		return out;
 	}
 
 	private static void glyph(Graphics2D g, BoxText.Glyph glyph, int x, int y, int size)
