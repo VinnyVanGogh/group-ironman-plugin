@@ -77,7 +77,10 @@ final class StorageTabView
 	{
 		noChanges.setVisible(!collapsed && lastLogEmpty);
 		rows.setVisible(!collapsed);
-		logHeader.setText((collapsed ? "▶ " : "▼ ") + "Changes");
+		// A drawn arrow: the RuneScape font has no glyph for ▶/▼ and showed a box.
+		logHeader.setIcon(new GroupIronmanPanel.Arrow(!collapsed));
+		logHeader.setIconTextGap(4);
+		logHeader.setText("Changes");
 		logHeader.setToolTipText(collapsed ? "Click to show the changes" : "Click to hide the changes");
 	}
 
