@@ -20,6 +20,25 @@ final class BoostText
 		return real + " (" + (diff > 0 ? "+" : "") + diff + ")";
 	}
 
+	/** "now", "8m", "2h", "3d": {@link #ago} without the words, for a tight overlay. */
+	static String shortAgo(long now, long then)
+	{
+		long ms = now - then;
+		if (ms < TimeUnit.MINUTES.toMillis(1))
+		{
+			return "now";
+		}
+		if (ms < TimeUnit.HOURS.toMillis(1))
+		{
+			return TimeUnit.MILLISECONDS.toMinutes(ms) + "m";
+		}
+		if (ms < TimeUnit.DAYS.toMillis(1))
+		{
+			return TimeUnit.MILLISECONDS.toHours(ms) + "h";
+		}
+		return TimeUnit.MILLISECONDS.toDays(ms) + "d";
+	}
+
 	/** "just now", "5m ago", "3h ago", "2d ago". A time ahead of now (clock skew) reads as just now. */
 	static String ago(long now, long then)
 	{

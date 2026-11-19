@@ -25,29 +25,29 @@ final class GroupBoxOverlay extends OverlayPanel
 	private final GroupIronmanConfig config;
 	private final GroupService group;
 	private final Supplier<EasterEggs.Settings> eggs;
+	private final BoxIcons.Source icons;
 
 	GroupBoxOverlay(ToastQueue toasts, GroupIronmanConfig config, GroupService group,
-		Supplier<EasterEggs.Settings> eggs)
+		Supplier<EasterEggs.Settings> eggs, BoxIcons.Source icons)
 	{
 		this.toasts = toasts;
 		this.config = config;
 		this.group = group;
 		this.eggs = eggs;
+		this.icons = icons;
 		setPosition(OverlayPosition.TOP_LEFT);
 		OverlayStyle.frame(panelComponent, OverlayStyle.WIDTH);
 	}
 
-	/** One recent event, already worded. */
+	/** One recent event, already worded; the colour is the member's name's. */
 	static final class EventLine
 	{
-		final String text;
-		final String ago;
+		final BoxText.Line line;
 		final Color colour;
 
-		EventLine(String text, String ago, Color colour)
+		EventLine(BoxText.Line line, Color colour)
 		{
-			this.text = text;
-			this.ago = ago;
+			this.line = line;
 			this.colour = colour;
 		}
 	}
@@ -63,13 +63,18 @@ final class GroupBoxOverlay extends OverlayPanel
 		Map<String, Integer> online = GamePresence.othersOnline(group.roster().onlineStats(now), group.presence(),
 			group.self());
 		EasterEggs.Settings egg = eggs.get();
+		BoxSize size = config.overlayGroupBoxSize();
+		boolean pictures = config.overlayGroupBoxIcons();
+		BoxTimes times = config.overlayGroupBoxTimes();
 		List<EventLine> events = new ArrayList<>();
 		for (GroupEvent event : toasts.recent(config.overlayGroupBoxEvents()))
 		{
-			events.add(new EventLine(EasterEggs.tagged(EventText.sentence(event, group.lookup), event, egg),
-				BoostText.ago(now, event.at), new Color(event.type.category.colour)));
+			BoxText.Line line = BoxText.format(event, group.lookup, size, pictures, times, now);
+			events.add(new EventLine(new BoxText.Line(line.icon, line.member,
+				EasterEggs.tagged(line.detail, event, egg), line.ago), new Color(event.type.category.colour)));
 		}
-		build(panelComponent, online, group.roster().activities(now), events);
+		OverlayStyle.frame(panelComponent, size.width);
+		build(panelComponent, online, group.roster().activities(now), events, size, icons);
 		return super.render(graphics);
 	}
 
@@ -78,24 +83,24 @@ final class GroupBoxOverlay extends OverlayPanel
 	 * state arrived, not here: this runs every frame), then the latest events.
 	 */
 	static void build(PanelComponent panel, Map<String, Integer> online, Map<String, ActivityState> activities,
-		List<EventLine> events)
+		List<EventLine> events, BoxSize size, BoxIcons.Source icons)
 	{
 		List<LayoutableRenderableEntity> kids = panel.getChildren();
 		kids.add(new OverlayStyle.Header("Group", online.isEmpty() ? "" : online.size() + " online",
 			OverlayStyle.ACCENT));
 		if (online.isEmpty())
 		{
-			kids.add(new OverlayStyle.Row("Nobody else online", OverlayStyle.MUTED));
+			kids.add(new OverlayStyle.Row("Nobody else online", OverlayStyle.MUTED).scale(size.fontScale));
 		}
 		for (Map.Entry<String, Integer> e : online.entrySet())
 		{
 			int world = e.getValue();
 			kids.add(new OverlayStyle.Row(e.getKey(), OverlayStyle.TEXT).dot(OverlayStyle.ONLINE)
-				.right(world > 0 ? "W" + world : "", OverlayStyle.MUTED));
+				.right(world > 0 ? "W" + world : "", OverlayStyle.MUTED).scale(size.fontScale));
 			ActivityState a = activities.get(e.getKey());
 			if (a != null)
 			{
-				kids.add(new OverlayStyle.Row(a.overlayLine(), ACTIVITY).indent(12));
+				kids.add(new OverlayStyle.Row(a.overlayLine(), ACTIVITY).indent(12).scale(size.fontScale));
 			}
 		}
 		if (!events.isEmpty())
@@ -104,7 +109,7 @@ final class GroupBoxOverlay extends OverlayPanel
 		}
 		for (EventLine event : events)
 		{
-			kids.add(new OverlayStyle.Row(event.text, event.colour).right(event.ago, OverlayStyle.MUTED));
+			kids.add(new OverlayStyle.EventRow(event.line, event.colour, size.fontScale, icons));
 		}
 	}
 }
