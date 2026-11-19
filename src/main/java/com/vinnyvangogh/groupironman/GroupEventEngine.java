@@ -373,6 +373,17 @@ class GroupEventEngine
 		warnBadWebhooks();
 	}
 
+	private DiscordStyle discordStyle()
+	{
+		return resolved().on(GroupSettingsSchema.PLAIN_TEXT) ? DiscordStyle.PLAIN : DiscordStyle.EMBED;
+	}
+
+	private GraveScreenshot graveScreenshot()
+	{
+		GraveScreenshot[] all = GraveScreenshot.values();
+		return all[resolved().intValue(GroupSettingsSchema.GRAVE_SHOT)];
+	}
+
 	/** The shared values now; this member's own config until the first {@link #reloadConfig}. */
 	private GroupSettingsSchema.Resolved resolved()
 	{
@@ -579,10 +590,10 @@ class GroupEventEngine
 		GroupSettingsSchema.Resolved v = resolved();
 		boolean quiet = DiscordQueue.quiet(LocalTime.now().getHour(), v.intValue("discordQuietStart"),
 			v.intValue("discordQuietEnd"));
-		StatusBoard.Send send = board.next(now, quiet, LocalDate.now().toEpochDay(), config.discordRepostBoard());
+		StatusBoard.Send send = board.next(now, quiet, LocalDate.now().toEpochDay(), resolved().on(GroupSettingsSchema.REPOST_BOARD));
 		if (send != null)
 		{
-			board.send(sender, send, StatusBoard.payload(gson, send, config.discordStyle(),
+			board.send(sender, send, StatusBoard.payload(gson, send, discordStyle(),
 				posterName(Webhook.ONLINE)), System::currentTimeMillis);
 		}
 	}
@@ -663,7 +674,7 @@ class GroupEventEngine
 		{
 			return;
 		}
-		levels.restore(readData(LEVEL_FILE), TimeUnit.MINUTES.toMillis(config.discordCombineLevels()));
+		levels.restore(readData(LEVEL_FILE), TimeUnit.MINUTES.toMillis(resolved().intValue(GroupSettingsSchema.COMBINE_LEVELS)));
 		levelsLoaded = true;
 	}
 
@@ -680,7 +691,7 @@ class GroupEventEngine
 		{
 			return;
 		}
-		grouped.restore(readData(GROUPED_FILE), TimeUnit.MINUTES.toMillis(config.discordGroupPosts()));
+		grouped.restore(readData(GROUPED_FILE), TimeUnit.MINUTES.toMillis(resolved().intValue(GroupSettingsSchema.GROUP_POSTS)));
 		groupedLoaded = true;
 	}
 
@@ -1248,7 +1259,7 @@ class GroupEventEngine
 	/** The gravestone warning posts to Discord with "Where I died" ({@link GraveScreenshot#DEATH}) and screenshots on. */
 	private boolean keepsDeathFrame()
 	{
-		return config.discordScreenshot() && config.discordGravestoneScreenshot() == GraveScreenshot.DEATH
+		return resolved().on(GroupSettingsSchema.SCREENSHOT) && graveScreenshot() == GraveScreenshot.DEATH
 			&& settings.discord.contains(GroupEvent.Type.GRAVESTONE_EXPIRING)
 			&& webhookFor(Webhook.of(GroupEvent.Type.GRAVESTONE_EXPIRING)) != null;
 	}
@@ -1968,7 +1979,7 @@ class GroupEventEngine
 	 */
 	private boolean framesAtStart(GroupEvent event, DiscordBatch.Pending moment, List<DiscordBatch.Pending> done)
 	{
-		return moment.events.size() == 1 && !done.contains(moment) && config.discordScreenshot()
+		return moment.events.size() == 1 && !done.contains(moment) && resolved().on(GroupSettingsSchema.SCREENSHOT)
 			&& event.type != GroupEvent.Type.LEVEL_UP;
 	}
 
@@ -1977,7 +1988,7 @@ class GroupEventEngine
 	{
 		if (event.type == GroupEvent.Type.GRAVESTONE_EXPIRING)
 		{
-			return graveShot.choose(config.discordGravestoneScreenshot(), config.discordScreenshot());
+			return graveShot.choose(graveScreenshot(), resolved().on(GroupSettingsSchema.SCREENSHOT));
 		}
 		return event.type == GroupEvent.Type.ONLINE ? GraveShot.Choice.NOTHING : GraveShot.Choice.NEXT_FRAME;
 	}
@@ -2007,7 +2018,7 @@ class GroupEventEngine
 			return;
 		}
 		GroupEvent level = firstLevelUp(moment.events);
-		if (!config.discordScreenshot() || moment.screenshot != null)
+		if (!resolved().on(GroupSettingsSchema.SCREENSHOT) || moment.screenshot != null)
 		{
 			send.accept(moment.screenshot);
 		}
@@ -2047,7 +2058,7 @@ class GroupEventEngine
 	private Consumer<byte[]> combineLevels(String url, List<GroupEvent> levels, DiscordMerge.Post first,
 		List<GroupEvent> events)
 	{
-		long window = TimeUnit.MINUTES.toMillis(config.discordCombineLevels());
+		long window = TimeUnit.MINUTES.toMillis(resolved().intValue(GroupSettingsSchema.COMBINE_LEVELS));
 		if (window <= 0 || levels == null)
 		{
 			return null;
@@ -2061,7 +2072,7 @@ class GroupEventEngine
 	private void levelUp(String url, List<GroupEvent> levelUps, DiscordMerge.Post first, long window, byte[] png,
 		String egg)
 	{
-		String json = DiscordWebhook.payload(gson, first, discordWords(), config.discordStyle(),
+		String json = DiscordWebhook.payload(gson, first, discordWords(), discordStyle(),
 			config.discordMention(), png != null, egg, posterName(Webhook.PROGRESS));
 		levels.level(url, levelUps, window, png, json);
 	}
@@ -2089,7 +2100,7 @@ class GroupEventEngine
 		{
 			return;
 		}
-		if (!picture || !config.discordScreenshot() || shot != null)
+		if (!picture || !resolved().on(GroupSettingsSchema.SCREENSHOT) || shot != null)
 		{
 			send.accept(shot);
 			return;
@@ -2104,21 +2115,21 @@ class GroupEventEngine
 	 */
 	private Consumer<byte[]> poster(String url, DiscordMerge.Post post, List<GroupEvent> events, boolean picture)
 	{
-		boolean picked = picture && config.discordScreenshot();
+		boolean picked = picture && resolved().on(GroupSettingsSchema.SCREENSHOT);
 		ItemLookup words = discordWords();
 		String egg = egg(events);
 		String mention = config.discordMention();
 		String username = posterName(Webhook.of(post.lead.type));
-		String json = DiscordWebhook.payload(gson, post, words, config.discordStyle(), mention, picked, egg, username);
+		String json = DiscordWebhook.payload(gson, post, words, discordStyle(), mention, picked, egg, username);
 		if (json == null)
 		{
 			return null;
 		}
-		if (picked && config.discordPickupShot() && pickable(post))
+		if (picked && resolved().on(GroupSettingsSchema.PICKUP_SHOT) && pickable(post))
 		{
 			return pickupPost(url, json, post.lead.items);
 		}
-		long window = TimeUnit.MINUTES.toMillis(config.discordGroupPosts());
+		long window = TimeUnit.MINUTES.toMillis(resolved().intValue(GroupSettingsSchema.GROUP_POSTS));
 		boolean pings = post.big && mention != null && !mention.trim().isEmpty();
 		EventThreads.Moment moment = window <= 0 ? null
 			: EventPosts.moment(gson, url, post, words, egg, username, pings);
@@ -2149,7 +2160,7 @@ class GroupEventEngine
 		}
 		WorldPoint at = me.getWorldLocation();
 		Map<Integer, Integer> baseline = inventoryCounts();
-		long expires = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(config.discordPickupMinutes());
+		long expires = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(resolved().intValue(GroupSettingsSchema.PICKUP_MINUTES));
 		return png -> sender.post(url, json, png, (status, id) ->
 		{
 			if (EditedThreads.ok(status) && id != null && png != null)

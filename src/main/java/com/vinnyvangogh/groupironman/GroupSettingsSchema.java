@@ -75,6 +75,18 @@ final class GroupSettingsSchema
 	/** "Post every N waves" for wave activities ({@link WaveTracker}); 0 posts the final boss waves only. */
 	static final String WAVE_EVERY = "eventWaveEvery";
 
+	/** "How to post" settings the leader and editors set for the whole group. */
+	static final String COMBINE_LEVELS = "discordCombineLevels";
+	static final String GROUP_POSTS = "discordGroupPosts";
+	/** A switch: 1 is plain text, 0 the rich embed. */
+	static final String PLAIN_TEXT = "discordPlainText";
+	static final String SCREENSHOT = "discordScreenshot";
+	static final String PICKUP_SHOT = "discordPickupShot";
+	static final String PICKUP_MINUTES = "discordPickupMinutes";
+	/** The {@link GraveScreenshot} ordinal: 0 where I died, 1 current view, 2 none. */
+	static final String GRAVE_SHOT = "discordGraveShot";
+	static final String REPOST_BOARD = "discordRepostBoard";
+
 	private static final long GP_MAX = Integer.MAX_VALUE;
 	private static final Map<String, Setting> BY_KEY = new LinkedHashMap<>();
 	/** In the order the panel lists them. */
@@ -119,6 +131,16 @@ final class GroupSettingsSchema
 		timing("discordFreeloaderAt", "Freeloader at (gp)", 0, GP_MAX, GroupIronmanConfig::discordFreeloaderAt);
 		flag(NO_PLUGIN_EVENTS, "Post events for members without the plugin", TIMING,
 			GroupIronmanConfig::discordNoPluginEvents);
+
+		timing(COMBINE_LEVELS, "Combine level-ups (minutes, 0 off)", 0, 240, GroupIronmanConfig::discordCombineLevels);
+		timing(GROUP_POSTS, "Group posts (minutes, 0 off)", 0, 240, GroupIronmanConfig::discordGroupPosts);
+		flag(PLAIN_TEXT, "Plain text, not embeds", TIMING, config -> config.discordStyle() == DiscordStyle.PLAIN);
+		flag(SCREENSHOT, "Attach a screenshot", TIMING, GroupIronmanConfig::discordScreenshot);
+		flag(PICKUP_SHOT, "Add picked-up screenshot", TIMING, GroupIronmanConfig::discordPickupShot);
+		timing(PICKUP_MINUTES, "Pickup wait (minutes)", 1, 30, GroupIronmanConfig::discordPickupMinutes);
+		timing(GRAVE_SHOT, "Grave picture (0 death, 1 now, 2 none)", 0, GraveScreenshot.values().length - 1,
+			config -> config.discordGravestoneScreenshot().ordinal());
+		flag(REPOST_BOARD, "Repost online board daily", TIMING, GroupIronmanConfig::discordRepostBoard);
 
 		ALL = Collections.unmodifiableList(new ArrayList<>(BY_KEY.values()));
 	}
