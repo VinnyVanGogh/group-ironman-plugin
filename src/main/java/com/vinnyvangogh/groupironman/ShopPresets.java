@@ -6,7 +6,7 @@ import com.google.gson.annotations.SerializedName;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+import com.google.common.base.Charsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -175,7 +175,7 @@ final class ShopPresets
 			{
 				return new ShopPresets();
 			}
-			ShopPresets out = gson.fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), ShopPresets.class);
+			ShopPresets out = gson.fromJson(new InputStreamReader(in, Charsets.UTF_8), ShopPresets.class);
 			return out == null ? new ShopPresets() : out;
 		}
 		catch (IOException | JsonParseException e)
