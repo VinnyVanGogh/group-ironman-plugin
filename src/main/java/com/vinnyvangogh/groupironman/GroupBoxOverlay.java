@@ -67,7 +67,7 @@ final class GroupBoxOverlay extends OverlayPanel
 		boolean pictures = config.overlayGroupBoxIcons();
 		BoxTimes times = config.overlayGroupBoxTimes();
 		List<EventLine> events = new ArrayList<>();
-		for (GroupEvent event : toasts.recent(config.overlayGroupBoxEvents()))
+		for (GroupEvent event : BoxText.stack(toasts.recent(config.overlayGroupBoxEvents())))
 		{
 			BoxText.Line line = BoxText.format(event, group.lookup, size, pictures, times, now);
 			events.add(new EventLine(new BoxText.Line(line.icon, line.member,

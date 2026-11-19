@@ -45,6 +45,8 @@ final class DiscordQueue
 		final String json;
 		/** A PNG to attach, or null. */
 		final byte[] png;
+		/** A second PNG, sent after {@link #png} (the picked-up screenshot of a drop); null for none. */
+		final byte[] second;
 		/** The message this post edits in place (or deletes), or null for a new message. */
 		final String edit;
 		/** Told once how it went (never for a retry); null when nobody asks. A new post with one waits for its id. */
@@ -63,8 +65,20 @@ final class DiscordQueue
 			this(url, json, png, edit, result, false);
 		}
 
+		/** An edit that uploads two pictures: {@code png} as the first file, {@code second} as the next. */
+		Post(String url, String json, byte[] png, byte[] second, String edit, Result result)
+		{
+			this(url, json, png, edit, result, false, second);
+		}
+
 		private Post(String url, String json, byte[] png, String edit, Result result, boolean delete)
 		{
+			this(url, json, png, edit, result, delete, null);
+		}
+
+		private Post(String url, String json, byte[] png, String edit, Result result, boolean delete, byte[] second)
+		{
+			this.second = second;
 			this.url = url;
 			this.json = json;
 			this.png = png;

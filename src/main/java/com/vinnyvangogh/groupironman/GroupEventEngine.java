@@ -43,6 +43,7 @@ import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetLoaded;
@@ -212,6 +213,8 @@ class GroupEventEngine
 	private EventPosts grouped;
 	/** Whether this run has read {@link #GROUPED_FILE}. Timer and shutdown. */
 	private volatile boolean groupedLoaded;
+	/** Posted drops waiting for their pickup ({@link PickupWatch}). Any thread; never saved. */
+	private final PickupWatch pickups = new PickupWatch();
 	private volatile EventSettings settings = EventSettings.OFF;
 	/**
 	 * {@link #settings} without this member's own opt-outs: what posts for members without the plugin, who cannot
@@ -341,6 +344,7 @@ class GroupEventEngine
 			groupedLoaded = false;
 			grouped.clear();
 		}
+		pickups.clear();
 		toasts.clear();
 		// Held login events are dropped with the rest of the unsent posts.
 		gate.startOver();
@@ -2110,6 +2114,10 @@ class GroupEventEngine
 		{
 			return null;
 		}
+		if (picked && config.discordPickupShot() && pickable(post))
+		{
+			return pickupPost(url, json, post.lead.items);
+		}
 		long window = TimeUnit.MINUTES.toMillis(config.discordGroupPosts());
 		boolean pings = post.big && mention != null && !mention.trim().isEmpty();
 		EventThreads.Moment moment = window <= 0 ? null
@@ -2119,6 +2127,85 @@ class GroupEventEngine
 			return png -> grouped.add(moment, json, picked ? png : null, window);
 		}
 		return png -> sender.post(url, json, picked ? png : null);
+	}
+
+	/** A post of this player's own drop, with items to pick up. */
+	private static boolean pickable(DiscordMerge.Post post)
+	{
+		return post.lead.type == GroupEvent.Type.DROP && !post.lead.broadcast && !post.lead.items.isEmpty();
+	}
+
+	/**
+	 * Client thread. A drop's post that goes on its own (never in a grouped message, whose edits would drop the second
+	 * picture) and is then watched for its pickup: {@link #pickedUp} edits it. Where the drop was, and what the
+	 * inventory held, are read now.
+	 */
+	private Consumer<byte[]> pickupPost(String url, String json, Map<Integer, Integer> items)
+	{
+		Player me = client.getLocalPlayer();
+		if (me == null)
+		{
+			return png -> sender.post(url, json, png);
+		}
+		WorldPoint at = me.getWorldLocation();
+		Map<Integer, Integer> baseline = inventoryCounts();
+		long expires = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(config.discordPickupMinutes());
+		return png -> sender.post(url, json, png, (status, id) ->
+		{
+			if (EditedThreads.ok(status) && id != null && png != null)
+			{
+				pickups.add(new PickupWatch.Watch(url, id, json, png, items, baseline, at.getX(), at.getY(),
+					at.getPlane(), expires));
+			}
+		});
+	}
+
+	/** Client thread. The inventory's amounts by canonical item id. */
+	private Map<Integer, Integer> inventoryCounts()
+	{
+		Map<Integer, Integer> counts = new TreeMap<>();
+		ItemContainer inv = client.getItemContainer(InventoryID.INV);
+		if (inv != null)
+		{
+			for (Item item : inv.getItems())
+			{
+				if (item.getId() > 0)
+				{
+					ItemCounts.add(counts, item.getId(), item.getQuantity(), itemManager::canonicalize);
+				}
+			}
+		}
+		return counts;
+	}
+
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event)
+	{
+		if (event.getContainerId() != InventoryID.INV || pickups.size() == 0)
+		{
+			return;
+		}
+		Player me = client.getLocalPlayer();
+		if (me == null)
+		{
+			return;
+		}
+		WorldPoint at = me.getWorldLocation();
+		for (PickupWatch.Watch w : pickups.inventory(inventoryCounts(), at.getX(), at.getY(), at.getPlane(),
+			System.currentTimeMillis()))
+		{
+			pickedUp(w);
+		}
+	}
+
+	/** The pickup's frame, then the post's edit: its own screenshot again with the new one after it. */
+	private void pickedUp(PickupWatch.Watch w)
+	{
+		String edit = DiscordWebhook.pickupEdit(gson, w.json);
+		if (edit != null)
+		{
+			nextFrame(png -> sender.edit(w.url, w.messageId, edit, w.shot, png, null));
+		}
 	}
 
 	/** The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread. */
