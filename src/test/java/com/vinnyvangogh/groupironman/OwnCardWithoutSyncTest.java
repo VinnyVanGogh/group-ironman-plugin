@@ -6,6 +6,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Player;
 import net.runelite.api.events.GameTick;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.party.PartyService;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -43,6 +44,7 @@ public class OwnCardWithoutSyncTest
 		set(service, "client", client);
 		set(service, "config", config);
 		set(service, "gson", new Gson());
+		set(service, "configManager", Mockito.mock(ConfigManager.class));
 		set(service, "partyService", Mockito.mock(PartyService.class));
 		set(service, "containers", Mockito.mock(CarriedContainers.class));
 		set(service, "memberName", GroupMembers.key("Alice"));
