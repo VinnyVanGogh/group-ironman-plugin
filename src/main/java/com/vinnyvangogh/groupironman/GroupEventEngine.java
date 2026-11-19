@@ -766,9 +766,19 @@ class GroupEventEngine
 	{
 		Predicate<String> plugin = pluginUser();
 		List<GroupEvent> posts;
+		List<GroupEvent> shows;
+		Player me = client.getLocalPlayer();
+		String self = me == null || me.getName() == null ? "" : GroupMembers.key(me.getName());
+		long now = System.currentTimeMillis();
 		synchronized (presenceLock)
 		{
-			posts = channelPosts.update(game, plugin, System.currentTimeMillis(), offlineGrace());
+			shows = channelPosts.shows(game, self, now);
+			posts = channelPosts.update(game, plugin, now, offlineGrace());
+		}
+		// The banner and Log do not wait on the grace; the debounced posts below are Discord's.
+		for (GroupEvent e : shows)
+		{
+			router.show(e, settings, group.lookup);
 		}
 		routeChannelPosts(posts);
 	}
@@ -861,7 +871,11 @@ class GroupEventEngine
 		boolean leads = leadsChannelPosts(System.currentTimeMillis());
 		for (GroupEvent e : posts)
 		{
-			router.route(e, leads, settings, group.lookup);
+			// Shown already, the moment the game's channel changed ({@link ChannelPosts#shows}): this is Discord's.
+			if (leads)
+			{
+				router.post(e, settings, group.lookup);
+			}
 		}
 	}
 
@@ -886,6 +900,13 @@ class GroupEventEngine
 	/** A member's event from the party, already filed under their name. */
 	void member(GroupEvent event)
 	{
+		if (event.type == GroupEvent.Type.ONLINE
+			&& group.presence().state(event.member) != GamePresence.State.UNKNOWN)
+		{
+			// Their login or logout was shown when the game's Group channel changed; their client's, held by the
+			// offline grace, would be a second, late line.
+			return;
+		}
 		router.route(event, false, settings, group.lookup);
 	}
 
@@ -1514,6 +1535,8 @@ class GroupEventEngine
 	{
 		String name = me.getName();
 		waves.every(resolved().intValue(GroupSettingsSchema.WAVE_EVERY));
+		waves.enabled(a -> a == WaveTracker.Arena.FIGHT_CAVES ? config.activityFightCaves()
+			: a == WaveTracker.Arena.INFERNO ? config.activityInferno() : config.activityColosseum());
 		waves.tick(now, name);
 		waves.region(templateRegion(me), client.getWorld(), now, name);
 		if (waves.active())

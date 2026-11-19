@@ -15,9 +15,13 @@ import java.util.function.IntPredicate;
  */
 final class EventDetect
 {
-	/** Untradeables that drop all the time and are not what anyone means by a unique. */
-	static final String DEFAULT_UNTRADEABLE_IGNORE = "Clue scroll, Scroll box, Brimstone key, Larran's key,"
-		+ " Ancient shard, Dark totem, Mossy key, Giant key, Ecumenical key, Looting bag";
+	/**
+	 * Untradeables that drop all the time and are not what anyone means by a unique: clue and scroll box
+	 * junk and the looting bag. Keys, totems and shards (Brimstone, Larran's, Mossy, Giant and Ecumenical
+	 * keys, Ancient shards, Dark totems) are deliberately left out so they are announced.
+	 */
+	static final String DEFAULT_UNTRADEABLE_IGNORE = "Clue scroll, Clue geode, Clue bottle, Clue nest,"
+		+ " Scroll box, Challenge scroll, Looting bag";
 
 	/** The account type varbit's value for a Hardcore Group Ironman (Varbits.ACCOUNT_TYPE javadoc, runelite-api). */
 	static final int HARDCORE_GROUP_IRONMAN = 5;

@@ -144,23 +144,36 @@ final class ItemPaths
 		final List<Stop> banks;
 		/** Where the player stands; null when logged out, and then the data's order stands. */
 		final WorldPoint here;
+		/**
+		 * False while gathering: an item in any bank, group storage or inventory already counts as had, so
+		 * there is no "withdraw" stop. True only once a member starts the quest that needs it.
+		 */
+		final boolean withdrawing;
 
 		Planner(QuestData data, ShopSources.Viewer viewer, ShopAllocation.Holdings holdings, List<Stop> banks,
 			WorldPoint here)
+		{
+			this(data, viewer, holdings, banks, here, false);
+		}
+
+		Planner(QuestData data, ShopSources.Viewer viewer, ShopAllocation.Holdings holdings, List<Stop> banks,
+			WorldPoint here, boolean withdrawing)
 		{
 			this.data = data;
 			this.viewer = viewer;
 			this.holdings = holdings;
 			this.banks = banks;
 			this.here = here;
+			this.withdrawing = withdrawing;
 		}
 
+		/** The gathering planner: shops only, never a bank. */
 		static Planner of(ShoppingBoard.Inputs in, List<Stop> banks, WorldPoint here)
 		{
 			return new Planner(in.data, in.viewer, in.holdings, banks, here);
 		}
 
-		/** A list line: its shops while some is still to get, the banks while storage covers some. */
+		/** A list line: its shops while some is still to get; the banks only when withdrawing what storage covers. */
 		List<Stop> shopping(ShoppingBoard.Row r)
 		{
 			List<Stop> out = new ArrayList<>();
@@ -168,7 +181,7 @@ final class ItemPaths
 			{
 				out.addAll(shops(r.sources));
 			}
-			if (r.line.storageUsed > 0)
+			if (withdrawing && r.line.storageUsed > 0)
 			{
 				out.addAll(banks);
 			}
@@ -183,7 +196,7 @@ final class ItemPaths
 				return Collections.emptyList();
 			}
 			List<Stop> out = new ArrayList<>(shops(ShopSources.forViewer(data.item(r.itemId), viewer, data)));
-			if (holdings.storage.getOrDefault(r.itemId, 0L) > 0)
+			if (withdrawing && holdings.storage.getOrDefault(r.itemId, 0L) > 0)
 			{
 				out.addAll(banks);
 			}

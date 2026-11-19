@@ -209,6 +209,8 @@ class GroupIronmanPanel extends PluginPanel
 	private static final Color ACTIVITY = new Color(0xE0, 0xB0, 0x40);
 	/** What the last Copy/Paste key press did, shown under the buttons for a while. */
 	private String keyNote;
+	/** What the header on screen shows; an update that would draw the same leaves it alone. */
+	private String headerDrawn;
 	private long keyNoteAt;
 	private final SharingPrompt sharing = new SharingPrompt();
 	private volatile View view;
@@ -621,12 +623,26 @@ class GroupIronmanPanel extends PluginPanel
 
 	private void drawHeader(View v)
 	{
+		long now = System.currentTimeMillis();
+		SyncHeader h = SyncHeader.of(v.sync, v.group.othersOnline(v.self, now), v.members);
+		String note = keyNote != null && now - keyNoteAt < 30_000 ? keyNote : null;
+		SharingPrompt.Card card = v.sharing == null ? null : sharing.card(v.sharing);
+		// A header that would read the same is left alone: rebuilding its buttons on every member update was
+		// the lag with the Settings tab open (that tab is skipped when unchanged, the header was not).
+		String signature = String.join("|", String.valueOf(SidebarButton.offNotice(v.anyOn)), h.title,
+			String.valueOf(h.detail), String.valueOf(h.ok), String.valueOf(h.buttons), String.valueOf(note),
+			card == null ? "-" : card.sharing + "," + card.discord + "," + v.sharing.key,
+			String.valueOf(v.group.strangers()));
+		if (signature.equals(headerDrawn) && header.getComponentCount() > 0)
+		{
+			return;
+		}
+		headerDrawn = signature;
 		header.removeAll();
 		if (SidebarButton.offNotice(v.anyOn))
 		{
 			header.add(offNotice());
 		}
-		SyncHeader h = SyncHeader.of(v.sync, v.group.othersOnline(v.self, System.currentTimeMillis()), v.members);
 		header.add(Ui.label(h.title, FontManager.getRunescapeBoldFont(),
 			h.ok ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.BRAND_ORANGE));
 		if (h.detail != null)
@@ -641,9 +657,9 @@ class GroupIronmanPanel extends PluginPanel
 			buttons.add(Ui.button(b.label, b.tooltip, () -> press(b)));
 		}
 		header.add(buttons);
-		if (keyNote != null && System.currentTimeMillis() - keyNoteAt < 30_000)
+		if (note != null)
 		{
-			header.add(text(keyNote, Color.WHITE));
+			header.add(text(note, Color.WHITE));
 		}
 		drawSharingCard(v.sharing);
 		for (String stranger : v.group.strangers())
