@@ -281,6 +281,12 @@ class GroupService
 	private boolean activityOut;
 	/** Client thread: the name this player's live activity is filed under in the roster, null when none. */
 	private String activityName;
+	/** When another member's client last said it keeps the live status board ({@link BoardBeacon}). */
+	private final BoardBeacon boardBeacon = new BoardBeacon();
+	/** This client keeps the live status board: set by the event engine's timer, read on the client thread. */
+	private volatile boolean keepingBoard;
+	/** Client thread: ticks since this client's last board beacon. */
+	private int ticksSinceBeacon = STATS_HEARTBEAT_TICKS;
 	private Map<Integer, Integer> seedVault = new TreeMap<>();
 	private long seedVaultAt = -1;
 	private boolean session;
@@ -1237,6 +1243,7 @@ class GroupService
 			return;
 		}
 		flushGovernance();
+		sendBoardBeacon();
 
 		if (s.stats)
 		{
@@ -1247,6 +1254,37 @@ class GroupService
 		{
 			extrasDirty = false;
 			sendExtras(s);
+		}
+	}
+
+	/** Any thread: whether this client keeps the live status board, so its beacon goes out while it does. */
+	void keepingBoard(boolean keeping)
+	{
+		keepingBoard = keeping;
+	}
+
+	/**
+	 * Any thread: whether another member's client keeps the live status board, heard of in the last
+	 * {@link BoardBeacon#STALE_MS}. This client then posts no separate online or offline messages.
+	 */
+	boolean boardKeptByOthers(long now)
+	{
+		return boardBeacon.fresh(now);
+	}
+
+	/** Client thread, syncing: a beacon about once a minute while this client keeps the board. */
+	private void sendBoardBeacon()
+	{
+		if (!keepingBoard)
+		{
+			// The next time it keeps the board, the beacon goes out at once.
+			ticksSinceBeacon = STATS_HEARTBEAT_TICKS;
+			return;
+		}
+		if (++ticksSinceBeacon >= STATS_HEARTBEAT_TICKS)
+		{
+			ticksSinceBeacon = 0;
+			send(BoardBeacon.encode(gson, System.currentTimeMillis()));
 		}
 	}
 
@@ -1749,6 +1787,14 @@ class GroupService
 		if (ActivityCodec.isActivity(payload))
 		{
 			receiveActivity(name, payload);
+			return;
+		}
+		if (BoardBeacon.isBeacon(payload))
+		{
+			if (BoardBeacon.valid(gson, payload))
+			{
+				boardBeacon.heard(System.currentTimeMillis());
+			}
 			return;
 		}
 		if (g != null && GovernanceSync.isGovernance(payload) && g.receive(name, payload))
