@@ -637,6 +637,18 @@ venom and disease have no duration in the client, so state only and the
 tooltip says so. Log basket per-log counts and looting bag contents were
 already shipped in RUNELITE-222 (#85) and render in the slot tooltip.
 
+**Import a list from the clipboard (RUNELITE-194, 2026-11-19) — allowed, with
+precedent.** A button on the Shopping tab's *New list* form reads the system
+clipboard once per press (AWT `Toolkit`, same call as *Paste group key*) and
+stages the items it names; the player reviews them and presses *Add list*.
+Nothing is read in the background and no input is synthesised. *Nearest rule:*
+Data & Privacy, nothing about other players is read; the text is the player's
+own paste. *Precedent:* the Hub plugin **Inventory Setups** imports a setup
+from the clipboard on a button press, and RuneLite's own plugins import
+settings profiles the same way. Item names resolve through
+`ItemManager#search` on the client thread, exact match only. No reflection, no
+network, no new JSON parser (the injected `Gson`).
+
 ---
 
 ## Phase 3 — quality bar
