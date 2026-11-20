@@ -156,6 +156,11 @@ class GroupIronmanPanel extends PluginPanel
 	private static final int MAX_GRID_ITEMS = 200;
 	private static final Color HP = new Color(0xB0, 0x2E, 0x26);
 	private static final Color PRAYER = new Color(0x2E, 0x8B, 0xB0);
+	/** The ring and "ON" label of a member whose prayer is switched on. */
+	private static final Color PRAYER_ON = new Color(0xFF, 0xE0, 0x4A);
+	private static final Color POISON = new Color(0x3C, 0xC8, 0x3C);
+	private static final Color VENOM = new Color(0xB0, 0x5C, 0xE0);
+	private static final Color DISEASE = new Color(0xD8, 0xB0, 0x40);
 	private static final Color RUN = new Color(0xC8, 0xA0, 0x2A);
 	private static final Color SPEC = new Color(0x3A, 0x9A, 0x4A);
 	static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR.darker();
@@ -204,6 +209,8 @@ class GroupIronmanPanel extends PluginPanel
 	private static final Color ACTIVITY = new Color(0xE0, 0xB0, 0x40);
 	/** What the last Copy/Paste key press did, shown under the buttons for a while. */
 	private String keyNote;
+	/** What the header on screen shows; an update that would draw the same leaves it alone. */
+	private String headerDrawn;
 	private long keyNoteAt;
 	private final SharingPrompt sharing = new SharingPrompt();
 	private volatile View view;
@@ -616,12 +623,26 @@ class GroupIronmanPanel extends PluginPanel
 
 	private void drawHeader(View v)
 	{
+		long now = System.currentTimeMillis();
+		SyncHeader h = SyncHeader.of(v.sync, v.group.othersOnline(v.self, now), v.members);
+		String note = keyNote != null && now - keyNoteAt < 30_000 ? keyNote : null;
+		SharingPrompt.Card card = v.sharing == null ? null : sharing.card(v.sharing);
+		// A header that would read the same is left alone: rebuilding its buttons on every member update was
+		// the lag with the Settings tab open (that tab is skipped when unchanged, the header was not).
+		String signature = String.join("|", String.valueOf(SidebarButton.offNotice(v.anyOn)), h.title,
+			String.valueOf(h.detail), String.valueOf(h.ok), String.valueOf(h.buttons), String.valueOf(note),
+			card == null ? "-" : card.sharing + "," + card.discord + "," + v.sharing.key,
+			String.valueOf(v.group.strangers()));
+		if (signature.equals(headerDrawn) && header.getComponentCount() > 0)
+		{
+			return;
+		}
+		headerDrawn = signature;
 		header.removeAll();
 		if (SidebarButton.offNotice(v.anyOn))
 		{
 			header.add(offNotice());
 		}
-		SyncHeader h = SyncHeader.of(v.sync, v.group.othersOnline(v.self, System.currentTimeMillis()), v.members);
 		header.add(Ui.label(h.title, FontManager.getRunescapeBoldFont(),
 			h.ok ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.BRAND_ORANGE));
 		if (h.detail != null)
@@ -636,9 +657,9 @@ class GroupIronmanPanel extends PluginPanel
 			buttons.add(Ui.button(b.label, b.tooltip, () -> press(b)));
 		}
 		header.add(buttons);
-		if (keyNote != null && System.currentTimeMillis() - keyNoteAt < 30_000)
+		if (note != null)
 		{
-			header.add(text(keyNote, Color.WHITE));
+			header.add(text(note, Color.WHITE));
 		}
 		drawSharingCard(v.sharing);
 		for (String stranger : v.group.strangers())
@@ -901,6 +922,15 @@ class GroupIronmanPanel extends PluginPanel
 				bars.add(new Orb(b, barColor(b.label), live && !b.assumed, orbIcons.get(b.label)));
 			}
 			body.add(bars);
+		}
+		for (int i = 0; i < c.effects.size(); i++)
+		{
+			String chip = c.effects.get(i);
+			JLabel label = new JLabel(chip);
+			label.setFont(FontManager.getRunescapeSmallFont());
+			label.setForeground(chip.startsWith("Venom") ? VENOM : chip.startsWith("Disease") ? DISEASE : POISON);
+			label.setToolTipText(i < c.effectNotes.size() ? c.effectNotes.get(i) : chip);
+			body.add(label);
 		}
 		if (c.source != null)
 		{
@@ -1688,6 +1718,12 @@ class GroupIronmanPanel extends PluginPanel
 			int textWidth = g2.getFontMetrics().stringWidth(number);
 			g2.drawString(number, x - textWidth - 3, y + SIZE - 4);
 			// Ring, empty part, then the fill rising from the bottom like the game's orbs.
+			// Prayer switched on: a bright gold ring around the orb; off or unshared: plain.
+			if (live && bar.on > 0)
+			{
+				g2.setColor(PRAYER_ON);
+				g2.fillOval(x - 2, y - 2, SIZE + 4, SIZE + 4);
+			}
 			g2.setColor(Color.BLACK);
 			g2.fillOval(x - 1, y - 1, SIZE + 2, SIZE + 2);
 			g2.setColor(ColorScheme.DARK_GRAY_COLOR);

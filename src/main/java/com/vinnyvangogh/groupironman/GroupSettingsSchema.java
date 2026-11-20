@@ -19,7 +19,7 @@ import java.util.function.ToLongFunction;
  * uses while their group has none).
  *
  * <p><b>What is not here, on purpose.</b> Webhook URLs, the mention, "Post to
- * Discord" itself, "Online status" and every "Share ..." switch stay each member's own: they
+ * Discord" itself and every "Share ..." switch stay each member's own: they
  * are where a member's posts go and what of theirs leaves their client, and a
  * webhook is a secret. {@code GroupSettingsSchemaTest} checks no key here
  * names one. The one way a webhook reaches members is the leader's own
@@ -75,6 +75,9 @@ final class GroupSettingsSchema
 	/** "Post every N waves" for wave activities ({@link WaveTracker}); 0 posts the final boss waves only. */
 	static final String WAVE_EVERY = "eventWaveEvery";
 
+	/** The group's "Online status" as {@link OnlineStatus#ordinal()}: 0 posts, 1 live board, 2 off. */
+	static final String ONLINE_STATUS = "discordOnlineStatus";
+
 	private static final long GP_MAX = Integer.MAX_VALUE;
 	private static final Map<String, Setting> BY_KEY = new LinkedHashMap<>();
 	/** In the order the panel lists them. */
@@ -114,6 +117,8 @@ final class GroupSettingsSchema
 		timing("discordQuietStart", "Quiet hours from", 0, 23, GroupIronmanConfig::discordQuietStart);
 		timing("discordQuietEnd", "Quiet hours until", 0, 23, GroupIronmanConfig::discordQuietEnd);
 		timing("discordOfflineGrace", "Offline grace (minutes)", 0, 10, GroupIronmanConfig::discordOfflineGrace);
+		timing(ONLINE_STATUS, "Online status (0 posts, 1 live board, 2 off)", 0, OnlineStatus.values().length - 1,
+			c -> c.discordOnlineStatus() == null ? 0 : c.discordOnlineStatus().ordinal());
 		flag("discordEasterEggs", "Easter eggs", TIMING, GroupIronmanConfig::discordEasterEggs);
 		timing("discordLegendAt", "Legend at (gp)", 0, GP_MAX, GroupIronmanConfig::discordLegendAt);
 		timing("discordFreeloaderAt", "Freeloader at (gp)", 0, GP_MAX, GroupIronmanConfig::discordFreeloaderAt);

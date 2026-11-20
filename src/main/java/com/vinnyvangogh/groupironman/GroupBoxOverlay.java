@@ -3,6 +3,7 @@ package com.vinnyvangogh.groupironman;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -67,15 +68,31 @@ final class GroupBoxOverlay extends OverlayPanel
 		boolean pictures = config.overlayGroupBoxIcons();
 		BoxTimes times = config.overlayGroupBoxTimes();
 		List<EventLine> events = new ArrayList<>();
-		for (GroupEvent event : toasts.recent(config.overlayGroupBoxEvents()))
+		for (GroupEvent event : BoxText.stack(toasts.recent(config.overlayGroupBoxEvents())))
 		{
 			BoxText.Line line = BoxText.format(event, group.lookup, size, pictures, times, now);
 			events.add(new EventLine(new BoxText.Line(line.icon, line.member,
 				EasterEggs.tagged(line.detail, event, egg), line.ago), new Color(event.type.category.colour)));
 		}
 		OverlayStyle.frame(panelComponent, size.width);
-		build(panelComponent, online, group.roster().activities(now), events, size, icons);
+		String empty = EmptyBox.CLASSIC;
+		if (online.isEmpty())
+		{
+			Map<String, LastSeen> seen = new java.util.TreeMap<>(group.roster().lastSeen());
+			seen.remove(group.self());
+			String latest = events.isEmpty() ? null
+				: events.get(0).line.member + ": " + events.get(0).line.detail;
+			empty = EmptyBox.pick(config.overlayGroupBoxEmpty(), ZonedDateTime.now(), now, seen, latest,
+				now / EmptyBox.ROTATE_MS);
+		}
+		build(panelComponent, online, group.roster().activities(now), events, size, icons, empty);
 		return super.render(graphics);
+	}
+
+	static void build(PanelComponent panel, Map<String, Integer> online, Map<String, ActivityState> activities,
+		List<EventLine> events, BoxSize size, BoxIcons.Source icons)
+	{
+		build(panel, online, activities, events, size, icons, EmptyBox.CLASSIC);
 	}
 
 	/**
@@ -83,14 +100,14 @@ final class GroupBoxOverlay extends OverlayPanel
 	 * state arrived, not here: this runs every frame), then the latest events.
 	 */
 	static void build(PanelComponent panel, Map<String, Integer> online, Map<String, ActivityState> activities,
-		List<EventLine> events, BoxSize size, BoxIcons.Source icons)
+		List<EventLine> events, BoxSize size, BoxIcons.Source icons, String empty)
 	{
 		List<LayoutableRenderableEntity> kids = panel.getChildren();
 		kids.add(new OverlayStyle.Header("Group", online.isEmpty() ? "" : online.size() + " online",
 			OverlayStyle.ACCENT));
 		if (online.isEmpty())
 		{
-			kids.add(new OverlayStyle.Row("Nobody else online", OverlayStyle.MUTED).scale(size.fontScale));
+			kids.add(new OverlayStyle.Row(empty,OverlayStyle.MUTED).scale(size.fontScale));
 		}
 		for (Map.Entry<String, Integer> e : online.entrySet())
 		{

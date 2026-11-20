@@ -73,6 +73,24 @@ Attribution-NonCommercial-ShareAlike 3.0 license
 (<https://creativecommons.org/licenses/by-nc-sa/3.0/>); the table is a small
 adaptation of it, shared under the same license.
 
+## Old School RuneScape Wiki: item equip requirements
+
+`src/main/resources/com/vinnyvangogh/groupironman/item-requirements.txt` lists
+the skill levels needed to wield or wear some common combat items, read from
+the Old School RuneScape Wiki (<https://oldschool.runescape.wiki>, each item's
+equipment requirements, 2026-11-18). Same Creative Commons
+Attribution-NonCommercial-ShareAlike 3.0 license as above; the table is a
+small adaptation of it, shared under the same license.
+
+## Old School RuneScape Wiki: item experience
+
+`src/main/resources/com/vinnyvangogh/groupironman/banked-xp.txt` lists the
+experience some bones, ashes, logs, raw fish, uncut gems and bars give when
+used once, read from the Old School RuneScape Wiki
+(<https://oldschool.runescape.wiki>, 2026-11-18). Same Creative Commons
+Attribution-NonCommercial-ShareAlike 3.0 license as above; the table is a
+small adaptation of it, shared under the same license.
+
 ## Shortest Path: bank tiles
 
 `src/main/resources/com/vinnyvangogh/groupironman/banks.tsv` lists one tile

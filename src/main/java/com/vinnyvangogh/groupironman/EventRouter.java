@@ -73,6 +73,34 @@ final class EventRouter
 		}
 	}
 
+	/** The Log and banner only, for a login or logout the game's channel shows now; Discord waits on its grace. */
+	void show(GroupEvent event, EventSettings settings, ItemLookup lookup)
+	{
+		GroupEvent kept = threshold(event, settings, lookup);
+		if (kept == null || !kept.isValid() || kept.member.isEmpty())
+		{
+			return;
+		}
+		log.accept(kept);
+		if (settings.overlay.contains(kept.type))
+		{
+			overlay.accept(kept);
+		}
+	}
+
+	/**
+	 * A backfilled event ({@link EventBackfill}): the Log only, with its own time. Never a toast or a Discord post,
+	 * which are for what happens now.
+	 */
+	void backfill(GroupEvent event, EventSettings settings, ItemLookup lookup)
+	{
+		GroupEvent kept = threshold(event, settings, lookup);
+		if (kept != null && kept.isValid() && !kept.member.isEmpty())
+		{
+			log.accept(kept);
+		}
+	}
+
 	/**
 	 * Discord and the digest only, under {@code settings}, for an event {@link #route} already showed under this
 	 * member's own: a game broadcast for a member without the plugin, posted without the poster's own opt-outs.

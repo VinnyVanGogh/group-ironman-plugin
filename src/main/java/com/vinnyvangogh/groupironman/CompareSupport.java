@@ -54,6 +54,31 @@ final class CompareSupport
 		return out;
 	}
 
+	/** Each member's banked experience from the last bank they closed plus what they carry; empty when neither shared. */
+	static Map<String, Map<String, Double>> banked(GroupRoster roster, Collection<String> names)
+	{
+		Map<String, BankSnapshot> banks = roster.banks();
+		Map<String, GroupCodec.Carried> carried = roster.allCarried();
+		Map<String, Map<String, Double>> out = new java.util.LinkedHashMap<>();
+		for (String name : names)
+		{
+			BankSnapshot bank = banks.get(name);
+			GroupCodec.Carried c = carried.get(name);
+			if (bank != null || c != null)
+			{
+				out.put(name, BankedXp.bundled().xp(BankedXp.combine(bank == null ? null : bank.items(),
+					c == null ? null : c.inventory)));
+			}
+		}
+		return out;
+	}
+
+	/** What the shared group storage would give, once. */
+	static Map<String, Double> storageBanked(GroupRoster roster)
+	{
+		return BankedXp.bundled().xp(roster.storageItems());
+	}
+
 	/** What the item ranking reads of each member: levels, worn items, carried items. */
 	static List<BenefitFinder.Member> members(GroupRoster roster, Collection<String> names)
 	{
@@ -71,7 +96,7 @@ final class CompareSupport
 			GroupCodec.Carried c = carried.get(name);
 			out.add(new BenefitFinder.Member(name, levels,
 				c == null ? Collections.<Integer>emptySet() : c.worn.keySet(),
-				c == null ? Collections.<Integer>emptySet() : c.inventory.keySet()));
+				c == null ? Collections.<Integer>emptySet() : c.inventory.keySet(), c != null));
 		}
 		return out;
 	}
@@ -114,8 +139,8 @@ final class CompareSupport
 			@Override
 			public Map<String, Integer> requirements(int id)
 			{
-				// RuneLite carries no level requirements, so none are claimed: the tab says so.
-				return Collections.emptyMap();
+				// RuneLite carries no level requirements: they come from the bundled table, empty when not in it.
+				return ItemRequirements.bundled().of(id);
 			}
 		};
 	}

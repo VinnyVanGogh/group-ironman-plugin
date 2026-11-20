@@ -86,7 +86,6 @@ public class WaveTrackerTest
 	@Test
 	public void fightCavesOneToSixtyThreeClearPostsMilestonesAndCompletion()
 	{
-		t.every(10);
 		at(FIGHT_CAVES);
 		for (int w = 1; w <= 63; w++)
 		{
@@ -95,7 +94,7 @@ public class WaveTrackerTest
 		}
 		List<Long> waves = new ArrayList<>();
 		of(GroupEvent.Type.ACTIVITY_WAVE).forEach(e -> waves.add(e.number));
-		assertEquals(java.util.Arrays.asList(10L, 20L, 30L, 40L, 50L, 60L, 63L), waves);
+		assertEquals(java.util.Arrays.asList(31L, 37L, 50L, 62L, 63L), waves);
 		chat("Your TzTok-Jad kill count is: <col=ff0000>4</col>.");
 		chat("Duration: <col=ff0000>31:40</col> (new personal best)");
 		t.tick(now, ME);
@@ -111,7 +110,6 @@ public class WaveTrackerTest
 	@Test
 	public void infernoOneToSixtyNineMarksTripleJadsAndZuk()
 	{
-		t.every(10);
 		at(INFERNO);
 		for (int w = 1; w <= 69; w++)
 		{
@@ -119,7 +117,7 @@ public class WaveTrackerTest
 		}
 		List<Long> waves = new ArrayList<>();
 		of(GroupEvent.Type.ACTIVITY_WAVE).forEach(e -> waves.add(e.number));
-		assertEquals(java.util.Arrays.asList(10L, 20L, 30L, 40L, 50L, 60L, 68L, 69L), waves);
+		assertEquals(java.util.Arrays.asList(30L, 50L, 60L, 66L, 67L, 68L, 69L), waves);
 		assertEquals("in The Inferno, wave 69", t.state(now).board);
 		chat("Your TzKal-Zuk kill count is: 1.");
 		t.tick(now, ME);
@@ -128,16 +126,49 @@ public class WaveTrackerTest
 	}
 
 	@Test
-	public void waveEveryZeroPostsBossWavesOnly()
+	public void waveEveryAddsToTheArenasOwnMilestones()
 	{
-		t.every(0);
+		t.every(10);
 		at(FIGHT_CAVES);
 		for (int w = 1; w <= 63; w++)
 		{
 			wave(w);
 		}
-		assertEquals(1, of(GroupEvent.Type.ACTIVITY_WAVE).size());
-		assertEquals(63, of(GroupEvent.Type.ACTIVITY_WAVE).get(0).number);
+		List<Long> waves = new ArrayList<>();
+		of(GroupEvent.Type.ACTIVITY_WAVE).forEach(e -> waves.add(e.number));
+		assertEquals(java.util.Arrays.asList(10L, 20L, 30L, 31L, 37L, 40L, 50L, 60L, 62L, 63L), waves);
+	}
+
+	@Test
+	public void colosseumMilestonesAreFourEightElevenTwelve()
+	{
+		at(COLOSSEUM);
+		for (int w = 1; w <= 12; w++)
+		{
+			wave(w);
+		}
+		List<Long> waves = new ArrayList<>();
+		of(GroupEvent.Type.ACTIVITY_WAVE).forEach(e -> waves.add(e.number));
+		assertEquals(java.util.Arrays.asList(4L, 8L, 11L, 12L), waves);
+	}
+
+	@Test
+	public void aTurnedOffArenaPostsNothingButStillTracksAndLetsThePlainDeathThrough()
+	{
+		t.enabled(a -> a != WaveTracker.Arena.INFERNO);
+		at(INFERNO);
+		for (int w = 1; w <= 50; w++)
+		{
+			wave(w);
+		}
+		assertTrue(t.active());
+		assertEquals(50, t.state(now).wave);
+		assertFalse("plain death post is not suppressed", t.died(now, ME));
+		assertTrue(out.isEmpty());
+		t.enabled(null);
+		at(FIGHT_CAVES);
+		wave(1);
+		assertEquals(1, of(GroupEvent.Type.ACTIVITY_START).size());
 	}
 
 	@Test
@@ -275,8 +306,8 @@ public class WaveTrackerTest
 	{
 		at(FIGHT_CAVES);
 		wave(1);
-		wave(40);
-		wave(40);
+		wave(50);
+		wave(50);
 		assertEquals(1, of(GroupEvent.Type.ACTIVITY_WAVE).size());
 	}
 

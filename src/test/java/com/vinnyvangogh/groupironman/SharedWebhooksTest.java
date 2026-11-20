@@ -271,6 +271,27 @@ public class SharedWebhooksTest
 	}
 
 	@Test
+	public void theGroupsOnlineStatusRulesTheSharedWebhookOnly()
+	{
+		Client member = sharing()[2];
+		Map<String, Long> v = new java.util.TreeMap<>(GroupSettingsSchema.seed(new GroupIronmanConfig()
+		{
+		}));
+		v.put(GroupSettingsSchema.ONLINE_STATUS, (long) OnlineStatus.LIVE_BOARD.ordinal());
+		GroupSettings gs = new GroupSettings(1, NOW, "Alex", "k", v, java.util.Collections.emptyList(), "");
+		GroupSettingsSchema.Resolved group = new GroupSettingsSchema.Resolved(new GroupIronmanConfig()
+		{
+		}, gs);
+		Webhooks shared = none().withGroup(member.shared());
+		assertEquals("a member on the shared webhook follows the group", OnlineStatus.LIVE_BOARD,
+			StatusBoard.effective(OnlineStatus.POSTS, group, shared));
+		assertFalse("and, not the leader, posts nothing", StatusBoard.keeps(OnlineStatus.LIVE_BOARD, shared, false));
+		Webhooks pasted = own(Webhook.ONLINE, OWN_ONLINE);
+		assertEquals("their own pasted webhook stays theirs", OnlineStatus.POSTS,
+			StatusBoard.effective(OnlineStatus.POSTS, group, pasted));
+	}
+
+	@Test
 	public void aNewLeaderDropsTheOldLeadersWebhooks()
 	{
 		Client kim = sharing()[2];

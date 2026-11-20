@@ -267,6 +267,7 @@ class GroupService
 	private int lastX;
 	private int lastY;
 	private int lastPlane;
+	private MemberStatus lastStatus = MemberStatus.UNKNOWN;
 	private String lastStatsSent;
 	private String lastCarriedSent;
 	/** This player's carried items as last put on their own card, sent or not. */
@@ -280,6 +281,12 @@ class GroupService
 	private boolean activityOut;
 	/** Client thread: the name this player's live activity is filed under in the roster, null when none. */
 	private String activityName;
+	/** When another member's client last said it keeps the live status board ({@link BoardBeacon}). */
+	private final BoardBeacon boardBeacon = new BoardBeacon();
+	/** This client keeps the live status board: set by the event engine's timer, read on the client thread. */
+	private volatile boolean keepingBoard;
+	/** Client thread: ticks since this client's last board beacon. */
+	private int ticksSinceBeacon = STATS_HEARTBEAT_TICKS;
 	private Map<Integer, Integer> seedVault = new TreeMap<>();
 	private long seedVaultAt = -1;
 	private boolean session;
@@ -1236,6 +1243,7 @@ class GroupService
 			return;
 		}
 		flushGovernance();
+		sendBoardBeacon();
 
 		if (s.stats)
 		{
@@ -1246,6 +1254,65 @@ class GroupService
 		{
 			extrasDirty = false;
 			sendExtras(s);
+		}
+	}
+
+	/** Names already reported as removed this session, so each is logged once. */
+	private final Set<String> purgeLogged = new HashSet<>();
+
+	/**
+	 * Removes every entry filed under a name that is not on the group roster from this client's Log, storage log,
+	 * banks and live data. Each client runs this on its own copy, so the entries go from everyone's, including the
+	 * client that recorded them (Board 2026-11-17). Never the local player or a roster member, and nothing while
+	 * the roster is unknown.
+	 */
+	private void purgeNonRoster(GroupMembers roster)
+	{
+		String self = localName();
+		Set<String> hit = this.roster.purge(name -> EventBackfill.offRoster(roster, self, name));
+		if (hit.isEmpty())
+		{
+			return;
+		}
+		for (String name : hit)
+		{
+			if (purgeLogged.add(GroupMembers.key(name)))
+			{
+				log.debug("removed entries from {}: not on the group roster", name);
+			}
+		}
+		saveCache();
+		onChange.run();
+	}
+
+	/** Any thread: whether this client keeps the live status board, so its beacon goes out while it does. */
+	void keepingBoard(boolean keeping)
+	{
+		keepingBoard = keeping;
+	}
+
+	/**
+	 * Any thread: whether another member's client keeps the live status board, heard of in the last
+	 * {@link BoardBeacon#STALE_MS}. This client then posts no separate online or offline messages.
+	 */
+	boolean boardKeptByOthers(long now)
+	{
+		return boardBeacon.fresh(now);
+	}
+
+	/** Client thread, syncing: a beacon about once a minute while this client keeps the board. */
+	private void sendBoardBeacon()
+	{
+		if (!keepingBoard)
+		{
+			// The next time it keeps the board, the beacon goes out at once.
+			ticksSinceBeacon = STATS_HEARTBEAT_TICKS;
+			return;
+		}
+		if (++ticksSinceBeacon >= STATS_HEARTBEAT_TICKS)
+		{
+			ticksSinceBeacon = 0;
+			send(BoardBeacon.encode(gson, System.currentTimeMillis()));
 		}
 	}
 
@@ -1268,6 +1335,11 @@ class GroupService
 		boolean wasMember = member();
 		checkMember(now);
 		boolean isMember = member();
+		if (isMember)
+		{
+			// Another group's roster must never clear this group's cache.
+			purgeNonRoster(now);
+		}
 		changed |= wasMember != isMember;
 		if (now.known() && isMember)
 		{
@@ -1544,9 +1616,13 @@ class GroupService
 		int x = at == null ? 0 : at.getX();
 		int y = at == null ? 0 : at.getY();
 		int plane = at == null ? 0 : at.getPlane();
+		MemberStatus status = MemberStatus.fromGame(client.getVarbitValue(VarbitID.PRAYER_ALLACTIVE),
+			client.getVarpValue(VarPlayerID.POISON), client.getVarpValue(VarPlayerID.DISEASE));
 		if (run != lastRun || spec != lastSpec || world != lastWorld || region != lastRegion
-			|| plane != lastPlane || Math.abs(x - lastX) + Math.abs(y - lastY) >= MOVE_TILES)
+			|| plane != lastPlane || Math.abs(x - lastX) + Math.abs(y - lastY) >= MOVE_TILES
+			|| !status.equals(lastStatus))
 		{
+			lastStatus = status;
 			lastRun = run;
 			lastSpec = spec;
 			lastWorld = world;
@@ -1587,8 +1663,7 @@ class GroupService
 				GroupOutbox.bank(gson, switches(), lastBank).forEach(this::send);
 			}
 			// The joiner may have been offline for these: this is how "since you last played" works with no server.
-			List<GroupEvent> mine = roster.events().recentBy(localName(), System.currentTimeMillis());
-			GroupOutbox.events(gson, switches(), mine).forEach(this::send);
+			uploadOwnEvents();
 			if (lastActivity.active())
 			{
 				// A joiner mid-run sees it now, not at the next wave.
@@ -1611,7 +1686,36 @@ class GroupService
 		assembler.clear();
 		roster.clearStrangers();
 		resendLive();
+		if (syncing())
+		{
+			// Joining the sync later: what this player did while not synced goes up now (Board 2026-11-17).
+			uploadOwnEvents();
+		}
 		onChange.run();
+	}
+
+	/**
+	 * Sends this player's recent events, drops and log slots under the drops switch and every other kind under
+	 * "Share group events". Receivers keep their original times and log each once ({@link EventBackfill}).
+	 */
+	private void uploadOwnEvents()
+	{
+		if (!syncing() || !member())
+		{
+			return;
+		}
+		long now = System.currentTimeMillis();
+		List<GroupEvent> mine = EventBackfill.upload(roster, localName(), now);
+		List<GroupEvent> drops = new ArrayList<>();
+		for (GroupEvent e : mine)
+		{
+			if (e.type.logged())
+			{
+				drops.add(e);
+			}
+		}
+		GroupOutbox.events(gson, switches(), drops).forEach(this::send);
+		GroupOutbox.groupEvents(gson, config.groupShareEvents(), mine).forEach(this::send);
 	}
 
 	/**
@@ -1746,6 +1850,14 @@ class GroupService
 			receiveActivity(name, payload);
 			return;
 		}
+		if (BoardBeacon.isBeacon(payload))
+		{
+			if (BoardBeacon.valid(gson, payload))
+			{
+				boardBeacon.heard(System.currentTimeMillis());
+			}
+			return;
+		}
 		if (g != null && GovernanceSync.isGovernance(payload) && g.receive(name, payload))
 		{
 			roster.heard(name, System.currentTimeMillis());
@@ -1811,6 +1923,7 @@ class GroupService
 		}
 		boolean added = false;
 		GroupEventEngine engine = events;
+		long now = System.currentTimeMillis();
 		for (GroupEvent e : received)
 		{
 			GroupEvent mine = e.withMember(name);
@@ -1819,11 +1932,24 @@ class GroupService
 			{
 				continue;
 			}
+			EventBackfill.Arrival arrival = EventBackfill.classify(roster.feed(), mine, now);
+			if (arrival == EventBackfill.Arrival.DUPLICATE)
+			{
+				continue;
+			}
 			resolve(e.items.keySet());
 			added |= logged;
 			if (engine != null)
 			{
-				engine.member(mine);
+				// Earlier events a member uploaded on joining the sync reach the Log only, never a toast.
+				if (arrival == EventBackfill.Arrival.BACKFILL)
+				{
+					engine.backfill(mine);
+				}
+				else
+				{
+					engine.member(mine);
+				}
 			}
 		}
 		if (added)
@@ -1935,7 +2061,8 @@ class GroupService
 			skills.put(skill.getName(), new MemberStats.Level(client.getRealSkillLevel(skill),
 				client.getBoostedSkillLevel(skill)));
 		}
-		MemberStats stats = new MemberStats(skills, lastRun, lastSpec, lastWorld, lastRegion, lastX, lastY, lastPlane);
+		MemberStats stats = new MemberStats(skills, lastRun, lastSpec, lastWorld, lastRegion, lastX, lastY, lastPlane,
+			lastStatus);
 		String payload = GroupOutbox.stats(gson, s, stats);
 		if (payload == null || Objects.equals(payload, lastStatsSent))
 		{
@@ -2337,11 +2464,12 @@ class GroupService
 		{
 			names.add(self);
 		}
-		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names);
+		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names,
+			CompareSupport.banked(roster, names), CompareSupport.storageBanked(roster));
 	}
 
-	/** "Who benefits most" for a typed item; {@code done} runs on the client thread. */
-	void benefit(String query, Consumer<BenefitFinder.Outcome> done)
+	/** "Who benefits most" for an item picked from the dropdown; {@code done} runs on the client thread. */
+	void benefit(int itemId, Consumer<BenefitFinder.Outcome> done)
 	{
 		List<String> names = new ArrayList<>(members.names());
 		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
@@ -2349,7 +2477,7 @@ class GroupService
 			names.add(self);
 		}
 		ItemBenefit.Settings settings = ItemBenefit.Settings.parse(config.compareStats(), config.compareCategories());
-		clientThread.invokeLater(() -> done.accept(BenefitFinder.run(query, CompareSupport.source(itemManager),
+		clientThread.invokeLater(() -> done.accept(BenefitFinder.runId(itemId, CompareSupport.source(itemManager),
 			CompareSupport.members(roster, names), settings)));
 	}
 
