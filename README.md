@@ -251,6 +251,21 @@ Anyone with the key can join your sync, so keep it inside your group.
 
 **Running from source, every setting, and what to test: [SETUP.md](SETUP.md).**
 
+### Tester bundle
+
+The test launchers (`tools/windows/Run-GimUtilities.cmd`,
+`tools/unix/run-gim-utilities.sh`) start a RuneLite dev client with GIM
+Utilities and sideload two other plugins from the same release, each checked
+against `tools/bundle/SHA256SUMS`:
+
+| Component | Source | Commit / tag | Jar |
+|---|---|---|---|
+| GIM Utilities | this repo | tag `gim-test-9` | built from source |
+| Combat & Skilling Vitals | VinnyVanGogh/combat-vitals-plugin | `084f6e5` | `combat-vitals.jar` |
+| Quest Route | VinnyVanGogh/questpath-plugin | `2fe0674` | `quest-route.jar` |
+
+Only the test client loads them; a normal RuneLite never reads that folder.
+
 ## Coming later
 
 - **Joining on its own.** For now you click *Join group sync* each session:

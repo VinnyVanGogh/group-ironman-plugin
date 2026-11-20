@@ -41,13 +41,15 @@ $SourceUrl = "https://github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/
 # The dev client this launcher starts runs with --developer-mode, which loads
 # every *.jar in %USERPROFILE%\.runelite\sideloaded-plugins. A normal RuneLite
 # never loads that folder.
-$CvJarUrl    = "https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/$SourceRef/combat-vitals.jar"
+$CvCommit    = '084f6e5'
+$CvJarUrl    ="https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/$SourceRef/combat-vitals.jar"
 $CvJarSha256 = '6156ad6ca1dd134cd78b2169a4c726997bf42feeb32f8d1ef0a6ec6856408081'
 # Quest Route, attached to the same release as quest-route.jar (the plain
 # `./gradlew jar` of VinnyVanGogh/questpath-plugin, build/libs/questpath.jar
 # renamed). All zeros means "not pinned yet": the launcher skips it with a
 # warning. Replace with the real SHA-256 of the jar attached to the release.
-$QrJarUrl    = "https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/$SourceRef/quest-route.jar"
+$QrCommit    = '2fe0674'
+$QrJarUrl    ="https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/$SourceRef/quest-route.jar"
 $QrJarSha256 = '0000000000000000000000000000000000000000000000000000000000000000'
 
 $GuHome = Join-Path $env:LOCALAPPDATA 'GimUtilities'
@@ -289,6 +291,15 @@ try {
     Say 'GIM Utilities test client'
     Say "Everything is kept in $GuHome"
     Say ''
+
+    # GU_DRY_RUN=1 lists what this launcher would install, then stops.
+    if ($env:GU_DRY_RUN -eq '1') {
+        Say 'Dry run (GU_DRY_RUN=1): nothing is downloaded or started. Components:'
+        Say "GIM Utilities             $SourceRef (this repo)"
+        Say "Combat & Skilling Vitals  $CvCommit  combat-vitals.jar  sha256 $CvJarSha256"
+        Say "Quest Route               $QrCommit  quest-route.jar  sha256 $QrJarSha256"
+        exit 0
+    }
 
     Say '[1/3] Looking for Java 11 or newer...'
     $jdk = Find-Jdk
