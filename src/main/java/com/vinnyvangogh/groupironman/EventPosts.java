@@ -128,7 +128,8 @@ final class EventPosts extends EditedPosts
 		{
 			List<EventThreads.Card> shown = DeathBoard.FAMILY.equals(m.feed.family)
 				? DeathBoard.fold(gson, m.cards) : m.cards;
-			return DiscordWebhook.stack(gson, shown, style.get(), m.png != null, m.username);
+			return DiscordWebhook.stack(gson, shown, style.get(), m.png != null, m.username,
+				m.chronological);
 		}
 		ItemLookup lookup = words.get();
 		String json = DiscordWebhook.payload(gson, net(m, lookup), lookup, style.get(), null, m.png != null, null,
