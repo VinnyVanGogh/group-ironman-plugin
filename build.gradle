@@ -106,14 +106,16 @@ tasks.named('test') {
 	dependsOn 'printRuneLiteVersion'
 }
 
-// Fails above 195,000 estimated Hub-bot tokens (the Hub skips plugins over
-// 200,000). Dev-only: the Hub replaces this file.
+// A ratchet, not the Hub limit: fails above 250,000 estimated Hub-bot tokens so
+// the plugin cannot grow unnoticed. The Hub's automatic review reads 200,000;
+// over that a human reviews (Board 2026-11-20). The split that gets back under
+// is RUNELITE-362. Dev-only: the Hub replaces this file.
 tasks.register('tokenBudget', Exec) {
 	group = 'verification'
-	description = 'Fails when tools/tokens.py estimates more than 195,000 Plugin Hub tokens.'
+	description = 'Fails when tools/tokens.py estimates more than 250,000 Plugin Hub tokens.'
 	inputs.dir('src/main/java')
 	inputs.file('tools/tokens.py')
-	commandLine 'python3', 'tools/tokens.py', '--max', '195000'
+	commandLine 'python3', 'tools/tokens.py', '--max', '250000'
 }
 
 tasks.named('check') {

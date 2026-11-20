@@ -106,7 +106,7 @@ def main():
     now = raw_tokens(worktree_files())
     total = sum(now.values())
     print(f"raw chars/4:     {total:,.0f}")
-    print(f"bot estimate:    {total * CALIBRATION:,.0f}  (limit 200,000, target < 190,000)")
+    print(f"bot estimate:    {total * CALIBRATION:,.0f}  (Hub bot reads up to 200,000; build gate in build.gradle)")
     try:
         base = sum(raw_tokens(ref_files(args.base)).values())
         delta = (total - base) * CALIBRATION
