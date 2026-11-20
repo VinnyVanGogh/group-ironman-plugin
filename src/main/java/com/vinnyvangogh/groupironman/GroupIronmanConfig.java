@@ -1091,6 +1091,26 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "riskShowHighAlch", name = "Risk: show High Alchemy value",
+		description = "Member cards' risk line shows High Alchemy value instead of Grand Exchange guide price."
+			+ " Which items are kept on death is always ranked by guide price, as the game does.",
+		section = thresholdsSection, position = 90)
+	default boolean riskShowHighAlch()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "riskAlertThreshold", name = "Risk: Wilderness alert (gp)",
+		description = "When you enter the Wilderness risking at least this much (skulled), the Wilderness banner"
+			+ " and Discord post say so. 0 turns it off. Needs the Wilderness event on and 'Share inventory and"
+			+ " equipment'.",
+		section = thresholdsSection, position = 91)
+	@Range(max = 2_000_000_000)
+	default int riskAlertThreshold()
+	{
+		return 0;
+	}
+
 	@ConfigItem(keyName = "overlayStorageDeposit", name = "Banner: Big storage deposit",
 		description = "A big group storage deposit.", section = inGameSection, position = 19)
 	default boolean overlayStorageDeposit()

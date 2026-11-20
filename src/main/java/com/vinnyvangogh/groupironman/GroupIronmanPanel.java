@@ -118,6 +118,8 @@ class GroupIronmanPanel extends PluginPanel
 		final SharingPrompt.Settings sharing;
 		/** The Shopping tab's view, or null before the plugin has started its lists. */
 		final ShoppingTab.View shopping;
+		/** Show the risk line in High Alchemy value instead of the Grand Exchange guide price. */
+		boolean riskAlch;
 
 		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
 			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GamePresence presence,
@@ -160,7 +162,9 @@ class GroupIronmanPanel extends PluginPanel
 	private static final Color PRAYER_ON = new Color(0xFF, 0xE0, 0x4A);
 	private static final Color POISON = new Color(0x3C, 0xC8, 0x3C);
 	private static final Color VENOM = new Color(0xB0, 0x5C, 0xE0);
-	private static final Color DISEASE = new Color(0xD8, 0xB0, 0x40);
+	/** The risk line of a member who is in the Wilderness now. */
+	private static final Color RISK_HOT = new Color(0xFF, 0x5A, 0x4A);
+	private static final Color DISEASE =new Color(0xD8, 0xB0, 0x40);
 	private static final Color RUN = new Color(0xC8, 0xA0, 0x2A);
 	private static final Color SPEC = new Color(0x3A, 0x9A, 0x4A);
 	static final Color MUTED = ColorScheme.LIGHT_GRAY_COLOR.darker();
@@ -788,7 +792,7 @@ class GroupIronmanPanel extends PluginPanel
 	private void drawGroup(JPanel tab, View v, long now)
 	{
 		List<PanelModel.MemberCard> cardsList = PanelModel.members(v.group, v.members.names(), v.regions, v.items,
-			v.self, v.presence, now);
+			v.self, v.presence, v.riskAlch, now);
 		if (cardsList.isEmpty())
 		{
 			empty(tab, "No members yet.", "Turn on 'Share stats' and 'Share inventory and equipment' in GIM Utilities'"
@@ -931,6 +935,15 @@ class GroupIronmanPanel extends PluginPanel
 			label.setForeground(chip.startsWith("Venom") ? VENOM : chip.startsWith("Disease") ? DISEASE : POISON);
 			label.setToolTipText(i < c.effectNotes.size() ? c.effectNotes.get(i) : chip);
 			body.add(label);
+		}
+		if (c.risk != null)
+		{
+			// In the Wilderness the line is drawn in red and bold, so a risky member stands out in the list.
+			JLabel risk = new JLabel(c.riskHot ? "Wild! " + c.risk : c.risk);
+			risk.setFont(c.riskHot ? FontManager.getRunescapeBoldFont() : FontManager.getRunescapeSmallFont());
+			risk.setForeground(c.riskHot ? RISK_HOT : MUTED);
+			risk.setToolTipText(c.riskTooltip);
+			body.add(risk);
 		}
 		if (c.source != null)
 		{

@@ -29,39 +29,68 @@ final class MemberStatus
 	static final int MAX_POISON_HITS = 1000;
 
 	/** Not shared by this sender. */
-	static final MemberStatus UNKNOWN = new MemberStatus(false, false, 0, false, false);
+	static final MemberStatus UNKNOWN = new MemberStatus(false, false, 0, false, false, false, false);
 	/** Shared: prayer off, nothing wrong. */
-	static final MemberStatus NONE = new MemberStatus(true, false, 0, false, false);
+	static final MemberStatus NONE = new MemberStatus(true, false, 0, false, false, false, false);
 
 	private final boolean known;
 	private final boolean prayerOn;
 	private final int poisonHits;
 	private final boolean venom;
 	private final boolean disease;
+	private final boolean wilderness;
+	private final boolean skulled;
 
-	private MemberStatus(boolean known, boolean prayerOn, int poisonHits, boolean venom, boolean disease)
+	private MemberStatus(boolean known, boolean prayerOn, int poisonHits, boolean venom, boolean disease,
+		boolean wilderness, boolean skulled)
 	{
 		this.known = known;
 		this.prayerOn = prayerOn;
 		this.poisonHits = poisonHits;
 		this.venom = venom;
 		this.disease = disease;
+		this.wilderness = wilderness;
+		this.skulled = skulled;
 	}
 
 	/** @param poisonHits poison hits left, 0 for none; ignored while {@code venom}. */
 	static MemberStatus of(boolean prayerOn, int poisonHits, boolean venom, boolean disease)
 	{
+		return of(prayerOn, poisonHits, venom, disease, false, false);
+	}
+
+	/** As above, plus whether the member is in the Wilderness and whether they are skulled. */
+	static MemberStatus of(boolean prayerOn, int poisonHits, boolean venom, boolean disease, boolean wilderness,
+		boolean skulled)
+	{
 		int hits = venom ? 0 : Math.max(0, Math.min(MAX_POISON_HITS, poisonHits));
-		return new MemberStatus(true, prayerOn, hits, venom, disease);
+		return new MemberStatus(true, prayerOn, hits, venom, disease, wilderness, skulled);
 	}
 
 	/** From the raw game values: the prayer bitmask, the poison varp and the disease varp. */
 	static MemberStatus fromGame(int prayerMask, int poisonVarp, int diseaseVarp)
 	{
+		return fromGame(prayerMask, poisonVarp, diseaseVarp, false, false);
+	}
+
+	/** As above, with the inside-Wilderness varbit and whether the player carries a skull. */
+	static MemberStatus fromGame(int prayerMask, int poisonVarp, int diseaseVarp, boolean wilderness,
+		boolean skulled)
+	{
 		boolean venom = poisonVarp >= VENOM_THRESHOLD;
 		// A negative poison varp is the immunity after an antipoison, not poison.
 		int hits = venom || poisonVarp <= 0 ? 0 : poisonVarp;
-		return of(prayerMask != 0, hits, venom, diseaseVarp > 0);
+		return of(prayerMask != 0, hits, venom, diseaseVarp > 0, wilderness, skulled);
+	}
+
+	boolean inWilderness()
+	{
+		return wilderness;
+	}
+
+	boolean skulled()
+	{
+		return skulled;
 	}
 
 	boolean known()
@@ -154,12 +183,13 @@ final class MemberStatus
 		}
 		MemberStatus m = (MemberStatus) o;
 		return known == m.known && prayerOn == m.prayerOn && poisonHits == m.poisonHits && venom == m.venom
-			&& disease == m.disease;
+			&& disease == m.disease && wilderness == m.wilderness && skulled == m.skulled;
 	}
 
 	@Override
 	public int hashCode()
 	{
-		return (known ? 1 : 0) + (prayerOn ? 2 : 0) + (venom ? 4 : 0) + (disease ? 8 : 0) + poisonHits * 16;
+		return (known ? 1 : 0) + (prayerOn ? 2 : 0) + (venom ? 4 : 0) + (disease ? 8 : 0) + (wilderness ? 16 : 0) + (skulled ? 32 : 0)
+			+ poisonHits * 64;
 	}
 }

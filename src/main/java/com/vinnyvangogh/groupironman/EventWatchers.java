@@ -12,6 +12,7 @@ import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.function.IntUnaryOperator;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import net.runelite.api.gameval.VarbitID;
 
 /**
@@ -87,6 +88,9 @@ final class EventWatchers
 	private String deathWhere = "";
 	private int deathWorld;
 	private final SlayerWatch slayer = new SlayerWatch(this::emit);
+
+	/** What to add to the Wilderness entry line (", risking ..."), empty for nothing; set by the engine. */
+	Supplier<String> wildRisk = () -> "";
 
 	EventWatchers(Consumer<GroupEvent> out, Predicate<GroupEvent.Type> wanted)
 	{
@@ -303,7 +307,7 @@ final class EventWatchers
 		}
 		if (rose.get(VarbitID.INSIDE_WILDERNESS))
 		{
-			emit(GroupEvent.of(GroupEvent.Type.WILDERNESS, now, me).text("entered the Wilderness").build());
+			emit(GroupEvent.of(GroupEvent.Type.WILDERNESS, now, me).text("entered the Wilderness" + wildRisk.get()).build());
 		}
 		if (rose.get(SKULL))
 		{

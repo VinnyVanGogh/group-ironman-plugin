@@ -557,6 +557,7 @@ public class GroupIronmanPlugin extends Plugin
 			group.lookup, group.switches(), group.regions(), group.since(), group.self(),
 			group.presence(), settingsView(), group.anyOn(), group.sharingSettings(), shoppingView());
 		view.progress = group.progressView();
+		view.riskAlch = config.riskShowHighAlch();
 		view.compare = group.compareView(view.progress);
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
