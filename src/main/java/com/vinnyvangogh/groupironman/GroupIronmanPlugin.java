@@ -6,6 +6,7 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -88,6 +89,10 @@ public class GroupIronmanPlugin extends Plugin
 	/** What the on-screen path card says; null while no path is in force. Built each redraw. */
 	private volatile PathStopPlan pathPlan;
 	private PathStopOverlay pathOverlay;
+
+	/** The scene and minimap overlays for group members, and the Compare colours they read (refreshed each redraw). */
+	private final List<MemberPlayerOverlay> memberOverlays = new ArrayList<>();
+	private volatile Map<String, Color> memberColours = Collections.emptyMap();
 
 	@Inject
 	private WSClient wsClient;
@@ -172,7 +177,13 @@ public class GroupIronmanPlugin extends Plugin
 			ShortestPathBridge.clientThreadEventPoster(clientThread::invoke, eventBus::post)));
 		pathOverlay = new PathStopOverlay(config, () -> pathPlan);
 		overlayManager.add(pathOverlay);
-		panel = new GroupIronmanPanel(itemManager, skillIconManager, spriteManager, new GroupIronmanPanel.Actions()
+		for (MemberPlayerOverlay.Layer l : MemberPlayerOverlay.Layer.values())
+		{
+			MemberPlayerOverlay o = new MemberPlayerOverlay(client, config, () -> memberColours, l);
+			memberOverlays.add(o);
+			overlayManager.add(o);
+		}
+		panel =new GroupIronmanPanel(itemManager, skillIconManager, spriteManager, new GroupIronmanPanel.Actions()
 		{
 			@Override
 			public void join()
@@ -463,6 +474,9 @@ public class GroupIronmanPlugin extends Plugin
 			overlayManager.remove(pathOverlay);
 			pathOverlay = null;
 		}
+		memberOverlays.forEach(overlayManager::remove);
+		memberOverlays.clear();
+		memberColours = Collections.emptyMap();
 		wsClient.unregisterMessage(VvgGroupIronmanMessage.class);
 		eventBus.unregister(events);
 		events.shutDown();
@@ -614,9 +628,10 @@ public class GroupIronmanPlugin extends Plugin
 	/** Markers only add points to the world map; they never open it (that stays the player's click). */
 	private void updateMarkers()
 	{
+		memberColours = MemberColors.byKey(group.colourOrder());
 		if (config.groupWorldMap() && config.groupShareStats() && group.syncing())
 		{
-			markers.update(group.roster().onlineStats(System.currentTimeMillis()), group.self());
+			markers.update(group.roster().onlineStats(System.currentTimeMillis()), group.self(), memberColours);
 		}
 		else
 		{
