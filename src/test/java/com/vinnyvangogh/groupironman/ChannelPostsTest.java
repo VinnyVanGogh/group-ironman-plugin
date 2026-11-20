@@ -36,6 +36,28 @@ public class ChannelPostsTest
 	}
 
 	@Test
+	public void showsAreAtOnceForPluginUsersToo_noGraceNoPairLimit()
+	{
+		assertTrue(posts.shows(channel("GroupShip", 303), "", NOW).isEmpty());
+		List<GroupEvent> on = posts.shows(channel("GroupShip", 303, "GroupOtt", 615), "", NOW + MIN);
+		assertEquals(1, on.size());
+		assertEquals("online", on.get(0).text);
+		assertEquals(615, on.get(0).world);
+		assertTrue(posts.shows(channel("GroupShip", 303, "GroupOtt", 302), "", NOW + 2 * MIN).isEmpty());
+		List<GroupEvent> off = posts.shows(channel("GroupOtt", 302), "", NOW + 3 * MIN);
+		assertEquals(1, off.size());
+		assertEquals("GroupShip", off.get(0).member);
+		assertEquals("offline", off.get(0).text);
+	}
+
+	@Test
+	public void showsLeaveOutSelf()
+	{
+		posts.shows(channel("GroupShip", 303), "groupship", NOW);
+		assertTrue(posts.shows(channel("GroupShip", 303, "GroupOtt", 615), "groupott", NOW + MIN).isEmpty());
+	}
+
+	@Test
 	public void theFirstChannelIsTheBaselineAndPostsNothing()
 	{
 		assertTrue(posts.update(GamePresenceTest.twoOfFive(), PLUGIN, NOW, GRACE).isEmpty());

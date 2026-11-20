@@ -29,11 +29,11 @@ public class BoxStackTest
 		assertEquals(1, out.size());
 		assertEquals(NOW - 1_000, out.get(0).at);
 		BoxText.Line wide = BoxText.format(out.get(0), items, BoxSize.WIDE, true, BoxTimes.SHORT, NOW);
-		assertEquals("2 → 4", wide.detail);
+		assertEquals("2 to 4", wide.detail);
 		BoxText.Line compact = BoxText.format(out.get(0), items, BoxSize.COMPACT, true, BoxTimes.SHORT, NOW);
 		assertEquals("+3", compact.detail);
 		BoxText.Line plain = BoxText.format(out.get(0), items, BoxSize.WIDE, false, BoxTimes.SHORT, NOW);
-		assertEquals("Thieving 2 → 4", plain.detail);
+		assertEquals("Thieving 2 to 4", plain.detail);
 	}
 
 	@Test

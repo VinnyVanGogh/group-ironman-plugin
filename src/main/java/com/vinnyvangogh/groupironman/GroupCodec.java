@@ -456,6 +456,15 @@ final class GroupCodec
 		o.addProperty("spec", stats.specialAttack());
 		o.addProperty("w", stats.world());
 		o.addProperty("r", stats.region());
+		MemberStatus status = stats.status();
+		if (status.known())
+		{
+			// pr: prayer on; ps: poison hits left; vn: venomed; dz: diseased. Absent from an older sender.
+			o.addProperty("pr", status.prayerOn() ? 1 : 0);
+			o.addProperty("ps", status.poisonHits());
+			o.addProperty("vn", status.venomed() ? 1 : 0);
+			o.addProperty("dz", status.diseased() ? 1 : 0);
+		}
 		if (stats.hasPosition())
 		{
 			o.addProperty("x", stats.x());
@@ -868,7 +877,20 @@ final class GroupCodec
 			clamp(longOr(in.get("r"), 0), 0, 1 << 16),
 			clamp(longOr(in.get("x"), 0), 0, MAX_COORD),
 			clamp(longOr(in.get("y"), 0), 0, MAX_COORD),
-			clamp(longOr(in.get("pl"), 0), 0, 3)));
+			clamp(longOr(in.get("pl"), 0), 0, 3),
+			decodeStatus(in)));
+	}
+
+	/** {@link MemberStatus#UNKNOWN} unless the sender sent the prayer flag. */
+	private static MemberStatus decodeStatus(JsonObject in)
+	{
+		if (in.get("pr") == null)
+		{
+			return MemberStatus.UNKNOWN;
+		}
+		return MemberStatus.of(longOr(in.get("pr"), 0) != 0,
+			clamp(longOr(in.get("ps"), 0), 0, MemberStatus.MAX_POISON_HITS),
+			longOr(in.get("vn"), 0) != 0, longOr(in.get("dz"), 0) != 0);
 	}
 
 	private static JsonObject header(Kind kind)

@@ -193,11 +193,18 @@ final class EventSettings
 	 */
 	static EventSettings from(GroupIronmanConfig config, GroupSettingsSchema.Resolved values, MemberPrefs prefs)
 	{
+		return from(config, values, prefs, config.discordOnlineStatus());
+	}
+
+	/** As above, with {@code online} the Online status in force ({@link StatusBoard#effective}). */
+	static EventSettings from(GroupIronmanConfig config, GroupSettingsSchema.Resolved values, MemberPrefs prefs,
+		OnlineStatus online)
+	{
 		Set<GroupEvent.Type> discord = EnumSet.noneOf(GroupEvent.Type.class);
 		Set<GroupEvent.Type> overlay = EnumSet.noneOf(GroupEvent.Type.class);
 		for (GroupEvent.Type t : GroupEvent.Type.values())
 		{
-			boolean post = t == GroupSettingsSchema.OWN_DISCORD ? postsOnline(config)
+			boolean post = t == GroupSettingsSchema.OWN_DISCORD ? online == OnlineStatus.POSTS
 				: values.on(GroupSettingsSchema.discordKey(t));
 			if (post && prefs.posts(t))
 			{

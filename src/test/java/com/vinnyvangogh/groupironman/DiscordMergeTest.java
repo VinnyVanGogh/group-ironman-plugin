@@ -225,6 +225,21 @@ public class DiscordMergeTest
 		assertEquals("Combat level", posts.get(0).title);
 	}
 
+	@Test
+	public void aCombatLevelAFewTicksLateStillJoinsTheLevelUpsPost()
+	{
+		settings = discord(EnumSet.of(GroupEvent.Type.LEVEL_UP, GroupEvent.Type.COMBAT_LEVEL));
+		router.route(GroupEvent.of(GroupEvent.Type.LEVEL_UP, NOW, "Alex").text("Strength").number(56).build(), true,
+			settings, items);
+		assertTrue("the level-up still waits for its combat level", batch.due(NOW + 3_000).isEmpty());
+		now = NOW + 3_000;
+		router.route(GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, now, "Alex").number(59).build(), true, settings,
+			items);
+		List<DiscordMerge.Post> posts = posts();
+		assertEquals("one post, never two", 1, posts.size());
+		assertTrue(fieldNames(embed(posts.get(0))).contains("Level up"));
+	}
+
 	// ---- Deaths ----
 
 	@Test
