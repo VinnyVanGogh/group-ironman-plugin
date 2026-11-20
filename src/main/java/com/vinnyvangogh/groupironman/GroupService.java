@@ -2072,12 +2072,13 @@ class GroupService
 			onChange.run();
 		}
 		String payload = syncing() ? GroupOutbox.stats(gson, s, stats) : null;
-		if (!syncing())
+		if (payload == null)
 		{
-			// Nothing goes out; this still paces the next local capture.
+			// Nothing goes out (sync off or the stats switch off); this still paces the next local capture.
 			ticksSinceStats = 0;
+			return;
 		}
-		if (payload == null || Objects.equals(payload, lastStatsSent))
+		if (Objects.equals(payload, lastStatsSent))
 		{
 			return;
 		}
@@ -2100,11 +2101,12 @@ class GroupService
 			onChange.run();
 		}
 		String payload = syncing() ? GroupOutbox.extras(gson, s, extras) : null;
-		if (!syncing())
+		if (payload == null)
 		{
 			ticksSinceExtras = 0;
+			return;
 		}
-		if (payload == null || Objects.equals(payload, lastExtrasSent))
+		if (Objects.equals(payload, lastExtrasSent))
 		{
 			return;
 		}
