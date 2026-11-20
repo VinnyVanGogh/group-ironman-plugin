@@ -5,6 +5,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
+import java.util.function.Predicate;
 
 /**
  * A log of group events, newest first, without duplicates. As the drops log
@@ -98,6 +99,52 @@ final class DropLog
 	synchronized void clear()
 	{
 		entries.clear();
+	}
+
+	/** True when this event, or a resend of it ({@link GroupEvent#sameAs}), is already here. */
+	synchronized boolean contains(GroupEvent event)
+	{
+		for (GroupEvent e : entries)
+		{
+			if (e.at < event.at)
+			{
+				break;
+			}
+			if (e.sameAs(event))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Removes every entry whose member {@code drop} says to; how many went. */
+	synchronized int removeMembers(Predicate<String> drop)
+	{
+		int before = entries.size();
+		entries.removeIf(e -> drop.test(e.member));
+		return before - entries.size();
+	}
+
+	/**
+	 * {@code member}'s own events from the resend window that {@code wanted} accepts, newest first, at most
+	 * {@code limit}: what a client uploads when it joins the group's sync.
+	 */
+	List<GroupEvent> recentBy(String member, long now, Predicate<GroupEvent> wanted, int limit)
+	{
+		List<GroupEvent> out = new ArrayList<>();
+		for (GroupEvent e : entries())
+		{
+			if (out.size() >= limit || now - e.at > RESEND_WINDOW_MS)
+			{
+				break;
+			}
+			if (e.member.equalsIgnoreCase(member) && wanted.test(e))
+			{
+				out.add(e);
+			}
+		}
+		return out;
 	}
 
 	/** Events after {@code since}, newest first, leaving out {@code self}'s own. */

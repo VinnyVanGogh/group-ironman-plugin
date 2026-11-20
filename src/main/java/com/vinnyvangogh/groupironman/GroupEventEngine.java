@@ -360,8 +360,9 @@ class GroupEventEngine
 		GroupSettingsSchema.Resolved v = group == null ? new GroupSettingsSchema.Resolved(config, null)
 			: group.groupValues();
 		values = v;
-		settings = EventSettings.from(config, v, MemberPrefs.of(config));
-		broadcastSettings = EventSettings.from(config, v, MemberPrefs.NONE);
+		OnlineStatus online = StatusBoard.effective(config.discordOnlineStatus(), v, webhooks());
+		settings = EventSettings.from(config, v, MemberPrefs.of(config), online);
+		broadcastSettings = EventSettings.from(config, v, MemberPrefs.NONE, online);
 		if (sender != null)
 		{
 			sender.quietHours(v.intValue("discordQuietStart"), v.intValue("discordQuietEnd"));
@@ -547,10 +548,14 @@ class GroupEventEngine
 		// What Discord answered since the last tick is saved before the webhook can change.
 		saveBoard();
 		String url = webhookFor(Webhook.ONLINE);
-		if (!StatusBoard.keeps(config.discordOnlineStatus(), webhooks(), group.isLeader()))
+		GroupSettingsSchema.Resolved v = values != null ? values : new GroupSettingsSchema.Resolved(config, null);
+		if (!StatusBoard.keeps(StatusBoard.effective(config.discordOnlineStatus(), v, webhooks()), webhooks(),
+			group.isLeader()))
 		{
 			url = null;
 		}
+		// Tells the party this client keeps the board, so the others post no separate online/offline messages.
+		group.keepingBoard(url != null);
 		// Board 2026-11-14: nothing goes out until the leader's role, the shared webhooks and the saved boards are in.
 		board.settle(StatusBoard.settled(boardLoginAt, now, boardSaved != null && group.cacheLoaded()));
 		board.target(url, () -> boardSaved);
@@ -908,6 +913,12 @@ class GroupEventEngine
 			return;
 		}
 		router.route(event, false, settings, group.lookup);
+	}
+
+	/** A member's earlier event, uploaded when they joined the sync: the Log only, no toast and no post. */
+	void backfill(GroupEvent event)
+	{
+		router.backfill(event, settings, group.lookup);
 	}
 
 	/** Client thread. A storage visit: this player's own, or a member's from the party. */
@@ -1934,6 +1945,11 @@ class GroupEventEngine
 		String url = webhookFor(Webhook.of(event.type));
 		if (url == null)
 		{
+			return;
+		}
+		if (event.type == GroupEvent.Type.ONLINE && group.boardKeptByOthers(System.currentTimeMillis()))
+		{
+			// Another member's client keeps the live board: it already shows who is online, so no separate post.
 			return;
 		}
 		if (event.broadcast)

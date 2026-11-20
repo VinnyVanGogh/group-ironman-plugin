@@ -59,6 +59,16 @@ final class StatusBoard
 	 * pick the board on the shared webhook still gets one board (each member's own pasted webhook is theirs, as
 	 * before: the setting's description asks that only one member sharing a webhook turn the board on).
 	 */
+	static OnlineStatus effective(OnlineStatus own, GroupSettingsSchema.Resolved values, Webhooks webhooks)
+	{
+		if (!webhooks.fromGroup(Webhook.ONLINE))
+		{
+			return own;
+		}
+		OnlineStatus[] all = OnlineStatus.values();
+		return all[(int) Math.min(all.length - 1, values.value(GroupSettingsSchema.ONLINE_STATUS))];
+	}
+
 	static boolean keeps(OnlineStatus status, Webhooks webhooks, boolean leader)
 	{
 		if (status != OnlineStatus.LIVE_BOARD || webhooks.url(Webhook.ONLINE) == null)
