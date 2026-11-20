@@ -189,6 +189,10 @@ class GroupEventEngine
 	private final EventRouter router = new EventRouter(this::toDiscord, this::toast, this::toDigest, this::toLog);
 	/** One banner per event, however many sources report it ({@link AlertDedup}). */
 	private final AlertDedup alertDedup = new AlertDedup();
+	/** One chat line per shared alert; apart from {@link #alertDedup}, which the banner has already used up. */
+	private final AlertDedup chatDedup = new AlertDedup();
+	/** This player's own shop and low-storage alerts, throttled per shop or item ({@link SharedAlerts}). */
+	private final SharedAlerts.Cooldown alertCooldown = new SharedAlerts.Cooldown();
 	/** Timer: the change to "everyone in the group is online" ({@link EveryoneOnline}). */
 	private final EveryoneOnline everyone = new EveryoneOnline();
 	private long everyoneAt;
@@ -315,6 +319,8 @@ class GroupEventEngine
 		overlayManager.remove(toastOverlay);
 		overlayManager.remove(boxOverlay);
 		alertDedup.clear();
+		chatDedup.clear();
+		alertCooldown.clear();
 		everyone.reset();
 		toastOverlay = null;
 		boxOverlay = null;
@@ -913,6 +919,50 @@ class GroupEventEngine
 			return;
 		}
 		router.route(event, false, settings, group.lookup);
+		sharedAlertChat(event);
+	}
+
+	/** The group's switch for need and shop alerts, this member's own sending toggle aside. */
+	private boolean alertsOn()
+	{
+		return resolved().on(GroupSettingsSchema.SHARED_ALERTS);
+	}
+
+	/**
+	 * A chat line for a member's shared alert: the group switch is on, this player has not muted the line, and the
+	 * event is news (a resend on joining is not) and not one already told ({@link #chatDedup}).
+	 */
+	private void sharedAlertChat(GroupEvent event)
+	{
+		long now = System.currentTimeMillis();
+		if (!SharedAlerts.isShared(event) || !alertsOn() || !config.sharedAlertsChat()
+			|| GroupMembers.key(event.member).equals(GroupMembers.key(group.localPlayer()))
+			|| !SharedAlerts.recent(event, now) || !chatDedup.fresh(event, now))
+		{
+			return;
+		}
+		group.resolveItems(event.items.keySet());
+		group.say(SharedAlerts.chatLine(event, group.lookup));
+	}
+
+	/**
+	 * Client thread. This player came up on {@code shop}, which sells {@code items} the group still needs: shared
+	 * with the group, once per shop per {@link SharedAlerts#COOLDOWN_MS} unless the items changed.
+	 */
+	void shopNear(String shop, String items)
+	{
+		long now = System.currentTimeMillis();
+		String me = group.localPlayer();
+		if (sharingAlerts() && alertCooldown.allow(me, shop, items, now))
+		{
+			own(SharedAlerts.shopNear(me, shop, items, now));
+		}
+	}
+
+	/** This player sends need and shop alerts: the group's switch and their own toggle are both on. */
+	boolean sharingAlerts()
+	{
+		return group.member() && alertsOn() && config.sharedAlertsSend();
 	}
 
 	/** A member's earlier event, uploaded when they joined the sync: the Log only, no toast and no post. */
@@ -963,7 +1013,12 @@ class GroupEventEngine
 	void minimum(LowStock.Alert alert, boolean own)
 	{
 		String by = own ? group.localPlayer() : "Group storage";
-		router.route(EventDetect.minimum(System.currentTimeMillis(), by, alert), own, settings, group.lookup);
+		long now = System.currentTimeMillis();
+		router.route(EventDetect.minimum(now, by, alert), own, settings, group.lookup);
+		if (own && sharingAlerts() && alertCooldown.allow(by, alert.item, String.valueOf(alert.minimum), now))
+		{
+			own(SharedAlerts.stockShort(by, alert, now));
+		}
 	}
 
 	// ---- This player's own events ----
@@ -971,6 +1026,15 @@ class GroupEventEngine
 	/** Client thread. This player's Shopping tab request made, claimed or done ({@link RequestBoard}). */
 	void request(GroupEvent event)
 	{
+		if (SharedAlerts.isShared(event) && !sharingAlerts())
+		{
+			// The group switch or this player's own toggle is off: shown here, never sent.
+			if (event.isValid())
+			{
+				router.route(event, true, settings, group.lookup);
+			}
+			return;
+		}
 		own(event);
 	}
 
