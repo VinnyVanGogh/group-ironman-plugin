@@ -637,6 +637,27 @@ venom and disease have no duration in the client, so state only and the
 tooltip says so. Log basket per-log counts and looting bag contents were
 already shipped in RUNELITE-222 (#85) and render in the slot tooltip.
 
+### Phase 0 addendum — wave rotation and split times (2026-11-19, RUNELITE-208)
+
+**Feature:** for the player's own Fight Caves / Inferno / Colosseum run, show the
+Fight Caves spawn rotation (1 to 15, or "Rotation 7 or 8", or "unknown"), per-wave
+split times, and a personal best per wave; shared with the group like the rest of
+the activity and posted in the completion and death Discord messages.
+*Nearest rule:* Boss & Combat, "no indicators showing where to stand / what comes
+next" and Data & Privacy. *Verdict:* allowed. The rotation is a label for the run
+(which of 15 numbered rotations), not a floor marker, kill order, prayer cue or
+next-wave prediction, and nothing is read about anyone but the player's own cave
+and the opted-in group's shared state. *Precedent:* RuneLite's base
+`timersandbuffs` shows the wave and the Hub's Fight Cave Waves and Fight Caves
+Spawn Predictor (`damencs/spawn-predictor`) show rotations; Hub Inferno/Colosseum
+split timers show per-wave times. Read via `NpcSpawned` ids from
+`net.runelite.api.gameval.NpcID` only; waves 1 to 4 only. Sources: OSRS Wiki
+TzHaar Fight Cave/Rotations, docs/research/activity-detection.md §3.1.
+*Unverified in game:* that a wave's spawn events land within 3 s of its
+`Wave: N` line, and the wave-4 spawn pairs that tell rotation 7 from 8 (the table
+only; a mismatch shows "unknown", never a wrong number). The Inferno says "no
+rotation"; the Colosseum shows its chosen modifiers.
+
 ---
 
 ## Phase 3 — quality bar
