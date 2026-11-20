@@ -91,6 +91,15 @@ used once, read from the Old School RuneScape Wiki
 Attribution-NonCommercial-ShareAlike 3.0 license as above; the table is a
 small adaptation of it, shared under the same license.
 
+## Old School RuneScape Wiki: Group Ironman shared item requirements
+
+`src/main/resources/com/vinnyvangogh/groupironman/gim-shared-requirements.json`
+lists obtain requirements, equip/use requirements and tradeability for common
+Group Ironman items, read from the Old School RuneScape Wiki
+(<https://oldschool.runescape.wiki>, 2026-11-19). Same Creative Commons
+Attribution-NonCommercial-ShareAlike 3.0 license as above; the table is a
+small adaptation of it, shared under the same license.
+
 ## Shortest Path: bank tiles
 
 `src/main/resources/com/vinnyvangogh/groupironman/banks.tsv` lists one tile
