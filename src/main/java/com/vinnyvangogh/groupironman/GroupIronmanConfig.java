@@ -975,6 +975,14 @@ public interface GroupIronmanConfig extends Config
 		return BoxTimes.SHORT;
 	}
 
+	@ConfigItem(keyName = "overlayGroupBoxEmpty", name = "Empty group box shows",
+		description = "What the box says when nobody else is online: something useful, something fun for the time of"
+			+ " day, both, or the classic line.", section = inGameSection, position = 57)
+	default EmptyBoxMode overlayGroupBoxEmpty()
+	{
+		return EmptyBoxMode.BOTH;
+	}
+
 	@ConfigItem(keyName = "overlayPathStop", name = "Path stop card",
 		description = "On screen while you path from the Shopping tab: the stop, what to get there and for whom.",
 		section = inGameSection, position = 53)
