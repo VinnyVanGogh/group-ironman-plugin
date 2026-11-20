@@ -1202,8 +1202,15 @@ class GroupService
 			drawnFrom = null;
 			return;
 		}
+		WorldPoint before = here;
 		here = position();
 		redrawIfMoved();
+		if (here != null && (before == null || before.getRegionID() != here.getRegionID())
+			&& GearChecks.forRegion(here.getRegionID()) != null)
+		{
+			// Entering a place with a gear rule: the Gear tab picks it up on this redraw.
+			onChange.run();
+		}
 		long now = System.currentTimeMillis();
 		refreshRoster();
 		if (!member())
@@ -2466,6 +2473,48 @@ class GroupService
 		}
 		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names,
 			CompareSupport.banked(roster, names), CompareSupport.storageBanked(roster));
+	}
+
+	/** What the Gear tab shows: this player's last shared inventory and worn items, the region, and the group's items. */
+	GearTab.View gearView()
+	{
+		GroupCodec.Carried mine = roster.allCarried().get(self);
+		WorldPoint at = here;
+		return new GearTab.View(self, at == null ? 0 : at.getRegionID(),
+			mine == null ? Collections.emptyMap() : mine.inventory, mine == null ? Collections.emptyMap() : mine.worn,
+			roster.searchSources(), lookup);
+	}
+
+	/**
+	 * Gear tab: ask the group for {@code itemName}, or put it on this player's own shopping list. The id comes from
+	 * the item search on the client thread; {@code done} gets the line to show, on that thread.
+	 */
+	void gearItem(String itemName, boolean shopping, Consumer<String> done)
+	{
+		clientThread.invokeLater(() ->
+		{
+			Integer id = null;
+			for (ItemPrice p : itemManager.search(itemName))
+			{
+				if (GearChecks.matches(p.getName(), itemName))
+				{
+					id = p.getId();
+					names.putIfAbsent(p.getId(), p.getName());
+					break;
+				}
+			}
+			if (id == null)
+			{
+				done.accept("Could not find " + itemName + " to add.");
+				return;
+			}
+			Map<Integer, Integer> one = Collections.singletonMap(id, 1);
+			boolean ok = shopping
+				? addShoppingList(itemName, "", Collections.emptyList(), Collections.singletonList(self), one)
+				: addRequest(itemName, one);
+			done.accept(ok ? (shopping ? "Added " + itemName + " to your shopping lists."
+				: "Asked the group for " + itemName + ".") : "Not added: log in first, or the list is full.");
+		});
 	}
 
 	/** "Who benefits most" for an item picked from the dropdown; {@code done} runs on the client thread. */

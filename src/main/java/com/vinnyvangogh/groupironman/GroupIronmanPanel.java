@@ -70,7 +70,8 @@ import net.runelite.client.ui.components.IconTextField;
 class GroupIronmanPanel extends PluginPanel
 {
 	/** What the buttons in the header, and in the Settings tab, do. */
-	interface Actions extends GroupSettingsTab.Actions, ShoppingTab.Actions, CompareTab.Actions
+	interface Actions extends GroupSettingsTab.Actions, ShoppingTab.Actions, CompareTab.Actions,
+		GearTab.Actions
 	{
 		void join();
 
@@ -149,6 +150,8 @@ class GroupIronmanPanel extends PluginPanel
 		ProgressView progress = ProgressView.EMPTY;
 		/** The Compare tab's view, or null before the plugin has started. */
 		CompareTab.View compare;
+		/** The Gear tab's view, or null before the plugin has started. */
+		GearTab.View gear;
 	}
 
 	private static final int GRID_COLUMNS = 5;
@@ -182,6 +185,7 @@ class GroupIronmanPanel extends PluginPanel
 	private final GroupSettingsTab settingsTab;
 	private final ShoppingTab shoppingTab;
 	private final CompareTab compareTab;
+	private final GearTab gearTab;
 
 	private final JPanel header = new Column();
 	private final CardLayout cards = new CardLayout();
@@ -287,12 +291,13 @@ class GroupIronmanPanel extends PluginPanel
 		this.settingsTab = new GroupSettingsTab(actions, this::redraw);
 		this.shoppingTab = new ShoppingTab(actions, itemManager, this::redraw);
 		this.compareTab = new CompareTab(actions, skillIcons, this::redraw);
+		this.gearTab = new GearTab(actions, this::redraw);
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
 
 		JPanel top = new Column();
 		top.add(header);
-		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Activities", "Compare", "Shopping", "Settings"));
+		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Activities", "Compare", "Shopping", "Gear", "Settings"));
 		add(top, BorderLayout.NORTH);
 
 		addTab("Group", null);
@@ -303,6 +308,7 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Activities", activityFilters());
 		addTab("Compare", null);
 		addTab("Shopping", null);
+		addTab("Gear", null);
 		addTab("Settings", null);
 		add(views, BorderLayout.CENTER);
 		banksView = new BanksTabView(tabs.get("Banks"), bankFolds, this::paintCell, GRID_COLUMNS, MAX_GRID_ITEMS,
@@ -510,6 +516,9 @@ class GroupIronmanPanel extends PluginPanel
 			case "Shopping":
 				drawShopping(tab, v);
 				break;
+			case "Gear":
+				drawGear(tab, v);
+				break;
 			case "Settings":
 				drawSettings(tab, v, now);
 				break;
@@ -546,6 +555,16 @@ class GroupIronmanPanel extends PluginPanel
 			return;
 		}
 		compareTab.draw(tab, v.compare);
+	}
+
+	private void drawGear(JPanel tab, View v)
+	{
+		if (v.gear == null)
+		{
+			empty(tab, "Gear checks are starting.", "Open this tab again in a moment.");
+			return;
+		}
+		gearTab.draw(tab, v.gear);
 	}
 
 	private void drawShopping(JPanel tab, View v)
