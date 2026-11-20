@@ -258,6 +258,7 @@ class GroupEventEngine
 	private ScheduledFuture<?> pump;
 	private EventToastOverlay toastOverlay;
 	private GroupBoxOverlay boxOverlay;
+	private VitalsOverlay vitalsOverlay;
 
 	// Client thread only.
 	private EventText.Count lastKc;
@@ -284,8 +285,10 @@ class GroupEventEngine
 		toastOverlay = new EventToastOverlay(toasts, config, group.lookup, this::eggSettings, client);
 		boxOverlay = new GroupBoxOverlay(toasts, config, group, this::eggSettings,
 			new PluginIcons(skillIconManager, itemManager));
+		vitalsOverlay = new VitalsOverlay(config, group, client);
 		overlayManager.add(toastOverlay);
 		overlayManager.add(boxOverlay);
+		overlayManager.add(vitalsOverlay);
 		keyManager.registerKeyListener(dismissKey);
 		pump = executor.scheduleWithFixedDelay(this::tick, 1, 1, TimeUnit.SECONDS);
 		loginPending = client.getGameState() == GameState.LOGGED_IN;
@@ -314,6 +317,8 @@ class GroupEventEngine
 		keyManager.unregisterKeyListener(dismissKey);
 		overlayManager.remove(toastOverlay);
 		overlayManager.remove(boxOverlay);
+		overlayManager.remove(vitalsOverlay);
+		vitalsOverlay = null;
 		alertDedup.clear();
 		everyone.reset();
 		toastOverlay = null;

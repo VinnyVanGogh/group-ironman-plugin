@@ -637,6 +637,19 @@ venom and disease have no duration in the client, so state only and the
 tooltip says so. Log basket per-log counts and looting bag contents were
 already shipped in RUNELITE-222 (#85) and render in the slot tooltip.
 
+**Group vitals HUD (RUNELITE-215, 2026-11-19) — allowed, with precedent.** An
+overlay beside your character (or in a corner) with one card per online group
+member: HP, prayer, special attack, run energy, world, and a marker for the
+Wilderness or a running activity. *Nearest rule:* Data & Privacy, no
+crowdsourcing about other players. Cards come only from the group's own sync
+(each member's client sending their own stats under "Share stats") and the
+game's Group channel; nothing is read about anyone else on screen, so no PvP
+target scouting. *Precedent:* the base `party` plugin's HUD draws party
+members' HP, prayer, special attack and run energy the same way. Not built:
+an "in combat" marker for other members (not in the stats payload; only your
+own combat state is used, for "only in combat"). The Wilderness marker is
+from the member's shared tile, not a new datum.
+
 ---
 
 ## Phase 3 — quality bar

@@ -983,6 +983,82 @@ public interface GroupIronmanConfig extends Config
 		return EmptyBoxMode.BOTH;
 	}
 
+	@ConfigItem(keyName = "vitalsHud", name = "Group vitals HUD",
+		description = "On screen: HP, prayer, special attack and run energy for each online group member, from the"
+			+ " group sync. No party to join. Needs 'Share stats' on both sides.", section = inGameSection,
+		position = 58)
+	default boolean vitalsHud()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "vitalsHudPosition", name = "Vitals position",
+		description = "Beside your character, or fixed to a corner of the game screen.", section = inGameSection,
+		position = 59)
+	default VitalsPosition vitalsHudPosition()
+	{
+		return VitalsPosition.BESIDE_PLAYER;
+	}
+
+	@ConfigItem(keyName = "vitalsHudSize", name = "Vitals size",
+		description = "The font size of the HUD.", section = inGameSection, position = 60)
+	default BoxSize vitalsHudSize()
+	{
+		return BoxSize.MEDIUM;
+	}
+
+	@ConfigItem(keyName = "vitalsHudMembers", name = "Vitals members",
+		description = "Only these members, separated by commas. Empty shows everyone online.",
+		section = inGameSection, position = 61)
+	default String vitalsHudMembers()
+	{
+		return "";
+	}
+
+	@ConfigItem(keyName = "vitalsHudHp", name = "Vitals: hitpoints bar", description = "Show the HP bar.",
+		section = inGameSection, position = 62)
+	default boolean vitalsHudHp()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "vitalsHudPrayer", name = "Vitals: prayer bar", description = "Show the prayer bar.",
+		section = inGameSection, position = 63)
+	default boolean vitalsHudPrayer()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "vitalsHudSpec", name = "Vitals: special attack bar",
+		description = "Show the special attack bar.", section = inGameSection, position = 64)
+	default boolean vitalsHudSpec()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "vitalsHudRun", name = "Vitals: run energy bar", description = "Show the run energy bar.",
+		section = inGameSection, position = 65)
+	default boolean vitalsHudRun()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "vitalsHudSelf", name = "Vitals: show yourself",
+		description = "Off hides your own card, so only your teammates show.", section = inGameSection,
+		position = 66)
+	default boolean vitalsHudSelf()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "vitalsHudCombatOnly", name = "Vitals: only in combat",
+		description = "Hide the HUD unless you are fighting something, or were in the last few seconds.",
+		section = inGameSection, position = 67)
+	default boolean vitalsHudCombatOnly()
+	{
+		return false;
+	}
+
 	@ConfigItem(keyName = "overlayPathStop", name = "Path stop card",
 		description = "On screen while you path from the Shopping tab: the stop, what to get there and for whom.",
 		section = inGameSection, position = 53)
