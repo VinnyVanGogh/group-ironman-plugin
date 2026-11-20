@@ -1,6 +1,10 @@
 package com.vinnyvangogh.groupironman;
 
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -107,6 +111,8 @@ final class WaveTracker
 	static final long SAME_DEATH_MS = 3_000;
 	/** The live board moves only every this many waves (and on boss waves), so its message is not edited each wave. */
 	static final int BOARD_STEP = 5;
+	/** A spawn this close to a wave's line (either side) belongs to that wave. */
+	static final long SPAWN_WINDOW_MS = 3_000;
 
 	private final Consumer<GroupEvent> emit;
 	private final Supplier<String> mode;
@@ -130,6 +136,22 @@ final class WaveTracker
 	private int every;
 	private Predicate<Arena> enabled = a -> true;
 	private boolean changed;
+	/** Each finished wave's time in the run, index 0 is wave 1; 0 is untimed. */
+	private long[] splitMs = new long[WaveSplits.MAX_WAVES];
+	/** The run's clock ({@link #elapsed}) when the current wave began. */
+	private long waveStartMs;
+	/** Wall clock of the current wave's first line, for matching its spawns. */
+	private long waveAt;
+	/** This player's fastest time per wave, by arena; kept for good, unlike a run. */
+	private final Map<Arena, long[]> bests = new EnumMap<>(Arena.class);
+	/** The bests as the run began, so a completion can say which waves beat them. */
+	private long[] bestsAtStart = new long[0];
+	private boolean bestsChanged;
+	/** Fight Caves spawn points seen in waves 1 to 4, index 0 is wave 1. */
+	private final List<List<String>> spawns = newSpawns();
+	/** Spawns seen before their wave's line: (point, time). */
+	private final List<Object[]> pendingSpawns = new ArrayList<>();
+	private List<Integer> rotation = FightCaveRotation.candidates(newSpawns());
 
 	/** {@code emit} takes the activity events; {@code mode} is "solo" or the team, read when a run starts. */
 	WaveTracker(Consumer<GroupEvent> emit, Supplier<String> mode)
@@ -199,6 +221,11 @@ final class WaveTracker
 		if (done.find())
 		{
 			completed = Integer.parseInt(done.group(1));
+			// The Colosseum prints when a wave is cleared, so its split ends here and not at the next wave's line.
+			if (arena == Arena.COLOSSEUM && completed == wave)
+			{
+				closeWave(now);
+			}
 			return;
 		}
 		if (DEFEATED.matcher(text).matches())
@@ -243,7 +270,17 @@ final class WaveTracker
 		resumedAt = resumedAt == 0 ? now : resumedAt;
 		// A wave printed again after a relog is not a second milestone.
 		boolean fresh = n != wave;
+		if (fresh)
+		{
+			closeWave(now);
+			waveStartMs = elapsed(now);
+			waveAt = now;
+		}
 		wave = n;
+		if (fresh && here == Arena.FIGHT_CAVES && n <= FightCaveRotation.LAST_WAVE)
+		{
+			claimSpawns(n, now);
+		}
 		changed = true;
 		if (fresh && milestone(here, n))
 		{
@@ -279,6 +316,7 @@ final class WaveTracker
 		resumedAt = now;
 		String m = mode.get();
 		runMode = m == null ? "" : m;
+		bestsAtStart = bestsFor(a).clone();
 		if (n == 1)
 		{
 			post(event(GroupEvent.Type.ACTIVITY_START, now, me).number(1).detail(runMode).build());
@@ -307,8 +345,8 @@ final class WaveTracker
 			return;
 		}
 		post(event(GroupEvent.Type.ACTIVITY_DEATH, now, me).number(wave)
-			.detail(join(phase(), ActivityState.duration(elapsed(now)), mods)).world(world).location(arena.title)
-			.build());
+			.detail(join(phase(), ActivityState.duration(elapsed(now)), rotationShown(), waveTime(now), mods))
+			.world(world).location(arena.title).build());
 		defeatedAt = now;
 		clear();
 	}
@@ -320,9 +358,10 @@ final class WaveTracker
 		{
 			return;
 		}
+		closeWave(now);
 		String time = duration != null ? duration : ActivityState.duration(elapsed(now));
 		post(event(GroupEvent.Type.ACTIVITY_COMPLETE, now, me).number(pendingKc)
-			.detail(join(time, stats(), mods)).build());
+			.detail(join(time, stats(), rotationShown(), mods, WaveSplits.newBests(splitMs, bestsAtStart, 3))).build());
 		clear();
 	}
 
@@ -366,6 +405,145 @@ final class WaveTracker
 		duration = null;
 		pendingKc = 0;
 		runMode = "";
+		splitMs = new long[WaveSplits.MAX_WAVES];
+		waveStartMs = 0;
+		waveAt = 0;
+		bestsAtStart = new long[0];
+		spawns.clear();
+		spawns.addAll(newSpawns());
+		rotation = FightCaveRotation.candidates(spawns);
+	}
+
+	private static List<List<String>> newSpawns()
+	{
+		List<List<String>> out = new ArrayList<>();
+		for (int i = 0; i < FightCaveRotation.LAST_WAVE; i++)
+		{
+			out.add(new ArrayList<>());
+		}
+		return out;
+	}
+
+	/** This player's best times for an arena; a live array, grown to the arena's waves. */
+	private long[] bestsFor(Arena a)
+	{
+		return bests.computeIfAbsent(a, k -> new long[WaveSplits.MAX_WAVES]);
+	}
+
+	/** The current wave is over: its time goes in the splits, and in the bests if it is the fastest yet. */
+	private void closeWave(long now)
+	{
+		if (arena == null || wave < 1 || wave > splitMs.length || splitMs[wave - 1] > 0 || resumedAt == 0)
+		{
+			return;
+		}
+		long took = elapsed(now) - waveStartMs;
+		if (took <= 0)
+		{
+			return;
+		}
+		splitMs[wave - 1] = took;
+		long[] best = bestsFor(arena);
+		if (best[wave - 1] == 0 || took < best[wave - 1])
+		{
+			best[wave - 1] = took;
+			bestsChanged = true;
+		}
+		changed = true;
+	}
+
+	/**
+	 * A wave-start monster appeared at a Fight Caves spawn point ({@link FightCaveRotation#point}): the player's
+	 * own cave, waves 1 to 4 only. It may arrive just before or just after its wave's line, so it is kept briefly.
+	 */
+	void spawn(String point, long now)
+	{
+		if (point == null || region != Arena.FIGHT_CAVES.region)
+		{
+			return;
+		}
+		if (arena == Arena.FIGHT_CAVES && wave >= 1 && wave <= FightCaveRotation.LAST_WAVE
+			&& Math.abs(now - waveAt) <= SPAWN_WINDOW_MS)
+		{
+			spawns.get(wave - 1).add(point);
+			rotation = FightCaveRotation.candidates(spawns);
+			changed = true;
+			return;
+		}
+		pendingSpawns.add(new Object[] {point, now});
+	}
+
+	/** Spawns that arrived just before wave {@code n}'s line belong to it. */
+	private void claimSpawns(int n, long now)
+	{
+		for (Object[] p : pendingSpawns)
+		{
+			if (Math.abs(now - (Long) p[1]) <= SPAWN_WINDOW_MS)
+			{
+				spawns.get(n - 1).add((String) p[0]);
+			}
+		}
+		pendingSpawns.clear();
+		rotation = FightCaveRotation.candidates(spawns);
+	}
+
+	/** "Rotation 5", "unknown", "no rotation" or the Colosseum's chosen modifiers; empty before there is a run. */
+	private String rotationShown()
+	{
+		if (arena == Arena.FIGHT_CAVES)
+		{
+			return FightCaveRotation.label(rotation);
+		}
+		return arena == Arena.INFERNO ? "no rotation" : "";
+	}
+
+	/** "wave time 0:42": how long the wave in progress had gone on. */
+	private String waveTime(long now)
+	{
+		return wave > 0 ? "wave time " + WaveSplits.clock(elapsed(now) - waveStartMs) : "";
+	}
+
+	/** True once after a personal best changed, so the engine saves them. */
+	boolean takeBestsChanged()
+	{
+		boolean c = bestsChanged;
+		bestsChanged = false;
+		return c;
+	}
+
+	/** The personal bests as kept in the profile: "fight_caves:72,58|inferno:90". */
+	String saveBests()
+	{
+		List<String> out = new ArrayList<>();
+		for (Map.Entry<Arena, long[]> e : bests.entrySet())
+		{
+			String s = WaveSplits.encode(e.getValue());
+			if (!s.isEmpty())
+			{
+				out.add(e.getKey().id + ":" + s);
+			}
+		}
+		return String.join("|", out);
+	}
+
+	/** What {@link #saveBests} kept; an unreadable part is skipped. */
+	void restoreBests(String saved)
+	{
+		bests.clear();
+		if (saved == null || saved.isEmpty())
+		{
+			return;
+		}
+		for (String part : saved.split("\\|"))
+		{
+			int colon = part.indexOf(':');
+			Arena a = colon > 0 ? Arena.byId(part.substring(0, colon)) : null;
+			if (a != null)
+			{
+				long[] ms = WaveSplits.decode(part.substring(colon + 1));
+				System.arraycopy(ms, 0, bestsFor(a), 0, Math.min(ms.length, WaveSplits.MAX_WAVES));
+			}
+		}
 	}
 
 	/** True once after anything the state shows changed. */
@@ -395,7 +573,9 @@ final class WaveTracker
 		}
 		return new ActivityState.Builder(arena.id, now).cat(ActivityState.BOSS).name(arena.title).mode(runMode)
 			.phase(wave > 0 ? phase() : "").board(board()).wave(wave).max(arena.max).startedAt(startedAt)
-			.elapsedMs(elapsed(now)).stats(stats()).mods(mods).build();
+			.elapsedMs(elapsed(now)).stats(stats()).mods(mods).rotation(rotationShown())
+			.waveMs(wave > 0 && splitMs[Math.min(wave, splitMs.length) - 1] == 0 ? elapsed(now) - waveStartMs : 0)
+			.splits(WaveSplits.encode(splitMs)).bests(WaveSplits.encode(bestsFor(arena))).build();
 	}
 
 	private String phase()
@@ -440,14 +620,16 @@ final class WaveTracker
 		{
 			return "";
 		}
-		return arena.id + "," + wave + "," + startedAt + "," + activeMs + "," + completed;
+		return arena.id + "," + wave + "," + startedAt + "," + activeMs + "," + completed + "," + waveStartMs + ","
+			+ FightCaveRotation.save(rotation.size() == 15 ? new ArrayList<>() : rotation) + ","
+			+ WaveSplits.encode(splitMs).replace(',', ';');
 	}
 
 	/** A run {@link #save} kept; paused until the player is back in its arena. Anything unreadable is ignored. */
 	void restore(String saved)
 	{
-		String[] p = saved == null ? new String[0] : saved.split(",");
-		Arena a = p.length == 5 ? Arena.byId(p[0]) : null;
+		String[] p = saved == null ? new String[0] : saved.split(",", -1);
+		Arena a = p.length == 5 || p.length == 8 ? Arena.byId(p[0]) : null;
 		if (a == null)
 		{
 			return;
@@ -465,6 +647,15 @@ final class WaveTracker
 			activeMs = Math.max(0, active);
 			completed = Math.max(0, done);
 			runMode = mode.get() == null ? "" : mode.get();
+			bestsAtStart = bestsFor(a).clone();
+			if (p.length == 8)
+			{
+				waveStartMs = Math.max(0, Long.parseLong(p[5]));
+				List<Integer> rot = FightCaveRotation.restore(p[6]);
+				rotation = rot.isEmpty() ? FightCaveRotation.candidates(spawns) : rot;
+				long[] kept = WaveSplits.decode(p[7].replace(';', ','));
+				System.arraycopy(kept, 0, splitMs, 0, Math.min(kept.length, splitMs.length));
+			}
 		}
 		catch (NumberFormatException e)
 		{
@@ -476,6 +667,8 @@ final class WaveTracker
 	void reset()
 	{
 		clear();
+		bests.clear();
+		pendingSpawns.clear();
 		defeatedAt = 0;
 		region = -1;
 	}

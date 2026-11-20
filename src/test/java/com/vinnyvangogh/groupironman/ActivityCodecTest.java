@@ -88,7 +88,7 @@ public class ActivityCodecTest
 		assertNull("bad id", ActivityCodec.decode(GSON, "{\"v\":1,\"k\":\"activity\",\"id\":\"../x\",\"name\":\"a\"}"));
 		assertNull("no name", ActivityCodec.decode(GSON, "{\"v\":1,\"k\":\"activity\",\"id\":\"inferno\"}"));
 		assertNull("another kind", ActivityCodec.decode(GSON, "{\"v\":1,\"k\":\"stats\",\"id\":\"\"}"));
-		String huge = "{\"v\":1,\"k\":\"activity\",\"id\":\"inferno\",\"name\":\"" + repeat("y", 3000) + "\"}";
+		String huge = "{\"v\":1,\"k\":\"activity\",\"id\":\"inferno\",\"name\":\"" + repeat("y", ActivityCodec.MAX_CHARS + 1) + "\"}";
 		assertNull("oversized", ActivityCodec.decode(GSON, huge));
 	}
 

@@ -44,6 +44,14 @@ final class ActivityState
 	final String team;
 	/** When this state was true, the sender's clock. */
 	final long at;
+	/** "Rotation 5", "Rotation 7 or 8", "unknown", or empty when the activity has no rotation to show. */
+	final String rotation;
+	/** How long the current wave has gone on as of {@link #at}; 0 when not timed. */
+	final long waveMs;
+	/** Finished waves' times, {@link WaveSplits} format; empty when none. */
+	final String splits;
+	/** The sender's personal best per wave, {@link WaveSplits} format; empty when none. */
+	final String bests;
 	private final String overlay;
 
 	private ActivityState(Builder b)
@@ -62,6 +70,10 @@ final class ActivityState
 		mods = b.mods;
 		team = b.team;
 		at = b.at;
+		rotation = b.rotation;
+		waveMs = Math.max(0, b.waveMs);
+		splits = b.splits;
+		bests = b.bests;
 		overlay = "  " + (phase.isEmpty() ? name : name + ": " + phase);
 	}
 
@@ -97,6 +109,24 @@ final class ActivityState
 		return out.toString();
 	}
 
+	/** This wave's time as of {@code now}, or 0 when the sender does not time waves. */
+	long waveElapsed(long now)
+	{
+		return waveMs > 0 ? waveMs + Math.max(0, now - at) : 0;
+	}
+
+	/** "Rotation 5 - this wave 0:42" under the card line; empty when there is neither. */
+	String waveLine(long now)
+	{
+		// The Colosseum has no rotation: its chosen modifiers fill the slot.
+		StringBuilder out = new StringBuilder(rotation.isEmpty() ? mods : rotation);
+		if (wave > 0 && waveMs > 0)
+		{
+			out.append(out.length() == 0 ? "" : " - ").append("this wave ").append(WaveSplits.clock(waveElapsed(now)));
+		}
+		return out.toString();
+	}
+
 	/** The in-game group box's sub-line: "Fight Caves: wave 37/63". Made once here, never per frame. */
 	String overlayLine()
 	{
@@ -118,7 +148,8 @@ final class ActivityState
 	Builder toBuilder()
 	{
 		return new Builder(id, at).cat(cat).name(name).mode(mode).phase(phase).board(board).wave(wave).max(max)
-			.startedAt(startedAt).elapsedMs(elapsedMs).stats(stats).mods(mods).team(team);
+			.startedAt(startedAt).elapsedMs(elapsedMs).stats(stats).mods(mods).team(team).rotation(rotation)
+			.waveMs(waveMs).splits(splits).bests(bests);
 	}
 
 	static final class Builder
@@ -137,6 +168,10 @@ final class ActivityState
 		private String stats = "";
 		private String mods = "";
 		private String team = "";
+		private String rotation = "";
+		private long waveMs;
+		private String splits = "";
+		private String bests = "";
 
 		Builder(String id, long at)
 		{
@@ -213,6 +248,30 @@ final class ActivityState
 		Builder team(String v)
 		{
 			team = orEmpty(v);
+			return this;
+		}
+
+		Builder rotation(String v)
+		{
+			rotation = orEmpty(v);
+			return this;
+		}
+
+		Builder waveMs(long v)
+		{
+			waveMs = v;
+			return this;
+		}
+
+		Builder splits(String v)
+		{
+			splits = orEmpty(v);
+			return this;
+		}
+
+		Builder bests(String v)
+		{
+			bests = orEmpty(v);
 			return this;
 		}
 
