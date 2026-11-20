@@ -28,6 +28,7 @@ import net.runelite.api.Friend;
 import net.runelite.api.FriendContainer;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
+import net.runelite.api.NPC;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
@@ -1605,6 +1606,14 @@ class GroupService
 		return GroupMembers.UNKNOWN;
 	}
 
+	/** Client thread. The pet following the local player, by name; "" when none is out. */
+	private String followerName()
+	{
+		NPC pet = client.getFollower();
+		String name = pet == null ? null : pet.getName();
+		return name == null ? "" : name;
+	}
+
 	/** Client thread. Run energy, special attack and location fire no StatChanged; poll the cheap ints. */
 	private void pollStats(GroupOutbox.Switches s)
 	{
@@ -1617,7 +1626,8 @@ class GroupService
 		int y = at == null ? 0 : at.getY();
 		int plane = at == null ? 0 : at.getPlane();
 		MemberStatus status = MemberStatus.fromGame(client.getVarbitValue(VarbitID.PRAYER_ALLACTIVE),
-			client.getVarpValue(VarPlayerID.POISON), client.getVarpValue(VarPlayerID.DISEASE));
+			client.getVarpValue(VarPlayerID.POISON), client.getVarpValue(VarPlayerID.DISEASE))
+			.withPet(followerName());
 		if (run != lastRun || spec != lastSpec || world != lastWorld || region != lastRegion
 			|| plane != lastPlane || Math.abs(x - lastX) + Math.abs(y - lastY) >= MOVE_TILES
 			|| !status.equals(lastStatus))
