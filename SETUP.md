@@ -304,6 +304,14 @@ before friends run it. To test a different tag, change `$SourceRef` at the
 top of the launcher. The checksum step has its own tests:
 `pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1`.
 
+The launcher also installs **Quest Route** the same way, as `quest-route.jar`
+(the plain `./gradlew jar` output of VinnyVanGogh/questpath-plugin, renamed from
+`questpath.jar`), with its SHA-256 in `$QrJarSha256`. While that pin is all
+zeros the launcher prints a warning and skips it. Attach the jar to the release
+and put its real hash in the pin in the same change, as below. On macOS, drop
+`quest-route.jar` into `~/.runelite/sideloaded-plugins/` next to
+`combat-vitals.jar`.
+
 `combat-vitals.jar` is the plain `./gradlew jar` output of
 VinnyVanGogh/combat-vitals-plugin (only that plugin's own classes and
 sounds). Build it first, put its SHA-256 in `$CvJarSha256` at the top of the

@@ -43,6 +43,12 @@ $SourceUrl = "https://github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/
 # never loads that folder.
 $CvJarUrl    = "https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/$SourceRef/combat-vitals.jar"
 $CvJarSha256 = '6156ad6ca1dd134cd78b2169a4c726997bf42feeb32f8d1ef0a6ec6856408081'
+# Quest Route, attached to the same release as quest-route.jar (the plain
+# `./gradlew jar` of VinnyVanGogh/questpath-plugin, build/libs/questpath.jar
+# renamed). All zeros means "not pinned yet": the launcher skips it with a
+# warning. Replace with the real SHA-256 of the jar attached to the release.
+$QrJarUrl    = "https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/$SourceRef/quest-route.jar"
+$QrJarSha256 = '0000000000000000000000000000000000000000000000000000000000000000'
 
 $GuHome = Join-Path $env:LOCALAPPDATA 'GimUtilities'
 
@@ -102,36 +108,55 @@ function Install-SideloadedJar {
 }
 # END Install-SideloadedJar
 
-# Installs Combat & Skilling Vitals for the test client. Never fatal: if it
+# Installs one sideloaded plugin jar for the test client. Never fatal: if it
 # cannot be fetched or does not match its pin, GIM Utilities starts without it.
-function Install-CombatVitals {
+function Install-Sideload {
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Url,
+        [Parameter(Mandatory = $true)][string]$Sha256
+    )
     $folder = Join-Path $env:USERPROFILE '.runelite\sideloaded-plugins'
-    $target = Join-Path $folder 'combat-vitals.jar'
+    $target = Join-Path $folder $Name
+    if ($Sha256 -match '^0{64}$') {
+        Say "      WARNING: $Label is not pinned in this launcher yet, so it was skipped."
+        Say '      GIM Utilities still starts without it.'
+        return
+    }
     if (Test-Path -LiteralPath $target -PathType Leaf) {
         $have = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($have -eq $CvJarSha256.ToLowerInvariant()) {
-            Say "      Combat & Skilling Vitals ($SourceRef) is already in $folder"
+        if ($have -eq $Sha256.ToLowerInvariant()) {
+            Say "      $Label ($SourceRef) is already in $folder"
             return
         }
     }
-    Say "      Downloading Combat & Skilling Vitals ($SourceRef) into $folder..."
+    Say "      Downloading $Label ($SourceRef) into $folder..."
     $downloads = Join-Path $GuHome 'downloads'
     New-Item -ItemType Directory -Force -Path $downloads | Out-Null
-    $part = Join-Path $downloads 'combat-vitals.jar.part'
+    $part = Join-Path $downloads "$Name.part"
     if (Test-Path -LiteralPath $part) { Remove-Item -LiteralPath $part -Force }
     try {
-        Invoke-WebRequest -UseBasicParsing -Uri $CvJarUrl -OutFile $part
-        $result = Install-SideloadedJar -Downloaded $part -Folder $folder -Name 'combat-vitals.jar' -Expected $CvJarSha256
+        Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $part
+        $result = Install-SideloadedJar -Downloaded $part -Folder $folder -Name $Name -Expected $Sha256
     } catch {
         if (Test-Path -LiteralPath $part) { Remove-Item -LiteralPath $part -Force }
-        Say "      WARNING: Combat & Skilling Vitals was not installed ($($_.Exception.Message))."
+        Say "      WARNING: $Label was not installed ($($_.Exception.Message))."
         Say '      GIM Utilities still starts without it.'
         return
     }
     if ($result -eq 'replaced') {
-        Say '      Your earlier combat-vitals.jar is kept next to it as combat-vitals.jar.bak.'
+        Say "      Your earlier $Name is kept next to it as $Name.bak."
     }
-    Say '      Combat & Skilling Vitals installed. Only this test client loads it, not your normal RuneLite.'
+    Say "      $Label installed. Only this test client loads it, not your normal RuneLite."
+}
+
+function Install-CombatVitals {
+    Install-Sideload -Label 'Combat & Skilling Vitals' -Name 'combat-vitals.jar' -Url $CvJarUrl -Sha256 $CvJarSha256
+}
+
+function Install-QuestRoute {
+    Install-Sideload -Label 'Quest Route' -Name 'quest-route.jar' -Url $QrJarUrl -Sha256 $QrJarSha256
 }
 
 # The Java major version of a JDK home, or 0 when it is not a usable JDK.
@@ -272,6 +297,7 @@ try {
     Say '[2/3] Getting the plugin source...'
     $src = Find-Source
     Install-CombatVitals
+    Install-QuestRoute
 
     $gradleTask = Get-GradleTask $env:GU_BUILD_ONLY
     if ($gradleTask -eq 'build') {

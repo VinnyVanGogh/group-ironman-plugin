@@ -119,6 +119,15 @@ try {
         if (-not $m.Success) { throw 'no $CvJarSha256 pin found' }
         if ($m.Groups[1].Value -notmatch '^[0-9a-f]{64}$') { throw "bad pin $($m.Groups[1].Value)" }
     }
+    Check 'the pinned Quest Route hash in the .cmd is well-formed' {
+        $m = [regex]::Match((Get-Content -Raw $launcher), "\`$QrJarSha256\s*=\s*'([^']*)'")
+        if (-not $m.Success) { throw 'no $QrJarSha256 pin found' }
+        if ($m.Groups[1].Value -notmatch '^[0-9a-f]{64}$') { throw "bad pin $($m.Groups[1].Value)" }
+    }
+    Check 'the .cmd fetches quest-route.jar from the same release' {
+        $cmd = Get-Content -Raw $launcher
+        if ($cmd -notmatch '/VinnyVanGogh/group-ironman-plugin/releases/download/\$SourceRef/quest-route\.jar') { throw 'QrJarUrl does not point at this release' }
+    }
     Check 'the .cmd fetches combat-vitals.jar from the same release' {
         $cmd = Get-Content -Raw $launcher
         if ($cmd -notmatch '/VinnyVanGogh/group-ironman-plugin/releases/download/\$SourceRef/combat-vitals\.jar') { throw 'CvJarUrl does not point at this release' }
