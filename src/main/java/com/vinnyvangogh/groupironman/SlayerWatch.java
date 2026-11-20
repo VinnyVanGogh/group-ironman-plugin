@@ -30,6 +30,8 @@ final class SlayerWatch
 	/** A finished task still waiting for its streak line. */
 	private String killed;
 	private int killedWait;
+	/** A new task assigned while the finished one still waits for its streak line: posts right after it. */
+	private GroupEvent pending;
 	private String lastDialog = "";
 
 	SlayerWatch(Consumer<GroupEvent> out)
@@ -43,6 +45,7 @@ final class SlayerWatch
 		taskName = "";
 		killed = null;
 		killedWait = 0;
+		pending = null;
 		lastDialog = "";
 	}
 
@@ -105,8 +108,19 @@ final class SlayerWatch
 		held(t.name);
 		if ((t.fresh || changed) && t.amount > 0)
 		{
-			out.accept(GroupEvent.of(GroupEvent.Type.SLAYER, now, me).text(t.name).number(t.amount).detail(t.from)
-				.build());
+			GroupEvent event = GroupEvent.of(GroupEvent.Type.SLAYER, now, me).text(t.name).number(t.amount)
+				.detail(t.from).build();
+			if (killed != null)
+			{
+				// Posts in the order it happened: "task done" first, then this "new task".
+				if (pending != null)
+				{
+					out.accept(pending);
+				}
+				pending = event;
+				return;
+			}
+			out.accept(event);
 		}
 	}
 
@@ -114,9 +128,18 @@ final class SlayerWatch
 	{
 		String name = killed != null ? killed : taskName;
 		killed = null;
-		held("");
+		GroupEvent next = pending;
+		pending = null;
+		if (next == null)
+		{
+			held("");
+		}
 		out.accept(GroupEvent.of(GroupEvent.Type.SLAYER, now, me).text(name.isEmpty() ? "task" : name)
 			.detail(detail).build());
+		if (next != null)
+		{
+			out.accept(next);
+		}
 	}
 
 	private void held(String name)
