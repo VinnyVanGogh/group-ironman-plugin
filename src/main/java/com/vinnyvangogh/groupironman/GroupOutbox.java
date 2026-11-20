@@ -1,10 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Decides which group payloads this client is willing to send, and is the

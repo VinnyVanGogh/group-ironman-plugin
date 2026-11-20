@@ -1,15 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.HashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import net.runelite.client.hiscore.HiscoreSkill;
-import net.runelite.client.hiscore.HiscoreSkillType;
+import net.runelite.client.hiscore.*;
 
 /**
  * The categories of the Leaderboard and Compare views, as the Hiscores plugin groups them: Skilling, Bossing,

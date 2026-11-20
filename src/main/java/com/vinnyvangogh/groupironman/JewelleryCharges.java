@@ -1,12 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collections;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.regex.*;
 
 /**
  * Charges on the jewellery a member carries or wears, as RuneLite's Item Charges plugin shows them.

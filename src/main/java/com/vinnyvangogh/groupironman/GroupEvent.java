@@ -1,10 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 /**
  * One group event: a member's drop, collection log slot, pet, death, storage

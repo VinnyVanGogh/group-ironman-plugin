@@ -1,13 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.EnumMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BiFunction;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.regex.*;
 
 /**
  * The words for each {@link GroupEvent.Type}, and the game's chat and widget

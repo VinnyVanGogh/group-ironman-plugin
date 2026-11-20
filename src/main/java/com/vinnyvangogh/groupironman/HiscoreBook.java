@@ -1,15 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import net.runelite.client.hiscore.HiscoreResult;
-import net.runelite.client.hiscore.HiscoreSkill;
-import net.runelite.client.hiscore.HiscoreSkillType;
+import java.util.*;
+import net.runelite.client.hiscore.*;
 
 /**
  * Skill levels from the OSRS hiscores for members who do not share their own (Board 2026-11-11): what the Group

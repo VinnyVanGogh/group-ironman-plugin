@@ -1,9 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 /**
  * One member's quest progress, as far as the Shopping tab cares: which of the

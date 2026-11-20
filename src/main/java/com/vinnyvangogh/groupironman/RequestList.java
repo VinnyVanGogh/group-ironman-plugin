@@ -1,9 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Map;
-import java.util.TreeSet;
+import java.util.*;
 
 /**
  * One member's request to the group: their own named list of items and how

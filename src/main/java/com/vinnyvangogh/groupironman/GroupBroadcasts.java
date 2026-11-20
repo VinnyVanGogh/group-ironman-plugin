@@ -1,14 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.*;
+import java.util.function.*;
+import java.util.regex.*;
 
 /**
  * The game's own Group channel broadcasts ({@code ChatMessageType.CLAN_GIM_MESSAGE}) as group events, so members

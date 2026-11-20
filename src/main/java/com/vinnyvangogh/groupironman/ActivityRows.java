@@ -1,11 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumSet;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * What the Activities tab shows (docs/plans/activities.md §4.1), as plain rows so the Swing code only lays them out:

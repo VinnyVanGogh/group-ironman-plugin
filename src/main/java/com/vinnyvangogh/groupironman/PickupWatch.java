@@ -1,10 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Posted drops waiting to be picked up ("Add picked-up screenshot"): a drop posted to Discord is watched for

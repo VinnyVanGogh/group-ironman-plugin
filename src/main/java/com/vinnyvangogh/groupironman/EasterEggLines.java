@@ -1,10 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Every Easter egg line, read once from {@code easter-eggs.txt} beside this class so they are easy to edit.

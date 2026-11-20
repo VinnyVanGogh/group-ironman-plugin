@@ -1,13 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import java.util.ArrayList;
+import com.google.gson.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * Two more kinds inside a {@link VvgGroupIronmanMessage}, next to {@link ShoppingCodec}'s:

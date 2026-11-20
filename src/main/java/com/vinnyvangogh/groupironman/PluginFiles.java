@@ -1,9 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.common.base.Charsets;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import net.runelite.client.util.Filepath;
 
 /**

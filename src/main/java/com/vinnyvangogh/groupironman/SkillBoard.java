@@ -1,9 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The maths behind the Leaderboard and Compare tabs, with no Swing: one selected stat ranked across the group, and the
