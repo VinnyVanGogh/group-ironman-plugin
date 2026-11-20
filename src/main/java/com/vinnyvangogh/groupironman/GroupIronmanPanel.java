@@ -24,6 +24,7 @@ import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -70,7 +71,8 @@ import net.runelite.client.ui.components.IconTextField;
 class GroupIronmanPanel extends PluginPanel
 {
 	/** What the buttons in the header, and in the Settings tab, do. */
-	interface Actions extends GroupSettingsTab.Actions, ShoppingTab.Actions, CompareTab.Actions
+	interface Actions extends GroupSettingsTab.Actions, ShoppingTab.Actions, CompareTab.Actions,
+		GearTab.Actions
 	{
 		void join();
 
@@ -94,6 +96,12 @@ class GroupIronmanPanel extends PluginPanel
 
 		/** Ticks Post to Discord. */
 		void postToDiscord();
+
+		/** The quick-settings switches' values now, in {@link QuickSettings#ITEMS} order. */
+		boolean[] quickValues();
+
+		/** A quick-settings click: writes that config key, so RuneLite's settings list follows. */
+		void setQuick(String key, boolean on);
 	}
 
 	/** Everything a redraw needs, captured on the client side. */
@@ -149,6 +157,8 @@ class GroupIronmanPanel extends PluginPanel
 		ProgressView progress = ProgressView.EMPTY;
 		/** The Compare tab's view, or null before the plugin has started. */
 		CompareTab.View compare;
+		/** The Gear tab's view, or null before the plugin has started. */
+		GearTab.View gear;
 	}
 
 	private static final int GRID_COLUMNS = 5;
@@ -182,6 +192,7 @@ class GroupIronmanPanel extends PluginPanel
 	private final GroupSettingsTab settingsTab;
 	private final ShoppingTab shoppingTab;
 	private final CompareTab compareTab;
+	private final GearTab gearTab;
 
 	private final JPanel header = new Column();
 	private final CardLayout cards = new CardLayout();
@@ -198,6 +209,8 @@ class GroupIronmanPanel extends PluginPanel
 	private List<String> logMembers = Collections.emptyList();
 	/** Set while the member picker is rebuilt, so its own events do not redraw mid-draw. */
 	private boolean updatingMembers;
+	/** Whether the header's quick-settings card is unfolded. */
+	private boolean quickOpen = true;
 	/** Member cards the player collapsed, by name. */
 	private final Set<String> collapsed = new HashSet<>();
 	/** Members whose run detail (wave-by-wave splits) is open on the Activities tab; closed by default. */
@@ -289,12 +302,13 @@ class GroupIronmanPanel extends PluginPanel
 		this.settingsTab = new GroupSettingsTab(actions, this::redraw);
 		this.shoppingTab = new ShoppingTab(actions, itemManager, this::redraw);
 		this.compareTab = new CompareTab(actions, skillIcons, this::redraw);
+		this.gearTab = new GearTab(actions, this::redraw);
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
 
 		JPanel top = new Column();
 		top.add(header);
-		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Activities", "Compare", "Shopping", "Settings"));
+		top.add(tabBar("Group", "Banks", "Storage", "Find", "Log", "Activities", "Compare", "Shopping", "Gear", "Settings"));
 		add(top, BorderLayout.NORTH);
 
 		addTab("Group", null);
@@ -305,6 +319,7 @@ class GroupIronmanPanel extends PluginPanel
 		addTab("Activities", activityFilters());
 		addTab("Compare", null);
 		addTab("Shopping", null);
+		addTab("Gear", null);
 		addTab("Settings", null);
 		add(views, BorderLayout.CENTER);
 		banksView = new BanksTabView(tabs.get("Banks"), bankFolds, this::paintCell, GRID_COLUMNS, MAX_GRID_ITEMS,
@@ -512,6 +527,9 @@ class GroupIronmanPanel extends PluginPanel
 			case "Shopping":
 				drawShopping(tab, v);
 				break;
+			case "Gear":
+				drawGear(tab, v);
+				break;
 			case "Settings":
 				drawSettings(tab, v, now);
 				break;
@@ -548,6 +566,16 @@ class GroupIronmanPanel extends PluginPanel
 			return;
 		}
 		compareTab.draw(tab, v.compare);
+	}
+
+	private void drawGear(JPanel tab, View v)
+	{
+		if (v.gear == null)
+		{
+			empty(tab, "Gear checks are starting.", "Open this tab again in a moment.");
+			return;
+		}
+		gearTab.draw(tab, v.gear);
 	}
 
 	private void drawShopping(JPanel tab, View v)
@@ -629,12 +657,13 @@ class GroupIronmanPanel extends PluginPanel
 		SyncHeader h = SyncHeader.of(v.sync, v.group.othersOnline(v.self, now), v.members);
 		String note = keyNote != null && now - keyNoteAt < 30_000 ? keyNote : null;
 		SharingPrompt.Card card = v.sharing == null ? null : sharing.card(v.sharing);
+		boolean[] quick = actions.quickValues();
 		// A header that would read the same is left alone: rebuilding its buttons on every member update was
 		// the lag with the Settings tab open (that tab is skipped when unchanged, the header was not).
 		String signature = String.join("|", String.valueOf(SidebarButton.offNotice(v.anyOn)), h.title,
 			String.valueOf(h.detail), String.valueOf(h.ok), String.valueOf(h.buttons), String.valueOf(note),
 			card == null ? "-" : card.sharing + "," + card.discord + "," + v.sharing.key,
-			String.valueOf(v.group.strangers()));
+			String.valueOf(v.group.strangers()), quickOpen + Arrays.toString(quick));
 		if (signature.equals(headerDrawn) && header.getComponentCount() > 0)
 		{
 			return;
@@ -664,12 +693,32 @@ class GroupIronmanPanel extends PluginPanel
 			header.add(text(note, Color.WHITE));
 		}
 		drawSharingCard(v.sharing);
+		drawQuickSettings(quick);
 		for (String stranger : v.group.strangers())
 		{
 			header.add(text("Not in your group: " + stranger + " (ignored)", ColorScheme.PROGRESS_ERROR_COLOR));
 		}
 		header.revalidate();
 		header.repaint();
+	}
+
+	/** A foldable card of the most-used switches and "All settings"; each click writes the real config key. */
+	private void drawQuickSettings(boolean[] values)
+	{
+		JPanel box = Ui.card();
+		box.add(Ui.wide(Ui.button((quickOpen ? "▾ " : "▸ ") + QuickSettings.TITLE,
+			"Show or hide the switches", () ->
+			{
+				quickOpen = !quickOpen;
+				redraw();
+			})));
+		if (quickOpen)
+		{
+			QuickSettings.draw(box, values, actions::setQuick);
+			box.add(Ui.wide(Ui.button(QuickSettings.ALL, "Opens GIM Utilities' page in RuneLite's settings",
+				actions::openSettings)));
+		}
+		header.add(box);
 	}
 
 	/** Every switch is off: say so first, with a way to the settings, so the panel never looks broken. */
@@ -938,6 +987,14 @@ class GroupIronmanPanel extends PluginPanel
 			label.setForeground(chip.startsWith("Venom") ? VENOM : chip.startsWith("Disease") ? DISEASE : POISON);
 			label.setToolTipText(i < c.effectNotes.size() ? c.effectNotes.get(i) : chip);
 			body.add(label);
+		}
+		if (!c.pet.isEmpty())
+		{
+			JLabel pet = new JLabel("Pet: " + c.pet);
+			pet.setFont(FontManager.getRunescapeSmallFont());
+			pet.setForeground(MUTED);
+			pet.setToolTipText(c.name + " has " + c.pet + " out");
+			body.add(pet);
 		}
 		if (c.source != null)
 		{

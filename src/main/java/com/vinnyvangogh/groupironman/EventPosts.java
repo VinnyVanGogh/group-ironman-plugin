@@ -119,7 +119,8 @@ final class EventPosts extends EditedPosts
 	{
 		if (!m.storage)
 		{
-			return DiscordWebhook.stack(gson, m.cards, style.get(), m.png != null, m.username);
+			return DiscordWebhook.stack(gson, m.cards, style.get(), m.png != null, m.username,
+				m.chronological);
 		}
 		ItemLookup lookup = words.get();
 		String json = DiscordWebhook.payload(gson, net(m, lookup), lookup, style.get(), null, m.png != null, null,

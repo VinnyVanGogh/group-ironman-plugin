@@ -236,6 +236,29 @@ public class EventPostsTest
 	}
 
 	@Test
+	public void slayerTaskDoneStaysAboveTheNewTaskAndThePictureIsOnTheNewest()
+	{
+		GroupEvent done = GroupEvent.of(GroupEvent.Type.SLAYER, 0, "Alex")
+			.text("Slayer task done: Mammoths (streak 17, 25 points)").build();
+		GroupEvent next = GroupEvent.of(GroupEvent.Type.SLAYER, 0, "Alex")
+			.text("New Slayer task: 119 x Bandits (Krystilia)").build();
+		posts.add(EventPosts.moment(gson, URL, DiscordMerge.single(done, LOOKUP), LOOKUP, null, null, false),
+			"first", null, WINDOW);
+		tick();
+		reply(200, "m1");
+		now += 15 * SEC;
+		posts.add(EventPosts.moment(gson, URL, DiscordMerge.single(next, LOOKUP), LOOKUP, null, null, false),
+			"second", new byte[]{2}, WINDOW);
+		tick();
+		JsonArray cards = embeds(sent.get(1));
+		assertEquals(2, cards.size());
+		assertTrue(cards.get(0).getAsJsonObject().get("description").getAsString().contains("task done"));
+		assertTrue(cards.get(1).getAsJsonObject().get("description").getAsString().contains("New Slayer task"));
+		assertFalse(cards.get(0).getAsJsonObject().has("image"));
+		assertTrue("the picture stays on the newest event", cards.get(1).getAsJsonObject().has("image"));
+	}
+
+	@Test
 	public void quickEventsFoldIntoOneEdit()
 	{
 		add(diary("Alex", "Easy Varrock"), "first");

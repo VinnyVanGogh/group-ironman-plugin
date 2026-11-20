@@ -464,6 +464,11 @@ final class GroupCodec
 			o.addProperty("ps", status.poisonHits());
 			o.addProperty("vn", status.venomed() ? 1 : 0);
 			o.addProperty("dz", status.diseased() ? 1 : 0);
+			if (!status.pet().isEmpty())
+			{
+				// pt: the follower pet's name; absent when none is out or from an older sender.
+				o.addProperty("pt", status.pet());
+			}
 		}
 		if (stats.hasPosition())
 		{
@@ -890,7 +895,7 @@ final class GroupCodec
 		}
 		return MemberStatus.of(longOr(in.get("pr"), 0) != 0,
 			clamp(longOr(in.get("ps"), 0), 0, MemberStatus.MAX_POISON_HITS),
-			longOr(in.get("vn"), 0) != 0, longOr(in.get("dz"), 0) != 0);
+			longOr(in.get("vn"), 0) != 0, longOr(in.get("dz"), 0) != 0).withPet(string(in, "pt"));
 	}
 
 	private static JsonObject header(Kind kind)
