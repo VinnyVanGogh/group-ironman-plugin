@@ -111,6 +111,40 @@ public class EasterEggsTest
 			EasterEggs.line(deathValue(items(ItemID.SPADE, 1), 0), lookup, ON));
 	}
 
+	private static GroupEvent diedCarrying(Map<Integer, Integer> lost, Map<Integer, Integer> carried)
+	{
+		return deathValue(lost, lost.isEmpty() ? 0 : 1_500_000).toBuilder().carried(carried).build();
+	}
+
+	@Test
+	public void anUnskulledDeathThatKeptTheSpadeStillBlamesTheClueHunters()
+	{
+		assertEquals(EasterEggLines.CLUE_HUNTERS[0], EasterEggs.line(diedCarrying(items(),
+			items(ItemID.SPADE, 1, CLUE_HARD, 1)), lookup, ON));
+		assertEquals("a clue scroll alone, carried", EasterEggLines.CLUE_HUNTERS[0],
+			EasterEggs.line(diedCarrying(items(CLUE_HARD, 1), items(CLUE_HARD, 1, WHIP, 1)), lookup, ON));
+	}
+
+	@Test
+	public void aSkulledDeathWithTheSpadeLostStillBlamesTheClueHunters()
+	{
+		assertEquals(EasterEggLines.CLUE_HUNTERS[0], EasterEggs.line(diedCarrying(items(ItemID.SPADE, 1),
+			items(ItemID.SPADE, 1)), lookup, ON));
+	}
+
+	@Test
+	public void carryingGearThatWasLostIsNotAClueDeathEvenWithASpade()
+	{
+		assertNull(EasterEggs.line(diedCarrying(items(WHIP, 1), items(ItemID.SPADE, 1, WHIP, 1)), lookup, ON));
+	}
+
+	@Test
+	public void aDeathCarryingNoClueKitKeepsItsOwnLine()
+	{
+		String egg = EasterEggs.line(diedCarrying(items(), items(WHIP, 1)), lookup, ON);
+		assertTrue(egg, Arrays.asList(EasterEggLines.FREE_TRIP).contains(egg));
+	}
+
 	@Test
 	public void aSpadeWithSomethingElseIsNotAClueDeath()
 	{

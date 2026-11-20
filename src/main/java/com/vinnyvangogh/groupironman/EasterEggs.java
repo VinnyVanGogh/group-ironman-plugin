@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -47,9 +48,12 @@ final class EasterEggs
 		}
 	}
 
-	/** Lost alongside a spade, these still make it a clue hunter's death. Matched on the item name's start. */
+	/** Carried or lost alongside a spade, these still make it a clue hunter's death. Matched on the item name's start. */
 	private static final List<String> CLUE_ITEMS = Arrays.asList("clue ", "scroll box", "challenge scroll",
 		"casket");
+	/** Tools a clue step needs, matched on the whole name; with a light source they are not gear at risk. */
+	private static final Set<String> CLUE_TOOLS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+		"sextant", "watch", "chart", "light orb", "tinderbox", "lockpick")));
 	/** Event types whose items are a drop the item table reads by id. */
 	private static final Set<GroupEvent.Type> DROPS = Collections.unmodifiableSet(EnumSet.of(GroupEvent.Type.DROP,
 		GroupEvent.Type.UNIQUE, GroupEvent.Type.CLUE, GroupEvent.Type.BARROWS));
@@ -208,26 +212,38 @@ final class EasterEggs
 		return e.type == GroupEvent.Type.DEATH_VALUE && e.number <= 0;
 	}
 
+	/**
+	 * A clue hunter's death: it carried a spade or a clue item (skulled or not: unskulled keeps the spade), and what
+	 * it lost is only clue-hunting kit. A client that did not see the inventory (another member's event) reads the
+	 * lost items alone, as before.
+	 */
 	private static boolean clueDeath(GroupEvent e, ItemLookup lookup)
 	{
-		if (e.type != GroupEvent.Type.DEATH_VALUE || !e.items.containsKey(EasterEggLines.SPADE))
+		if (e.type != GroupEvent.Type.DEATH_VALUE)
 		{
 			return false;
 		}
-		for (int id : e.items.keySet())
+		boolean seen = !e.carried.isEmpty();
+		Set<Integer> had = seen ? e.carried.keySet() : e.items.keySet();
+		if (!had.contains(EasterEggLines.SPADE) && !(seen && had.stream().anyMatch(id -> clueItem(lookup.name(id)))))
 		{
-			if (id != EasterEggLines.SPADE && !clueItem(lookup.name(id)))
-			{
-				return false;
-			}
+			return false;
 		}
-		return true;
+		return e.items.keySet().stream().allMatch(id -> id == EasterEggLines.SPADE || clueKit(lookup.name(id)));
 	}
 
+	/** A clue scroll, casket or the like. */
 	private static boolean clueItem(String name)
 	{
 		String n = name.toLowerCase(Locale.ROOT);
 		return CLUE_ITEMS.stream().anyMatch(n::startsWith);
+	}
+
+	/** Clue items, and the tools a clue step asks for: they do not count as gear at risk. */
+	private static boolean clueKit(String name)
+	{
+		String n = name.toLowerCase(Locale.ROOT);
+		return clueItem(n) || CLUE_TOOLS.contains(n) || n.endsWith(" lantern") || n.startsWith("lit ");
 	}
 
 	private static boolean bonesOnly(GroupEvent e)

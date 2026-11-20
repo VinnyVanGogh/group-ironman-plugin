@@ -348,6 +348,7 @@ final class EventWatchers
 				lost.put(e.getKey(), gone);
 			}
 		}
+		Map<Integer, Integer> carried = carriedAtDeath;
 		carriedAtDeath = null;
 		if (graveLeft > 0)
 		{
@@ -359,7 +360,7 @@ final class EventWatchers
 			}
 		}
 		emit(GroupEvent.of(GroupEvent.Type.DEATH_VALUE, now, me).items(lost).number(EventText.value(lost, lookup))
-			.location(deathWhere).world(deathWorld).detail("gravestone: 15 min").build());
+			.carried(carried).location(deathWhere).world(deathWorld).detail("gravestone: 15 min").build());
 	}
 
 	/**
