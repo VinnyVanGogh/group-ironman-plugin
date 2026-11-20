@@ -57,6 +57,12 @@ final class ShoppingTab
 		/** Tradeable items matching {@code query}; {@code done} may be called on another thread. */
 		void searchItems(String query, Consumer<List<Hit>> done);
 
+		/**
+		 * Reads pasted list text and matches its items by name, on the client thread; {@code done} gets the preview
+		 * and may be called on another thread.
+		 */
+		void importItems(String text, Consumer<ListImport.Preview> done);
+
 		/** This player's own request; a blank name becomes "Name's requests". */
 		boolean addRequest(String name, Map<Integer, Integer> items);
 
@@ -603,6 +609,8 @@ final class ShoppingTab
 		private final JComboBox<Hit> hits = new JComboBox<>();
 		private final JSpinner quantity = new JSpinner(new SpinnerNumberModel(1, 1, ShoppingList.MAX_QUANTITY, 1));
 		private final JPanel staged = new GroupIronmanPanel.Column();
+		/** What the last clipboard import added and could not match. */
+		private final JPanel imported = new GroupIronmanPanel.Column();
 		private final JPanel custom = new GroupIronmanPanel.Column();
 		private final JPanel members = new GroupIronmanPanel.Column();
 		private final JLabel forLabel = ShopCards.tabText("For:", MUTED);
@@ -642,6 +650,77 @@ final class ShoppingTab
 			add.add(Ui.button("Add item", null, this::stage), BorderLayout.EAST);
 			custom.add(add);
 			custom.add(staged);
+			custom.add(Ui.wide(Ui.button("Import from clipboard", null, this::importClipboard)));
+			custom.add(imported);
+		}
+
+		/** Reads the clipboard once, on this press, and stages what it names; the rest is listed for the player. */
+		private void importClipboard()
+		{
+			String text = Ui.clipboardText();
+			if (text.trim().isEmpty())
+			{
+				showImport(null, "Your clipboard has no text. Copy a list (one item per line, CSV or JSON), then press"
+					+ " Import again.");
+				return;
+			}
+			actions.importItems(text, preview -> SwingUtilities.invokeLater(() -> stageImport(preview)));
+		}
+
+		private void stageImport(ListImport.Preview p)
+		{
+			int added = 0;
+			int full = 0;
+			for (Map.Entry<Integer, Integer> e : p.items.entrySet())
+			{
+				boolean known = stagedItems.containsKey(e.getKey());
+				if (!known && stagedItems.size() >= ShoppingList.MAX_ITEMS)
+				{
+					full++;
+					continue;
+				}
+				stagedItems.merge(e.getKey(), e.getValue(), (a, b) -> (int) Math.min((long) a + b, ShoppingList.MAX_QUANTITY));
+				stagedNames.put(e.getKey(), p.names.get(e.getKey()));
+				added++;
+			}
+			redrawStaged();
+			List<String> lines = new ArrayList<>();
+			lines.add(added == 0 ? "Nothing matched." : "Added " + added + " item" + (added == 1 ? "" : "s")
+				+ " above; check them, then Add list.");
+			if (p.merged > 0)
+			{
+				lines.add(p.merged + " repeated item" + (p.merged == 1 ? "" : "s") + " merged into one row.");
+			}
+			int over = p.overflow + full;
+			if (over > 0)
+			{
+				lines.add(over + " more item" + (over == 1 ? "" : "s") + " left out: a list holds at most "
+					+ ShoppingList.MAX_ITEMS + ".");
+			}
+			if (p.truncated)
+			{
+				lines.add("The paste was longer than " + ListImport.MAX_ROWS + " lines or " + ListImport.MAX_CHARS
+					+ " characters; the rest was not read.");
+			}
+			showImport(p.unmatched, String.join(" ", lines));
+		}
+
+		private void showImport(List<String> unmatched, String summary)
+		{
+			imported.removeAll();
+			if (!summary.isEmpty())
+			{
+				imported.add(new ShopCards.Wrap(summary, Color.WHITE, ShopCards.TAB_TEXT - 40));
+			}
+			if (unmatched != null && !unmatched.isEmpty())
+			{
+				imported.add(new ShopCards.Wrap("Not matched, so not added (add them with the search above, or fix"
+					+ " the line and import again):", MUTED, ShopCards.TAB_TEXT - 40));
+				unmatched.forEach(u -> imported.add(new ShopCards.Wrap("• " + u, Color.WHITE,
+					ShopCards.TAB_TEXT - 40)));
+			}
+			panel.revalidate();
+			panel.repaint();
 		}
 
 		JPanel panel(View v)
@@ -785,6 +864,7 @@ final class ShoppingTab
 				name.setText("");
 				stagedItems.clear();
 				redrawStaged();
+				showImport(null, "");
 			}
 			say(ok ? null : "Not added: log in first (the group holds at most " + ShoppingSync.MAX_LISTS
 				+ " lists).");
@@ -803,6 +883,7 @@ final class ShoppingTab
 				name.setText("");
 				stagedItems.clear();
 				redrawStaged();
+				showImport(null, "");
 			}
 			say(ok ? null : "Not added: log in first (the group holds at most " + RequestBook.MAX_REQUESTS
 				+ " requests).");

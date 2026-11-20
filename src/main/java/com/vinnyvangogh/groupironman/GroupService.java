@@ -2568,6 +2568,34 @@ class GroupService
 		});
 	}
 
+	/**
+	 * A pasted list ({@link ListImport}): each distinct name is searched once on the client thread and matched
+	 * exactly, never guessed; {@code done} gets the preview.
+	 */
+	void importItems(String text, Consumer<ListImport.Preview> done)
+	{
+		ListImport.Parsed parsed = ListImport.parse(gson, text);
+		clientThread.invokeLater(() ->
+		{
+			Map<String, ShoppingTab.Hit> found = new HashMap<>();
+			for (String name : ListImport.names(parsed))
+			{
+				List<ShoppingTab.Hit> hits = new ArrayList<>();
+				for (ItemPrice p : itemManager.search(ListImport.searchTerm(name)))
+				{
+					hits.add(new ShoppingTab.Hit(p.getId(), p.getName()));
+				}
+				ShoppingTab.Hit match = ListImport.pick(name, hits);
+				if (match != null)
+				{
+					names.putIfAbsent(match.id, match.name);
+					found.put(name, match);
+				}
+			}
+			done.accept(ListImport.resolve(parsed, found::get, lookup::name));
+		});
+	}
+
 	// ---- Requests: each member's own lists the group fills ----
 
 	/** A request of this player's own; a blank name becomes "Name's requests". False when refused. */

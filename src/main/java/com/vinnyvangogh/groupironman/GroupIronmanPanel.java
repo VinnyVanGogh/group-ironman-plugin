@@ -20,8 +20,6 @@ import net.runelite.api.SpriteID;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.util.AsyncBufferedImage;
 import java.awt.GridLayout;
-import java.awt.Toolkit;
-import java.awt.datatransfer.DataFlavor;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -757,7 +755,7 @@ class GroupIronmanPanel extends PluginPanel
 	/** "Paste group key": saves it, says so, and opens the "Turn on sharing" card for it. */
 	private void pasteKey()
 	{
-		boolean saved = actions.pasteKey(clipboardText());
+		boolean saved = actions.pasteKey(Ui.clipboardText());
 		keyNote = saved
 			? "Key saved. Joining your group's sync."
 			: "Your clipboard has no group key. Copy the key a member sent, then press Paste again.";
@@ -767,20 +765,6 @@ class GroupIronmanPanel extends PluginPanel
 			sharing.pasted(actions.groupKey());
 		}
 		redraw();
-	}
-
-	/** Text on the computer's clipboard, or "" when there is none or it cannot be read. */
-	private static String clipboardText()
-	{
-		try
-		{
-			Object data = Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
-			return data instanceof String ? (String) data : "";
-		}
-		catch (Exception e)
-		{
-			return "";
-		}
 	}
 
 	// Group tab: one card per member.

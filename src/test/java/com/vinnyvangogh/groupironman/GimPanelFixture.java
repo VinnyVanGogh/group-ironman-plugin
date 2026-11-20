@@ -95,6 +95,12 @@ final class GimPanelFixture
 		}
 
 		@Override
+		public void importItems(String text, java.util.function.Consumer<ListImport.Preview> done)
+		{
+			calls.add("importItems:" + text);
+		}
+
+		@Override
 		public void openSettings()
 		{
 			calls.add("openSettings");

@@ -304,6 +304,12 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public void importItems(String text, Consumer<ListImport.Preview> done)
+			{
+				group.importItems(text, done);
+			}
+
+			@Override
 			public void benefit(int itemId, Consumer<BenefitFinder.Outcome> done)
 			{
 				group.benefit(itemId, done);

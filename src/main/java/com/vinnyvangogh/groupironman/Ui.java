@@ -6,6 +6,7 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.Toolkit;
+import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -100,5 +101,19 @@ final class Ui
 	static void copy(String text)
 	{
 		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
+	}
+
+	/** Text on the computer's clipboard, or "" when there is none or it cannot be read. Call it only on a button press. */
+	static String clipboardText()
+	{
+		try
+		{
+			Object data = Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+			return data instanceof String ? (String) data : "";
+		}
+		catch (Exception e)
+		{
+			return "";
+		}
 	}
 }
