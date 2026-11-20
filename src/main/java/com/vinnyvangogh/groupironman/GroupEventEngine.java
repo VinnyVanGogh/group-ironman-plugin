@@ -32,6 +32,9 @@ import net.runelite.api.clan.ClanMember;
 import net.runelite.api.clan.ClanSettings;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
+import net.runelite.api.NPC;
+import net.runelite.api.events.NpcSpawned;
+import net.runelite.api.gameval.NpcID;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
@@ -129,6 +132,8 @@ class GroupEventEngine
 	static final String COMBINE_CHOSEN_KEY = "combineLevelsChosen";
 	/** Profile key: this player's wave run ({@link WaveTracker#save}), so a logout mid-run resumes. Not a setting. */
 	static final String WAVE_RUN_KEY = "activityRun";
+	/** Profile key: this player's fastest time per wave ({@link WaveTracker#saveBests}). Not a setting. */
+	static final String WAVE_BESTS_KEY = "activityBests";
 	/** An activity is sent again this often while it lasts, so members can tell a crashed client's run apart. */
 	static final long ACTIVITY_KEEPALIVE_MS = 60_000;
 	/** "Everyone is online" fires at most this often, so a member's reconnects do not repeat it. */
@@ -1008,6 +1013,27 @@ class GroupEventEngine
 		return s.detects(type) || s.share && type.travels() && !type.logged();
 	}
 
+	/**
+	 * A Fight Caves wave-start monster in the player's own cave: its spawn point tells the run's rotation. Only the
+	 * level 22 and 45 monsters that open waves 1 to 4; the 22s a Tz-Kek splits into are not spawn points.
+	 */
+	@Subscribe
+	public void onNpcSpawned(NpcSpawned event)
+	{
+		NPC npc = event.getNpc();
+		int id = npc.getId();
+		if (id != NpcID.TZHAAR_FIGHTCAVE_SWARM_1A && id != NpcID.TZHAAR_FIGHTCAVE_SWARM_1B
+			&& id != NpcID.TZHAAR_FIGHTCAVE_SWARM_2A && id != NpcID.TZHAAR_FIGHTCAVE_SWARM_2B)
+		{
+			return;
+		}
+		WorldPoint at = npc.getLocalLocation() == null ? null : WorldPoint.fromLocalInstance(client, npc.getLocalLocation());
+		if (at != null)
+		{
+			waves.spawn(FightCaveRotation.point(at.getX() & 63, at.getY() & 63), System.currentTimeMillis());
+		}
+	}
+
 	@Subscribe
 	public void onNpcLootReceived(NpcLootReceived event)
 	{
@@ -1515,6 +1541,7 @@ class GroupEventEngine
 			loginPending = false;
 			login(now, me.getName());
 			// A run this account left mid-way: paused until the player is back in its arena.
+			waves.restoreBests(profile(WAVE_BESTS_KEY));
 			waves.restore(profile(WAVE_RUN_KEY));
 		}
 		releaseBursts(now);
@@ -1554,6 +1581,10 @@ class GroupEventEngine
 		{
 			waves.colosseum(ColosseumModifiers.describe(client::getVarbitValue),
 				client.getVarpValue(VarPlayerID.COLOSSEUM_GLORY));
+		}
+		if (waves.takeBestsChanged())
+		{
+			saveProfile(WAVE_BESTS_KEY, waves.saveBests());
 		}
 		boolean keepAlive = waves.active() && now - activitySentAt >= ACTIVITY_KEEPALIVE_MS;
 		if (waves.takeChanged() || keepAlive)

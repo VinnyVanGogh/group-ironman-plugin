@@ -340,9 +340,12 @@ final class DiscordWebhook
 	 * newest first, at most {@link EditedThreads#MAX_CARDS}, the picture on the top card only (Board 2026-11-15: the
 	 * newest event's). Plain style says one line per card, newest first, within Discord's 2,000 characters. It never
 	 * mentions anyone: a moment that pings starts its own message.
+	 *
+	 * <p>{@code chronological} (Slayer, Board 2026-11-20: "task done" must sit above the "new task" after it) gets the
+	 * cards oldest first, so the picture goes on the last card, still the newest event's.
 	 */
 	static JsonObject stack(Gson gson, List<EventThreads.Card> cards, DiscordStyle style, boolean screenshot,
-		String username)
+		String username, boolean chronological)
 	{
 		JsonObject o = poster(username);
 		allowMentions(o, false);
@@ -361,15 +364,17 @@ final class DiscordWebhook
 			return o;
 		}
 		JsonArray embeds = new JsonArray();
-		for (EventThreads.Card c : cards)
+		int pictureAt = chronological ? cards.size() - 1 : 0;
+		for (int i = 0; i < cards.size(); i++)
 		{
+			EventThreads.Card c = cards.get(i);
 			if (c.embed == null || embeds.size() >= EditedThreads.MAX_CARDS)
 			{
 				continue;
 			}
 			JsonObject embed = gson.fromJson(c.embed, JsonObject.class);
 			embed.remove("image");
-			if (screenshot && embeds.size() == 0)
+			if (screenshot && i == pictureAt)
 			{
 				JsonObject image = new JsonObject();
 				image.addProperty("url", "attachment://" + SCREENSHOT);

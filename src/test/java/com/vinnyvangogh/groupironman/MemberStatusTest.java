@@ -95,6 +95,24 @@ public class MemberStatusTest
 		assertTrue(prayerBar(MemberStatus.of(true, 0, false, false)).tooltip().contains("prayer ON"));
 	}
 
+	@Test
+	public void petSurvivesTheWireAndNoPetStaysEmpty()
+	{
+		MemberStatus s = MemberStatus.NONE.withPet("Callisto cub");
+		assertEquals("Callisto cub", roundTrip(s).pet());
+		assertEquals("", roundTrip(MemberStatus.NONE).pet());
+		assertFalse(GroupCodec.encodeStats(GSON, stats(MemberStatus.NONE)).contains("\"pt\""));
+	}
+
+	@Test
+	public void petNameIsTidied()
+	{
+		assertEquals("", MemberStatus.NONE.withPet(null).pet());
+		assertEquals("Hellpuppy", MemberStatus.NONE.withPet("<col=ff0000>Hellpuppy</col> ").pet());
+		assertEquals(MemberStatus.MAX_PET_NAME, MemberStatus.NONE.withPet("x".repeat(500)).pet().length());
+		assertFalse(MemberStatus.NONE.equals(MemberStatus.NONE.withPet("Rocky")));
+	}
+
 	private static PanelModel.Bar prayerBar(MemberStatus status)
 	{
 		for (PanelModel.Bar b : PanelModel.bars(stats(status)))

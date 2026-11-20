@@ -5,6 +5,8 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -75,6 +77,11 @@ final class GroupBoxOverlay extends OverlayPanel
 				EasterEggs.tagged(line.detail, event, egg), line.ago), new Color(event.type.category.colour)));
 		}
 		OverlayStyle.frame(panelComponent, size.width);
+		Map<String, String> pets = new HashMap<>();
+		for (Map.Entry<String, MemberStats> e : group.roster().onlineStats(now).entrySet())
+		{
+			pets.put(e.getKey(), e.getValue().status().pet());
+		}
 		String empty = EmptyBox.CLASSIC;
 		if (online.isEmpty())
 		{
@@ -85,14 +92,14 @@ final class GroupBoxOverlay extends OverlayPanel
 			empty = EmptyBox.pick(config.overlayGroupBoxEmpty(), ZonedDateTime.now(), now, seen, latest,
 				now / EmptyBox.ROTATE_MS);
 		}
-		build(panelComponent, online, group.roster().activities(now), events, size, icons, empty);
+		build(panelComponent, online, group.roster().activities(now), pets, events, size, icons, empty);
 		return super.render(graphics);
 	}
 
 	static void build(PanelComponent panel, Map<String, Integer> online, Map<String, ActivityState> activities,
 		List<EventLine> events, BoxSize size, BoxIcons.Source icons)
 	{
-		build(panel, online, activities, events, size, icons, EmptyBox.CLASSIC);
+		build(panel, online, activities, Collections.emptyMap(), events, size, icons, EmptyBox.CLASSIC);
 	}
 
 	/**
@@ -100,20 +107,25 @@ final class GroupBoxOverlay extends OverlayPanel
 	 * state arrived, not here: this runs every frame), then the latest events.
 	 */
 	static void build(PanelComponent panel, Map<String, Integer> online, Map<String, ActivityState> activities,
-		List<EventLine> events, BoxSize size, BoxIcons.Source icons, String empty)
+		Map<String, String> pets, List<EventLine> events, BoxSize size, BoxIcons.Source icons, String empty)
 	{
 		List<LayoutableRenderableEntity> kids = panel.getChildren();
 		kids.add(new OverlayStyle.Header("Group", online.isEmpty() ? "" : online.size() + " online",
 			OverlayStyle.ACCENT));
 		if (online.isEmpty())
 		{
-			kids.add(new OverlayStyle.Row(empty,OverlayStyle.MUTED).scale(size.fontScale));
+			kids.add(new OverlayStyle.Row(empty, OverlayStyle.MUTED).lines(4).scale(size.fontScale));
 		}
 		for (Map.Entry<String, Integer> e : online.entrySet())
 		{
 			int world = e.getValue();
 			kids.add(new OverlayStyle.Row(e.getKey(), OverlayStyle.TEXT).dot(OverlayStyle.ONLINE)
 				.right(world > 0 ? "W" + world : "", OverlayStyle.MUTED).scale(size.fontScale));
+			String pet = pets.get(e.getKey());
+			if (pet != null && !pet.isEmpty())
+			{
+				kids.add(new OverlayStyle.Row("Pet: " + pet, OverlayStyle.MUTED).indent(12).scale(size.fontScale));
+			}
 			ActivityState a = activities.get(e.getKey());
 			if (a != null)
 			{
