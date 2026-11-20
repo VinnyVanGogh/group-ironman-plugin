@@ -988,6 +988,14 @@ class GroupIronmanPanel extends PluginPanel
 			label.setToolTipText(i < c.effectNotes.size() ? c.effectNotes.get(i) : chip);
 			body.add(label);
 		}
+		if (!c.pet.isEmpty())
+		{
+			JLabel pet = new JLabel("Pet: " + c.pet);
+			pet.setFont(FontManager.getRunescapeSmallFont());
+			pet.setForeground(MUTED);
+			pet.setToolTipText(c.name + " has " + c.pet + " out");
+			body.add(pet);
+		}
 		if (c.source != null)
 		{
 			body.add(text(c.source, MUTED));
