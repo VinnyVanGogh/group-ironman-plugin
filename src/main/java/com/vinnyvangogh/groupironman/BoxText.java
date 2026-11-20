@@ -165,7 +165,7 @@ final class BoxText
 		return out;
 	}
 
-	/** "Thieving 44": one level; "44 → 46" (compact: "+2") for a stack. */
+	/** "Thieving 44": one level; "44 to 46" (compact: "+2") for a stack. */
 	private static Part level(GroupEvent e, ItemLookup lookup, int tier)
 	{
 		long gained = e.number - from(e);
@@ -173,7 +173,8 @@ final class BoxText
 		{
 			return skill(e.text, Long.toString(e.number), e.text + " " + e.number);
 		}
-		String span = (from(e) + 1) + " → " + e.number;
+		// "to", not an arrow: the RuneScape font the banner is drawn in has no glyph for one and shows a box.
+		String span = (from(e) + 1) + " to " + e.number;
 		String plus = "+" + gained;
 		return skill(e.text, tier == 0 ? plus : span, e.text + " " + (tier == 0 ? plus : span));
 	}

@@ -30,6 +30,9 @@ final class ChannelPosts
 	private final ZoneId zone;
 	private final Map<String, PresenceDebounce> members = new HashMap<>();
 	private boolean seeded;
+	/** Member key to whether the last channel showed them online, for {@link #shows}. */
+	private final Map<String, Boolean> shown = new HashMap<>();
+	private boolean shownSeeded;
 
 	ChannelPosts(ZoneId zone)
 	{
@@ -83,11 +86,46 @@ final class ChannelPosts
 		return out;
 	}
 
+	/**
+	 * The banner and Log lines for logins and logouts the game's channel shows, at once: no grace, no pair limit
+	 * (those hold only the Discord post). Every member but {@code selfKey}, plugin or not, one line per change;
+	 * the first channel after a {@link #reset} is the baseline and shows none.
+	 */
+	List<GroupEvent> shows(GamePresence game, String selfKey, long now)
+	{
+		if (!game.known())
+		{
+			return Collections.emptyList();
+		}
+		List<GroupEvent> out = new ArrayList<>();
+		for (String name : game.names())
+		{
+			String key = GroupMembers.key(name);
+			if (key.equals(selfKey))
+			{
+				continue;
+			}
+			boolean on = game.state(name) == GamePresence.State.ONLINE;
+			Boolean was = shown.put(key, on);
+			if (!shownSeeded || was == null || was == on)
+			{
+				continue;
+			}
+			GroupEvent.Builder e = GroupEvent.of(GroupEvent.Type.ONLINE, now, name).text(on ? "online" : "offline");
+			// An offline's session length is not known here (number -1, as for a login the debounce never saw).
+			out.add((on ? e.world(game.world(name)) : e.number(-1)).build());
+		}
+		shownSeeded = true;
+		return out;
+	}
+
 	/** This player logged out: forget everyone, and take the next channel as a new baseline. */
 	void reset()
 	{
 		members.clear();
 		seeded = false;
+		shown.clear();
+		shownSeeded = false;
 	}
 
 	/**
