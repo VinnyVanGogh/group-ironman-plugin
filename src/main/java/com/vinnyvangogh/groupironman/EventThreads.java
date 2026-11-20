@@ -211,8 +211,10 @@ final class EventThreads extends EditedThreads<EventThreads.Feed, EventThreads.E
 		final String messageId;
 		final String username;
 		final boolean storage;
-		/** Copies of the cards, newest first. */
+		/** Copies of the cards: newest first, or oldest first when {@link #chronological}. */
 		final List<Card> cards;
+		/** The cards read in the order things happened (a Slayer "task done" above the "new task" after it). */
+		final boolean chronological;
 		final Map<Integer, Long> net;
 		final List<String> moves;
 		final Lead lead;
@@ -226,8 +228,13 @@ final class EventThreads extends EditedThreads<EventThreads.Feed, EventThreads.E
 			this.messageId = f.messageId;
 			this.username = f.username;
 			this.storage = f.storage();
-			this.cards = Collections.unmodifiableList(new ArrayList<>(f.cards.subList(0,
-				Math.min(MAX_CARDS, f.cards.size()))));
+			this.chronological = "SLAYER".equals(f.family);
+			List<Card> shown = new ArrayList<>(f.cards.subList(0, Math.min(MAX_CARDS, f.cards.size())));
+			if (chronological)
+			{
+				Collections.reverse(shown);
+			}
+			this.cards = Collections.unmodifiableList(shown);
 			this.net = Collections.unmodifiableMap(new TreeMap<>(f.net));
 			this.moves = Collections.unmodifiableList(new ArrayList<>(f.moves));
 			this.lead = f.lead;
