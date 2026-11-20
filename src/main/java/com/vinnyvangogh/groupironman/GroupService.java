@@ -1605,6 +1605,36 @@ class GroupService
 		return GroupMembers.UNKNOWN;
 	}
 
+	/**
+	 * Client thread. ", risking 4.5M skulled (1.2M unskulled)" for the Wilderness entry event when the local
+	 * player's skulled risk reaches the alert threshold, else empty. Empty too when the threshold is 0 or no
+	 * carried items are known yet.
+	 */
+	String wildernessRiskText()
+	{
+		int threshold = config.riskAlertThreshold();
+		GroupCodec.Carried own = threshold <= 0 ? null : roster.allCarried().get(localName());
+		if (own == null)
+		{
+			return "";
+		}
+		RiskValue risk = RiskValue.of(own, lookup, config.riskShowHighAlch());
+		long skulled = risk.outcome(true, false).lostValue;
+		if (skulled < threshold)
+		{
+			return "";
+		}
+		return ", risking " + Amounts.GAME.of(skulled) + " skulled (" + Amounts.GAME.of(risk.outcome(false, false).lostValue)
+			+ " unskulled)";
+	}
+
+	/** Client thread. Whether the local player carries a skull, as the Wilderness watcher reads it. */
+	private boolean skulled()
+	{
+		Player me = client.getLocalPlayer();
+		return me != null && me.getSkullIcon() != -1;
+	}
+
 	/** Client thread. Run energy, special attack and location fire no StatChanged; poll the cheap ints. */
 	private void pollStats(GroupOutbox.Switches s)
 	{
@@ -1617,7 +1647,8 @@ class GroupService
 		int y = at == null ? 0 : at.getY();
 		int plane = at == null ? 0 : at.getPlane();
 		MemberStatus status = MemberStatus.fromGame(client.getVarbitValue(VarbitID.PRAYER_ALLACTIVE),
-			client.getVarpValue(VarPlayerID.POISON), client.getVarpValue(VarPlayerID.DISEASE));
+			client.getVarpValue(VarPlayerID.POISON), client.getVarpValue(VarPlayerID.DISEASE),
+			client.getVarbitValue(VarbitID.INSIDE_WILDERNESS) != 0, skulled());
 		if (run != lastRun || spec != lastSpec || world != lastWorld || region != lastRegion
 			|| plane != lastPlane || Math.abs(x - lastX) + Math.abs(y - lastY) >= MOVE_TILES
 			|| !status.equals(lastStatus))

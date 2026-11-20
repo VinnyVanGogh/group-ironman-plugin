@@ -271,6 +271,7 @@ class GroupEventEngine
 	void startUp(GroupService group)
 	{
 		this.group = group;
+		watchers.wildRisk = group::wildernessRiskText;
 		group.events(this);
 		sender = new DiscordSender(DiscordSender.okHttp(okHttpClient, gson), System::currentTimeMillis,
 			() -> LocalTime.now().getHour());

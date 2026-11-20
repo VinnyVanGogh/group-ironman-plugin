@@ -464,6 +464,9 @@ final class GroupCodec
 			o.addProperty("ps", status.poisonHits());
 			o.addProperty("vn", status.venomed() ? 1 : 0);
 			o.addProperty("dz", status.diseased() ? 1 : 0);
+			// wd: inside the Wilderness; sk: carrying a skull. Both read by the risk line on the member's card.
+			o.addProperty("wd", status.inWilderness() ? 1 : 0);
+			o.addProperty("sk", status.skulled() ? 1 : 0);
 		}
 		if (stats.hasPosition())
 		{
@@ -890,7 +893,8 @@ final class GroupCodec
 		}
 		return MemberStatus.of(longOr(in.get("pr"), 0) != 0,
 			clamp(longOr(in.get("ps"), 0), 0, MemberStatus.MAX_POISON_HITS),
-			longOr(in.get("vn"), 0) != 0, longOr(in.get("dz"), 0) != 0);
+			longOr(in.get("vn"), 0) != 0, longOr(in.get("dz"), 0) != 0,
+			longOr(in.get("wd"), 0) != 0, longOr(in.get("sk"), 0) != 0);
 	}
 
 	private static JsonObject header(Kind kind)

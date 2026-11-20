@@ -639,6 +639,23 @@ already shipped in RUNELITE-222 (#85) and render in the slot tooltip.
 
 ---
 
+**Risk value on member cards, Wilderness highlight and entry alert
+(task-ebaa9acd, 2026-11-19) — allowed, with precedent.** Each member's card
+shows what they would lose on death from the inventory, worn items and looting
+bag contents they already share, and a red highlight while their client says
+they are in the Wilderness (`VarbitID.INSIDE_WILDERNESS`, `getSkullIcon`, shared
+as `wd` / `sk` under the stats switch). *Nearest rule:* Data & Privacy, no
+crowdsourcing about other players; nothing is read about anyone who has not
+opted in, it is teammates' own gear, and it shows no other player's risk
+(no PvP scouting, no player-lookup). *Precedent:* the base `party` plugin
+shares party members' status; the Hub's death-value and "items kept on death"
+plugins compute the same figure for the local player. Ranking is by guide
+price, as the game does; a looting bag's contents are always lost. Alert: the
+member's own Wilderness entry line gains the risk when it reaches a threshold,
+through the existing banner and Discord path; no new channel. Assumptions not
+verified in game: stackables are ranked one unit at a time (shows more at risk,
+never less), untradeables count as 0, and Protect Item adds one kept item.
+
 ## Phase 3 — quality bar
 
 - Pure logic separated from client access, and unit tested.

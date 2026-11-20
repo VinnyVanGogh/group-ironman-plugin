@@ -231,6 +231,12 @@ final class PanelModel
 		List<String> effects = Collections.emptyList();
 		/** The chips' tooltip lines, with what the game does not say about time left. */
 		List<String> effectNotes = Collections.emptyList();
+		/** "Risk 1.2M · skulled 4.5M" for what the member would lose on death; null when their items are not known. */
+		String risk;
+		/** The risk line's tooltip, HTML: what is kept and lost, with and without Protect Item. */
+		String riskTooltip;
+		/** The member is in the Wilderness now: the risk line is drawn highlighted, with the skull that applies. */
+		boolean riskHot;
 
 		MemberCard(String name, boolean you, boolean online, String status, List<Bar> bars, List<SkillCell> skills,
 			List<ItemGroup> items, String seedVault, String source)
@@ -404,6 +410,13 @@ final class PanelModel
 	static List<MemberCard> members(GroupRoster group, Collection<String> roster, RegionNames regions, ItemLookup items,
 		String self, GamePresence game, long now)
 	{
+		return members(group, roster, regions, items, self, game, false, now);
+	}
+
+	/** As above; {@code alch} shows the risk line in High Alchemy value instead of the guide price. */
+	static List<MemberCard> members(GroupRoster group, Collection<String> roster, RegionNames regions, ItemLookup items,
+		String self, GamePresence game, boolean alch, long now)
+	{
 		Map<String, MemberStats> stats = group.allStats();
 		Map<String, GroupCodec.Carried> carried = group.allCarried();
 		Map<String, MemberExtras> extras = group.extras();
@@ -435,6 +448,12 @@ final class PanelModel
 			{
 				card.effects = s.status().chips();
 				card.effectNotes = s.status().lines();
+			}
+			if (worn != null)
+			{
+				MemberStatus status = s == null ? MemberStatus.UNKNOWN : s.status();
+				applyRisk(card, RiskValue.of(worn, items, alch), alch, online && status.inWilderness(),
+					status.skulled());
 			}
 			out.add(card);
 		}
@@ -636,6 +655,69 @@ final class PanelModel
 		{
 			out.add(new ItemGroup(title, cells(counts, items, GridFilter.NONE, false)));
 		}
+	}
+
+	/**
+	 * The card's risk line and tooltip. The card always shows both the unskulled (keep 3) and skulled (keep 0)
+	 * figures; Protect Item's extra kept item and the kept and lost items go in the tooltip.
+	 */
+	static void applyRisk(MemberCard card, RiskValue risk, boolean alch, boolean inWilderness, boolean skulled)
+	{
+		RiskValue.Outcome unskulled = risk.outcome(false, false);
+		RiskValue.Outcome skull = risk.outcome(true, false);
+		if (unskulled.lostValue == 0 && skull.lostValue == 0 && unskulled.lostLines.isEmpty())
+		{
+			return;
+		}
+		card.risk = "Risk " + Amounts.GAME.of(unskulled.lostValue) + " · skulled " + Amounts.GAME.of(skull.lostValue);
+		card.riskHot = inWilderness;
+		StringBuilder tip = new StringBuilder("<html>Value lost on death, ")
+			.append(alch ? "High Alchemy value" : "Grand Exchange guide price").append(".<br>");
+		if (inWilderness)
+		{
+			tip.append("<b>In the Wilderness, ").append(skulled ? "skulled" : "not skulled").append(".</b><br>");
+		}
+		tip.append("Unskulled (keeps 3): ").append(Amounts.EXACT.of(unskulled.lostValue)).append(" gp<br>")
+			.append("Skulled (keeps 0): ").append(Amounts.EXACT.of(skull.lostValue)).append(" gp<br>")
+			.append("With Protect Item (+1 kept): ")
+			.append(Amounts.EXACT.of(risk.outcome(false, true).lostValue)).append(" gp unskulled, ")
+			.append(Amounts.EXACT.of(risk.outcome(true, true).lostValue)).append(" gp skulled<br>");
+		if (!risk.bagKnown())
+		{
+			tip.append("Looting bag contents not known: not counted.<br>");
+		}
+		else if (risk.bagValue() > 0)
+		{
+			tip.append("Looting bag contents (always lost): ").append(Amounts.EXACT.of(risk.bagValue())).append(" gp<br>");
+		}
+		RiskValue.Outcome now = risk.outcome(skulled, false);
+		appendLines(tip, "Kept " + (skulled ? "skulled" : "unskulled"), now.keptLines);
+		appendLines(tip, "Lost " + (skulled ? "skulled" : "unskulled"), now.lostLines);
+		card.riskTooltip = tip.append("Ranked one item at a time; items with no price count as 0.</html>").toString();
+	}
+
+	private static final int RISK_TIP_LINES = 12;
+
+	private static void appendLines(StringBuilder tip, String title, List<String> lines)
+	{
+		if (lines.isEmpty())
+		{
+			return;
+		}
+		tip.append("<b>").append(title).append(":</b><br>");
+		for (int i = 0; i < lines.size() && i < RISK_TIP_LINES; i++)
+		{
+			tip.append(escape(lines.get(i))).append("<br>");
+		}
+		if (lines.size() > RISK_TIP_LINES)
+		{
+			tip.append("and ").append(lines.size() - RISK_TIP_LINES).append(" more<br>");
+		}
+	}
+
+	private static String escape(String s)
+	{
+		return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
 	}
 
 	/** One cell per slot in the game's order, {@link ItemCell#EMPTY} for an empty one; noted ids stay noted. */
