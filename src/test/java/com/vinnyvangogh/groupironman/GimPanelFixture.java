@@ -112,6 +112,28 @@ final class GimPanelFixture
 			calls.add("postToDiscord");
 		}
 
+		/** What the quick switches show now; a test flips them as a config change would. */
+		final boolean[] quick = new boolean[QuickSettings.ITEMS.size()];
+
+		@Override
+		public boolean[] quickValues()
+		{
+			return quick.clone();
+		}
+
+		@Override
+		public void setQuick(String key, boolean on)
+		{
+			calls.add("setQuick:" + key + "=" + on);
+			for (int i = 0; i < quick.length; i++)
+			{
+				if (QuickSettings.ITEMS.get(i).key.equals(key))
+				{
+					quick[i] = on;
+				}
+			}
+		}
+
 		@Override
 		public boolean claim()
 		{
