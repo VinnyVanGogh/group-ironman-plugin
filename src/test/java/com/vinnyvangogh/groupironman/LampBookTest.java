@@ -92,6 +92,18 @@ public class LampBookTest
 	}
 
 	@Test
+	public void quietMoveMovesTheBaselineWithoutAnEvent()
+	{
+		book.inventory(inv(ROPE, 1, LAMP, 1), NAMES, NOW, "Alex", false);
+		assertTrue("lamp put into storage: a loss, no event", book.inventory(inv(ROPE, 1), NAMES, NOW + 1_000,
+			"Alex", true).isEmpty());
+		assertTrue("taken back out while storage is open: no event", book.inventory(inv(ROPE, 1, LAMP, 1), NAMES,
+			NOW + 2_000, "Alex", true).isEmpty());
+		assertTrue("baseline moved, so closing it posts nothing", book.inventory(inv(ROPE, 1, LAMP, 1), NAMES,
+			NOW + 3_000, "Alex", false).isEmpty());
+	}
+
+	@Test
 	public void resetStartsTheBaselineOver()
 	{
 		book.inventory(inv(ROPE, 1), NAMES, NOW, "Alex", false);

@@ -182,7 +182,7 @@ class GroupEventEngine
 	private final WebhookWarnings webhookWarnings = new WebhookWarnings();
 	private final PosterNames posterNames = new PosterNames();
 	private final LampBook lampBook = new LampBook();
-	private final ProgressTracker progress =new ProgressTracker(Skill.values().length - 1);
+	private final ProgressTracker progress = new ProgressTracker(Skill.values().length - 1);
 	/** Guards {@link #presence}: the client thread logs in and out, the executor polls. */
 	private final Object presenceLock = new Object();
 	private PresenceDebounce presence = new PresenceDebounce(ZoneId.systemDefault());
@@ -1336,7 +1336,8 @@ class GroupEventEngine
 		addAll(inv, event.getItemContainer());
 		// The bank, a trade or the group storage open: lamps moved, not received.
 		boolean moving = client.getWidget(InterfaceID.BANKMAIN, 0) != null
-			|| client.getWidget(InterfaceID.TRADEMAIN, 0) != null;
+			|| client.getWidget(InterfaceID.TRADEMAIN, 0) != null
+			|| client.getWidget(InterfaceID.SHARED_BANK, 0) != null;
 		for (GroupEvent e : lampBook.inventory(inv, id -> itemManager.getItemComposition(id).getName(),
 			System.currentTimeMillis(), group.localPlayer(), moving))
 		{

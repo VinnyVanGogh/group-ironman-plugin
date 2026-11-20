@@ -102,7 +102,7 @@ final class EventText
 		line(GroupEvent.Type.LAMP_USED, "Lamp or book used", (e, l) -> "used "
 			+ (e.detail.isEmpty() ? "a lamp or book" : e.detail) + " on " + e.text
 			+ (e.number > 0 ? ", +" + l.amount(e.number) + " XP" : ""));
-		line(GroupEvent.Type.REQUEST,"Request", (e, l) -> RequestBoard.describe(e));
+		line(GroupEvent.Type.REQUEST, "Request", (e, l) -> RequestBoard.describe(e));
 		line(GroupEvent.Type.ANNOUNCEMENT, "Announcement", (e, l) -> e.text);
 		line(GroupEvent.Type.EVERYONE_ONLINE, "Everyone is online", (e, l) -> e.number > 0
 			? "all " + e.number + " members are online" : "everyone is online");

@@ -81,7 +81,7 @@ final class EventSettings
 			GroupIronmanConfig::overlayAnnouncement);
 		both(GroupEvent.Type.LAMP_BOOK, GroupIronmanConfig::discordLampReceived, GroupIronmanConfig::overlayLampReceived);
 		both(GroupEvent.Type.LAMP_USED, GroupIronmanConfig::discordLampUsed, GroupIronmanConfig::overlayLampUsed);
-		both(GroupEvent.Type.EVERYONE_ONLINE,GroupIronmanConfig::discordEveryoneOnline,
+		both(GroupEvent.Type.EVERYONE_ONLINE, GroupIronmanConfig::discordEveryoneOnline,
 			GroupIronmanConfig::overlayEveryoneOnline);
 
 		DIGEST.put(GroupEvent.Category.DROPS, GroupIronmanConfig::digestDrops);
