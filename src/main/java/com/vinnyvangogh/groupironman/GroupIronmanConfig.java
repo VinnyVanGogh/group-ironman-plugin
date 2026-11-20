@@ -1005,7 +1005,7 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigItem(keyName = "memberMinimapDots", name = "Members on minimap",
 		description = "A dot per group member near you on your world, in their Compare colour. Hidden in PvP worlds and"
-		+ " the Wilderness.", section = inGameSection, position = 57)
+		+ " the Wilderness.", section = inGameSection, position = 58)
 	default boolean memberMinimapDots()
 	{
 		return true;
@@ -1013,7 +1013,7 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigItem(keyName = "memberNames", name = "Member names overhead",
 		description = "Group members' names above their heads in their Compare colour. Hidden in PvP worlds and the"
-		+ " Wilderness.", section = inGameSection, position = 58)
+		+ " Wilderness.", section = inGameSection, position = 59)
 	default boolean memberNames()
 	{
 		return true;
@@ -1021,7 +1021,7 @@ public interface GroupIronmanConfig extends Config
 
 	@ConfigItem(keyName = "memberOutline", name = "Member tile outline",
 		description = "Outlines the tile of each group member near you in their Compare colour.",
-		section = inGameSection, position = 59)
+		section = inGameSection, position = 60)
 	default boolean memberOutline()
 	{
 		return false;
