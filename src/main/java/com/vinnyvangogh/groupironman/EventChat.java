@@ -1,8 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.regex.*;
 
 /**
  * The game's chat lines for the medium event kinds. Pure, tags stripped first.

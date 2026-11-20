@@ -1,10 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
-import java.time.DayOfWeek;
-import java.time.ZonedDateTime;
-import java.util.ArrayList;
+import java.time.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The one line the Group box shows when nobody else is online. Pure: the clock, the rotation step and the group's

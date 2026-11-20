@@ -1,8 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 import java.util.regex.Pattern;
 
 /**

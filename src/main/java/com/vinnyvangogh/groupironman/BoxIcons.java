@@ -1,14 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
-import java.awt.BasicStroke;
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
+import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.util.IdentityHashMap;
-import java.util.Map;
+import java.util.*;
 
 /** Draws a {@link BoxText.Icon} in a square: RuneLite's skill and item pictures, or a small built-in glyph. */
 final class BoxIcons

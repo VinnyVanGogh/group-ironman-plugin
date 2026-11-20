@@ -1,7 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.EnumMap;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 
 /**

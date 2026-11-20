@@ -1,13 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * The optional funny line under a Discord post. Pure and table-driven: {@link #RULES} is checked in order and the
