@@ -328,6 +328,12 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public void gearItem(String itemName, boolean shopping, Consumer<String> done)
+			{
+				group.gearItem(itemName, shopping, done);
+			}
+
+			@Override
 			public boolean addRequest(String name, Map<Integer, Integer> items)
 			{
 				return group.addRequest(name, items);
@@ -570,6 +576,7 @@ public class GroupIronmanPlugin extends Plugin
 			group.presence(), settingsView(), group.anyOn(), group.sharingSettings(), shoppingView());
 		view.progress = group.progressView();
 		view.compare = group.compareView(view.progress);
+		view.gear = group.gearView();
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
 	}
