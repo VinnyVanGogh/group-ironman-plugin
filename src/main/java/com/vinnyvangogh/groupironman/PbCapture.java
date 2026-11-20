@@ -1,9 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.*;
+import java.util.regex.*;
 
 /**
  * Reads this player's own boss personal bests from their own game chat. The game says the boss in a kill count line

@@ -1,16 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
-import net.runelite.api.Quest;
-import net.runelite.api.QuestState;
+import net.runelite.api.*;
 
 /**
  * This player's progress in the bundled quests, read from the game: the quest

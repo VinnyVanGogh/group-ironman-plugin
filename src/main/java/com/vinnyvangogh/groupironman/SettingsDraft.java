@@ -1,7 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 /**
  * The Settings tab's unsaved edits, and when they give way to what the group

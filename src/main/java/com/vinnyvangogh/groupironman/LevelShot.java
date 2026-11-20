@@ -1,14 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.*;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.regex.*;
 
 /**
  * When a level-up's screenshot is taken (Board 2026-11-11): not the moment the level registers, which shows the

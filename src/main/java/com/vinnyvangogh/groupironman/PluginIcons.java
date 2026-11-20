@@ -3,8 +3,7 @@ package com.vinnyvangogh.groupironman;
 import java.awt.image.BufferedImage;
 import java.util.Locale;
 import net.runelite.api.Skill;
-import net.runelite.client.game.ItemManager;
-import net.runelite.client.game.SkillIconManager;
+import net.runelite.client.game.*;
 
 /** The Group box's pictures from RuneLite's own managers; both cache, so asking every frame is cheap. */
 final class PluginIcons implements BoxIcons.Source
