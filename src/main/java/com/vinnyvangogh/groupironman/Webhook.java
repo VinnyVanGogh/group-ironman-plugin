@@ -1,7 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.EnumMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * The seven Discord webhooks, in the order the settings show them (Board 2026-11-11): Main, the fallback and home

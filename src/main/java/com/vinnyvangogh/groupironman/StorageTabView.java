@@ -1,12 +1,10 @@
 package com.vinnyvangogh.groupironman;
 
 import java.awt.Color;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.ui.FontManager;
+import javax.swing.*;
+import net.runelite.client.ui.*;
 
 /**
  * The Storage tab, built once and then changed in place: the summary's text,

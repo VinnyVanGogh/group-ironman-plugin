@@ -1,8 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * The item whose icon the game draws for a stack (Board 2026-11-10: a coin
