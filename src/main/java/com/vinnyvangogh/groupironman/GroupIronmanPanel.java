@@ -200,6 +200,8 @@ class GroupIronmanPanel extends PluginPanel
 	private boolean updatingMembers;
 	/** Member cards the player collapsed, by name. */
 	private final Set<String> collapsed = new HashSet<>();
+	/** Members whose run detail (wave-by-wave splits) is open on the Activities tab; closed by default. */
+	private final Set<String> splitsOpen = new HashSet<>();
 	/** Bank cards folded in the Banks tab, kept apart from the Group tab's. */
 	private final BankFolds bankFolds = new BankFolds();
 	private String current = "Group";
@@ -882,6 +884,11 @@ class GroupIronmanPanel extends PluginPanel
 		if (activity != null)
 		{
 			card.add(text(activity.cardLine(), ACTIVITY));
+			String detail = activity.waveLine(System.currentTimeMillis());
+			if (!detail.isEmpty())
+			{
+				card.add(text(detail, ACTIVITY));
+			}
 		}
 	}
 
@@ -1504,6 +1511,21 @@ class GroupIronmanPanel extends PluginPanel
 			JPanel card = Ui.card();
 			card.add(Ui.label(c.title, FontManager.getRunescapeBoldFont(), Color.WHITE));
 			c.lines.forEach(line -> card.add(text(line, ACTIVITY)));
+			if (!c.splits.isEmpty())
+			{
+				boolean open = splitsOpen.contains(c.member);
+				card.add(foldHeader("Wave splits", open, Color.WHITE, () ->
+				{
+					if (!splitsOpen.remove(c.member))
+					{
+						splitsOpen.add(c.member);
+					}
+				}));
+				if (open)
+				{
+					c.splits.forEach(line -> card.add(text(line, MUTED)));
+				}
+			}
 			tab.add(card);
 		}
 		if (v.sharing != null && !v.sharing.allSharing)
