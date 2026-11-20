@@ -107,7 +107,7 @@ final class GroupBoxOverlay extends OverlayPanel
 			OverlayStyle.ACCENT));
 		if (online.isEmpty())
 		{
-			kids.add(new OverlayStyle.Row(empty,OverlayStyle.MUTED).scale(size.fontScale));
+			kids.add(new OverlayStyle.Row(empty, OverlayStyle.MUTED).lines(4).scale(size.fontScale));
 		}
 		for (Map.Entry<String, Integer> e : online.entrySet())
 		{
