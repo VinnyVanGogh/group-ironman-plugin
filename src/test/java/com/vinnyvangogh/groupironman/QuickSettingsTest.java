@@ -95,7 +95,7 @@ public class QuickSettingsTest
 			GimPanelFixture f = new GimPanelFixture().show(GimPanelFixture.groupScene());
 			f.ui.click(QuickSettings.ALL);
 			assertEquals("openSettings", f.actions.calls.get(0));
-			f.ui.click(f.ui.button(QuickSettings.TITLE));
+			f.ui.click(f.ui.button("▾ " + QuickSettings.TITLE));
 			f.ui.layout(GimPanelFixture.PANEL_WIDTH);
 			f.ui.assertHides("Group box");
 		});
