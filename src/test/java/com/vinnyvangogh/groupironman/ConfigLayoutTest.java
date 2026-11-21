@@ -33,7 +33,7 @@ public class ConfigLayoutTest
 		"findYourBankColour", "findMemberBankColour", "findStorageColour", "findCarriedColour", "eventDropMinValue",
 		"eventStorageMinValue", "eventLevelMin", "eventBackAfterDays", "eventUntradeableIgnore", "discordEnabled",
 		"discordWebhookUrl", "discordDropsUrl", "discordDeathsUrl", "discordStorageUrl", "discordProgressUrl",
-		"discordGroupUrl", "discordActivitiesUrl", "discordStyle", "discordScreenshot", "discordGravestoneScreenshot",
+		"discordGroupUrl", "discordActivitiesUrl", "discordStyle", "discordScreenshot", "discordGravestoneScreenshot", "discordChatShot",
 		"discordMention", "discordQuietStart", "discordQuietEnd", "discordEasterEggs", "discordLegendAt",
 		"discordFreeloaderAt", "discordCombineLevels", "discordPosterName", "discordNameMain", "discordNameDrops",
 		"discordNameDeaths", "discordNameStorage", "discordNameProgress", "discordNameGroup", "discordNameActivities",

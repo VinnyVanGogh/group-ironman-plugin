@@ -101,7 +101,7 @@ public class PluginIdentityTest
 		// needs. Shopping requests (Board 2026-11-14) are one more kind, so two more switches, both off.
 		// Live activities Slice A adds four kinds (start, wave, completion, death): eight more switches, all off.
 		assertEquals(10 + 4 + 2 * GroupEvent.Type.values().length + GroupEvent.Category.values().length + 1 + 1 + 1
-			+ 1 + 1 + 1 + 1 + 1 + 1 + 3, switches);
+			+ 1 + 1 + 1 + 1 + 1 + 1 + 3 + 1, switches);
 		// "Add picked-up screenshot" (Discord, Board 2026-11-18) is one more switch, off.
 		// "Group box icons" (In-game, Board 2026-11-18) is on by default: it only picks pictures for the box's
 		// event lines, and the box itself stays off.
@@ -111,9 +111,12 @@ public class PluginIdentityTest
 		// login alert ("Banner: Online") and "Banner: Everyone online" stay off.
 		// Activity entered is on in both places and the three per-activity "Activity posts" switches are on
 		// (Board 2026-11-18); they post nothing until Discord or banners are turned on.
-		assertEquals(116, switches);
+		// "Chat-only events: just the chat" (Discord, Board 2026-11-19) is on by default: it only crops the
+		// screenshot, and nothing posts without Discord and "Attach a screenshot".
+		assertEquals(117, switches);
+		// (the count above already includes it: the first assertion's final + 1)
 		List<String> expectedOn = Arrays.asList("activityColosseum", "activityFightCaves", "activityInferno",
-			"discordActivityStart", "discordNoPluginEvents", "discordRepostBoard", "groupSync",
+			"discordActivityStart", "discordChatShot", "discordNoPluginEvents", "discordRepostBoard", "groupSync",
 			"overlayActivityStart", "overlayAnnouncement", "overlayGroupBoxIcons", "showUpdateNotes");
 		Collections.sort(on);
 		assertEquals(expectedOn, on);

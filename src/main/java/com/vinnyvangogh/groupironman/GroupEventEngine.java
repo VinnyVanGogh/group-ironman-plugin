@@ -1,7 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
+import java.awt.Dimension;
 import java.awt.Image;
+import java.awt.Rectangle;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDate;
@@ -2005,9 +2007,12 @@ class GroupEventEngine
 			// frame is also the gravestone warning's, when that wants it: encoded once, held for that grave.
 			int live = graveShot.live();
 			int grave = family == DiscordMerge.Family.DEATH && keepsDeathFrame() && graveShot.ask(live) ? live : 0;
+			// A death frame kept for the gravestone stays the full screen: that post shows the scene.
+			Rectangle chat = grave == 0 && ChatCrop.chatOnly(event.type) ? chatBounds() : null;
+			Dimension real = client.getRealDimensions();
 			drawManager.requestNextFrameListener(image -> executor.execute(() ->
 			{
-				moment.screenshot = png(image);
+				moment.screenshot = png(ChatCrop.crop(ImageUtil.bufferedImageFromImage(image), chat, real));
 				graveShot.keep(grave, moment.screenshot);
 			}));
 		}
@@ -2088,7 +2093,7 @@ class GroupEventEngine
 		}
 		else
 		{
-			nextFrame(send);
+			nextFrame(send, allChatOnly(moment.events));
 		}
 	}
 
@@ -2105,7 +2110,7 @@ class GroupEventEngine
 
 	private void shoot(LevelShot.Held shot)
 	{
-		nextFrame(png -> shot.sends.forEach(send -> send.accept(png)));
+		nextFrame(png -> shot.sends.forEach(send -> send.accept(png)), true);
 	}
 
 	/**
@@ -2164,7 +2169,7 @@ class GroupEventEngine
 			send.accept(shot);
 			return;
 		}
-		nextFrame(send);
+		nextFrame(send, allChatOnly(events));
 	}
 
 	/**
@@ -2281,7 +2286,32 @@ class GroupEventEngine
 	/** The ScreenshotPlugin pattern: the next drawn frame, encoded off the client thread. */
 	private void nextFrame(Consumer<byte[]> send)
 	{
-		drawManager.requestNextFrameListener(image -> executor.execute(() -> send.accept(png(image))));
+		nextFrame(send, false);
+	}
+
+	/** {@code chatOnly}: the chat box alone ({@link ChatCrop}) when the setting is on and the chat is showing. */
+	private void nextFrame(Consumer<byte[]> send, boolean chatOnly)
+	{
+		Rectangle chat = chatOnly ? chatBounds() : null;
+		Dimension real = chat == null ? null : client.getRealDimensions();
+		drawManager.requestNextFrameListener(image -> executor.execute(() ->
+			send.accept(png(ChatCrop.crop(ImageUtil.bufferedImageFromImage(image), chat, real)))));
+	}
+
+	/** Client thread. The chat box's canvas bounds; null when chat-only crops are off or the chat is not showing. */
+	private Rectangle chatBounds()
+	{
+		if (!config.discordChatShot())
+		{
+			return null;
+		}
+		Widget w = client.getWidget(InterfaceID.Chatbox.UNIVERSE);
+		return w == null || w.isHidden() ? null : w.getBounds();
+	}
+
+	private static boolean allChatOnly(List<GroupEvent> events)
+	{
+		return !events.isEmpty() && events.stream().allMatch(e -> ChatCrop.chatOnly(e.type));
 	}
 
 	private static byte[] png(Image image)
