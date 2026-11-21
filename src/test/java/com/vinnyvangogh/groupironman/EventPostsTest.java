@@ -366,6 +366,79 @@ public class EventPostsTest
 		assertEquals("Iron Pals", new Gson().fromJson(again.json, JsonObject.class).get("username").getAsString());
 	}
 
+	/** A death moment as the engine words it: its post and its board row. */
+	private void death(String member, String where, String killer, long at, long lost)
+	{
+		List<GroupEvent> events = java.util.Arrays.asList(
+			GroupEvent.of(GroupEvent.Type.DEATH, at, member).text(killer).location(where).build(),
+			GroupEvent.of(GroupEvent.Type.DEATH_VALUE, at, member).number(lost).location(where).build());
+		DiscordMerge.Post post = DiscordMerge.single(events.get(0), LOOKUP);
+		EventThreads.Moment m = EventPosts.moment(gson, URL, post, LOOKUP, null, "Iron Pals", false,
+			DeathBoard.row(events, LOOKUP));
+		assertNotNull(m);
+		posts.add(m, "first", null, WINDOW);
+	}
+
+	@Test
+	public void olderDeathsFoldIntoOneTimedBoardUnderTheLatest()
+	{
+		death("GIM1", "Bandit Camp", "Guard Bandit", 1_700_000_000_000L, 0);
+		tick();
+		reply(200, "m1");
+		now += 15 * SEC;
+		death("GIM1", "Edgeville", "Green dragon", 1_700_000_900_000L, 209);
+		tick();
+		JsonArray shown = embeds(sent.get(1));
+		assertEquals("latest card plus the board", 2, shown.size());
+		assertTrue(shown.get(0).getAsJsonObject().get("description").getAsString().contains("Green dragon"));
+		JsonObject board = shown.get(1).getAsJsonObject();
+		assertEquals(DeathBoard.TITLE, board.get("title").getAsString());
+		assertEquals("<t:1700000000:t> GIM1 · Bandit Camp · killed by Guard Bandit",
+			board.get("description").getAsString());
+	}
+
+	@Test
+	public void theBoardKeepsTheLatestTenOlderDeathsNewestFirst()
+	{
+		for (int i = 0; i < 13; i++)
+		{
+			death("GIM1", "Place" + i, "Mob", 1_700_000_000_000L + i * 60_000L, i);
+			tick();
+			reply(200, "m1");
+			now += 15 * SEC;
+		}
+		tick();
+		DiscordQueue.Post last = sent.get(sent.size() - 1);
+		JsonArray shown = embeds(last);
+		assertEquals(2, shown.size());
+		String[] rows = shown.get(1).getAsJsonObject().get("description").getAsString().split("\n");
+		assertEquals(DeathBoard.MAX_ROWS, rows.length);
+		assertTrue(rows[0], rows[0].contains("Place11"));
+		assertTrue(rows[9], rows[9].contains("Place2"));
+	}
+
+	@Test
+	public void aLoneDeathHasNoBoard()
+	{
+		death("GIM1", "Bandit Camp", "Guard Bandit", 1_700_000_000_000L, 5);
+		tick();
+		assertEquals("one post, nothing to fold", 1, sent.size());
+	}
+
+	@Test
+	public void plainStyleBoardIsTitledLines()
+	{
+		style = DiscordStyle.PLAIN;
+		death("GIM1", "Bandit Camp", "Guard Bandit", 1_700_000_000_000L, 5);
+		tick();
+		reply(200, "m1");
+		now += 15 * SEC;
+		death("GIM1", "Edgeville", "Green dragon", 1_700_000_900_000L, 209);
+		tick();
+		String content = new Gson().fromJson(sent.get(1).json, JsonObject.class).get("content").getAsString();
+		assertTrue(content, content.contains("Recent deaths:\n<t:1700000000:t> GIM1"));
+	}
+
 	@Test
 	public void plainStyleIsOneLinePerCardNewestFirst()
 	{

@@ -50,6 +50,13 @@ final class EventPosts extends EditedPosts
 	static EventThreads.Moment moment(Gson gson, String url, DiscordMerge.Post post, ItemLookup lookup, String egg,
 		String username, boolean pings)
 	{
+		return moment(gson, url, post, lookup, egg, username, pings, null);
+	}
+
+	/** As above, with a death's {@link DeathBoard#row} for when a later death pushes this one onto the board. */
+	static EventThreads.Moment moment(Gson gson, String url, DiscordMerge.Post post, ItemLookup lookup, String egg,
+		String username, boolean pings, String row)
+	{
 		String family = EventThreads.family(post.lead.type);
 		String embed = DiscordWebhook.payload(gson, post, lookup, DiscordStyle.EMBED, null, false, egg, null);
 		if (family == null || embed == null)
@@ -58,7 +65,7 @@ final class EventPosts extends EditedPosts
 		}
 		String plain = DiscordWebhook.payload(gson, post, lookup, DiscordStyle.PLAIN, null, false, egg, null);
 		EventThreads.Card card = new EventThreads.Card(DiscordWebhook.firstEmbed(gson, embed),
-			DiscordWebhook.content(gson, plain));
+			DiscordWebhook.content(gson, plain), row);
 		String move = post.description.startsWith(VISIT) ? post.description.substring(VISIT.length()).trim()
 			: post.description;
 		return new EventThreads.Moment(family, url, username, pings, card, post.lead, post.extras, move);
@@ -119,7 +126,9 @@ final class EventPosts extends EditedPosts
 	{
 		if (!m.storage)
 		{
-			return DiscordWebhook.stack(gson, m.cards, style.get(), m.png != null, m.username,
+			List<EventThreads.Card> shown = DeathBoard.FAMILY.equals(m.feed.family)
+				? DeathBoard.fold(gson, m.cards) : m.cards;
+			return DiscordWebhook.stack(gson, shown, style.get(), m.png != null, m.username,
 				m.chronological);
 		}
 		ItemLookup lookup = words.get();

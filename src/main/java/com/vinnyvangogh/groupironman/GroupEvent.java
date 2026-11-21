@@ -179,6 +179,11 @@ final class GroupEvent
 	 * not seen by their client. This client only: never sent, saved or compared.
 	 */
 	final boolean broadcast;
+	/**
+	 * A death's inventory and worn items just before it, kept or lost: the clue-hunter egg reads what was carried,
+	 * not only what was lost. Empty when not known. This client only: never sent, saved or compared.
+	 */
+	final Map<Integer, Integer> carried;
 
 	private GroupEvent(Builder b)
 	{
@@ -194,6 +199,9 @@ final class GroupEvent
 		this.location = clip(b.location);
 		this.previous = Math.max(0, b.previous);
 		this.broadcast = b.broadcast;
+		// Not capped: the clue items to find sit anywhere among 42 slots.
+		this.carried = b.carried == null ? Collections.emptyMap()
+			: Collections.unmodifiableMap(new TreeMap<>(b.carried));
 	}
 
 	private static String clip(String text)
@@ -237,7 +245,7 @@ final class GroupEvent
 	Builder toBuilder()
 	{
 		return of(type, at, member).text(text).items(items).taken(taken).number(number).detail(detail)
-			.world(world).location(location).previous(previous).broadcast(broadcast);
+			.world(world).location(location).previous(previous).broadcast(broadcast).carried(carried);
 	}
 
 	GroupEvent withMember(String name)
@@ -295,6 +303,7 @@ final class GroupEvent
 		private String location;
 		private long previous;
 		private boolean broadcast;
+		private Map<Integer, Integer> carried;
 
 		private Builder(Type type, long at, String member)
 		{
@@ -360,6 +369,12 @@ final class GroupEvent
 		Builder broadcast(boolean v)
 		{
 			broadcast = v;
+			return this;
+		}
+
+		Builder carried(Map<Integer, Integer> v)
+		{
+			carried = v;
 			return this;
 		}
 
