@@ -1,6 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
 import java.awt.Color;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * One colour per member for the Leaderboard and Compare views (Board 2026-11-18): the same member is the same colour
@@ -21,6 +24,20 @@ final class MemberColors
 	static Color of(int index)
 	{
 		return PALETTE[Math.floorMod(index, PALETTE.length)];
+	}
+
+	/**
+	 * Every member's colour by {@link GroupMembers#key}, from the same order Compare uses: the map markers, minimap
+	 * dots and overhead names read this, so a member is one colour everywhere.
+	 */
+	static Map<String, Color> byKey(List<String> order)
+	{
+		Map<String, Color> out = new HashMap<>();
+		for (int i = 0; i < order.size(); i++)
+		{
+			out.putIfAbsent(GroupMembers.key(order.get(i)), of(i));
+		}
+		return out;
 	}
 
 	/** The same colour at about 22% opacity, to tint a table cell behind its text. */

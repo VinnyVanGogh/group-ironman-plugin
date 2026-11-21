@@ -1003,6 +1003,30 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "memberMinimapDots", name = "Members on minimap",
+		description = "A dot per group member near you on your world, in their Compare colour. Hidden in PvP worlds and"
+		+ " the Wilderness.", section = inGameSection, position = 58)
+	default boolean memberMinimapDots()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "memberNames", name = "Member names overhead",
+		description = "Group members' names above their heads in their Compare colour. Hidden in PvP worlds and the"
+		+ " Wilderness.", section = inGameSection, position = 59)
+	default boolean memberNames()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "memberOutline", name = "Member tile outline",
+		description = "Outlines the tile of each group member near you in their Compare colour.",
+		section = inGameSection, position = 60)
+	default boolean memberOutline()
+	{
+		return false;
+	}
+
 	@ConfigItem(
 		keyName = "groupFindCommand",
 		name = "::find chat command",

@@ -2495,14 +2495,21 @@ class GroupService
 			config.groupShareEvents() ? ownAchievements : null);
 	}
 
-	/** What the Compare tab shows. */
-	CompareTab.View compareView(ProgressView view)
+	/** The roster in Compare's order, this player last if not listed: a member's place here picks their colour. */
+	List<String> colourOrder()
 	{
 		List<String> names = new ArrayList<>(members.names());
 		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
 		{
 			names.add(self);
 		}
+		return names;
+	}
+
+	/** What the Compare tab shows. */
+	CompareTab.View compareView(ProgressView view)
+	{
+		List<String> names = colourOrder();
 		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names,
 			CompareSupport.banked(roster, names), CompareSupport.storageBanked(roster));
 	}
