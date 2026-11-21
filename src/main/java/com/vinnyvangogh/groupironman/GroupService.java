@@ -2861,7 +2861,9 @@ class GroupService
 	/** Client thread. "Shopping: shop alert": once per approach to a shop selling something still needed. */
 	private void shopAlert()
 	{
-		if (!config.shoppingShopAlert() || ++ticksSinceShopAlert < SHOP_ALERT_INTERVAL_TICKS)
+		GroupEventEngine engine = events;
+		boolean share = engine != null && engine.sharingAlerts();
+		if (!(config.shoppingShopAlert() || share) || ++ticksSinceShopAlert < SHOP_ALERT_INTERVAL_TICKS)
 		{
 			return;
 		}
@@ -2876,8 +2878,21 @@ class GroupService
 		Map<String, List<ShopAllocation.Line>> shops = ShoppingBoard.byShop(ShoppingBoard.of(lists, shoppingInputs()));
 		for (String name : shopVisits.arrived(at.getX(), at.getY(), at.getPlane(), shops.keySet(), questData))
 		{
-			tell(name + ": " + ShoppingBoard.describe(shops.get(name)) + ".");
+			if (config.shoppingShopAlert())
+			{
+				tell(name + ": " + ShoppingBoard.describe(shops.get(name)) + ".");
+			}
+			if (share)
+			{
+				engine.shopNear(name, ShoppingBoard.items(shops.get(name)));
+			}
 		}
+	}
+
+	/** A line in the game chat from the plugin, from any thread. */
+	void say(String text)
+	{
+		clientThread.invoke(() -> tell(text));
 	}
 
 	/** Kept for the panel: is any group feature on; false shows its "everything is off" notice. */
