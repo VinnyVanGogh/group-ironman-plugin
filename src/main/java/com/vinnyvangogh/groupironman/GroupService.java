@@ -30,6 +30,7 @@ import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.NPC;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
@@ -2229,9 +2230,24 @@ class GroupService
 			{
 				continue;
 			}
+			if (isPlaceholder(item.getId()))
+			{
+				continue;
+			}
 			ItemCounts.add(out, item.getId(), item.getQuantity(), itemManager::canonicalize);
 		}
 		return out;
+	}
+
+	/** Client thread. A bank placeholder is a marker for an empty slot, not an item the player owns. */
+	private boolean isPlaceholder(int id)
+	{
+		if (id <= 0)
+		{
+			return false;
+		}
+		ItemComposition composition = itemManager.getItemComposition(id);
+		return composition != null && composition.getPlaceholderTemplateId() != -1;
 	}
 
 	/** Client thread. The real-world tile, also inside instances; null when not known. */
