@@ -254,6 +254,8 @@ class GroupEventEngine
 	private int scheduleTicks;
 	private DiscordSender sender;
 	private final StatusBoard board = new StatusBoard();
+	/** Timer: this keeping spell has looked for a board another client named ({@link StatusBoard#adopt}). */
+	private boolean boardAdopted;
 	/** This player for the live board: set on the client thread, read by the timer. Null before a login. */
 	private volatile StatusBoard.Self boardSelf;
 	/** The saved boards as {@link #BOARD_FILE} holds them; null until read this run. */
@@ -554,16 +556,30 @@ class GroupEventEngine
 		saveBoard();
 		String url = webhookFor(Webhook.ONLINE);
 		GroupSettingsSchema.Resolved v = values != null ? values : new GroupSettingsSchema.Resolved(config, null);
+		// While the leader is offline, one online member's client keeps the leader's shared board (StatusBoard#standsIn).
+		boolean standIn = StatusBoard.standsIn(boardSelf, group.leaderName(), group.roster().lastHeard(),
+			group.presence(), now);
 		if (!StatusBoard.keeps(StatusBoard.effective(config.discordOnlineStatus(), v, webhooks()), webhooks(),
-			group.isLeader()))
+			group.isLeader(), standIn))
 		{
 			url = null;
 		}
-		// Tells the party this client keeps the board, so the others post no separate online/offline messages.
-		group.keepingBoard(url != null);
 		// Board 2026-11-14: nothing goes out until the leader's role, the shared webhooks and the saved boards are in.
-		board.settle(StatusBoard.settled(boardLoginAt, now, boardSaved != null && group.cacheLoaded()));
+		boolean settled = StatusBoard.settled(boardLoginAt, now, boardSaved != null && group.cacheLoaded());
+		board.settle(settled);
 		board.target(url, () -> boardSaved);
+		if (url != null && settled && !boardAdopted)
+		{
+			// Starting to keep it (the leader left or came back): edit the board the last keeper named, not a second.
+			boardAdopted = true;
+			board.adopt(group.boardKeptOn(board.hook(), now), LocalDate.now().toEpochDay());
+		}
+		else if (url == null)
+		{
+			boardAdopted = false;
+		}
+		// Tells the party this client keeps the board, so the others post no separate online/offline messages.
+		group.keepingBoard(url != null, board.hook(), board.boardId());
 		if (url != null)
 		{
 			sendBoard(now);

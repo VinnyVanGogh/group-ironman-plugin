@@ -21,14 +21,31 @@ final class BoardBeacon
 	static final long STALE_MS = 5 * 60_000L;
 
 	private volatile long heardAt;
+	/** The webhook tag ({@link StatusBoard#hookOf}) and message id of the board the last beacon named; null if none. */
+	private volatile String heardHook;
+	private volatile String heardId;
 
 	/** The message a board-keeping client sends. */
 	static String encode(Gson gson, long at)
+	{
+		return encode(gson, at, null, null);
+	}
+
+	/**
+	 * As above, naming the board it keeps: the webhook's tag (its id, never its token) and the message's id, so a
+	 * member taking the board over while the leader is offline edits that message instead of posting a second.
+	 */
+	static String encode(Gson gson, long at, String hook, String messageId)
 	{
 		JsonObject o = new JsonObject();
 		o.addProperty("v", 1);
 		o.addProperty("k", KIND);
 		o.addProperty("at", at);
+		if (hook != null && messageId != null && hook.matches("w\\d{1,20}") && messageId.matches("\\d{1,20}"))
+		{
+			o.addProperty("h", hook);
+			o.addProperty("m", messageId);
+		}
 		return gson.toJson(o);
 	}
 
@@ -49,6 +66,28 @@ final class BoardBeacon
 	void heard(long now)
 	{
 		heardAt = now;
+		heardHook = null;
+		heardId = null;
+	}
+
+	/** A valid beacon, with the board it names when it names one in the expected form. */
+	void heard(Gson gson, String json, long now)
+	{
+		heard(now);
+		JsonObject o = GroupCodec.object(gson, json, MAX_CHARS);
+		String hook = o == null ? "" : ActivityCodec.string(o, "h", 24);
+		String id = o == null ? "" : ActivityCodec.string(o, "m", 24);
+		if (hook != null && id != null && hook.matches("w\\d{1,20}") && id.matches("\\d{1,20}"))
+		{
+			heardHook = hook;
+			heardId = id;
+		}
+	}
+
+	/** The message id of the board on webhook {@code hook} that a beacon within {@link #STALE_MS} named, else null. */
+	String boardOn(String hook, long now)
+	{
+		return hook != null && fresh(now) && hook.equals(heardHook) ? heardId : null;
 	}
 
 	/** Whether another client's board beacon was heard within {@link #STALE_MS} of {@code now}. */
@@ -62,5 +101,7 @@ final class BoardBeacon
 	void clear()
 	{
 		heardAt = 0;
+		heardHook = null;
+		heardId = null;
 	}
 }

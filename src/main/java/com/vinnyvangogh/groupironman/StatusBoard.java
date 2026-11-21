@@ -77,6 +77,78 @@ final class StatusBoard
 		}
 		return leader || !webhooks.fromGroup(Webhook.ONLINE);
 	}
+
+	/**
+	 * Whether this client keeps the board for the leader while the leader is offline: on a shared webhook, the
+	 * leader is not online (not heard from lately, or the game says logged out) and this client is the online
+	 * plugin user whose name sorts first, so exactly one member's client takes over, and every client works it out
+	 * from the same roster. {@code heardBy} is when each member's client was last heard ({@link GroupMembers#key}ed).
+	 */
+	static boolean standsIn(Self self, String leader, Map<String, Long> heardBy, GamePresence game, long now)
+	{
+		if (self == null || !self.online || self.name.isEmpty() || leader == null || leader.isEmpty())
+		{
+			return false;
+		}
+		String me = GroupMembers.key(self.name);
+		String lead = GroupMembers.key(leader);
+		if (me.equals(lead))
+		{
+			return false;
+		}
+		for (Map.Entry<String, Long> e : heardBy.entrySet())
+		{
+			String key = GroupMembers.key(e.getKey());
+			boolean online = Presence.online(e.getValue(), now) && game.state(e.getKey()) != GamePresence.State.OFFLINE;
+			if (!online)
+			{
+				continue;
+			}
+			if (key.equals(lead) || key.compareTo(me) < 0)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	static boolean keeps(OnlineStatus status, Webhooks webhooks, boolean leader, boolean standIn)
+	{
+		return keeps(status, webhooks, leader)
+			|| standIn && status == OnlineStatus.LIVE_BOARD && webhooks.url(Webhook.ONLINE) != null
+			&& webhooks.fromGroup(Webhook.ONLINE);
+	}
+
+	/** The webhook's tag the board is on, null with none. */
+	synchronized String hook()
+	{
+		return url == null ? null : hook;
+	}
+
+	/** The id of the board message this client edits, null before the first post. */
+	synchronized String boardId()
+	{
+		return url == null ? null : messageId;
+	}
+
+	/**
+	 * This client starts keeping a board another client's beacon named (the leader's, kept by a stand-in or the
+	 * other way round): it edits that message from now on and deletes the one it had, so the channel keeps one board.
+	 * {@code day} is the keeper's day, so the daily repost is not due at once.
+	 */
+	synchronized void adopt(String id, long day)
+	{
+		if (url == null || id == null || id.equals(messageId))
+		{
+			return;
+		}
+		addOld(messageId);
+		messageId = id;
+		postedDay = day;
+		idChanged = true;
+		oldIds.remove(id);
+	}
+
 	static final String TITLE = "Group status";
 	static final String ONLINE = "🟢";
 	static final String OFFLINE = "🔴";

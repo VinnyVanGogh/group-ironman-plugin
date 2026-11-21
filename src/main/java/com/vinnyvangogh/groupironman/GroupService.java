@@ -286,6 +286,9 @@ class GroupService
 	private final BoardBeacon boardBeacon = new BoardBeacon();
 	/** This client keeps the live status board: set by the event engine's timer, read on the client thread. */
 	private volatile boolean keepingBoard;
+	/** The webhook tag and message id of the board this client keeps, for its beacon; null when not known yet. */
+	private volatile String boardHook;
+	private volatile String boardMessageId;
 	/** Client thread: ticks since this client's last board beacon. */
 	private int ticksSinceBeacon = STATS_HEARTBEAT_TICKS;
 	private Map<Integer, Integer> seedVault = new TreeMap<>();
@@ -1299,6 +1302,23 @@ class GroupService
 		keepingBoard = keeping;
 	}
 
+	/** As above, naming the board kept ({@link StatusBoard#hookOf}'s tag and the message id; null when unknown). */
+	void keepingBoard(boolean keeping, String hook, String messageId)
+	{
+		boardHook = keeping ? hook : null;
+		boardMessageId = keeping ? messageId : null;
+		keepingBoard = keeping;
+	}
+
+	/**
+	 * Any thread: the message id of the board on webhook {@code hook} that another client's beacon named in the last
+	 * {@link BoardBeacon#STALE_MS}, else null. A client starting to keep the board edits that one, not a second.
+	 */
+	String boardKeptOn(String hook, long now)
+	{
+		return boardBeacon.boardOn(hook, now);
+	}
+
 	/**
 	 * Any thread: whether another member's client keeps the live status board, heard of in the last
 	 * {@link BoardBeacon#STALE_MS}. This client then posts no separate online or offline messages.
@@ -1320,7 +1340,7 @@ class GroupService
 		if (++ticksSinceBeacon >= STATS_HEARTBEAT_TICKS)
 		{
 			ticksSinceBeacon = 0;
-			send(BoardBeacon.encode(gson, System.currentTimeMillis()));
+			send(BoardBeacon.encode(gson, System.currentTimeMillis(), boardHook, boardMessageId));
 		}
 	}
 
@@ -1871,7 +1891,7 @@ class GroupService
 		{
 			if (BoardBeacon.valid(gson, payload))
 			{
-				boardBeacon.heard(System.currentTimeMillis());
+				boardBeacon.heard(gson, payload, System.currentTimeMillis());
 			}
 			return;
 		}
