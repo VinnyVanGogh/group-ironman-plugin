@@ -45,6 +45,17 @@ final class ItemCounts
 		into.merge(key, quantity, ItemCounts::saturatingAdd);
 	}
 
+	/** Like {@link #add}, but a placeholder slot (a marker for an empty slot) is not an item and is skipped. */
+	static void addOwned(Map<Integer, Integer> into, int id, int quantity, IntUnaryOperator canonical,
+		java.util.function.IntPredicate placeholder)
+	{
+		if (placeholder.test(id))
+		{
+			return;
+		}
+		add(into, id, quantity, canonical);
+	}
+
 	static int saturatingAdd(int a, int b)
 	{
 		long sum = (long) a + b;

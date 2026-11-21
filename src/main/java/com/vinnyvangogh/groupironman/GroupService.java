@@ -2229,11 +2229,7 @@ class GroupService
 			{
 				continue;
 			}
-			if (isPlaceholder(item.getId()))
-			{
-				continue;
-			}
-			ItemCounts.add(out, item.getId(), item.getQuantity(), itemManager::canonicalize);
+			ItemCounts.addOwned(out, item.getId(), item.getQuantity(), itemManager::canonicalize, this::isPlaceholder);
 		}
 		return out;
 	}
