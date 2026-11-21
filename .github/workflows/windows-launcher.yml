@@ -17,6 +17,9 @@ on:
   pull_request:
     paths:
       - 'tools/windows/**'
+      - 'tools/unix/**'
+      - 'tools/bundle/**'
+      - 'scripts/test_unix_launcher.sh'
       - '.github/workflows/windows-launcher.yml'
 
 permissions:
@@ -26,6 +29,16 @@ env:
   RELEASE_ASSET_URL: https://github.com/VinnyVanGogh/group-ironman-plugin/releases/download/gim-test-9/Run-GimUtilities.cmd
 
 jobs:
+  unix-launcher-tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mac/Linux launcher tests
+        run: bash scripts/test_unix_launcher.sh
+
   launcher-tests:
     runs-on: windows-latest
     steps:

@@ -119,6 +119,40 @@ try {
         if (-not $m.Success) { throw 'no $CvJarSha256 pin found' }
         if ($m.Groups[1].Value -notmatch '^[0-9a-f]{64}$') { throw "bad pin $($m.Groups[1].Value)" }
     }
+    Check 'the pinned Quest Route hash in the .cmd is well-formed' {
+        $m = [regex]::Match((Get-Content -Raw $launcher), "\`$QrJarSha256\s*=\s*'([^']*)'")
+        if (-not $m.Success) { throw 'no $QrJarSha256 pin found' }
+        if ($m.Groups[1].Value -notmatch '^[0-9a-f]{64}$') { throw "bad pin $($m.Groups[1].Value)" }
+    }
+    # An all-zero pin makes the launcher skip that jar, so a release built
+    # with one would quietly ship without the plugin.
+    Check 'no jar pin in the .cmd is all zeros' {
+        foreach ($n in @('CvJarSha256', 'QrJarSha256')) {
+            $m = [regex]::Match((Get-Content -Raw $launcher), "\`$$n\s*=\s*'([^']*)'")
+            if ($m.Groups[1].Value -match '^0{64}$') { throw "`$$n is all zeros: attach the jar to the release and pin its real SHA-256" }
+        }
+    }
+    Check 'the jar pins in the .cmd match tools/bundle/SHA256SUMS' {
+        $sums = Get-Content (Join-Path $repo 'tools/bundle/SHA256SUMS')
+        $map = @{ 'CvJarSha256' = 'combat-vitals.jar'; 'QrJarSha256' = 'quest-route.jar' }
+        foreach ($n in $map.Keys) {
+            $m = [regex]::Match((Get-Content -Raw $launcher), "\`$$n\s*=\s*'([^']*)'")
+            $line = @($sums | Where-Object { $_ -match "^[0-9a-f]{64}  $([regex]::Escape($map[$n]))$" })
+            if ($line.Count -ne 1) { throw "SHA256SUMS has no single line for $($map[$n])" }
+            if ($line[0].Substring(0, 64) -ne $m.Groups[1].Value) { throw "$n differs from SHA256SUMS" }
+        }
+    }
+    Check 'a dry run lists the three components with commits' {
+        $cmd = Get-Content -Raw $launcher
+        foreach ($v in @('SourceRef', 'CvCommit', 'QrCommit')) {
+            if ($cmd -notmatch "\`$$v\s*=\s*'[^']+'") { throw "no `$$v value" }
+        }
+        if ($cmd -notmatch "GU_DRY_RUN -eq '1'") { throw 'no GU_DRY_RUN branch' }
+    }
+    Check 'the .cmd fetches quest-route.jar from the same release' {
+        $cmd = Get-Content -Raw $launcher
+        if ($cmd -notmatch '/VinnyVanGogh/group-ironman-plugin/releases/download/\$SourceRef/quest-route\.jar') { throw 'QrJarUrl does not point at this release' }
+    }
     Check 'the .cmd fetches combat-vitals.jar from the same release' {
         $cmd = Get-Content -Raw $launcher
         if ($cmd -notmatch '/VinnyVanGogh/group-ironman-plugin/releases/download/\$SourceRef/combat-vitals\.jar') { throw 'CvJarUrl does not point at this release' }

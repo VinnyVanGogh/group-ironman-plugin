@@ -291,11 +291,16 @@ system is changed: everything goes into `%LOCALAPPDATA%\GimUtilities`.
 4. Carry on from step 2 above (log in, turn sharing on, share the key, join). To
    stop, close the RuneLite window.
 
-**macOS, with Combat & Skilling Vitals:** there is no Mac launcher. Run the
-client from a checkout of the release tag (`git checkout gim-test-9`, then
-`./gradlew run`), and before starting it download `combat-vitals.jar` from
-the release into `~/.runelite/sideloaded-plugins/` (create the folder if it
-is missing). The dev client loads it alongside GIM Utilities.
+**macOS / Linux:** run `bash tools/unix/run-gim-utilities.sh` from a checkout
+(or download that one file from the release and run it with `bash`). It does
+what the Windows launcher does: finds Java 11 to 21 with `javac` (it does not
+download one, so install Eclipse Temurin 11 first if you have none), uses the
+checkout or fetches the `gim-test-9` source, installs `combat-vitals.jar` and
+`quest-route.jar` into `~/.runelite/sideloaded-plugins/` once each matches
+its SHA-256 pin (skipping a jar that is already identical, keeping a different
+one as `.bak`), then runs `./gradlew run`. `GU_BUILD_ONLY=1` only builds;
+`GU_DRY_RUN=1` lists the three components with their commits and stops.
+Its tests: `bash scripts/test_unix_launcher.sh`.
 
 For whoever cuts the test release: the launcher downloads
 `github.com/VinnyVanGogh/group-ironman-plugin/archive/refs/tags/gim-test-9.zip`
@@ -303,6 +308,22 @@ with no login, so the repo has to be public and the `gim-test-9` tag pushed
 before friends run it. To test a different tag, change `$SourceRef` at the
 top of the launcher. The checksum step has its own tests:
 `pwsh -NoProfile -File tools/windows/tests/Checksum.Tests.ps1`.
+
+The launcher also installs **Quest Route** the same way, as `quest-route.jar`
+(the plain `./gradlew jar` output of VinnyVanGogh/questpath-plugin, renamed from
+`questpath.jar`), with its SHA-256 in `$QrJarSha256`. While that pin is all
+zeros the launcher prints a warning and skips it, and the launcher tests fail
+on an all-zero pin so it cannot ship that way. Attach the jar to the release
+and put its real hash in the pin in the same change, as below.
+
+**SHA256SUMS.** `tools/bundle/SHA256SUMS` lists both jars in `sha256sum`
+format. Attach it to the release next to the jars (testers can check a
+download with `sha256sum -c SHA256SUMS`). The pins in the Windows `.cmd`, in
+`tools/unix/run-gim-utilities.sh` and in that file must be identical; both
+launcher test suites check it. To cut a bundle: build each jar, copy it into
+one folder as `combat-vitals.jar` / `quest-route.jar`, run
+`sha256sum *.jar > SHA256SUMS` (`shasum -a 256` on macOS), copy the hashes
+into the three places, attach the two jars and `SHA256SUMS` to the release.
 
 `combat-vitals.jar` is the plain `./gradlew jar` output of
 VinnyVanGogh/combat-vitals-plugin (only that plugin's own classes and
