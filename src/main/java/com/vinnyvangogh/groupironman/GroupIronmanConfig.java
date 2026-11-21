@@ -701,6 +701,22 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "discordLampReceived", name = "Lamp or book received",
+		description = "An XP lamp or skilling book (antique lamp, book of knowledge, Tome of experience) got.",
+		section = discordEventsSection, position = 41)
+	default boolean discordLampReceived()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordLampUsed", name = "Lamp or book used",
+		description = "An XP lamp or skilling book used: the skill and the XP it gave.",
+		section = discordEventsSection, position = 42)
+	default boolean discordLampUsed()
+	{
+		return false;
+	}
+
 	// ---- 4. Discord: how to post ----
 
 	@ConfigItem(keyName = "discordOnlineStatus", name = "Online status", description = "Posts: one per login and"
@@ -1313,6 +1329,21 @@ public interface GroupIronmanConfig extends Config
 	@ConfigItem(keyName = "overlayEveryoneOnline", name = "Banner: Everyone online",
 		description = "Everyone in the group is online at once.", section = inGameSection, position = 49)
 	default boolean overlayEveryoneOnline()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayLampReceived", name = "Banner: Lamp or book received",
+		description = "A member got an XP lamp or skilling book.", section = inGameSection, position = 100)
+	default boolean overlayLampReceived()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayLampUsed", name = "Banner: Lamp or book used",
+		description = "A member used an XP lamp or skilling book: the skill and the XP.", section = inGameSection,
+		position = 101)
+	default boolean overlayLampUsed()
 	{
 		return false;
 	}

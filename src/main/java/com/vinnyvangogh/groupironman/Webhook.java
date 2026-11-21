@@ -31,11 +31,11 @@ enum Webhook
 	{
 		on(ONLINE, GroupEvent.Type.ONLINE);
 		on(DROPS, GroupEvent.Type.DROP, GroupEvent.Type.CLOG, GroupEvent.Type.PET, GroupEvent.Type.UNIQUE,
-			GroupEvent.Type.BARROWS, GroupEvent.Type.RAID_UNIQUE, GroupEvent.Type.STORAGE_LAST);
+			GroupEvent.Type.BARROWS, GroupEvent.Type.RAID_UNIQUE, GroupEvent.Type.STORAGE_LAST, GroupEvent.Type.LAMP_BOOK);
 		on(PROGRESS, GroupEvent.Type.LEVEL_UP, GroupEvent.Type.MAXED, GroupEvent.Type.XP_MILESTONE,
 			GroupEvent.Type.COMBAT_LEVEL, GroupEvent.Type.TOTAL_LEVEL, GroupEvent.Type.QUEST,
 			GroupEvent.Type.QUEST_POINTS, GroupEvent.Type.ACTIVITY_START, GroupEvent.Type.ACTIVITY_WAVE,
-			GroupEvent.Type.ACTIVITY_COMPLETE);
+			GroupEvent.Type.ACTIVITY_COMPLETE, GroupEvent.Type.LAMP_USED);
 		on(DEATHS, GroupEvent.Type.DEATH, GroupEvent.Type.DEATH_VALUE, GroupEvent.Type.GRAVESTONE_EXPIRING,
 			GroupEvent.Type.HC_LIFE_LOST, GroupEvent.Type.ACTIVITY_DEATH);
 		on(STORAGE, GroupEvent.Type.STORAGE_DEPOSIT, GroupEvent.Type.STORAGE_WITHDRAWAL,

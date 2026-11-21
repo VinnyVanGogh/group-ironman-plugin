@@ -97,6 +97,11 @@ final class EventText
 		line(GroupEvent.Type.SLAYER, "Slayer", (e, l) -> slayer(e));
 		line(GroupEvent.Type.FARMING, "Farming run", (e, l) -> ready(e));
 		line(GroupEvent.Type.BIRDHOUSE, "Bird houses and Hespori", (e, l) -> ready(e));
+		line(GroupEvent.Type.LAMP_BOOK, "Lamp or book", (e, l) -> "received " + (e.number > 1 ? e.number + " x " : "")
+			+ e.text);
+		line(GroupEvent.Type.LAMP_USED, "Lamp or book used", (e, l) -> "used "
+			+ (e.detail.isEmpty() ? "a lamp or book" : e.detail) + " on " + e.text
+			+ (e.number > 0 ? ", +" + l.amount(e.number) + " XP" : ""));
 		line(GroupEvent.Type.REQUEST, "Request", (e, l) -> RequestBoard.describe(e));
 		line(GroupEvent.Type.ANNOUNCEMENT, "Announcement", (e, l) -> e.text);
 		line(GroupEvent.Type.EVERYONE_ONLINE, "Everyone is online", (e, l) -> e.number > 0

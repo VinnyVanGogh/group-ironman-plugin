@@ -228,11 +228,11 @@ public class WebhooksTest
 	{
 		expect(Webhook.ONLINE, GroupEvent.Type.ONLINE);
 		expect(Webhook.DROPS, GroupEvent.Type.DROP, GroupEvent.Type.PET, GroupEvent.Type.CLOG, GroupEvent.Type.UNIQUE,
-			GroupEvent.Type.BARROWS, GroupEvent.Type.RAID_UNIQUE, GroupEvent.Type.STORAGE_LAST);
+			GroupEvent.Type.BARROWS, GroupEvent.Type.RAID_UNIQUE, GroupEvent.Type.STORAGE_LAST, GroupEvent.Type.LAMP_BOOK);
 		expect(Webhook.PROGRESS, GroupEvent.Type.LEVEL_UP, GroupEvent.Type.MAXED, GroupEvent.Type.XP_MILESTONE,
 			GroupEvent.Type.COMBAT_LEVEL, GroupEvent.Type.TOTAL_LEVEL, GroupEvent.Type.QUEST,
 			GroupEvent.Type.QUEST_POINTS, GroupEvent.Type.ACTIVITY_START, GroupEvent.Type.ACTIVITY_WAVE,
-			GroupEvent.Type.ACTIVITY_COMPLETE);
+			GroupEvent.Type.ACTIVITY_COMPLETE, GroupEvent.Type.LAMP_USED);
 		expect(Webhook.DEATHS, GroupEvent.Type.DEATH, GroupEvent.Type.DEATH_VALUE,
 			GroupEvent.Type.GRAVESTONE_EXPIRING, GroupEvent.Type.HC_LIFE_LOST, GroupEvent.Type.ACTIVITY_DEATH);
 		expect(Webhook.STORAGE, GroupEvent.Type.STORAGE_DEPOSIT, GroupEvent.Type.STORAGE_WITHDRAWAL,
@@ -252,7 +252,7 @@ public class WebhooksTest
 			}
 		}
 		// Activities Slice A (docs/plans/activities.md §3): start, wave and completion to Progress, death to Deaths.
-		assertEquals("exactly the Board's lists, nothing else outside Main", 27, listed.size());
+		assertEquals("exactly the Board's lists, nothing else outside Main", 29, listed.size());
 		assertEquals("anything not covered goes to Main", Webhook.MAIN, Webhook.of(GroupEvent.Type.CLUE));
 		assertEquals(Webhook.MAIN, Webhook.of(GroupEvent.Type.WEEKLY_RECAP));
 	}
