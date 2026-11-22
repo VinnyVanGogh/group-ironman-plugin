@@ -223,6 +223,8 @@ final class PanelModel
 		List<String> effects = Collections.emptyList();
 		/** The chips' tooltip lines, with what the game does not say about time left. */
 		List<String> effectNotes = Collections.emptyList();
+		/** The follower pet the member has out, "" when none or not shared. */
+		String pet = "";
 
 		MemberCard(String name, boolean you, boolean online, String status, List<Bar> bars, List<SkillCell> skills,
 			List<ItemGroup> items, String seedVault, String source)
@@ -427,6 +429,7 @@ final class PanelModel
 			{
 				card.effects = s.status().chips();
 				card.effectNotes = s.status().lines();
+				card.pet = s.status().pet();
 			}
 			out.add(card);
 		}

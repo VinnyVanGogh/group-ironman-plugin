@@ -24,6 +24,8 @@ final class GroupBroadcasts
 	static final String SOURCE = "from the game's group broadcast";
 	/** How long a posted broadcast is remembered, so a restart or a late claim never posts it again. */
 	static final long REMEMBER_MS = 24L * 60 * 60 * 1000;
+	/** How far apart two sightings of one broadcast can be and still land in neighbouring minutes' keys. */
+	static final long NEXT_DOOR_MS = 30_000L;
 	/** Most broadcasts remembered at once; a busy group makes a few dozen a day. */
 	static final int MAX_SEEN = 500;
 
@@ -213,7 +215,7 @@ final class GroupBroadcasts
 		boolean add(String key, long now)
 		{
 			prune(now);
-			if (key == null || key.isEmpty() || keys.containsKey(key))
+			if (key == null || key.isEmpty() || keys.containsKey(key) || seenNextDoor(key, now))
 			{
 				return false;
 			}
@@ -223,6 +225,36 @@ final class GroupBroadcasts
 				keys.remove(keys.keySet().iterator().next());
 			}
 			return true;
+		}
+
+		/**
+		 * True when the same broadcast is held under the minute either side of {@code key}'s, put there less than
+		 * {@link #NEXT_DOOR_MS} ago: clients see one line a second or two apart, so a line on the minute's edge
+		 * keys into two different minutes and would otherwise be posted twice. A real repeat a minute later is
+		 * further apart than that and stays new.
+		 */
+		private boolean seenNextDoor(String key, long now)
+		{
+			int bar = key.lastIndexOf('|');
+			if (bar < 0)
+			{
+				return false;
+			}
+			long minute = number(key.substring(bar + 1));
+			if (minute <= 0)
+			{
+				return false;
+			}
+			String head = key.substring(0, bar + 1);
+			for (long next : new long[] {minute - 1, minute + 1})
+			{
+				Long at = keys.get(head + next);
+				if (at != null && Math.abs(now - at) < NEXT_DOOR_MS)
+				{
+					return true;
+				}
+			}
+			return false;
 		}
 
 		private void prune(long now)

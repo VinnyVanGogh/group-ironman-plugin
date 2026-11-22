@@ -124,6 +124,38 @@ public class SlayerWatchTest
 	}
 
 	@Test
+	public void aNewTaskHandedOutBeforeTheStreakLinePostsAfterTheDoneLine()
+	{
+		dialog("Your new task is to kill 19 Icefiends.", "Turael");
+		out.clear();
+		chat("You have completed your task! You killed 19 Icefiends. You gained 1,520 xp.");
+		dialog("Your new task is to kill 30 Bears.", "Turael");
+		silent("held until the done line posts");
+		chat("<col=ef1020>You've completed </col>1 task<col=ef1020> and received </col>2 points<col=ef1020>, giving you a"
+			+ " total of </col>2<col=ef1020>; return to a Slayer master.");
+		assertEquals(out.toString(), 2, out.size());
+		assertEquals("Slayer task done: Icefiends (streak 1, 2 points)", EventText.describe(out.get(0), ITEMS));
+		assertEquals("New Slayer task: 30 x Bears (Turael)", EventText.describe(out.get(1), ITEMS));
+		out.clear();
+		watch.tick(NOW, "Alex");
+		watch.tick(NOW, "Alex");
+		silent("nothing left to post");
+	}
+
+	@Test
+	public void aNewTaskBeforeTheWaitRunsOutStillPostsAfterTheDoneLine()
+	{
+		chat("You have completed your task! You killed 19 Icefiends. You gained 1,520 xp.");
+		dialog("Your new task is to kill 30 Bears.", "Turael");
+		watch.tick(NOW, "Alex");
+		silent("one tick in");
+		watch.tick(NOW, "Alex");
+		assertEquals(out.toString(), 2, out.size());
+		assertEquals("Slayer task done: Icefiends", EventText.describe(out.get(0), ITEMS));
+		assertEquals("New Slayer task: 30 x Bears (Turael)", EventText.describe(out.get(1), ITEMS));
+	}
+
+	@Test
 	public void runeLitesCompletionLines()
 	{
 		String[][] lines = {

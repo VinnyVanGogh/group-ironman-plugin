@@ -209,6 +209,24 @@ public class GroupBroadcastsTest
 	}
 
 	@Test
+	public void aLineOnTheMinuteEdgeIsStillPostedOnceNotByEachClient()
+	{
+		// One client hears the line at 1:59.9, the other at 2:00.4: two minutes' keys, one broadcast.
+		GroupEvent early = GroupBroadcasts.parse("Ott has reached Herblore level 21.", 119_900, ITEMS);
+		GroupEvent late = GroupBroadcasts.parse("Ott has reached Herblore level 21.", 120_400, ITEMS);
+		assertFalse(GroupBroadcasts.key(early).equals(GroupBroadcasts.key(late)));
+		GroupBroadcasts.Seen first = new GroupBroadcasts.Seen();
+		assertEquals(GroupBroadcasts.Action.POST, GroupBroadcasts.decide(early, NOBODY, true, first, 119_900));
+		// The poster's claim reaches the other client after its own line.
+		GroupBroadcasts.Seen second = new GroupBroadcasts.Seen();
+		second.add(GroupBroadcasts.key(early), 120_100);
+		assertEquals(GroupBroadcasts.Action.SHOW, GroupBroadcasts.decide(late, NOBODY, true, second, 120_400));
+		// The same drop a full minute later is a new broadcast.
+		GroupEvent again = GroupBroadcasts.parse("Ott has reached Herblore level 21.", 181_000, ITEMS);
+		assertEquals(GroupBroadcasts.Action.POST, GroupBroadcasts.decide(again, NOBODY, true, first, 181_000));
+	}
+
+	@Test
 	public void aClaimIsCappedAndReadOnlyAsStrings()
 	{
 		Gson gson = new Gson();

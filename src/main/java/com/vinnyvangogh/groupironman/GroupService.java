@@ -1155,8 +1155,15 @@ class GroupService
 			drawnFrom = null;
 			return;
 		}
+		WorldPoint before = here;
 		here = position();
 		redrawIfMoved();
+		if (here != null && (before == null || before.getRegionID() != here.getRegionID())
+			&& GearChecks.forRegion(here.getRegionID()) != null)
+		{
+			// Entering a place with a gear rule: the Gear tab picks it up on this redraw.
+			onChange.run();
+		}
 		long now = System.currentTimeMillis();
 		refreshRoster();
 		if (!member())
@@ -1168,6 +1175,9 @@ class GroupService
 		if (!session)
 		{
 			session = true;
+			// Fill your card now: turning the plugin on while logged in fires no container or stat events.
+			statsDirty = true;
+			carriedDirty = true;
 			extrasDirty = true;
 			Player player = client.getLocalPlayer();
 			if (player != null && player.getName() != null)
@@ -1191,19 +1201,15 @@ class GroupService
 		carriedDirty |= containers.tick();
 		GroupOutbox.Switches s = switches();
 		updateCarried(s);
-		if (!syncing())
+		if (syncing())
 		{
-			return;
+			flushGovernance();
+			sendBoardBeacon();
 		}
-		flushGovernance();
-		sendBoardBeacon();
+		// Your own card is filled from this client, synced or not; only the party send waits on syncing.
+		pollStats(s);
 
-		if (s.stats)
-		{
-			pollStats(s);
-		}
-
-		if (s.extras && extrasDirty && ticksSinceExtras >= EXTRAS_INTERVAL_TICKS)
+		if (extrasDirty && ticksSinceExtras >= EXTRAS_INTERVAL_TICKS)
 		{
 			extrasDirty = false;
 			sendExtras(s);
@@ -1558,6 +1564,14 @@ class GroupService
 		return GroupMembers.UNKNOWN;
 	}
 
+	/** Client thread. The pet following the local player, by name; "" when none is out. */
+	private String followerName()
+	{
+		NPC pet = client.getFollower();
+		String name = pet == null ? null : pet.getName();
+		return name == null ? "" : name;
+	}
+
 	/** Client thread. Run energy, special attack and location fire no StatChanged; poll the cheap ints. */
 	private void pollStats(GroupOutbox.Switches s)
 	{
@@ -1570,7 +1584,8 @@ class GroupService
 		int y = at == null ? 0 : at.getY();
 		int plane = at == null ? 0 : at.getPlane();
 		MemberStatus status = MemberStatus.fromGame(client.getVarbitValue(VarbitID.PRAYER_ALLACTIVE),
-			client.getVarpValue(VarPlayerID.POISON), client.getVarpValue(VarPlayerID.DISEASE));
+			client.getVarpValue(VarPlayerID.POISON), client.getVarpValue(VarPlayerID.DISEASE))
+			.withPet(followerName());
 		if (run != lastRun || spec != lastSpec || world != lastWorld || region != lastRegion
 			|| plane != lastPlane || Math.abs(x - lastX) + Math.abs(y - lastY) >= MOVE_TILES
 			|| !status.equals(lastStatus))
@@ -1587,7 +1602,8 @@ class GroupService
 		}
 		if (ticksSinceStats >= STATS_HEARTBEAT_TICKS)
 		{
-			// Nothing changed for a minute: send the same again so members still see us online.
+			// Nothing changed for a minute: recapture so your own card stays online, and while syncing send the
+			// same again so members still see us online.
 			lastStatsSent = null;
 			statsDirty = true;
 		}
@@ -2016,34 +2032,56 @@ class GroupService
 		}
 		MemberStats stats = new MemberStats(skills, lastRun, lastSpec, lastWorld, lastRegion, lastX, lastY, lastPlane,
 			lastStatus);
-		String payload = GroupOutbox.stats(gson, s, stats);
-		if (payload == null || Objects.equals(payload, lastStatsSent))
+		String me = localName();
+		boolean changed = !stats.equals(roster.allStats().get(me));
+		roster.putStats(me, stats);
+		roster.heard(me, System.currentTimeMillis());
+		if (changed)
+		{
+			onChange.run();
+		}
+		String payload = syncing() ? GroupOutbox.stats(gson, s, stats) : null;
+		if (payload == null)
+		{
+			// Nothing goes out (sync off or the stats switch off); this still paces the next local capture.
+			ticksSinceStats = 0;
+			return;
+		}
+		if (Objects.equals(payload, lastStatsSent))
 		{
 			return;
 		}
 		send(payload);
 		lastStatsSent = payload;
 		ticksSinceStats = 0;
-		roster.putStats(localName(), stats);
-		roster.heard(localName(), System.currentTimeMillis());
-		onChange.run();
 	}
 
 	/** Client thread. */
 	private void sendExtras(GroupOutbox.Switches s)
 	{
 		MemberExtras extras = new MemberExtras(runePouch(), quiver(), seedVault, seedVaultAt);
-		String payload = GroupOutbox.extras(gson, s, extras);
-		if (payload == null || Objects.equals(payload, lastExtrasSent))
+		String me = localName();
+		boolean changed = !extras.equals(roster.extras().get(me));
+		if (changed)
+		{
+			// Names first: a changed card redraws straight away.
+			resolveNow(ItemCounts.ids(extras.runePouch, extras.quiver, extras.seedVault));
+			roster.putExtras(me, extras);
+			onChange.run();
+		}
+		String payload = syncing() ? GroupOutbox.extras(gson, s, extras) : null;
+		if (payload == null)
+		{
+			ticksSinceExtras = 0;
+			return;
+		}
+		if (Objects.equals(payload, lastExtrasSent))
 		{
 			return;
 		}
 		send(payload);
 		lastExtrasSent = payload;
 		ticksSinceExtras = 0;
-		resolveNow(ItemCounts.ids(extras.runePouch, extras.quiver, extras.seedVault));
-		roster.putExtras(localName(), extras);
-		onChange.run();
 	}
 
 	/** Client thread. Rune type varbits index the RUNEPOUCH_RUNE enum, the way the base rune pouch plugin reads them. */
@@ -2419,6 +2457,48 @@ class GroupService
 		}
 		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names,
 			CompareSupport.banked(roster, names), CompareSupport.storageBanked(roster));
+	}
+
+	/** What the Gear tab shows: this player's last shared inventory and worn items, the region, and the group's items. */
+	GearTab.View gearView()
+	{
+		GroupCodec.Carried mine = roster.allCarried().get(self);
+		WorldPoint at = here;
+		return new GearTab.View(self, at == null ? 0 : at.getRegionID(),
+			mine == null ? Collections.emptyMap() : mine.inventory, mine == null ? Collections.emptyMap() : mine.worn,
+			roster.searchSources(), lookup);
+	}
+
+	/**
+	 * Gear tab: ask the group for {@code itemName}, or put it on this player's own shopping list. The id comes from
+	 * the item search on the client thread; {@code done} gets the line to show, on that thread.
+	 */
+	void gearItem(String itemName, boolean shopping, Consumer<String> done)
+	{
+		clientThread.invokeLater(() ->
+		{
+			Integer id = null;
+			for (ItemPrice p : itemManager.search(itemName))
+			{
+				if (GearChecks.matches(p.getName(), itemName))
+				{
+					id = p.getId();
+					names.putIfAbsent(p.getId(), p.getName());
+					break;
+				}
+			}
+			if (id == null)
+			{
+				done.accept("Could not find " + itemName + " to add.");
+				return;
+			}
+			Map<Integer, Integer> one = Collections.singletonMap(id, 1);
+			boolean ok = shopping
+				? addShoppingList(itemName, "", Collections.emptyList(), Collections.singletonList(self), one)
+				: addRequest(itemName, one);
+			done.accept(ok ? (shopping ? "Added " + itemName + " to your shopping lists."
+				: "Asked the group for " + itemName + ".") : "Not added: log in first, or the list is full.");
+		});
 	}
 
 	/** "Who benefits most" for an item picked from the dropdown; {@code done} runs on the client thread. */

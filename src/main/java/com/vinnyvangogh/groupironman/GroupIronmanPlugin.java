@@ -214,6 +214,18 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public boolean[] quickValues()
+			{
+				return QuickSettings.read(config);
+			}
+
+			@Override
+			public void setQuick(String key, boolean on)
+			{
+				configManager.setConfiguration(GroupIronmanConfig.GROUP, key, on);
+			}
+
+			@Override
 			public boolean claim()
 			{
 				return group.claimLeadership();
@@ -290,6 +302,12 @@ public class GroupIronmanPlugin extends Plugin
 			public void groupExperience(List<String> names, Consumer<Map<String, Long>> done)
 			{
 				group.groupExperience(names, done);
+			}
+
+			@Override
+			public void gearItem(String itemName, boolean shopping, Consumer<String> done)
+			{
+				group.gearItem(itemName, shopping, done);
 			}
 
 			@Override
@@ -535,6 +553,7 @@ public class GroupIronmanPlugin extends Plugin
 			group.presence(), settingsView(), group.anyOn(), group.sharingSettings(), shoppingView());
 		view.progress = group.progressView();
 		view.compare = group.compareView(view.progress);
+		view.gear = group.gearView();
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
 	}

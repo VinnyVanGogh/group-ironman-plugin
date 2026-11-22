@@ -15,7 +15,10 @@ final class ActivityCodec
 {
 	static final String KIND = "activity";
 	/** Longer payloads are dropped unread. */
-	static final int MAX_CHARS = 2048;
+	static final int MAX_CHARS = 4096;
+	static final int MAX_ROTATION = 24;
+	/** 70 waves of up to five characters and a comma. */
+	static final int MAX_SPLITS = 420;
 	static final int MAX_NAME = 40;
 	static final int MAX_MODE = 24;
 	static final int MAX_PHASE = 40;
@@ -54,6 +57,10 @@ final class ActivityCodec
 			o.addProperty("stats", s.stats);
 			o.addProperty("mods", s.mods);
 			o.addProperty("team", s.team);
+			o.addProperty("rotation", s.rotation);
+			o.addProperty("waveMs", s.waveMs);
+			o.addProperty("splits", s.splits);
+			o.addProperty("bests", s.bests);
 		}
 		return gson.toJson(o);
 	}
@@ -93,7 +100,14 @@ final class ActivityCodec
 			.wave((int) number(o, "wave", 0, MAX_WAVE)).max((int) number(o, "max", 0, MAX_WAVE))
 			.startedAt(number(o, "startedAt", 0, Long.MAX_VALUE)).elapsedMs(number(o, "elapsedMs", 0, MAX_ELAPSED_MS))
 			.stats(string(o, "stats", MAX_STATS)).mods(string(o, "mods", MAX_MODS)).team(string(o, "team", MAX_TEAM))
-			.build();
+			.rotation(string(o, "rotation", MAX_ROTATION)).waveMs(number(o, "waveMs", 0, MAX_ELAPSED_MS))
+			.splits(digits(string(o, "splits", MAX_SPLITS))).bests(digits(string(o, "bests", MAX_SPLITS))).build();
+	}
+
+	/** A splits string with anything but digits and commas removed: it is only ever read as numbers. */
+	private static String digits(String s)
+	{
+		return s.replaceAll("[^0-9,]", "");
 	}
 
 	/** The field as safe display text, at most {@code max} characters; empty when missing or not a string. */

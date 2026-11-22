@@ -29,30 +29,52 @@ final class MemberStatus
 	static final int MAX_POISON_HITS = 1000;
 
 	/** Not shared by this sender. */
-	static final MemberStatus UNKNOWN = new MemberStatus(false, false, 0, false, false);
+	static final MemberStatus UNKNOWN = new MemberStatus(false, false, 0, false, false, "");
 	/** Shared: prayer off, nothing wrong. */
-	static final MemberStatus NONE = new MemberStatus(true, false, 0, false, false);
+	static final MemberStatus NONE = new MemberStatus(true, false, 0, false, false, "");
+	/** Longest pet name kept; a decoded name past it is cut, not believed. */
+	static final int MAX_PET_NAME = 40;
 
 	private final boolean known;
 	private final boolean prayerOn;
 	private final int poisonHits;
 	private final boolean venom;
 	private final boolean disease;
+	/** The member's follower pet by name, "" when none out or not shared. */
+	private final String pet;
 
-	private MemberStatus(boolean known, boolean prayerOn, int poisonHits, boolean venom, boolean disease)
+	private MemberStatus(boolean known, boolean prayerOn, int poisonHits, boolean venom, boolean disease, String pet)
 	{
 		this.known = known;
 		this.prayerOn = prayerOn;
 		this.poisonHits = poisonHits;
 		this.venom = venom;
 		this.disease = disease;
+		this.pet = pet;
+	}
+
+	/** This status with the pet the member has out; a null, blank or over-long name is tidied, never trusted. */
+	MemberStatus withPet(String name)
+	{
+		String clean = name == null ? "" : name.replaceAll("<[^>]*>", "").trim();
+		if (clean.length() > MAX_PET_NAME)
+		{
+			clean = clean.substring(0, MAX_PET_NAME);
+		}
+		return new MemberStatus(known, prayerOn, poisonHits, venom, disease, clean);
+	}
+
+	/** The pet's name, or "" when no pet is out (or the sender does not share it). */
+	String pet()
+	{
+		return pet;
 	}
 
 	/** @param poisonHits poison hits left, 0 for none; ignored while {@code venom}. */
 	static MemberStatus of(boolean prayerOn, int poisonHits, boolean venom, boolean disease)
 	{
 		int hits = venom ? 0 : Math.max(0, Math.min(MAX_POISON_HITS, poisonHits));
-		return new MemberStatus(true, prayerOn, hits, venom, disease);
+		return new MemberStatus(true, prayerOn, hits, venom, disease, "");
 	}
 
 	/** From the raw game values: the prayer bitmask, the poison varp and the disease varp. */
@@ -154,12 +176,12 @@ final class MemberStatus
 		}
 		MemberStatus m = (MemberStatus) o;
 		return known == m.known && prayerOn == m.prayerOn && poisonHits == m.poisonHits && venom == m.venom
-			&& disease == m.disease;
+			&& disease == m.disease && pet.equals(m.pet);
 	}
 
 	@Override
 	public int hashCode()
 	{
-		return (known ? 1 : 0) + (prayerOn ? 2 : 0) + (venom ? 4 : 0) + (disease ? 8 : 0) + poisonHits * 16;
+		return (known ? 1 : 0) + (prayerOn ? 2 : 0) + (venom ? 4 : 0) + (disease ? 8 : 0) + poisonHits * 16 + pet.hashCode() * 31;
 	}
 }

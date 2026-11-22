@@ -42,12 +42,21 @@ final class ActivityRows
 		/** "The Inferno - wave 42/69", "solo - 38m", then glory and modifiers when there are any. */
 		final List<String> lines;
 
-		Card(String member, boolean you, List<String> lines)
+		/** The run's wave-by-wave times with each wave's personal best, then the total; empty before one is done. */
+		final List<String> splits;
+
+		Card(String member, boolean you, List<String> lines, List<String> splits)
 		{
 			this.member = member;
 			this.you = you;
 			this.title = you ? member + " (you)" : member;
 			this.lines = Collections.unmodifiableList(lines);
+			this.splits = Collections.unmodifiableList(splits);
+		}
+
+		Card(String member, boolean you, List<String> lines)
+		{
+			this(member, you, lines, new ArrayList<>());
 		}
 	}
 
@@ -77,6 +86,14 @@ final class ActivityRows
 		lines.add(s.phase.isEmpty() ? s.name : s.name + " - " + s.phase);
 		String time = ActivityState.duration(s.elapsed(now));
 		lines.add(s.mode.isEmpty() ? time : s.mode + " - " + time);
+		if (!s.rotation.isEmpty())
+		{
+			lines.add(s.rotation);
+		}
+		if (s.waveMs > 0)
+		{
+			lines.add("This wave: " + WaveSplits.clock(s.waveElapsed(now)));
+		}
 		if (!s.stats.isEmpty())
 		{
 			lines.add(s.stats);
@@ -85,7 +102,7 @@ final class ActivityRows
 		{
 			lines.add("Modifiers: " + s.mods);
 		}
-		return new Card(member, you, lines);
+		return new Card(member, you, lines, WaveSplits.rows(s.splits, s.bests));
 	}
 
 	/** "Done: Alex completed The Inferno, kill count 3 (1:58:12) - 9m ago", newest first. */
