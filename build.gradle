@@ -59,6 +59,27 @@ tasks.named('test', Test) {
 	systemProperty 'java.awt.headless', project.hasProperty('headful') ? 'false' : 'true'
 }
 
+// Sandboxed runs (StayPoint's build_test under sandbox-exec) deny writes to the
+// user's temp dir and to /tmp. Font.createFont and SwingDriver's PNG test write to
+// java.io.tmpdir, and Mockito's inline mock maker attaches its agent at runtime
+// through /tmp/.attach_pid, so 78 tests failed with "Operation not permitted".
+// Keep each test JVM's tmpdir inside build/, and load Mockito as a -javaagent at
+// JVM start so no runtime attach happens (also what Mockito recommends on JDK 21+).
+configurations {
+	mockitoAgent
+}
+dependencies {
+	mockitoAgent('org.mockito:mockito-core:5.14.2') {
+		transitive = false
+	}
+}
+tasks.withType(Test).configureEach {
+	def testTmp = layout.buildDirectory.dir("tmp/${name}").get().asFile
+	doFirst { testTmp.mkdirs() }
+	systemProperty 'java.io.tmpdir', testTmp.absolutePath
+	jvmArgs "-javaagent:${configurations.mockitoAgent.asPath}"
+}
+
 // Renders the README's screenshots (ReadmeShots) into docs/images at fixed
 // sizes, from made-up scenes. ./gradlew test renders the same shots into
 // build/screenshots, so a broken shot fails the build first.
