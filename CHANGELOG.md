@@ -73,7 +73,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Collapsed explicit imports to on-demand imports across the main sources (no behaviour change; the compiler proves every name still resolves to the same class) and relaxed the `tokenBudget` build gate from 195,000 to a 250,000 ratchet: the Hub's automatic review reads up to 200,000 tokens and a human reviews above that. Estimate 251.5k to 243.9k (RUNELITE-343). The split that gets back under 200k is RUNELITE-362.
+- Collapsed explicit imports to on-demand imports across the main sources (no behaviour change; the compiler proves every name still resolves to the same class) and relaxed the `tokenBudget` build gate from 195,000 to a 255,000 ratchet just above the measured size: the Hub's automatic review reads up to 200,000 tokens and a human reviews above that. Estimate 261.0k on main to 253.2k after the collapse (RUNELITE-343). The split that gets back under 200k is RUNELITE-362.
 - Updated the Windows launcher, `SETUP.md`, and CI validation workflow across test release tags `gim-test-2` (#43), `gim-test-3` (#50), `gim-test-4` (#62), `gim-test-5` (#70), `gim-test-6` (#77), and `gim-test-7` (#80).
 - Reduced plugin source token count below the Plugin Hub's 200,000-token auto-review limit (~204k to ~198k) by extracting shared UI builders (`Ui.java`), moving Easter egg lines and item aliases to resource files (`easter-eggs.txt`, `item-aliases.txt`), shortening config tooltips, folding repeated cache/codec helpers, and adding `tools/tokens.py` (#79).
 - Folded shopping lists and requests by default with progress bars and item previews (`ShopFolds`), and compacted item rows with expandable ownership, source, quest, and tradeability details (#73).

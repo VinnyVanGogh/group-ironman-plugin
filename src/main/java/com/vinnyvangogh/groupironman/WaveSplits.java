@@ -1,8 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 /**
  * Per-wave times, the way they travel and read. A run's splits are one string, whole seconds by wave: "42,38,0,51"
