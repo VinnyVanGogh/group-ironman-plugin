@@ -303,9 +303,42 @@ class GroupService
 	/** When this player last played before this session; 0 when not known. */
 	private volatile long since;
 	private volatile String self = "";
+	/** Untradeable items by name (a collection log line's Giant key), for the Group box's pictures. */
+	private final ItemNameIndex itemsByName = new ItemNameIndex();
+	private static final int NAME_SCAN_SLICE = 2_000;
+	/** The client's item list for {@link #itemsByName}'s scan; client thread only. */
+	private final ItemNameIndex.Items clientItems = new ItemNameIndex.Items()
+	{
+		@Override
+		public int count()
+		{
+			return client.getItemCount();
+		}
+
+		@Override
+		public String baseName(int item)
+		{
+			ItemComposition c = itemManager.getItemComposition(item);
+			String n = c.getName();
+			return c.getNote() != -1 || c.getPlaceholderTemplateId() != -1 || n == null
+				|| "null".equalsIgnoreCase(n) ? null : n;
+		}
+	};
 
 	final ItemLookup lookup = new ItemLookup()
 	{
+		@Override
+		public int itemId(String name)
+		{
+			int id = itemsByName.id(name);
+			if (itemsByName.claim())
+			{
+				// A slice per client frame until done (invokeLater repeats a supplier until it returns true).
+				clientThread.invokeLater(() -> itemsByName.step(clientItems, NAME_SCAN_SLICE));
+			}
+			return id;
+		}
+
 		@Override
 		public String name(int id)
 		{

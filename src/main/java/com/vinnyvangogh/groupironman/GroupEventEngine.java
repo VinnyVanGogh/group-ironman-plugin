@@ -67,6 +67,7 @@ import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
 import net.runelite.client.game.SkillIconManager;
+import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.DrawManager;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ImageUtil;
@@ -160,6 +161,9 @@ class GroupEventEngine
 
 	@Inject
 	private SkillIconManager skillIconManager;
+
+	@Inject
+	private SpriteManager spriteManager;
 
 	@Inject
 	private OkHttpClient okHttpClient;
@@ -288,7 +292,7 @@ class GroupEventEngine
 		restorePresence();
 		toastOverlay = new EventToastOverlay(toasts, config, group.lookup, this::eggSettings, client);
 		boxOverlay = new GroupBoxOverlay(toasts, config, group, this::eggSettings,
-			new PluginIcons(skillIconManager, itemManager));
+			new PluginIcons(skillIconManager, itemManager, spriteManager));
 		overlayManager.add(toastOverlay);
 		overlayManager.add(boxOverlay);
 		keyManager.registerKeyListener(dismissKey);

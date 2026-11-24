@@ -21,6 +21,12 @@ final class BoxIcons
 
 		/** The item's inventory image, or null while it loads. */
 		BufferedImage item(int id);
+
+		/** The game's own picture for a glyph (the quest tab icon for a quest), or null; the letter badge is the last resort. */
+		default BufferedImage glyph(BoxText.Glyph glyph)
+		{
+			return null;
+		}
 	}
 
 	private static final Color GREY = new Color(0x9A, 0x9A, 0xA2);
@@ -49,10 +55,20 @@ final class BoxIcons
 		};
 	}
 
+	/** The picture to draw: the skill's, else the item's, else the game's picture for the glyph; null for none. */
+	static BufferedImage picture(BoxText.Icon icon, Source source)
+	{
+		if (icon.skill != null)
+		{
+			return source.skill(icon.skill);
+		}
+		BufferedImage image = icon.itemId >= 0 ? source.item(icon.itemId) : null;
+		return image == null && icon.glyph != null ? source.glyph(icon.glyph) : image;
+	}
+
 	static void draw(Graphics2D g, BoxText.Icon icon, Source source, int x, int y, int size)
 	{
-		BufferedImage image = icon.skill != null ? source.skill(icon.skill)
-			: icon.glyph == null ? source.item(icon.itemId) : null;
+		BufferedImage image = picture(icon, source);
 		Object old = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		if (image != null)
