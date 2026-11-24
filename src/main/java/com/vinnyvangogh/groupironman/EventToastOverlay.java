@@ -30,6 +30,8 @@ final class EventToastOverlay extends OverlayPanel
 	private final Client client;
 	/** Height drawn last frame: "Above player" grows upward from the head, so it needs it before drawing. */
 	private int lastHeight;
+	/** Where "Above player" drew last, in canvas pixels: kept while the head is off screen. */
+	private Point lastPlaced;
 
 	EventToastOverlay(ToastQueue toasts, GroupIronmanConfig config, ItemLookup lookup,
 		Supplier<EasterEggs.Settings> eggs, Client client)
@@ -74,11 +76,14 @@ final class EventToastOverlay extends OverlayPanel
 		}
 		if (config.overlayPosition() == ToastPosition.ABOVE_PLAYER)
 		{
-			panelComponent.setPreferredLocation(BannerAnchor.place(headPoint(graphics),
-				client.getCanvasWidth(), client.getCanvasHeight(), OverlayStyle.BANNER_WIDTH, lastHeight));
+			// Placed in canvas pixels, then moved into the space this graphics draws in (see BannerAnchor).
+			lastPlaced = BannerAnchor.place(headPoint(graphics), lastPlaced, client.getCanvasWidth(),
+				client.getCanvasHeight(), OverlayStyle.BANNER_WIDTH, lastHeight);
+			panelComponent.setPreferredLocation(BannerAnchor.toGraphics(lastPlaced, graphics.getTransform()));
 		}
 		else
 		{
+			lastPlaced = null;
 			panelComponent.setPreferredLocation(new Point());
 		}
 		Dimension drawn = super.render(graphics);
