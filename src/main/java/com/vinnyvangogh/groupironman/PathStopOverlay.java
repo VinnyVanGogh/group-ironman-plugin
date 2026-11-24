@@ -4,6 +4,9 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.util.List;
 import java.util.function.Supplier;
+import net.runelite.api.MenuAction;
+import net.runelite.client.events.OverlayMenuClicked;
+import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LayoutableRenderableEntity;
@@ -19,6 +22,9 @@ final class PathStopOverlay extends OverlayPanel
 {
 	/** Lines shown at most; the rest are counted. */
 	static final int MOST_ENTRIES = 6;
+	/** The card's right-click entry and its target text. */
+	static final String STOP = "Stop path";
+	static final String TARGET = "Path to";
 
 	private final GroupIronmanConfig config;
 	private final Supplier<PathStopPlan> plan;
@@ -29,6 +35,14 @@ final class PathStopOverlay extends OverlayPanel
 		this.plan = plan;
 		setPosition(OverlayPosition.TOP_LEFT);
 		OverlayStyle.frame(panelComponent, OverlayStyle.WIDTH);
+		// The plugin's own UI only: RUNELITE_OVERLAY sends nothing to the game.
+		getMenuEntries().add(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY, STOP, TARGET));
+	}
+
+	/** True when {@code click} is this card's "Stop path": the same stop as the Shopping tab's button. */
+	boolean stops(OverlayMenuClicked click)
+	{
+		return click.getOverlay() == this && click.getEntry() != null && STOP.equals(click.getEntry().getOption());
 	}
 
 	@Override
