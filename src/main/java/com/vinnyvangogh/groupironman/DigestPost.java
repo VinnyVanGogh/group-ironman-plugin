@@ -17,7 +17,7 @@ import java.util.Set;
 
 /**
  * The daily digest as Discord posts: one embed per section (Storage, Progress, Group, ...) in the live posts' colours,
- * each member's lines as a field, the section's notable item (or skill) as its thumbnail and its totals as its
+ * each member's lines as a field, the section's most valuable item as its thumbnail and its totals as its
  * description (Board 2026-11-20: "the digest posts should probably look better too"). Pure: no network, no clock.
  *
  * <p>A member's storage moves are netted over the day, so taking 799,999 coins and putting them back reads as one
@@ -38,8 +38,6 @@ final class DigestPost
 	static final int CONTENT = 2_000;
 	/** Most items one line names; the rest read "+N more", beside the whole list's total. */
 	static final int LISTED = 25;
-	/** The OSRS Wiki's skill icons, e.g. {@code Magic_icon.png}: Discord loads them, never this client. */
-	private static final String SKILL_ICON = "https://oldschool.runescape.wiki/images/%s_icon.png";
 	private static final String ITEM_ICON = DiscordWebhook.ICON;
 	private static final String CONTINUED = " (cont.)";
 	private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("MMM d, HH:mm", Locale.ENGLISH);
@@ -292,15 +290,13 @@ final class DigestPost
 
 	/**
 	 * Level-ups grouped per member and skill, from the level before the first to the last ("Magic 58 → 62 (+4)"),
-	 * in the order each skill first levelled; every other progress line as it was. The skill that gained the most
-	 * is the thumbnail.
+	 * in the order each skill first levelled; every other progress line as it was. No thumbnail: skill icons live
+	 * on a host other than RuneLite's, which a Hub plugin may not link without a warning.
 	 */
 	static Section progress(List<Digest.Entry> entries)
 	{
 		Section s = new Section(GroupEvent.Category.PROGRESS);
 		long gained = 0;
-		long bestGain = 0;
-		String bestSkill = null;
 		for (Map.Entry<String, List<Digest.Entry>> m : byMember(entries).entrySet())
 		{
 			Map<String, long[]> skills = new LinkedHashMap<>();
@@ -334,11 +330,6 @@ final class DigestPost
 				long gain = to - from;
 				gained += gain;
 				lines.add(k.getKey() + " " + from + " → " + to + (gain > 1 ? " (+" + gain + ")" : ""));
-				if (gain > bestGain)
-				{
-					bestGain = gain;
-					bestSkill = k.getKey();
-				}
 			}
 			lines.addAll(others);
 			if (!lines.isEmpty())
@@ -349,10 +340,6 @@ final class DigestPost
 		if (gained > 0)
 		{
 			s.summary = gained + (gained == 1 ? " level" : " levels") + " gained";
-		}
-		if (bestSkill != null)
-		{
-			s.thumbnail = String.format(SKILL_ICON, bestSkill.trim().replace(' ', '_'));
 		}
 		return s;
 	}

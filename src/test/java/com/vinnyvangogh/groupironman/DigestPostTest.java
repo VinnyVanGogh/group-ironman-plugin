@@ -136,7 +136,7 @@ public class DigestPostTest
 		assertEquals(Arrays.asList("Magic 61 → 63 (+2)", "Prayer 3 → 7 (+4)"), p.members.get("GroupPNK"));
 		assertEquals(Arrays.asList("Attack 40 → 41", "Completed Cook's Assistant"), p.members.get("Bob"));
 		assertEquals("7 levels gained", p.summary);
-		assertEquals("https://oldschool.runescape.wiki/images/Prayer_icon.png", p.thumbnail);
+		assertEquals("no third-party host", null, p.thumbnail);
 	}
 
 	private static Digest.Entry level(String member, String skill, long level, long previous)
