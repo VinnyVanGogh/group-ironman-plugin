@@ -114,10 +114,13 @@ public class PosterNamesTest
 	@Test
 	public void theDigestUsesThePosterName()
 	{
-		List<String> lines = Collections.singletonList("Alex: took 1 x Abyssal whip");
-		JsonObject own = parse(DiscordWebhook.digest(gson, GroupEvent.Category.STORAGE, lines, null));
+		DigestPost.Section s = new DigestPost.Section(GroupEvent.Category.STORAGE);
+		s.members.put("Alex", Collections.singletonList("Took out 1 x Abyssal whip"));
+		List<DigestPost.Section> sections = Collections.singletonList(s);
+		JsonObject own = parse(DigestPost.payloads(gson, sections, DiscordStyle.EMBED, null, "f", 1L).get(0));
 		assertFalse(own.has("username"));
-		JsonObject named = parse(DiscordWebhook.digest(gson, GroupEvent.Category.STORAGE, lines, "Varrock Herald"));
+		JsonObject named = parse(DigestPost.payloads(gson, sections, DiscordStyle.EMBED, "Varrock Herald", "f", 1L)
+			.get(0));
 		assertEquals("Varrock Herald", named.get("username").getAsString());
 	}
 

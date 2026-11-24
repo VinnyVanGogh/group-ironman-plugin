@@ -5,7 +5,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -30,9 +29,9 @@ final class DiscordWebhook
 	static final String SCREENSHOT = "screenshot.png";
 	/** The second picture of a drop's post: the inventory once it was picked up. */
 	static final String PICKUP = "pickup.png";
-	/** Discord refuses {@code content} over 2,000 characters; lines past this wait out the day and are dropped. */
+	/** Discord refuses {@code content} over 2,000 characters; a plain grouped message stops short of it. */
 	static final int MAX_DIGEST = 1_900;
-	private static final String ICON = "https://static.runelite.net/cache/item/icon/%d.png";
+	static final String ICON = "https://static.runelite.net/cache/item/icon/%d.png";
 	/** discord.com (and the old discordapp.com, and the ptb/canary clients' hosts), /api/webhooks/id/token. */
 	private static final Pattern URL = Pattern.compile(
 		"^https://(?:(?:ptb|canary)\\.)?discord(?:app)?\\.com/api/webhooks/\\d+/[A-Za-z0-9_-]+/?$");
@@ -76,37 +75,6 @@ final class DiscordWebhook
 		}
 		allowed.add("parse", parse);
 		o.add("allowed_mentions", allowed);
-	}
-
-	/** {@link #digest(Gson, GroupEvent.Category, List, String)} under today's name, "GIM Utilities". */
-	static String digest(Gson gson, GroupEvent.Category category, List<String> lines)
-	{
-		return digest(gson, category, lines, USERNAME);
-	}
-
-	/**
-	 * One day's held lines for a category as a plain post; null when there are none. Mentions nobody.
-	 * {@code username} null sends none, so the webhook's own name shows ({@link PosterNames}).
-	 */
-	static String digest(Gson gson, GroupEvent.Category category, List<String> lines, String username)
-	{
-		if (lines.isEmpty())
-		{
-			return null;
-		}
-		StringBuilder text = new StringBuilder("Daily digest, ").append(category.name().toLowerCase(Locale.ROOT));
-		for (String line : lines)
-		{
-			if (text.length() + line.length() + 1 > MAX_DIGEST)
-			{
-				break;
-			}
-			text.append('\n').append(line);
-		}
-		JsonObject o = poster(username);
-		o.addProperty("content", text.toString());
-		allowMentions(o, false);
-		return gson.toJson(o);
 	}
 
 	/** One event's post text; see {@link #words(DiscordMerge.Post, String)}. */
@@ -402,7 +370,7 @@ final class DiscordWebhook
 	}
 
 	/** A post's body, with the {@code username} key only when there is a name to send. */
-	private static JsonObject poster(String username)
+	static JsonObject poster(String username)
 	{
 		JsonObject o = new JsonObject();
 		if (username != null)
