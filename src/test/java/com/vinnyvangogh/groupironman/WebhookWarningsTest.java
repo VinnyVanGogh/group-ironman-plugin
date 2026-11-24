@@ -64,6 +64,24 @@ public class WebhookWarningsTest
 	}
 
 	@Test
+	public void theGroupKeyInAWebhookBoxIsNamedAndNeverShown()
+	{
+		String key = "0123456789abcdef0123456789abcdef";
+		Map<String, String> fields = new LinkedHashMap<>();
+		fields.put("main", " " + key.toUpperCase() + " ");
+		fields.put("drops", GroupKey.shareLine(key));
+		List<String> lines = new WebhookWarnings().check(fields);
+		assertEquals(2, lines.size());
+		assertEquals(WebhookWarnings.groupKeyMessage("main"), lines.get(0));
+		assertTrue(lines.get(0).contains("looks like the group key, not a webhook"));
+		assertEquals(WebhookWarnings.groupKeyMessage("drops"), lines.get(1));
+		for (String line : lines)
+		{
+			assertFalse(line.toLowerCase().contains(key));
+		}
+	}
+
+	@Test
 	public void quotedGoodUrlsAndBlankFieldsNeverWarn()
 	{
 		Map<String, String> fields = new LinkedHashMap<>();

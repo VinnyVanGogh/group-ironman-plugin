@@ -318,4 +318,126 @@ public class SharedWebhooksTest
 		assertTrue("survives the round trip with its signature", back.verify());
 		assertEquals(7, back.settings.size());
 	}
+
+	// ---- RUNELITE-512: shared webhooks not reaching members ----
+
+	@Test
+	public void theLeadersSavedWebhooksReachEveryOtherMember()
+	{
+		Client[] c = sharing();
+		for (int i = 1; i < c.length; i++)
+		{
+			Client m = c[i];
+			Webhooks merged = none().withGroup(m.shared());
+			assertEquals(m.name, MAIN, merged.url(Webhook.MAIN));
+			assertEquals(m.name, PROGRESS, merged.url(Webhook.PROGRESS));
+			assertEquals(m.name, ONLINE, merged.url(Webhook.ONLINE));
+			assertEquals(m.name + ": an empty category lands on Main", MAIN, merged.url(Webhook.DROPS));
+		}
+	}
+
+	@Test
+	public void aMemberWhoIsNotTheLeaderIsToldOnlyTheLeaderShares()
+	{
+		Client kim = group()[2];
+		assertFalse(kim.sync.shareWebhooks("Kim", true, leaderHooks(), NOW + 2));
+		List<String> lines = SettingsModel.webhookLines(GroupGovernance.Role.MEMBER, null);
+		assertEquals(1, lines.size());
+		assertTrue(lines.get(0), lines.get(0).startsWith("Only the leader can share webhooks"));
+	}
+
+	@Test
+	public void junkInAMembersWebhookBoxNeverBlocksTheGroups()
+	{
+		Client kim = sharing()[2];
+		String groupKey = "0123456789abcdef0123456789abcdef";
+		Map<Webhook, Webhooks.Setting> mine = new EnumMap<>(Webhook.class);
+		mine.put(Webhook.MAIN, new Webhooks.Setting(groupKey, DiscordPosterName.WEBHOOK, ""));
+		mine.put(Webhook.PROGRESS, new Webhooks.Setting("https://discord.com/api/webhooks/", DiscordPosterName.WEBHOOK,
+			""));
+		mine.put(Webhook.DROPS, new Webhooks.Setting(OWN_DROPS, DiscordPosterName.WEBHOOK, ""));
+		Webhooks merged = new Webhooks(mine).withGroup(kim.shared());
+		assertEquals("the group key in Main: the group's Main is used", MAIN, merged.url(Webhook.MAIN));
+		assertTrue(merged.fromGroup(Webhook.MAIN));
+		assertEquals("a half-pasted link: the group's", PROGRESS, merged.url(Webhook.PROGRESS));
+		assertEquals("with the leader's poster name", "Leader's Levels", merged.name(Webhook.PROGRESS));
+		assertEquals("a valid own webhook still wins", OWN_DROPS, merged.url(Webhook.DROPS));
+	}
+
+	@Test
+	public void anOldFormatDocumentIsStillAccepted()
+	{
+		Client[] c = group();
+		Client alex = c[0];
+		Client kim = c[2];
+		assertTrue(alex.sync.shareWebhooks("Alex", true, leaderHooks(), NOW + 2));
+		String payload = GovernanceCodec.encode(gson, alex.sync.governance().webhooks());
+		assertFalse("this build sends no signed-form number: older builds read it as before", payload.contains("\"cv\""));
+		kim.sync.receive("Alex", payload);
+		assertNotNull(kim.shared());
+		assertEquals(MAIN, kim.shared().settings.get(Webhook.MAIN).url);
+	}
+
+	/** Alex's document as a newer build would sign it: an eighth webhook and a poster-name choice this build lacks. */
+	private String fromNewerBuild(Client alex)
+	{
+		GroupSigner.Identity id = GroupSigner.Identity.load(alex.config.get(GovernanceSync.KEY_IDENTITY));
+		List<String[]> entries = new java.util.ArrayList<>();
+		entries.add(new String[]{"MAIN", MAIN, "SOME_NEW_CHOICE", "Crier"});
+		entries.add(new String[]{"PROGRESS", PROGRESS, "CUSTOM", "Leader's Levels"});
+		entries.add(new String[]{"RAIDS", "https://discord.com/api/webhooks/999/" + TOKEN + "raids", "WEBHOOK", ""});
+		Map<Webhook, Webhooks.Setting> known = new EnumMap<>(Webhook.class);
+		long version = NOW + 10;
+		GroupWebhooks unsigned = new GroupWebhooks(GroupMembers.key(GROUP), version, version, "Alex", id.publicKey(),
+			true, known, "", entries);
+		GroupWebhooks signed = new GroupWebhooks(GroupMembers.key(GROUP), version, version, "Alex", id.publicKey(),
+			true, known, id.sign(unsigned.canonical()), entries);
+		return GovernanceCodec.encode(gson, signed);
+	}
+
+	@Test
+	public void aNewerLeadersExtraWebhooksCostOnlyThoseEntries()
+	{
+		Client[] c = group();
+		Client alex = c[0];
+		Client kim = c[2];
+		kim.sync.receive("Alex", fromNewerBuild(alex));
+		GroupWebhooks got = kim.shared();
+		assertNotNull("the signature still checks with entries this build does not know", got);
+		assertEquals(MAIN, got.settings.get(Webhook.MAIN).url);
+		assertEquals("an unknown choice falls back to the webhook's own name", DiscordPosterName.WEBHOOK,
+			got.settings.get(Webhook.MAIN).mode);
+		assertEquals(PROGRESS, got.settings.get(Webhook.PROGRESS).url);
+		assertEquals("the unknown webhook is not used", 2, got.settings.size());
+
+		kim.start();
+		assertNotNull("and survives a restart through the group cache", kim.shared());
+		assertEquals(PROGRESS, none().withGroup(kim.shared()).url(Webhook.PROGRESS));
+		// Relayed on as received, so a third member on this build accepts it too.
+		Client sam = c[1];
+		kim.sync.resendAll();
+		kim.tick(sam);
+		assertNotNull(sam.shared());
+	}
+
+	@Test
+	public void aNewerSignedFormSaysUpdateInsteadOfNothing()
+	{
+		Client[] c = group();
+		Client alex = c[0];
+		Client kim = c[2];
+		assertTrue(alex.sync.shareWebhooks("Alex", true, leaderHooks(), NOW + 2));
+		com.google.gson.JsonObject o = gson.fromJson(GovernanceCodec.encode(gson, alex.sync.governance().webhooks()),
+			com.google.gson.JsonObject.class);
+		o.addProperty("cv", GroupWebhooks.FORMAT + 1);
+		kim.sync.receive("Alex", gson.toJson(o));
+		assertNull(kim.shared());
+		assertTrue(kim.sync.governance().webhooksNeedUpdate());
+		List<String> lines = SettingsModel.webhookLines(GroupGovernance.Role.MEMBER, null, true);
+		assertTrue(lines.toString(), lines.get(0).contains("update to get shared webhooks"));
+
+		alex.tick(kim);
+		assertNotNull("a document this build reads clears it", kim.shared());
+		assertFalse(kim.sync.governance().webhooksNeedUpdate());
+	}
 }

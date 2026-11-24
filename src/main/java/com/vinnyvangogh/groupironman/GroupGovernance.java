@@ -49,6 +49,8 @@ final class GroupGovernance
 	private GroupSettings pendingSettings;
 	private GroupWebhooks webhooks;
 	private GroupWebhooks pendingWebhooks;
+	/** Set when the party carried webhooks in a newer signed form; cleared by any accepted document. */
+	private boolean newerWebhooks;
 	/** Name key to the public key in that member's latest announce. */
 	private final Map<String, String> keys = new LinkedHashMap<>();
 	/** Display name to the opt-outs in that member's latest announce. */
@@ -350,7 +352,20 @@ final class GroupGovernance
 			return Verdict.STALE;
 		}
 		webhooks = incoming;
+		newerWebhooks = false;
 		return Verdict.ACCEPTED;
+	}
+
+	/** The party carried webhooks signed in a form newer than this build reads. */
+	synchronized void newerWebhooks()
+	{
+		newerWebhooks = true;
+	}
+
+	/** True when the group shares webhooks this build cannot read: "update to get shared webhooks". */
+	synchronized boolean webhooksNeedUpdate()
+	{
+		return newerWebhooks && sharedWebhooks() == null;
 	}
 
 	/** Whatever was waiting on a key or on the roles, tried again. */

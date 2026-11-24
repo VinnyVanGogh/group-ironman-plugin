@@ -119,7 +119,21 @@ final class SettingsModel
 	 */
 	static List<String> webhookLines(GroupGovernance.Role mine, String by)
 	{
+		return webhookLines(mine, by, false);
+	}
+
+	/**
+	 * As {@link #webhookLines(GroupGovernance.Role, String)}; {@code needUpdate} when the leader shares webhooks in
+	 * a form this build cannot read. A member whose group shares none is told only the leader can share, so pasting
+	 * webhooks and saving is not mistaken for sharing them.
+	 */
+	static List<String> webhookLines(GroupGovernance.Role mine, String by, boolean needUpdate)
+	{
 		List<String> out = new ArrayList<>();
+		if (needUpdate && by == null)
+		{
+			out.add("Your leader shares webhooks from a newer GIM Utilities: update to get shared webhooks.");
+		}
 		if (mine == GroupGovernance.Role.LEADER)
 		{
 			out.add(by == null ? "Your webhooks are yours alone. Share them and members only tick 'Post to Discord'."
@@ -130,6 +144,11 @@ final class SettingsModel
 		{
 			out.add("Using the group's webhooks (set by " + by + ").");
 			out.add("A webhook you paste yourself wins for its category. Tick 'Post to Discord' to post.");
+		}
+		else if (!needUpdate)
+		{
+			out.add("Only the leader can share webhooks with the group, from their Settings tab. Webhooks you paste"
+				+ " post your own events only.");
 		}
 		return out;
 	}

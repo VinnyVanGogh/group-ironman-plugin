@@ -1,7 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -21,6 +23,11 @@ final class GroupWebhooks
 {
 	/** Longer than any Discord webhook link; a longer field is dropped as not one. */
 	static final int MAX_URL = 300;
+	/**
+	 * The signed form this build reads and writes. A build that changes it must send its number as {@code cv}, so
+	 * this one can say "update to get shared webhooks" ({@link GovernanceCodec}) instead of refusing in silence.
+	 */
+	static final int FORMAT = 1;
 
 	final String group;
 	final long version;
@@ -31,10 +38,24 @@ final class GroupWebhooks
 	/** Empty when not {@link #shared}; otherwise all seven, each URL a Discord webhook link or empty. */
 	final Map<Webhook, Webhooks.Setting> settings;
 	final String signature;
+	/**
+	 * Each webhook entry as the leader signed it, in the order it arrived; null for a document made here. A newer
+	 * build may share a webhook or a poster-name choice this one does not know: it is left out of {@link #settings}
+	 * but kept here, so the signature still checks and the webhooks this build knows still reach the member.
+	 */
+	private final List<String[]> signedEntries;
 
 	GroupWebhooks(String group, long version, long at, String by, String byKey, boolean shared,
 		Map<Webhook, Webhooks.Setting> settings, String signature)
 	{
+		this(group, version, at, by, byKey, shared, settings, signature, null);
+	}
+
+	/** As read from the party or the cache: {@code signedEntries} is every entry as sent ({@link #entries}). */
+	GroupWebhooks(String group, long version, long at, String by, String byKey, boolean shared,
+		Map<Webhook, Webhooks.Setting> settings, String signature, List<String[]> signedEntries)
+	{
+		this.signedEntries = signedEntries == null ? null : Collections.unmodifiableList(new ArrayList<>(signedEntries));
 		this.group = group;
 		this.version = version;
 		this.at = at;
@@ -105,15 +126,33 @@ final class GroupWebhooks
 		return true;
 	}
 
-	String canonical()
+	/**
+	 * Every webhook entry as it travels and is signed, in order: {webhook, URL, poster-name choice, Custom name}.
+	 * As received when read from the party or the cache, so a newer build's entries go back out unchanged.
+	 */
+	List<String[]> entries()
 	{
-		StringBuilder hooks = new StringBuilder();
+		if (signedEntries != null)
+		{
+			return signedEntries;
+		}
+		List<String[]> out = new ArrayList<>();
 		for (Map.Entry<Webhook, Webhooks.Setting> e : settings.entrySet())
 		{
 			Webhooks.Setting s = e.getValue();
-			hooks.append(GroupSigner.canonical(e.getKey().name(), s.url, s.mode.name(), s.name));
+			out.add(new String[]{e.getKey().name(), s.url, s.mode.name(), s.name});
 		}
-		return GroupSigner.canonical("gimu-webhooks", 1, group, version, at, by, byKey, shared ? 1 : 0, hooks);
+		return out;
+	}
+
+	String canonical()
+	{
+		StringBuilder hooks = new StringBuilder();
+		for (String[] e : entries())
+		{
+			hooks.append(GroupSigner.canonical(e[0], e[1], e[2], e[3]));
+		}
+		return GroupSigner.canonical("gimu-webhooks", FORMAT, group, version, at, by, byKey, shared ? 1 : 0, hooks);
 	}
 
 	/** Signed by the key it names; whether that key is the leader's is {@link GroupGovernance}'s check. */
