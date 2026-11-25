@@ -931,8 +931,15 @@ class GroupEventEngine
 	{
 		group.resolveItems(change.took().keySet());
 		group.resolveItems(change.deposited().keySet());
+		// A member's visit that arrives late (a reconnect, a queued resend) is history: the Log only (RUNELITE-510).
+		boolean late = !own && EventBackfill.late(change.at(), System.currentTimeMillis());
 		for (GroupEvent e : EventDetect.storage(change, group.lookup))
 		{
+			if (late)
+			{
+				router.backfill(e, settings, group.lookup);
+				continue;
+			}
 			router.route(e, own, settings, group.lookup);
 			if (own && e.type == GroupEvent.Type.STORAGE_SUMMARY)
 			{
