@@ -910,6 +910,14 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "digestHideRoundTrips", name = "Hide storage round trips",
+		description = "Leave out items taken from group storage and put back the same day.", section = digestSection,
+		position = 7)
+	default boolean digestHideRoundTrips()
+	{
+		return false;
+	}
+
 	// ---- 6. In-game: banners, group box, map, ::find, then which events show as a banner ----
 
 	@ConfigItem(keyName = "overlayDurationSeconds", name = "Banner time (seconds)", description = "How long a"

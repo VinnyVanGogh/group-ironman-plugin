@@ -123,21 +123,39 @@ final class RequestBoard
 
 	// ---- Discord ----
 
-	/** The owner made a request: "made a request, 'Fire cape': 500 Shark, 20 Prayer potion(4)". */
+	/**
+	 * The owner made a request: "made a request, 'Fire cape': 500 Shark, 20 Prayer potion(4)". The line names whole
+	 * items only, as many as fit the event's text ("and 2 more" for the rest), so it is never cut mid-word; the full
+	 * list rides in {@link GroupEvent#items} for the daily digest.
+	 */
 	static GroupEvent made(RequestList r, IntFunction<String> names, long now)
 	{
 		List<String> parts = new ArrayList<>();
 		for (Map.Entry<Integer, Integer> e : r.items.entrySet())
 		{
-			if (parts.size() < NAMED)
+			if (parts.size() >= NAMED)
 			{
-				parts.add(Amounts.GAME.of(e.getValue()) + " " + names.apply(e.getKey()));
+				break;
+			}
+			parts.add(Amounts.GAME.of(e.getValue()) + " " + names.apply(e.getKey()));
+		}
+		return GroupEvent.of(GroupEvent.Type.REQUEST, now, r.owner).text(r.name).detail(fitted(parts, r.items.size()))
+			.number(KIND_MADE).items(r.items).build();
+	}
+
+	/** The most of {@code parts} that fit {@link GroupEvent#MAX_TEXT}, whole, with how many more there are. */
+	static String fitted(List<String> parts, int total)
+	{
+		for (int n = parts.size(); n > 0; n--)
+		{
+			int rest = total - n;
+			String text = String.join(", ", parts.subList(0, n)) + (rest > 0 ? " and " + rest + " more" : "");
+			if (text.length() <= GroupEvent.MAX_TEXT)
+			{
+				return text;
 			}
 		}
-		int rest = r.items.size() - parts.size();
-		String items = String.join(", ", parts) + (rest > 0 ? " and " + rest + " more" : "");
-		return GroupEvent.of(GroupEvent.Type.REQUEST, now, r.owner).text(r.name).detail(items).number(KIND_MADE)
-			.build();
+		return total <= 0 ? "" : total == 1 ? "1 item" : total + " items";
 	}
 
 	/** A member claimed an item: "will get Shark for Alice's 'Fire cape'". */

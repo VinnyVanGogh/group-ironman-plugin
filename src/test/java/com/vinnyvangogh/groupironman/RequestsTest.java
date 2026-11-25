@@ -447,4 +447,18 @@ public class RequestsTest
 		assertEquals("Alice", done.member);
 		assertEquals("'Fire cape' is done: the group has it all", EventText.describe(done, null));
 	}
+
+	@Test
+	public void aRequestsLineNamesWholeItemsAndCarriesThemAll()
+	{
+		RequestList r = RequestList.create("Fire cape", fireCape(), "Alice", 1000);
+		GroupEvent made = RequestBoard.made(r, id -> id == SHARK ? "Thammaron's sceptre (uncharged)"
+			: "Prayer potion(4) with a name far too long to fit", 1000);
+		// Before, the 64-character event text cut it as "Thammaron's scept".
+		assertEquals("500 Thammaron's sceptre (uncharged) and 1 more", made.detail);
+		assertEquals(fireCape(), made.items);
+		assertEquals("2 items", RequestBoard.fitted(Collections.singletonList(
+			"1 An item name that alone is longer than the whole sixty-four character line"), 2));
+		assertEquals("", RequestBoard.fitted(Collections.emptyList(), 0));
+	}
 }

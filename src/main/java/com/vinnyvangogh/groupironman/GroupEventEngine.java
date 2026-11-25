@@ -9,6 +9,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1716,7 +1717,7 @@ class GroupEventEngine
 			long lastDigest = savedTime(DIGEST_LAST_KEY, now);
 			if (Digest.dailyDue(lastDigest, now, hour, zone))
 			{
-				flushDigest();
+				flushDigest(lastDigest, now, hour, zone);
 				saveProfile(DIGEST_LAST_KEY, Long.toString(now));
 			}
 		}
@@ -1754,17 +1755,28 @@ class GroupEventEngine
 		return 0;
 	}
 
-	private void flushDigest()
+	/**
+	 * The day's digest as one embed per section ({@link DigestPost}), split over as many posts as Discord's limits
+	 * need, to the Daily digest webhook (Main when empty) under its poster name.
+	 */
+	private void flushDigest(long from, long now, int hour, ZoneId zone)
 	{
-		// Every digest goes to the Daily digest webhook (Main when empty), under its poster name.
 		String url = webhookFor(Webhook.DIGEST);
-		// Draining first would lose the day's lines when the webhook has been cleared.
-		if (url != null)
+		GroupService g = group;
+		// Draining first would lose the day's lines when the webhook has been cleared, or with no item names yet.
+		if (url != null && g != null)
 		{
-			String name = posterName(Webhook.DIGEST);
+			Map<GroupEvent.Category, List<Digest.Entry>> held = new EnumMap<>(GroupEvent.Category.class);
 			for (GroupEvent.Category category : settings.digest)
 			{
-				sender.post(url, DiscordWebhook.digest(gson, category, digest.drain(category), name), null);
+				held.put(category, digest.drain(category));
+			}
+			List<DigestPost.Section> sections = DigestPost.sections(held, g.lookup, config.digestHideRoundTrips());
+			String footer = DigestPost.footer(from, now, Digest.nextDaily(now, hour, zone), zone);
+			for (String json : DigestPost.payloads(gson, sections, config.discordStyle(), posterName(Webhook.DIGEST),
+				footer, now))
+			{
+				sender.post(url, json, null);
 			}
 		}
 		saveProfile(DIGEST_KEY, digest.save());
@@ -1956,14 +1968,19 @@ class GroupEventEngine
 		{
 			return;
 		}
-		// A Discord line: "450K (450,001)", as the webhook's own posts read. A 0 gp death has no value
-		// line, so without an egg there is nothing left to say ("lost about 0 gp" is never listed).
-		String words = DiscordWebhook.words(event, discordWords(), egg(Collections.singletonList(event)));
+		GroupService g = group;
+		if (g == null)
+		{
+			return;
+		}
+		// A compact line, "450K": the digest sums a whole day. A 0 gp death has no value line, so without an egg
+		// there is nothing left to say ("lost about 0 gp" is never listed).
+		String words = DiscordWebhook.words(event, Amounts.GAME.words(g.lookup), egg(Collections.singletonList(event)));
 		if (words == null)
 		{
 			return;
 		}
-		digest.add(event.type.category, event.member + ": " + words.replace('\n', ' '));
+		digest.add(event, words.replace('\n', ' '));
 		saveProfile(DIGEST_KEY, digest.save());
 	}
 
