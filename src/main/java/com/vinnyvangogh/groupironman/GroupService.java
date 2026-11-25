@@ -234,6 +234,8 @@ class GroupService
 	private int ticksSinceSeal;
 
 	private volatile LowStock lowStock = LowStock.parse("");
+	/** The rules text {@link #lowStock} was parsed from; null before the first config load. */
+	private String lowStockText;
 	private volatile GroupMembers members = GroupMembers.UNKNOWN;
 	private volatile GamePresence presence = GamePresence.UNKNOWN;
 	/**
@@ -828,7 +830,13 @@ class GroupService
 			// Turning sync off is the player's own action: leave our party, never someone else's.
 			sync.leaveOwn();
 		}
-		lowStock = LowStock.parse(config.groupLowStock());
+		String lowStockText = config.groupLowStock();
+		if (!Objects.equals(lowStockText, this.lowStockText))
+		{
+			// Only a rules edit starts a new baseline; any other setting keeps what has already alerted.
+			this.lowStockText = lowStockText;
+			lowStock = LowStock.parse(lowStockText);
+		}
 		String key = GroupKey.normalize(config.groupKey());
 		if (keySeen != null && !keySeen.equals(key) && !key.isEmpty())
 		{
@@ -1814,7 +1822,11 @@ class GroupService
 				if (roster.putStorage(change))
 				{
 					resolve(ItemCounts.ids(change.after(), change.took(), change.deposited()));
-					checkLowStock(change.after());
+					// A late or out-of-order visit is history: it must not alert on a stale snapshot (RUNELITE-510).
+					if (!EventBackfill.late(change.at(), now) && roster.storageAt() == change.at())
+					{
+						checkLowStock(change.after());
+					}
 					memberStorage(change);
 					saveCache();
 				}
@@ -1949,7 +1961,8 @@ class GroupService
 			{
 				continue;
 			}
-			EventBackfill.Arrival arrival = EventBackfill.classify(roster.feed(), mine, now);
+			// A message carrying several events is catch-up, never something happening now (RUNELITE-510).
+			EventBackfill.Arrival arrival = EventBackfill.classify(roster.feed(), mine, now, received.size());
 			if (arrival == EventBackfill.Arrival.DUPLICATE)
 			{
 				continue;
@@ -1958,7 +1971,7 @@ class GroupService
 			added |= logged;
 			if (engine != null)
 			{
-				// Earlier events a member uploaded on joining the sync reach the Log only, never a toast.
+				// Earlier events a member uploaded on joining the sync, or any catch-up batch, reach the Log only.
 				if (arrival == EventBackfill.Arrival.BACKFILL)
 				{
 					engine.backfill(mine);
@@ -2297,7 +2310,9 @@ class GroupService
 		}
 		resolveNow(storage.keySet());
 		GroupEventEngine engine = events;
-		for (LowStock.Alert alert : lowStock.check(storage, lookup))
+		// A member's first state after a restart or reconnect is a baseline, not an alert for every short item.
+		LowStock rules = lowStock;
+		for (LowStock.Alert alert : own ? rules.check(storage, lookup) : rules.checkMember(storage, lookup))
 		{
 			notifier.notify(GroupIronmanPlugin.NAME + ": " + alert.message());
 			if (engine != null)

@@ -38,11 +38,27 @@ final class EventBackfill
 	/** How a member's event arriving at {@code now} is treated, given the Log {@code feed} already holds. */
 	static Arrival classify(DropLog feed, GroupEvent event, long now)
 	{
+		return classify(feed, event, now, 1);
+	}
+
+	/**
+	 * As {@link #classify(DropLog, GroupEvent, long)}, for an event that came in one message with {@code batch}
+	 * events. A live event is always sent on its own, so a message carrying several is catch-up (joining the sync,
+	 * a reconnect) even when its events are under {@link #LIVE_MS} old: logged, never a banner (RUNELITE-510).
+	 */
+	static Arrival classify(DropLog feed, GroupEvent event, long now, int batch)
+	{
 		if (feed.contains(event))
 		{
 			return Arrival.DUPLICATE;
 		}
-		return now - event.at > LIVE_MS ? Arrival.BACKFILL : Arrival.LIVE;
+		return batch > 1 || late(event.at, now) ? Arrival.BACKFILL : Arrival.LIVE;
+	}
+
+	/** True when something stamped {@code at} is too old on arrival to be happening now. */
+	static boolean late(long at, long now)
+	{
+		return now - at > LIVE_MS;
 	}
 
 	/**
