@@ -66,8 +66,9 @@ public class ToastQueueTest
 		{
 			q.add(sample(GroupEvent.Type.PET), NOW);
 		}
-		assertFalse(q.add(sample(GroupEvent.Type.PET), NOW + ToastQueue.RATE_WINDOW_MS - 1));
-		assertTrue(q.add(sample(GroupEvent.Type.PET), NOW + ToastQueue.RATE_WINDOW_MS));
+		// Independent of RATE_WINDOW_MS: the task asks for a one-minute window.
+		assertFalse(q.add(sample(GroupEvent.Type.PET), NOW + 59_999));
+		assertTrue(q.add(sample(GroupEvent.Type.PET), NOW + 60_000));
 	}
 
 	@Test

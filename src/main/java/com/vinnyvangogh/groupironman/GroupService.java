@@ -234,6 +234,8 @@ class GroupService
 	private int ticksSinceSeal;
 
 	private volatile LowStock lowStock = LowStock.parse("");
+	/** The rules text {@link #lowStock} was parsed from; null before the first config load. */
+	private String lowStockText;
 	private volatile GroupMembers members = GroupMembers.UNKNOWN;
 	private volatile GamePresence presence = GamePresence.UNKNOWN;
 	/**
@@ -828,7 +830,13 @@ class GroupService
 			// Turning sync off is the player's own action: leave our party, never someone else's.
 			sync.leaveOwn();
 		}
-		lowStock = LowStock.parse(config.groupLowStock());
+		String lowStockText = config.groupLowStock();
+		if (!Objects.equals(lowStockText, this.lowStockText))
+		{
+			// Only a rules edit starts a new baseline; any other setting keeps what has already alerted.
+			this.lowStockText = lowStockText;
+			lowStock = LowStock.parse(lowStockText);
+		}
 		String key = GroupKey.normalize(config.groupKey());
 		if (keySeen != null && !keySeen.equals(key) && !key.isEmpty())
 		{
@@ -1814,7 +1822,11 @@ class GroupService
 				if (roster.putStorage(change))
 				{
 					resolve(ItemCounts.ids(change.after(), change.took(), change.deposited()));
-					checkLowStock(change.after());
+					// A late or out-of-order visit is history: it must not alert on a stale snapshot (RUNELITE-510).
+					if (!EventBackfill.late(change.at(), now) && roster.storageAt() == change.at())
+					{
+						checkLowStock(change.after());
+					}
 					memberStorage(change);
 					saveCache();
 				}

@@ -21,7 +21,7 @@ public class EventBackfillTest
 	/** The Log's feed ages entries against the real clock, so these events are made relative to it. */
 	private static final long NOW = System.currentTimeMillis();
 	private static final long HOUR = TimeUnit.HOURS.toMillis(1);
-	private final Gson gson = new Gson();
+	private static final Gson gson = new Gson();
 	private final FakeItems lookup = new FakeItems();
 
 	private static GroupEvent run(GroupEvent.Type type, long at, String member, String text, long number)
@@ -77,7 +77,7 @@ public class EventBackfillTest
 		/** One party message as GroupService.receiveEvents takes it: each event, knowing how many came together. */
 		void message(String payload, long now)
 		{
-			GroupCodec.Decoded d = GroupCodec.decode(new Gson(), payload);
+			GroupCodec.Decoded d = GroupCodec.decode(gson, payload);
 			if (d.kind != GroupCodec.Kind.EVENTS)
 			{
 				// Banks, carried items, storage and extras fill the cards; GroupService never routes them as events.
