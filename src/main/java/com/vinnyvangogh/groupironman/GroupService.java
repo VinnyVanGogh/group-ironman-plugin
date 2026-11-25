@@ -64,7 +64,9 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.PluginMessage;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemEquipmentStats;
@@ -185,6 +187,19 @@ class GroupService
 	/** Log basket, fish barrel and coal bag contents, from the game's own lines. Client thread. */
 	@Inject
 	private CarriedContainers containers;
+
+	@Inject
+	private EventBus eventBus;
+
+	/** The Compare tab's hand-off to Player Compare ({@link PlayerCompare}); the bus is read when a message goes. */
+	private final PlayerCompare compare = new PlayerCompare(m ->
+	{
+		EventBus bus = eventBus;
+		if (bus != null)
+		{
+			bus.post(m);
+		}
+	});
 
 	private final GroupRoster roster = new GroupRoster();
 	private final BankAssembler assembler = new BankAssembler();
@@ -406,10 +421,78 @@ class GroupService
 			presets = ShopPresets.load(gson);
 			loadCache();
 		});
+		// Player Compare answers with ready (heard by onPluginMessage); until then Compare shows the install card.
+		compare.send(PlayerCompare.HELLO, PlayerCompare.hello(UpdateNotes.VERSION));
+	}
+
+	/** True once Player Compare has answered: the Compare tab can open its group view. */
+	boolean compareInstalled()
+	{
+		return compare.installed();
+	}
+
+	/** Compare tab's button: hand Player Compare the group as it is now and ask it to show the group view. */
+	void openCompare()
+	{
+		sendCompareSnapshot();
+		compare.send(PlayerCompare.OPEN, PlayerCompare.open());
+	}
+
+	/** Player Compare's ready or request: it gets the group as it is now. */
+	@Subscribe
+	public void onPluginMessage(PluginMessage message)
+	{
+		if (compare.receive(message))
+		{
+			sendCompareSnapshot();
+			onChange.run();
+		}
+		else if (PlayerCompare.NAMESPACE.equals(message.getNamespace()) && PlayerCompare.BYE.equals(message.getName()))
+		{
+			onChange.run();
+		}
+	}
+
+	private void sendCompareSnapshot()
+	{
+		compare.send(PlayerCompare.SNAPSHOT, compareSnapshot());
+	}
+
+	/** Every member's shared figures for Player Compare: levels (hiscore levels for one who shares none), bests. */
+	Map<String, Object> compareSnapshot()
+	{
+		List<String> names = PlayerCompare.names(members.names(), self);
+		ProgressView view = progressView();
+		Map<String, MemberStats> stats = roster.allStats();
+		Map<String, GroupCodec.Carried> carried = roster.allCarried();
+		Map<String, BankSnapshot> banks = roster.banks();
+		List<PlayerCompare.Member> out = new ArrayList<>();
+		for (String name : names)
+		{
+			Map<String, Integer> levels = new TreeMap<>();
+			MemberStats s = stats.get(name);
+			HiscoreBook.Entry h = roster.hiscores().entry(name);
+			if (s != null)
+			{
+				s.skills().forEach((skill, l) -> levels.put(skill, l.real));
+			}
+			else if (h != null)
+			{
+				levels.putAll(h.levels);
+			}
+			AchievementState a = view.achievements(name);
+			GroupCodec.Carried c = carried.get(name);
+			BankSnapshot bank = banks.get(name);
+			out.add(new PlayerCompare.Member(name, levels, a == null ? -1 : a.questPoints(), view.bests(name).all(),
+				h == null ? null : h.scores, c == null ? null : c.worn, c == null ? null : c.inventory,
+				bank == null ? null : bank.items()));
+		}
+		return PlayerCompare.snapshot(self, out, roster.storageItems());
 	}
 
 	void shutDown()
 	{
+		compare.send(PlayerCompare.BYE, PlayerCompare.bye());
 		if (session)
 		{
 			roster.markPlayed(System.currentTimeMillis());
@@ -2524,18 +2607,6 @@ class GroupService
 			config.groupShareEvents() ? ownAchievements : null);
 	}
 
-	/** What the Compare tab shows. */
-	CompareTab.View compareView(ProgressView view)
-	{
-		List<String> names = new ArrayList<>(members.names());
-		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
-		{
-			names.add(self);
-		}
-		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names,
-			CompareSupport.banked(roster, names), CompareSupport.storageBanked(roster));
-	}
-
 	/** What the Gear tab shows: this player's last shared inventory and worn items, the region, and the group's items. */
 	GearTab.View gearView()
 	{
@@ -2576,26 +2647,6 @@ class GroupService
 			done.accept(ok ? (shopping ? "Added " + itemName + " to your shopping lists."
 				: "Asked the group for " + itemName + ".") : "Not added: log in first, or the list is full.");
 		});
-	}
-
-	/** "Who benefits most" for an item picked from the dropdown; {@code done} runs on the client thread. */
-	void benefit(int itemId, Consumer<BenefitFinder.Outcome> done)
-	{
-		List<String> names = new ArrayList<>(members.names());
-		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
-		{
-			names.add(self);
-		}
-		ItemBenefit.Settings settings = ItemBenefit.Settings.parse(config.compareStats(), config.compareCategories());
-		clientThread.invokeLater(() -> done.accept(BenefitFinder.runId(itemId, CompareSupport.source(itemManager),
-			CompareSupport.members(roster, names), settings)));
-	}
-
-	/** Summed hiscore experience per skill for up to a group's worth of players; null when none were read. */
-	void groupExperience(List<String> names, Consumer<Map<String, Long>> done)
-	{
-		CompareSupport.groupExperience(hiscoreClient,
-			names.size() > CompareTab.MAX_OTHER_NAMES ? names.subList(0, CompareTab.MAX_OTHER_NAMES) : names, done);
 	}
 
 	/** The shared lists, or null when not running. */

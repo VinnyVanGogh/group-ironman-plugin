@@ -71,9 +71,13 @@ import net.runelite.client.ui.components.IconTextField;
 class GroupIronmanPanel extends PluginPanel
 {
 	/** What the buttons in the header, and in the Settings tab, do. */
-	interface Actions extends GroupSettingsTab.Actions, ShoppingTab.Actions, CompareTab.Actions,
-		GearTab.Actions
+	interface Actions extends GroupSettingsTab.Actions, ShoppingTab.Actions, GearTab.Actions
 	{
+		/** Compare tab: hand the group to Player Compare and show its group view. */
+		default void openCompare()
+		{
+		}
+
 		void join();
 
 		void switchParty();
@@ -152,8 +156,8 @@ class GroupIronmanPanel extends PluginPanel
 
 		/** Members' shared boss bests, quests and diaries; set by the plugin, empty until it does. */
 		ProgressView progress = ProgressView.EMPTY;
-		/** The Compare tab's view, or null before the plugin has started. */
-		CompareTab.View compare;
+		/** Player Compare has answered: the Compare tab opens its group view, else it shows the install card. */
+		boolean compareInstalled;
 		/** The Gear tab's view, or null before the plugin has started. */
 		GearTab.View gear;
 	}
@@ -188,7 +192,6 @@ class GroupIronmanPanel extends PluginPanel
 	private final Actions actions;
 	private final GroupSettingsTab settingsTab;
 	private final ShoppingTab shoppingTab;
-	private final CompareTab compareTab;
 	private final GearTab gearTab;
 
 	private final JPanel header = new Column();
@@ -298,7 +301,6 @@ class GroupIronmanPanel extends PluginPanel
 		this.actions = actions;
 		this.settingsTab = new GroupSettingsTab(actions, this::redraw);
 		this.shoppingTab = new ShoppingTab(actions, itemManager, this::redraw);
-		this.compareTab = new CompareTab(actions, skillIcons, this::redraw);
 		this.gearTab = new GearTab(actions, this::redraw);
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
@@ -557,12 +559,15 @@ class GroupIronmanPanel extends PluginPanel
 
 	private void drawCompare(JPanel tab, View v)
 	{
-		if (v.compare == null)
+		// Leaderboard, Players, Banked, Group vs group and Item are drawn by Player Compare's "Group" source.
+		if (!v.compareInstalled)
 		{
-			empty(tab, "Compare is starting.", "Open this tab again in a moment.");
+			empty(tab, "Compare", PlayerCompare.INSTALL_HINT + " (from the Plugin Hub).");
 			return;
 		}
-		compareTab.draw(tab, v.compare);
+		tab.add(heading("Compare"));
+		tab.add(text("Your group's levels, bosses, banked XP and gear open in Player Compare.", MUTED));
+		tab.add(Ui.button("Open group compare", "Show the group in Player Compare's panel", actions::openCompare));
 	}
 
 	private void drawGear(JPanel tab, View v)

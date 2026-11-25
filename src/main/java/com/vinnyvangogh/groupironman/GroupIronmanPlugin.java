@@ -318,15 +318,9 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
-			public void benefit(int itemId, Consumer<BenefitFinder.Outcome> done)
+			public void openCompare()
 			{
-				group.benefit(itemId, done);
-			}
-
-			@Override
-			public void groupExperience(List<String> names, Consumer<Map<String, Long>> done)
-			{
-				group.groupExperience(names, done);
+				group.openCompare();
 			}
 
 			@Override
@@ -620,7 +614,7 @@ public class GroupIronmanPlugin extends Plugin
 			group.lookup, group.switches(), group.regions(), group.since(), group.self(),
 			group.presence(), settingsView(), group.anyOn(), group.sharingSettings(), shoppingView());
 		view.progress = group.progressView();
-		view.compare = group.compareView(view.progress);
+		view.compareInstalled = group.compareInstalled();
 		view.gear = group.gearView();
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
