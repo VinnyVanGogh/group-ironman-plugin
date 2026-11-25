@@ -115,7 +115,17 @@ command*, *Path stop card*) plus **All settings**. Below it sit ten tabs:
   selected automatically when you enter the region or picked from the list.
   Marks each requirement *OK*, *Equip* (in your inventory when it must be worn)
   or *Missing*, showing which teammates hold a missing item with one-click
-  **Request from group** or **Add to shopping**.
+  **Request from group** or **Add to shopping**. Lines carry counts (4 prayer
+  potions), *any one of* a kind (any ranged weapon, anything but magic for
+  Ahrim) read from the item's stats, optional lines, and *Skip* toggles for a
+  sub-fight. **Make shopping list** turns every gap into one request for what
+  teammates hold and one shopping list for the rest, each item once; pressing it
+  again skips items already on your requests or lists. The pencil edits any list
+  (items, counts, worn, optional, **Reset to default**), and you can add lists
+  for places of your own, picked by region if you like. When an update changes
+  a default list you edited, the tab offers **Reset to default** or **Keep
+  mine**. Your edits are saved in your RuneLite settings profile (one set for
+  all your accounts) and are not shared with the group.
 
 - **Settings** (panel tab): ECDSA-signed group leader and editor roles, one
   group-wide set of thresholds and event switches (saved by the leader or an

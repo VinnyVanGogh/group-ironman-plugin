@@ -334,6 +334,18 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public void gearShoppingList(String place, GearChecks.Plan plan, Consumer<String> done)
+			{
+				group.gearShoppingList(place, plan, done);
+			}
+
+			@Override
+			public void saveGearBook()
+			{
+				group.saveGearBook();
+			}
+
+			@Override
 			public boolean addRequest(String name, Map<Integer, Integer> items)
 			{
 				return group.addRequest(name, items);
@@ -502,6 +514,13 @@ public class GroupIronmanPlugin extends Plugin
 			|| GroupIronmanConfig.KEY_LAST_SEEN_VERSION.equals(event.getKey())
 			|| GroupIronmanConfig.KEY_BOUND_GROUP.equals(event.getKey()))
 		{
+			return;
+		}
+		if (GroupIronmanConfig.KEY_GEAR_BOOK.equals(event.getKey()))
+		{
+			// The Gear tab's own saves land here too; a profile switch or settings reset brings a different value.
+			group.reloadGearBook();
+			redraw();
 			return;
 		}
 		group.reloadConfig();

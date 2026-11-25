@@ -405,7 +405,8 @@ Core tabs and sharing (two or more members in group sync with matching switches 
 10. **Gear tab.** Walk into Barrows, Vorkath, Zulrah, a raid lobby or Revenant
     Caves (or pick a rule): **Bring this** marks items *OK*, *Equip* or
     *Missing*, naming teammates who hold missing items with **Request from
-    group** or **Add to shopping**.
+    group** or **Add to shopping**. **Make shopping list** sends every gap at
+    once; the pencil edits the list, and the page icon adds a list of your own.
 
 ## Limitations
 

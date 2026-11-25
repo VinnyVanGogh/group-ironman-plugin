@@ -49,6 +49,8 @@ public interface GroupIronmanConfig extends Config
 	String KEY_BOUND_GROUP = "boundGroup";
 	/** 'Combine level-ups': frozen key; its default moved 30 → 60 for new installs only (GroupEventEngine). */
 	String KEY_COMBINE_LEVELS = "discordCombineLevels";
+	/** Frozen once published. Written by the Gear tab, never shown: the player's own "Bring this" lists (GearBook). */
+	String KEY_GEAR_BOOK = "gearBook";
 
 	/**
 	 * The {@code @Units} on every gp number box: no suffix at all. RuneLite's number box is a fixed 6 columns
@@ -1559,6 +1561,14 @@ public interface GroupIronmanConfig extends Config
 			+ " neck, ammo, weapon, body, shield, legs, hands, feet, ring, inventory.",
 		section = advancedSection, position = 12)
 	default String compareCategories()
+	{
+		return "";
+	}
+
+	/** The Gear tab's own lists and edits, as JSON; written by the plugin, never shown. */
+	@ConfigItem(keyName = KEY_GEAR_BOOK, name = "Gear lists", description = "Set in the Gear tab.",
+		hidden = true, section = advancedSection, position = 13)
+	default String gearBook()
 	{
 		return "";
 	}
