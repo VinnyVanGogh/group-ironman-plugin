@@ -1,17 +1,12 @@
 package com.vinnyvangogh.groupironman;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics2D;
+import java.awt.*;
 import java.awt.Point;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-import net.runelite.api.Client;
-import net.runelite.api.MenuAction;
-import net.runelite.api.Player;
-import net.runelite.client.ui.overlay.OverlayMenuEntry;
-import net.runelite.client.ui.overlay.OverlayPanel;
+import net.runelite.api.*;
+import net.runelite.client.ui.overlay.*;
 
 /**
  * Event banners: one title and one line per event, newest on top, each for

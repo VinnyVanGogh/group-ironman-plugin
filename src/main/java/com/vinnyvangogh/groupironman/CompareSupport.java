@@ -1,21 +1,11 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import net.runelite.client.game.ItemEquipmentStats;
-import net.runelite.client.game.ItemManager;
-import net.runelite.client.game.ItemStats;
-import net.runelite.client.hiscore.HiscoreClient;
-import net.runelite.client.hiscore.HiscoreEndpoint;
-import net.runelite.client.hiscore.HiscoreResult;
-import net.runelite.client.hiscore.HiscoreSkill;
+import net.runelite.client.game.*;
+import net.runelite.client.hiscore.*;
 import net.runelite.http.api.item.ItemPrice;
 
 /**

@@ -1,10 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.Iterator;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Holds the Discord-bound events of one moment until the rest of it has

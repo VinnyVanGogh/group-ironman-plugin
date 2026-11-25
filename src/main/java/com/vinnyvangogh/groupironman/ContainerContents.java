@@ -1,13 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.*;
+import java.util.regex.*;
 
 /**
  * How much is in each chat-tracked container (log basket, fish barrel, coal

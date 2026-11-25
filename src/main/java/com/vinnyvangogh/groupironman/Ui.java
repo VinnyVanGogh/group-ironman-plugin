@@ -1,23 +1,11 @@
 package com.vinnyvangogh.groupironman;
 
-import java.awt.Color;
-import java.awt.Cursor;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.awt.Insets;
-import java.awt.Toolkit;
+import java.awt.*;
 import java.awt.datatransfer.StringSelection;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JToggleButton;
+import java.awt.event.*;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.ui.FontManager;
+import net.runelite.client.ui.*;
 
 /** The side panel's small Swing building blocks, shared by every tab so each piece is built one way. */
 final class Ui

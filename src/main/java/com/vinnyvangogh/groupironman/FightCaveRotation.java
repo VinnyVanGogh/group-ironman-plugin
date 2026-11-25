@@ -1,7 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * Which of the Fight Caves' 15 spawn rotations a run is on, read from where the first waves' monsters appear.

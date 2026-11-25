@@ -2,8 +2,7 @@ package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
 import java.util.Map;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
+import java.util.function.*;
 import lombok.extern.slf4j.Slf4j;
 
 /**

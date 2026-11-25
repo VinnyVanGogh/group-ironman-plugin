@@ -1,7 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 
 /**
  * "This client keeps the live status board", sent to the party about once a minute while it does, so the other

@@ -1,13 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TreeSet;
+import java.util.*;
 
 /**
  * "Bring this": a small table of gear worth carrying to a boss, a raid lobby or the Revenant Caves, checked against

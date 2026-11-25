@@ -1,18 +1,11 @@
 package com.vinnyvangogh.groupironman;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
+import java.awt.*;
 import java.awt.Point;
-import java.awt.Rectangle;
-import java.awt.RenderingHints;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
 import net.runelite.client.ui.overlay.OverlayUtil;
-import net.runelite.client.ui.overlay.components.LayoutableRenderableEntity;
-import net.runelite.client.ui.overlay.components.PanelComponent;
+import net.runelite.client.ui.overlay.components.*;
 
 /**
  * One look for every Group Ironman overlay: a dark panel, a header with an

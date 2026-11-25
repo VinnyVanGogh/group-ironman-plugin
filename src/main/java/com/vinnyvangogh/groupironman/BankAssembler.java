@@ -1,8 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 /**
  * Puts a member's bank back together from its parts.

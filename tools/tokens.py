@@ -99,12 +99,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="origin/main")
     parser.add_argument("--top", type=int, default=0)
+    parser.add_argument("--max", type=int, default=0,
+                        help="exit 1 when the bot estimate is above this")
     args = parser.parse_args()
 
     now = raw_tokens(worktree_files())
     total = sum(now.values())
     print(f"raw chars/4:     {total:,.0f}")
-    print(f"bot estimate:    {total * CALIBRATION:,.0f}  (limit 200,000, target < 190,000)")
+    print(f"bot estimate:    {total * CALIBRATION:,.0f}  (Hub bot reads up to 200,000; build gate in build.gradle)")
     try:
         base = sum(raw_tokens(ref_files(args.base)).values())
         delta = (total - base) * CALIBRATION
@@ -115,7 +117,11 @@ def main():
         print()
         for name, tok in sorted(now.items(), key=lambda kv: -kv[1])[:args.top]:
             print(f"{tok * CALIBRATION:9,.0f}  {os.path.basename(name)}")
+    if args.max and total * CALIBRATION > args.max:
+        print(f"FAIL: bot estimate {total * CALIBRATION:,.0f} is over {args.max:,}", file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

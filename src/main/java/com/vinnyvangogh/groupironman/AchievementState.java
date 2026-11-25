@@ -1,12 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 
 /**
  * One member's quest points, quest states and achievement diary tiers, shared with the group so the Compare tab,

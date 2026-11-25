@@ -1,8 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * The leader's Discord webhooks, shared with the group (Board 2026-11-13: "Share webhooks with the group"). One

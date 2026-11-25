@@ -1,6 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
 import java.util.function.IntUnaryOperator;
 import net.runelite.api.gameval.VarbitID;

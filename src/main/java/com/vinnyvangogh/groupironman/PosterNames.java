@@ -1,11 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 
 /**
  * The rules a Custom poster name must meet ({@link Webhooks#name} decides which name a post uses).

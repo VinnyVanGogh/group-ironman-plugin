@@ -1,11 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.function.LongSupplier;
-import java.util.function.Predicate;
+import java.util.function.*;
 
 /**
  * A log of group events, newest first, without duplicates. As the drops log

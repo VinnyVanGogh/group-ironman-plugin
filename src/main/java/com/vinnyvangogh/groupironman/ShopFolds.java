@@ -1,8 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collection;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 /**
  * What the player opened on the Shopping tab (Board 2026-11-14: lists start

@@ -1,14 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.function.Predicate;
-import java.util.function.ToLongFunction;
+import java.util.function.*;
 
 /**
  * The settings a group shares: thresholds, which events post to Discord and

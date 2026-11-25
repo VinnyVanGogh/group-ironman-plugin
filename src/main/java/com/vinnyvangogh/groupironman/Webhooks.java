@@ -1,11 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * The one place a post's webhook URL and poster name are decided. Every sender asks this, never a webhook setting

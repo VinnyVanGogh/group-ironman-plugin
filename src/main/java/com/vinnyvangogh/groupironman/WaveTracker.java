@@ -5,11 +5,8 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.function.*;
+import java.util.regex.*;
 
 /**
  * This player's run through a wave activity: the TzHaar Fight Cave (63 waves), the Inferno (69) and the Fortis

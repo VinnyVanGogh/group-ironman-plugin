@@ -1,7 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.function.IntFunction;
-import java.util.function.IntUnaryOperator;
+import java.util.function.*;
 
 /**
  * A real name for any item id, noted and placeholder ids included. The game's own name for a noted or

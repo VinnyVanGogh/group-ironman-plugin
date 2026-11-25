@@ -1,8 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Roles and the group's settings on one client: what it holds, what it will

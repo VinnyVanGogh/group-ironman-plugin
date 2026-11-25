@@ -1,18 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.common.base.Charsets;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
+import java.io.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import net.runelite.api.coords.WorldPoint;
 

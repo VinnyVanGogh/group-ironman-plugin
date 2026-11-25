@@ -1,12 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
-import java.awt.Dimension;
-import java.awt.GridLayout;
-import java.util.ArrayList;
+import java.awt.*;
+import java.util.*;
 import java.util.List;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.SwingConstants;
+import javax.swing.*;
 
 /**
  * An item icon grid that is kept, not rebuilt: {@link #update} repaints only

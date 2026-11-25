@@ -1,16 +1,11 @@
 package com.vinnyvangogh.groupironman;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
+import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import javax.inject.Inject;
 import net.runelite.api.coords.WorldPoint;
-import net.runelite.client.ui.overlay.worldmap.WorldMapPoint;
-import net.runelite.client.ui.overlay.worldmap.WorldMapPointManager;
+import net.runelite.client.ui.overlay.worldmap.*;
 
 /**
  * Online members as markers on the game's world map, from the position in

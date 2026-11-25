@@ -1,13 +1,10 @@
 package com.vinnyvangogh.groupironman;
 
-import java.awt.Color;
-import java.awt.GridLayout;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.awt.*;
+import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
+import javax.swing.*;
 import net.runelite.client.game.ItemManager;
 
 /**

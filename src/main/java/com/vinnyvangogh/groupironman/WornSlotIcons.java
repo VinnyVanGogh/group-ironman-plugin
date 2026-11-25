@@ -1,11 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
 import java.awt.image.BufferedImage;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import net.runelite.api.EquipmentInventorySlot;
-import net.runelite.api.SpriteID;
+import java.util.*;
+import net.runelite.api.*;
 
 /**
  * The game's own empty-slot silhouettes from the Worn Equipment tab, drawn in

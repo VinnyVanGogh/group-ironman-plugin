@@ -1,18 +1,12 @@
 package com.vinnyvangogh.groupironman;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.util.Collections;
+import java.awt.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Consumer;
-import javax.swing.JComboBox;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.ui.FontManager;
+import net.runelite.client.ui.*;
 
 /**
  * The panel's Gear tab: "bring this" for the place the player is standing (picked from the region on entry) or one

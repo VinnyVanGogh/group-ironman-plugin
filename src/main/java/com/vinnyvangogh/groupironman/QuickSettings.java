@@ -1,15 +1,10 @@
 package com.vinnyvangogh.groupironman;
 
 import java.awt.Color;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.function.BiConsumer;
-import java.util.function.Predicate;
-import javax.swing.JCheckBox;
-import javax.swing.JPanel;
-import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.ui.FontManager;
+import java.util.*;
+import java.util.function.*;
+import javax.swing.*;
+import net.runelite.client.ui.*;
 
 /**
  * The sidebar's quick settings: the switches players change most, each the real config key, so

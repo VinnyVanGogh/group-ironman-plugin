@@ -1,10 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
-import java.util.Collections;
+import java.util.*;
 import java.util.List;
-import java.util.function.LongSupplier;
-import java.util.function.Supplier;
+import java.util.function.*;
 
 /**
  * {@link LevelThreads}' decisions sent through the {@link DiscordSender}: a member's message's first post (kept by

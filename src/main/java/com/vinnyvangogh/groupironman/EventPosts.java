@@ -1,13 +1,9 @@
 package com.vinnyvangogh.groupironman;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import java.util.ArrayList;
+import com.google.gson.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.function.LongSupplier;
-import java.util.function.Supplier;
+import java.util.function.*;
 
 /**
  * {@link EventThreads}' decisions sent through the {@link DiscordSender}: a member's message's first post (the

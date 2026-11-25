@@ -1,12 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.EnumMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * One moment, one Discord post. Kinds that describe the same moment (a kill's

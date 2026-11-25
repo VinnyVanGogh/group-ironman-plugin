@@ -1,11 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 /**
  * The maths behind Compare, with no Swing and no game: two players side by side (boss times; the skill ranking is {@link SkillBoard}), and a

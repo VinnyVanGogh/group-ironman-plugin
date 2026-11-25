@@ -1,13 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import com.google.gson.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Every member's requests and every claim on them, as this client holds them.

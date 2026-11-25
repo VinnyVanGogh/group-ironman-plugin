@@ -1,7 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.Collection;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Notices the moment every member of the group is online at once. Fires on the change from "someone is missing" to
