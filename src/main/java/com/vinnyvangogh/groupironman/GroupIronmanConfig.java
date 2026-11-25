@@ -713,14 +713,6 @@ public interface GroupIronmanConfig extends Config
 		return EmptyBoxMode.BOTH;
 	}
 
-	@ConfigItem(keyName = "overlayPathStop", name = "Path stop card",
-		description = "On screen while you path from the Shopping tab: the stop, what to get there and for whom.",
-		section = inGameSection, position = 53)
-	default boolean overlayPathStop()
-	{
-		return false;
-	}
-
 	@ConfigItem(
 		keyName = "groupWorldMap",
 		name = "Show members on world map",
@@ -986,14 +978,6 @@ public interface GroupIronmanConfig extends Config
 	@ConfigItem(keyName = "overlayBarrows", name = "Banner: Barrows chest", description = "A Barrows chest.",
 		section = inGameSection, position = 41)
 	default boolean overlayBarrows()
-	{
-		return false;
-	}
-
-	@ConfigItem(keyName = "shoppingShopAlert", name = "Shopping: shop alert",
-		description = "A chat line near a shop that sells something a Shopping list needs, once per visit.",
-		section = inGameSection, position = 42)
-	default boolean shoppingShopAlert()
 	{
 		return false;
 	}

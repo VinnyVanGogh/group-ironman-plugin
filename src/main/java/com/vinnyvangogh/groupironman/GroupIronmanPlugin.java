@@ -5,7 +5,6 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -40,7 +39,6 @@ import net.runelite.client.party.PartyDataType;
 import net.runelite.client.party.WSClient;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.Overlay;
@@ -87,9 +85,6 @@ public class GroupIronmanPlugin extends Plugin
 	@Inject
 	private OverlayManager overlayManager;
 
-	/** What the on-screen path card says; null while no path is in force. Built each redraw. */
-	private volatile PathStopPlan pathPlan;
-	private PathStopOverlay pathOverlay;
 	private SyncReminder syncReminder;
 	/** The sync-off chat line goes out once per login, the banner stays until synced. */
 	private boolean syncRemindedThisLogin;
@@ -137,22 +132,9 @@ public class GroupIronmanPlugin extends Plugin
 	@Inject
 	private ConfigManager configManager;
 
-	/**
-	 * The Shopping tab's open lists and items ({@link ShopFolds}), in the logged-in character's RuneLite profile:
-	 * not a setting, never shown or sent. Frozen once published.
-	 */
-	static final String SHOPPING_OPEN_KEY = "shoppingOpen";
-
 	@Inject
 	private ChatMessageManager chatMessageManager;
 
-	@Inject
-	private PluginManager pluginManager;
-
-	/** Bank tiles for "Path to" an item in group storage; read once. */
-	private final List<ItemPaths.Stop> banks = ItemPaths.loadBanks();
-	/** The path handed to Shortest Path; null when not running. */
-	private volatile PathSession paths;
 	private GroupIronmanPanel panel;
 	private NavigationButton navButton;
 	private SidebarButton sidebar;
@@ -171,12 +153,6 @@ public class GroupIronmanPlugin extends Plugin
 		// CHARACTER_NAME only while subscribed). Without the Party plugin, that is us.
 		partyDataService.subscribe(this, PartyDataType.CHARACTER_NAME);
 		eventBus.register(group);
-		// Shortest Path is reached only through RuneLite's own PluginMessage: no reflection, no dependency.
-		paths = new PathSession(new ShortestPathBridge(pluginManager::getPlugins,
-			p -> p instanceof Plugin && pluginManager.isPluginEnabled((Plugin) p),
-			ShortestPathBridge.clientThreadEventPoster(clientThread::invoke, eventBus::post)));
-		pathOverlay = new PathStopOverlay(config, () -> pathPlan);
-		overlayManager.add(pathOverlay);
 		syncReminder = new SyncReminder();
 		syncRemindedThisLogin = false;
 		overlayManager.add(syncReminder);
@@ -293,34 +269,15 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
-			public boolean addList(String name, String preset, List<String> picks, List<String> members,
-				Map<Integer, Integer> items)
-			{
-				return group.addShoppingList(name, preset, picks, members, items);
-			}
-
-			@Override
-			public boolean renameList(String id, String name)
-			{
-				return group.renameShoppingList(id, name);
-			}
-
-			@Override
-			public boolean removeList(String id)
-			{
-				return group.removeShoppingList(id);
-			}
-
-			@Override
-			public void searchItems(String query, Consumer<List<ShoppingTab.Hit>> done)
-			{
-				group.searchItems(query, done);
-			}
-
-			@Override
 			public void openCompare()
 			{
 				group.openCompare();
+			}
+
+			@Override
+			public void openShopping()
+			{
+				group.openShopping();
 			}
 
 			@Override
@@ -328,80 +285,7 @@ public class GroupIronmanPlugin extends Plugin
 			{
 				group.gearItem(itemName, shopping, done);
 			}
-
-			@Override
-			public boolean addRequest(String name, Map<Integer, Integer> items)
-			{
-				return group.addRequest(name, items);
-			}
-
-			@Override
-			public boolean renameRequest(String id, String name)
-			{
-				return group.renameRequest(id, name);
-			}
-
-			@Override
-			public boolean removeRequest(String id)
-			{
-				return group.removeRequest(id);
-			}
-
-			@Override
-			public boolean closeRequest(String id)
-			{
-				return group.closeRequest(id);
-			}
-
-			@Override
-			public boolean closeRequestItem(String id, int itemId)
-			{
-				return group.closeRequestItem(id, itemId);
-			}
-
-			@Override
-			public boolean claimRequest(String id, int itemId, boolean claimed)
-			{
-				return group.claimRequest(id, itemId, claimed);
-			}
-
-			@Override
-			public String openLists()
-			{
-				return configManager.getRSProfileConfiguration(GroupIronmanConfig.GROUP, SHOPPING_OPEN_KEY);
-			}
-
-			@Override
-			public void saveOpenLists(String keys)
-			{
-				if (keys == null)
-				{
-					configManager.unsetRSProfileConfiguration(GroupIronmanConfig.GROUP, SHOPPING_OPEN_KEY);
-				}
-				else
-				{
-					configManager.setRSProfileConfiguration(GroupIronmanConfig.GROUP, SHOPPING_OPEN_KEY, keys);
-				}
-			}
-
-			@Override
-			public String pathTo(ItemPaths.Target why, ItemPaths.Stop to)
-			{
-				PathSession s = paths;
-				String said = s == null ? "" : s.go(why, to, group.here() != null);
-				redraw();
-				return said;
-			}
-
-			@Override
-			public String clearPath()
-			{
-				PathSession s = paths;
-				String said = s == null ? "" : s.stop();
-				redraw();
-				return said;
-			}
-		}, (task, delayMs) -> executor.schedule(task, delayMs, TimeUnit.MILLISECONDS), SwingUtilities::invokeLater);
+		},(task, delayMs) -> executor.schedule(task, delayMs, TimeUnit.MILLISECONDS), SwingUtilities::invokeLater);
 		navButton = NavigationButton.builder()
 			.tooltip(NAME)
 			.icon(icon())
@@ -502,19 +386,6 @@ public class GroupIronmanPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
-		// Turning the plugin off takes its path with it.
-		PathSession s = paths;
-		paths = null;
-		pathPlan = null;
-		if (s != null)
-		{
-			s.stop();
-		}
-		if (pathOverlay != null)
-		{
-			overlayManager.remove(pathOverlay);
-			pathOverlay = null;
-		}
 		if (syncReminder != null)
 		{
 			overlayManager.remove(syncReminder);
@@ -612,42 +483,13 @@ public class GroupIronmanPlugin extends Plugin
 		}
 		GroupIronmanPanel.View view = new GroupIronmanPanel.View(group.syncState(), group.roster(), group.members(),
 			group.lookup, group.switches(), group.regions(), group.since(), group.self(),
-			group.presence(), settingsView(), group.anyOn(), group.sharingSettings(), shoppingView());
+			group.presence(), settingsView(), group.anyOn(), group.sharingSettings());
 		view.progress = group.progressView();
 		view.compareInstalled = group.compareInstalled();
+		view.shoppingInstalled = group.shoppingInstalled();
 		view.gear = group.gearView();
 		SwingUtilities.invokeLater(() -> p.render(view));
 		updateMarkers();
-	}
-
-	/** The Shopping tab's view, or null before the lists have started. */
-	private ShoppingTab.View shoppingView()
-	{
-		ShoppingSync shop = group.shopping();
-		if (shop == null)
-		{
-			return null;
-		}
-		List<ShoppingList> lists = shop.active();
-		List<String> roster = new ArrayList<>(group.members().names());
-		if (roster.isEmpty() && !group.self().isEmpty())
-		{
-			roster.add(group.self());
-		}
-		ShoppingBoard.Inputs in = group.shoppingInputs();
-		List<ShoppingBoard.Card> cards = ShoppingBoard.of(lists, in);
-		List<RequestBoard.Card> requests = group.requestCards();
-		ItemPaths.Planner planner = ItemPaths.Planner.of(in, banks, group.here());
-		// The path goes when its item is done, its list removed or its request closed.
-		PathSession s = paths;
-		if (s != null)
-		{
-			s.recheck(t -> ItemPaths.forTarget(t, cards, requests, planner));
-			pathPlan = PathStopPlan.of(s.activeTarget(), s.activeStop(), cards, requests, planner);
-		}
-		return new ShoppingTab.View(cards, group.presets().presets(), roster, shop.history(),
-			!group.self().isEmpty(), group.syncing(), requests, group.self(), planner,
-			s == null ? "" : s.active());
 	}
 
 	/** The Settings tab's view, or null before group settings have started. */

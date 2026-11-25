@@ -56,9 +56,7 @@ final class QuickSettings
 		new Item("groupWorldMap", "Members on world map", "Needs 'Share stats' on both sides.",
 			GroupIronmanConfig::groupWorldMap),
 		new Item("groupFindCommand", "::find chat command", "'::find whip' shows who has it.",
-			GroupIronmanConfig::groupFindCommand),
-		new Item("overlayPathStop", "Path stop card", "On screen while you path from the Shopping tab.",
-			GroupIronmanConfig::overlayPathStop)));
+			GroupIronmanConfig::groupFindCommand)));
 
 	private QuickSettings()
 	{

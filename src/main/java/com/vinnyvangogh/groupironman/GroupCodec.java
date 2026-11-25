@@ -903,7 +903,7 @@ final class GroupCodec
 		return header(kind.name().toLowerCase(Locale.ROOT));
 	}
 
-	/** {@code {"v":1,"k":kind}}, the start of every payload; also {@link ShoppingCodec}'s and {@link GovernanceCodec}'s. */
+	/** {@code {"v":1,"k":kind}}, the start of every payload; also Group Shopping's ({@link GroupShopping}) and {@link GovernanceCodec}'s. */
 	static JsonObject header(String kind)
 	{
 		JsonObject o = new JsonObject();
