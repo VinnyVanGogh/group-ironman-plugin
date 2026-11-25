@@ -97,7 +97,7 @@ final class GroupBoxOverlay extends OverlayPanel
 	}
 
 	/** Horizontal padding {@link OverlayStyle#frame} puts around the blocks. */
-	private static final int PADDING = 16;
+	static final int PADDING = 16;
 
 	/**
 	 * The box's width: the size's own, grown so the longest line fits whole, but no wider than the size's

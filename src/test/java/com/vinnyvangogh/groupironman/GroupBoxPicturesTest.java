@@ -210,13 +210,14 @@ public class GroupBoxPicturesTest
 		assertEquals(ItemNameIndex.PENDING, index.id("Not an item"));
 		assertTrue(index.claim());
 		assertFalse("only one scan at a time", index.claim());
+		assertEquals(500, GroupService.NAME_SCAN_SLICE);
 		int steps = 0;
-		while (!index.step(all, 2_000))
+		while (!index.step(all, GroupService.NAME_SCAN_SLICE))
 		{
 			steps++;
-			assertTrue("scan never ends", steps < 100);
+			assertTrue("scan never ends", steps < 200);
 		}
-		assertTrue("scanned in slices, not one frame", steps >= 10);
+		assertTrue("scanned in slices, not one frame", steps >= 40);
 		assertEquals(GIANT_KEY, index.id("giant KEY "));
 		assertEquals(ItemNameIndex.NOT_FOUND, index.id("Not an item"));
 		assertEquals(ItemNameIndex.NOT_FOUND, index.id(""));
@@ -231,9 +232,9 @@ public class GroupBoxPicturesTest
 		ItemNameIndex index = new ItemNameIndex();
 		index.id("Giant key");
 		assertTrue(index.claim());
-		assertFalse(index.step(table(names, 0), 2_000));
+		assertFalse(index.step(table(names, 0), GroupService.NAME_SCAN_SLICE));
 		assertEquals(ItemNameIndex.PENDING, index.id("Giant key"));
-		assertTrue(index.step(table(names, 10), 2_000));
+		assertTrue(index.step(table(names, 10), GroupService.NAME_SCAN_SLICE));
 		assertEquals(5, index.id("Giant key"));
 	}
 
@@ -250,20 +251,51 @@ public class GroupBoxPicturesTest
 			Color.WHITE, 1f, ALL);
 	}
 
+	private static int boxWidth(OverlayStyle.EventRow r, Graphics2D g, BoxSize size)
+	{
+		return GroupBoxOverlay.width(java.util.Collections.singletonList(r), g, size);
+	}
+
+	/** The padded width the box wants for {@code r}, measured with the same FontMetrics the box uses. */
+	private static int wants(OverlayStyle.EventRow r, Graphics2D g)
+	{
+		return r.natural(g) + GroupBoxOverlay.PADDING;
+	}
+
+	/**
+	 * A row whose padded width is just past {@code min}, built a word at a time and measured with {@code g}, so the
+	 * fixture is wide enough on whatever sans-serif font the machine has (macOS and Linux CI measure text differently).
+	 */
+	private static OverlayStyle.EventRow rowWiderThan(int min, Graphics2D g)
+	{
+		StringBuilder detail = new StringBuilder("Western Provinces Elite");
+		OverlayStyle.EventRow r = row("Member 1", detail.toString(), "3d");
+		for (int words = 0; wants(r, g) <= min; words++)
+		{
+			assertTrue("text never got wider than " + min, words < 500);
+			detail.append(" more");
+			r = row("Member 1", detail.toString(), "3d");
+		}
+		return r;
+	}
+
 	@Test
 	public void theBoxGrowsToItsLongestLineAndNoFurther()
 	{
 		Graphics2D g = graphics();
 		BoxSize size = BoxSize.MEDIUM;
 		assertEquals(330, size.maxWidth());
+
 		OverlayStyle.EventRow small = row("Member 1", "38", "now");
-		assertEquals(size.width, GroupBoxOverlay.width(java.util.Collections.singletonList(small), g, size));
-		OverlayStyle.EventRow longer = row("Member 1", "Western Provinces Elite and a bit more", "3d");
-		int grown = GroupBoxOverlay.width(java.util.Collections.singletonList(longer), g, size);
-		assertTrue(grown > size.width && grown <= size.maxWidth());
-		assertTrue(grown >= longer.natural(g));
-		OverlayStyle.EventRow huge = row("Member 1", repeat("Giant key ", 30), "3d");
-		assertEquals(size.maxWidth(), GroupBoxOverlay.width(java.util.Collections.singletonList(huge), g, size));
+		assertTrue("short fixture fits the size's own width", wants(small, g) <= size.width);
+		assertEquals(size.width, boxWidth(small, g, size));
+
+		OverlayStyle.EventRow longer = rowWiderThan(size.width, g);
+		assertTrue("one word never jumps past the widest box", wants(longer, g) <= size.maxWidth());
+		assertEquals(wants(longer, g), boxWidth(longer, g, size));
+
+		OverlayStyle.EventRow huge = rowWiderThan(size.maxWidth(), g);
+		assertEquals(size.maxWidth(), boxWidth(huge, g, size));
 	}
 
 	@Test

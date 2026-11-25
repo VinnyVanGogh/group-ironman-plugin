@@ -305,7 +305,8 @@ class GroupService
 	private volatile String self = "";
 	/** Untradeable items by name (a collection log line's Giant key), for the Group box's pictures. */
 	private final ItemNameIndex itemsByName = new ItemNameIndex();
-	private static final int NAME_SCAN_SLICE = 2_000;
+	/** Items read per client frame: small enough that a cold item cache (one decode per id) does not stutter a frame. */
+	static final int NAME_SCAN_SLICE = 500;
 	/** The client's item list for {@link #itemsByName}'s scan; client thread only. */
 	private final ItemNameIndex.Items clientItems = new ItemNameIndex.Items()
 	{
