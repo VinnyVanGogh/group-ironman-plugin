@@ -5,14 +5,14 @@ overview of what the plugin does, see the [README](README.md).
 
 - [Settings](#settings)
   - [Sidebar Quick settings](#sidebar-quick-settings)
+  - [Companion plugins](#companion-plugins)
   - [1. Group](#1-group)
-  - [2. Discord: connection](#2-discord-connection)
-  - [3. Discord: what to post](#3-discord-what-to-post)
-  - [4. Discord: how to post](#4-discord-how-to-post)
-  - [5. Discord: daily digest](#5-discord-daily-digest)
-  - [6. In-game](#6-in-game)
-  - [7. Thresholds](#7-thresholds)
-  - [8. Advanced](#8-advanced)
+  - [2. Discord: what to post](#2-discord-what-to-post)
+  - [3. Discord: how to post](#3-discord-how-to-post)
+  - [4. Discord: daily digest](#4-discord-daily-digest)
+  - [5. In-game](#5-in-game)
+  - [6. Thresholds](#6-thresholds)
+  - [7. Advanced](#7-advanced)
   - [Item search (`Find` and `::find`) and saved files](#item-search-find-and-find-and-saved-files)
 - [Running it next to Build Guard](#running-it-next-to-build-guard)
 - [Testing with friends](#testing-with-friends)
@@ -24,14 +24,13 @@ overview of what the plugin does, see the [README](README.md).
 ## Settings
 
 RuneLite's settings panel for GIM Utilities (`@ConfigGroup("gimutilities")`)
-has eight sections in a fixed order. *Group* starts open and the other seven
+has seven sections in a fixed order. *Group* starts open and the other six
 start closed, so a fresh install shows every section header at a glance.
 
-![Settings panel with its eight sections](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-overview.png)
+![Settings panel with its sections](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-overview.png)
 
-Every *Share* switch, *Post to Discord*, *Group box*, *Path stop card*, *Show
-members on world map*, *::find chat command*, *Shopping: shop alert* and the
-daily digest switches default to **Off**. With no *Group key* set, a fresh
+Every *Share* switch, *Group box*, *Show members on world map*, *::find chat
+command* and the daily digest switches default to **Off**. With no *Group key* set, a fresh
 install connects to nothing and sends nothing; its sidebar panel opens with an
 *Everything is off. Turn on what you want to share.* notice and an **Open GIM
 Utilities settings** button. Moving a setting between sections never resets it:
@@ -40,18 +39,17 @@ seven-figure thresholds fit inside RuneLite's six-column spinner.
 
 When your group leader or an editor saves group-wide settings on the panel's
 **Settings** tab, those group values override individual thresholds, event
-switches, digest ticks and Discord timing/online-status rules (while webhook
-URLs, *Post to Discord*, *Don't post my events* and all *Share* switches always
-remain yours alone).
+switches, digest ticks and Discord timing/online-status rules (while *Don't
+post my events*, all *Share* switches, and the webhooks and *Post to Discord*
+in Discord Relay always remain yours alone).
 
 ### Sidebar Quick settings
 
 At the top of the GIM Utilities sidebar panel, the foldable **Quick settings**
-card exposes the ten most-changed switches directly—each wired two-way to the
+card exposes the most-changed switches directly—each wired two-way to the
 underlying RuneLite config key—plus an **All settings** button:
 
 - *Sync with my group* (`groupSync`)
-- *Post to Discord* (`discordEnabled`)
 - *Keep my events off Discord* (`eventOptOutAll`, same setting as *Don't post my events*)
 - *Share bank* (`groupShareBank`)
 - *Share storage changes* (`groupShareStorage`, same setting as *Share group storage changes*)
@@ -59,7 +57,19 @@ underlying RuneLite config key—plus an **All settings** button:
 - *Group box* (`overlayGroupBox`)
 - *Members on world map* (`groupWorldMap`, same setting as *Show members on world map*)
 - *::find chat command* (`groupFindCommand`)
-- *Path stop card* (`overlayPathStop`)
+
+### Companion plugins
+
+Three features run in separate Plugin Hub plugins. GIM Utilities finds them
+through RuneLite's `PluginMessage` (inside your own client, never over the
+network) and hands them your group's shared data. Without one, its tab or
+setting shows a single line naming the plugin to install.
+
+| Plugin | What it adds | Without it |
+| --- | --- | --- |
+| Discord Relay | Every Discord post: webhooks, poster names, embeds or plain text, combined level-ups, grouped posts, screenshots, mentions, the *Live board* and the daily digest. On its first run it copies your old GIM Utilities webhook settings (read-only), so you don't re-enter them. | Nothing is posted; the panel's **Settings** tab shows *Install Discord Relay to post to Discord*. |
+| Player Compare | The **Compare** tab's leaderboard, side-by-side members, group against typed players, *Who benefits most?* and banked XP, using your group's shared stats. | **Compare** shows *Install Player Compare to compare your group*. |
+| Group Shopping | The **Shopping** tab's shared lists, requests, quest presets, *Path to*, the path stop card and the shop alert, using your group's shared banks, storage and inventories. | **Shopping** shows *Install Group Shopping for shared shopping lists*. |
 
 ### 1. Group
 
@@ -85,37 +95,19 @@ categories you also share yourself.
 | Share drops and collection log | Off | Sends NPC drops worth at least *Shared drops (gp)* and new collection log slots (requires the in-game *Collection log - New addition notification* chat setting), resent for 7 days when members join sync. |
 | Share group events | Off | Sends your pets, deaths, level-ups, quests, quest points, diary tiers, boss personal bests, live wave-activity state, logins, announcements and Barrows chests to teammates' panels and banners, and backfills unsynced events into teammates' **Log** and **Activities** when you next join sync. |
 
-### 2. Discord: connection
+### 2. Discord: what to post
 
-Each client posts only its own player's events (plus a single elected poster for
-in-game Group channel broadcasts when *Members without the plugin* is on), so
-nothing is posted twice.
-
-<details><summary>Screenshot: Discord: connection</summary>
-
-![Discord: connection, the webhooks and the poster name choices](https://raw.githubusercontent.com/VinnyVanGogh/group-ironman-plugin/main/docs/images/settings-discord-connection.png)
-
-</details>
-
-| Setting | Default | What it does |
-| --- | --- | --- |
-| Post to Discord | Off | Master switch for Discord webhook posts (displays RuneLite's third-party IP address warning). |
-| Main webhook | *(empty)* | Discord webhook URL (`https://discord.com/api/webhooks/...`, masked). Receives Main events and any category below whose URL is left empty. |
-| Main name | Webhook's own | Poster name mode for Main: *Webhook's own* (name/avatar configured in Discord), *Default name* (`Town Crier`), or *Custom*. |
-| Main custom name | `Town Crier` | Poster name used when *Main name* is *Custom* (up to 80 characters; names Discord refuses fall back to the default name with a chat warning). |
-| Online status webhook / Online name / Online custom name | *(empty)* / Webhook's own / `World Hopper` | Webhook and poster name for the *Live board* or login/logout posts. Changing this URL starts a fresh board. |
-| Drops & loot webhook / Drops name / Drops custom name | *(empty)* / Webhook's own / `Party Pete` | Webhook and poster name for drops, pets, collection log slots, untradeables, raid uniques, Barrows chests and *Took the last one*. |
-| Progress webhook / Progress name / Progress custom name | *(empty)* / Webhook's own / `Skillcape Seller` | Webhook and poster name for levels, 99s/max, XP/combat/total/quest-point milestones, quests, and activity start / wave / completion posts. |
-| Deaths & danger webhook / Deaths name / Deaths custom name | *(empty)* / Webhook's own / `Death's Office` | Webhook and poster name for deaths, value lost, gravestone warnings, Hardcore lives lost and activity deaths. |
-| Group storage webhook / Storage name / Storage custom name | *(empty)* / Webhook's own / `Gielinor Banker` | Webhook and poster name for big deposits/withdrawals, storage visit summaries and storage minimums. |
-| Daily digest webhook / Digest name / Digest custom name | *(empty)* / Webhook's own / `Varrock Herald` | Webhook and poster name for daily digests. |
-| Don't post my events | Off | Personal opt-out: none of your events are sent to Discord regardless of group settings. Per-event opt-outs live on the panel's **Settings** tab. |
-
-### 3. Discord: what to post
+These choose which events GIM Utilities hands to **Discord Relay**; the
+webhooks, poster names and *Post to Discord* switch are Discord Relay's own
+settings. Each client hands over only its own player's events (plus a single
+elected poster for in-game Group channel broadcasts when *Members without the
+plugin* is on), so nothing is posted twice.
 
 41 per-event switches. Every switch defaults to **Off** except **Activity
-started** (**On**, which still sends nothing unless *Post to Discord* and a
-webhook are active).
+started** (**On**, which still sends nothing unless Discord Relay is installed
+with *Post to Discord* and a webhook set). *Don't post my events* (Off) is your
+personal opt-out: none of your events go to Discord regardless of group
+settings. Per-event opt-outs live on the panel's **Settings** tab.
 
 <details><summary>Screenshot: Discord: what to post</summary>
 
@@ -131,10 +123,12 @@ webhook are active).
 | Progress & PvM | *Level up*, *99s and max total*, *XP milestones* (1M, 10M, 200M), *Combat level up*, *Total level milestones* (every 100), *Quest complete*, *Quest point milestones* (every 25 and quest cape), *Achievement diary tier*, *Combat achievement*, *Kill count milestone*, *New personal best*, *Slayer task* (completed before new assignment) |
 | Timers, activities & group | *Farming runs ready*, *Bird houses, Hespori*, *Back after a break*, *Weekly recap* (Mondays), *Shopping requests*, *Activity started* (**On** by default), *Activity wave milestone*, *Activity completed*, *Activity death*, *Announcement* (`::announce <text>`), *Everyone online* (posted by the group leader's client only) |
 
-### 4. Discord: how to post
+### 3. Discord: how to post
 
-At most 20 requests per minute are sent per webhook (up to 50 queued), and
-Discord's `Retry-After` rate limits are honoured.
+Group-wide rules Discord Relay follows when it posts GIM Utilities' events.
+Message style, screenshots, mentions, *Combine level-ups*, *Group posts*,
+*Repost board daily* and the picked-up screenshot are Discord Relay's own
+settings now.
 
 <details><summary>Screenshot: Discord: how to post</summary>
 
@@ -146,22 +140,13 @@ Discord's `Retry-After` rate limits are honoured.
 | --- | --- | --- |
 | Online status | Posts | *Posts* (one message per login/logout), *Live board* (one message edited in place with online members, worlds, activities and offline last-seen times; only one member per webhook should run a standalone board), or *Off*. On leader-shared webhooks, the leader's group *Online status* setting applies automatically. |
 | Offline grace | `2 mins` | Minutes (`0-10`) to wait before posting a logout; world hops and quick relogs within the window post nothing. |
-| Combine level-ups | `60 mins` | Minutes (`0-240`, `0` off) within which consecutive level-ups by the same member edit one Discord message in place (one card per skill, persisted across restarts). |
-| Message style | Rich embed | *Rich embed* (coloured cards with icons) or *Plain text*. |
-| Attach a screenshot | Off | Attaches a game screenshot to your Discord posts (level-up shots wait briefly for the chat confirmation banner). |
-| Grave picture | Where I died | Screenshot used on *Gravestone about to expire* posts (requires *Attach a screenshot*): *Where I died* (reuses the death-moment frame), *Current view*, or *None*. |
-| Mention for big events | *(empty)* | Role or user mention (e.g. `<@&role_id>`) prepended to pets, 99s, max total and Hardcore life-lost posts. |
 | Quiet hours from / Quiet hours until | `0` / `0` | Hours (`0-23`) during which Discord posts are held and flushed when quiet hours end. Setting the same hour for both disables quiet hours. |
 | Easter eggs | Off | Appends optional RuneScape meme lines to matching posts (levels 67 / 69 / 73 / 92 / 99, max total, combat 126, 2000 total, 200M XP, selected quests, Jad deaths, dry streaks, pets, 0 gp deaths, and storage Legend / Freeloader moves). |
 | Legend at (gp) | `1000000` | Minimum group storage deposit value for the Legend Easter egg (`0` disables). |
 | Freeloader at (gp) | `1000000` | Minimum group storage withdrawal value for the Freeloader Easter egg (`0` disables). |
-| Repost board daily | On | When *Online status* is *Live board*, posts a fresh board at the bottom of the channel after midnight and deletes the previous day's message once saved. |
 | Members without the plugin | On | Single elected plugin client relays in-game Group channel broadcasts (`ChatMessageType.CLAN_GIM_MESSAGE`) for roster members not running the plugin, deduplicated across the party. |
-| Group posts (minutes) | `30 mins` | Minutes (`0-240`, `0` off) within which same-kind events edit a single per-member Discord message (up to 10 cards; storage visits show net item totals). |
-| Add picked-up screenshot | Off | Adds a second screenshot to drop posts once the item appears in your inventory so both ground drop and pickup are shown (posts standalone rather than grouped; requires *Attach a screenshot*). |
-| Pickup wait (minutes) | `5 mins` | Minutes (`1-30`) after a drop post during which picking up the item still attaches the second screenshot. |
 
-### 5. Discord: daily digest
+### 4. Discord: daily digest
 
 Additive daily summaries sent alongside instant posts (never holds instant
 posts).
@@ -182,10 +167,10 @@ posts).
 | Include in daily digest: Group | Off | Includes group presence/announcement events in the daily digest. |
 | Include in daily digest: Activities | Off | Includes wave-activity and bossing events in the daily digest. |
 
-### 6. In-game
+### 5. In-game
 
-Controls in-game banners, the on-screen Group box, Shopping's path-stop card,
-world map markers and `::find`.
+Controls in-game banners, the on-screen Group box, world map markers and
+`::find`. The path stop card and shop alert are Group Shopping's settings.
 
 <details><summary>Screenshot: In-game</summary>
 
@@ -203,16 +188,14 @@ world map markers and `::find`.
 | Show members on world map | Off | Marks online teammates on the world map (requires *Share stats* on both sides). |
 | ::find chat command | Off | Enables `::find <item>` in the chatbox (local output only). |
 | *Banner:* event switches (42 switches) | Off *(except two)* | One *Banner:* toggle per event: *Banner: Valuable drop*, *Banner: Pet*, *Banner: New collection log slot*, *Banner: Untradeable unique*, *Banner: Raid unique*, *Banner: Clue reward*, *Banner: Dry streak*, *Banner: Death*, *Banner: Value lost on death*, *Banner: Gravestone expiring*, *Banner: Hardcore life lost*, *Banner: Wilderness and skull*, *Banner: Big storage deposit*, *Banner: Big storage withdrawal*, *Banner: Storage visit summary*, *Banner: Storage minimum hit*, *Banner: Took the last one*, *Banner: Level up*, *Banner: 99s and max total*, *Banner: XP milestones*, *Banner: Combat level up*, *Banner: Total level milestones*, *Banner: Quest complete*, *Banner: Quest point milestones*, *Banner: Achievement diary tier*, *Banner: Combat achievement*, *Banner: Kill count milestone*, *Banner: New personal best*, *Banner: Slayer task*, *Banner: Farming runs ready*, *Banner: Bird houses, Hespori*, *Banner: Online*, *Banner: Back after a break*, *Banner: Weekly recap*, *Banner: Barrows chest*, *Banner: Shopping requests*, *Banner: Activity started* (**On** by default), *Banner: Activity wave*, *Banner: Activity completed*, *Banner: Activity death*, *Banner: Announcement* (**On** by default), *Banner: Everyone online*. |
-| Shopping: shop alert | Off | Prints one chat line per visit when you walk near a reachable shop selling an item a shared Shopping list still needs. |
 | Dismiss banners key | Not set | Keybind to clear all active banners (right-clicking a banner and choosing *Dismiss* does the same). |
 | Banner quiet from / Banner quiet until | `0` / `0` | Hours (`0-23`) during which banners stay hidden (the **Log** tab still records them). Same hour twice means none. |
-| Path stop card | Off | Shows an on-screen card while pathing from the **Shopping** tab with the stop, town, needed items, recipients, prices and next stop. |
 | Group box size | Medium | Width, font scale and text detail for the Group box: *Compact*, *Small*, *Medium*, *Wide*, or *Large*. |
 | Group box icons | On | Draws skill and item icons on Group box event lines (off shows short text only). |
 | Group box times | Short | Relative event timestamps on the Group box: *Short* (`8m`), *Full* (`8m ago`), or *Off*. |
 | Empty group box shows | Both | Line shown in the Group box when nobody else is online (rotating every 30s): *Useful* (last-seen times and latest event), *Fun* (time-of-day lines), *Both*, or *Classic* (`Nobody else online`). |
 
-### 7. Thresholds
+### 6. Thresholds
 
 Shared cutoffs read by both Discord posts and in-game banners.
 
@@ -239,9 +222,10 @@ Shared cutoffs read by both Discord posts and in-game banners.
 | Activity posts: Inferno | On | Enables start, wave, completion and death event posts for The Inferno. |
 | Activity posts: Colosseum | On | Enables start, wave, completion and death event posts for the Fortis Colosseum. |
 
-### 8. Advanced
+### 7. Advanced
 
-Customises `::find` chat colours, update notes, and **Compare -> Item** filters.
+Customises `::find` chat colours and update notes. The **Compare -> Item**
+filters are Player Compare's settings.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
@@ -253,8 +237,6 @@ Customises `::find` chat colours, update notes, and **Compare -> Item** filters.
 | Carried colour | `#008B8B` | Colour for matches in inventories, worn gear, rune pouches, quivers, seed vaults and skilling containers. |
 | Item name colour | `#1E5AA8` | Item name colour when *Colour item names* is on. |
 | Show update notes | On | Prints a one-time welcome line on install and concise update notes in chat once per version. |
-| Compare: stats that count | *(empty)* | Comma-separated stats scored by **Compare -> Item** (blank = all: `melee_attack, melee_strength, ranged_attack, ranged_strength, magic_attack, magic_damage, defence, prayer`). |
-| Compare: item categories | *(empty)* | Comma-separated slots ranked by **Compare -> Item** (blank = all: `head, cape, neck, ammo, weapon, body, shield, legs, hands, feet, ring, inventory`). |
 
 ### Item search (`Find` and `::find`) and saved files
 
@@ -282,8 +264,9 @@ announcement over RuneLite Party without sending public chat.
 
 On-disk cache and state files live under
 `.runelite/plugin-data/gim-utilities/` via RuneLite's `Filepath` API
-(`group-cache.json`, `status-board.txt`, `level-streaks.txt`,
-`grouped-posts.txt`); any legacy `.runelite/gim-utilities/` folder is migrated
+(`group-cache.json`; older `status-board.txt`, `level-streaks.txt` and
+`grouped-posts.txt` are read once and handed to Discord Relay, and no longer
+written); any legacy `.runelite/gim-utilities/` folder is migrated
 automatically by RuneLite on first launch. Deleting `group-cache.json` clears
 cached banks, storage history and events on that machine if you switch groups.
 
@@ -318,7 +301,8 @@ plugins preserved.
    (**Not now** hides the card until the key changes; **New key** rotates a
    leaked key).
 4. **Join each session.** Click **Join group sync** in the panel header once per
-   login. The header switches to *Connected, N online*. If you are already in
+   login (or right-click the *Group sync is off - click to join* banner and pick
+   **Join group sync**). The header switches to *Connected, N online*. If you are already in
    another RuneLite party (such as a raid party), GIM sync pauses (*In another
    party; GIM sync paused*) so nothing leaks to outsiders; **Switch to group
    sync** moves you back.
@@ -395,14 +379,21 @@ Core tabs and sharing (two or more members in group sync with matching switches 
 7. **Activities tab.** Enter the Fight Caves, Inferno or Colosseum: **Live now**
    shows your wave, timers, Fight Caves rotation or Colosseum modifiers, and
    collapsible **Wave splits** with personal bests.
-8. **Compare tab.** Check **Leaderboard** (skill grid and boss/minigame counts),
-   **Compare** (two members side by side), **Group** (hiscore XP against another
-   group), **Item** (*Who benefits most?*), and **Banked XP**.
-9. **Shopping tab.** Add *1 Defence pure: Mithril gloves* or a *Request: ask the
-   group* list: teammates see it, banked/stored items count as *have*, **I'll
-   get it** claims a request line, and **Path to** / **Path to next** routes via
-   Shortest Path (with *Path stop card* and *Shopping: shop alert* when ticked).
-10. **Gear tab.** Walk into Barrows, Vorkath, Zulrah, a raid lobby or Revenant
+8. **Compare tab.** Without Player Compare it shows *Install Player Compare to
+   compare your group*; with it, **Open group compare** shows your group in
+   Player Compare's panel.
+9. **Shopping tab.** Without Group Shopping it shows *Install Group Shopping for
+   shared shopping lists*; with it, **Open shopping lists** shows the group's
+   lists in Group Shopping's panel.
+10. **Discord.** Without Discord Relay the panel's **Settings** tab shows
+    *Install Discord Relay to post to Discord* and nothing posts. With it, your
+    old webhooks appear in Discord Relay's settings and a ticked event posts
+    there.
+11. **Sync reminder.** With *Sync with my group* on and a key set, log in
+    without joining: the *Group sync is off - click to join* banner and one chat
+    line appear. Right-click the banner, pick **Join group sync**, and the
+    banner goes away. Nothing joins on its own.
+12. **Gear tab.** Walk into Barrows, Vorkath, Zulrah, a raid lobby or Revenant
     Caves (or pick a rule): **Bring this** marks items *OK*, *Equip* or
     *Missing*, naming teammates who hold missing items with **Request from
     group** or **Add to shopping**.
@@ -428,9 +419,7 @@ Core tabs and sharing (two or more members in group sync with matching switches 
   notification* chat setting.
 - **Item values and equip requirements:** bank values use RuneLite's cached
   Grand Exchange prices (untradeables count as 0 gp, with High Alchemy shown in
-  tooltips). **Compare -> Item** checks bundled OSRS Wiki equip requirements
-  (`item-requirements.txt`) for common combat gear and states when an item is
-  outside that table.
+  tooltips).
 - **Event caveats:** Barrows set progress counts pieces seen while the plugin is
   on; "every quest done" includes miniquests listed by RuneLite; Hardcore group
   deaths read `GIM_HARDCORE_DEATHS`; poison time left is estimated at 18s per
