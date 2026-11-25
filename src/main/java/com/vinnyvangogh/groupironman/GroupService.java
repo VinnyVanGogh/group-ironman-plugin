@@ -468,6 +468,7 @@ class GroupService
 		assembler.clear();
 		names.clear();
 		prices.clear();
+		itemsByName.stop();
 		storage.reset();
 		storageSaving = false;
 		lastBank = null;

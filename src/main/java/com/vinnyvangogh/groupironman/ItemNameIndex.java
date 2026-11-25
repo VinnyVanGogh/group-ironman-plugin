@@ -1,7 +1,7 @@
 package com.vinnyvangogh.groupironman;
 
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -28,7 +28,15 @@ final class ItemNameIndex
 	static final int NOT_FOUND = -2;
 	private static final int MAX_KEPT = 512;
 
-	private final Map<String, Integer> found = new HashMap<>();
+	/** Least recently asked first, so the cap drops a name nobody shows rather than all of them. */
+	private final Map<String, Integer> found = new LinkedHashMap<String, Integer>(16, 0.75f, true)
+	{
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<String, Integer> eldest)
+		{
+			return size() > MAX_KEPT;
+		}
+	};
 	/** Asked for since the running scan started; they wait for the next one. */
 	private final Set<String> queued = new HashSet<>();
 	/** What the running scan looks for. */
@@ -70,6 +78,11 @@ final class ItemNameIndex
 	/** Reads up to {@code budget} items; true when the scan is done and nothing waits (stop calling). */
 	synchronized boolean step(Items items, int budget)
 	{
+		if (!running)
+		{
+			// Stopped by shutDown: end the client-thread supplier even while the item list is still empty.
+			return true;
+		}
 		if (scanning.isEmpty())
 		{
 			scanning.addAll(queued);
@@ -107,12 +120,16 @@ final class ItemNameIndex
 		return false;
 	}
 
+	/** Drops the running scan and what waits for it, so the next {@link #step} ends; found names are kept. */
+	synchronized void stop()
+	{
+		queued.clear();
+		scanning.clear();
+		running = false;
+	}
+
 	private void keep(String key, int id)
 	{
-		if (found.size() >= MAX_KEPT)
-		{
-			found.clear();
-		}
 		found.put(key, id);
 	}
 

@@ -356,10 +356,110 @@ public class GroupBoxPicturesTest
 		Graphics2D draw = img.createGraphics();
 		draw.setFont(g.getFont());
 		int h = wraps.draw(draw, 0, 0, 180);
-		assertEquals(fm.getHeight() * 2, h);
+		assertTrue("wraps under the member", h >= fm.getHeight() * 2);
 		int one = row("Member 1", "38", "3d").draw(draw, 0, 0, 180);
 		assertEquals(fm.getHeight(), one);
 		assertNotNull(img);
+	}
+
+	@Test
+	public void aDetailLongerThanTwoLinesWrapsOnWithNothingCut()
+	{
+		FontMetrics fm = graphics().getFontMetrics();
+		String detail = repeat("Giant key ", 12).trim();
+		int room = fm.stringWidth("Giant key Giant key") + 2;
+		List<String> parts = OverlayStyle.EventRow.split(detail, fm, room, room);
+		assertTrue("more than two lines: " + parts, parts.size() > 2);
+		for (String part : parts)
+		{
+			assertFalse(part + " cut", part.endsWith(".."));
+			assertTrue(part + " too wide", fm.stringWidth(part) <= room);
+		}
+		assertEquals(detail, String.join(" ", parts));
+		// One word wider than the line breaks inside the word instead of losing its end.
+		String word = repeat("x", 80);
+		List<String> broken = OverlayStyle.EventRow.split(word, fm, 0, fm.stringWidth("xxxxxxxxxx"));
+		assertEquals(word, String.join("", broken));
+		assertFalse(broken.get(broken.size() - 1).endsWith(".."));
+	}
+
+	@Test
+	public void stopEndsTheScanEvenBeforeTheItemListLoads()
+	{
+		ItemNameIndex index = new ItemNameIndex();
+		index.id("Giant key");
+		assertTrue(index.claim());
+		assertFalse(index.step(table(new HashMap<>(), 0), GroupService.NAME_SCAN_SLICE));
+		index.stop();
+		assertTrue("the client-thread supplier ends", index.step(table(new HashMap<>(), 0), GroupService.NAME_SCAN_SLICE));
+		assertFalse("nothing waits after stop", index.claim());
+		// Asked again after a restart: a new scan starts and finds it.
+		Map<Integer, String> names = new HashMap<>();
+		names.put(GIANT_KEY, "Giant key");
+		assertEquals(ItemNameIndex.PENDING, index.id("Giant key"));
+		assertTrue(index.claim());
+		assertTrue(index.step(table(names, GIANT_KEY + 1), GIANT_KEY + 1));
+		assertEquals(GIANT_KEY, index.id("Giant key"));
+	}
+
+	@Test
+	public void theCapDropsTheLeastRecentlyAskedNameNotEveryName()
+	{
+		Map<Integer, String> names = new HashMap<>();
+		int count = 600;
+		for (int i = 0; i < count; i++)
+		{
+			names.put(i, "item " + i);
+		}
+		ItemNameIndex index = new ItemNameIndex();
+		index.id("item 0");
+		assertTrue(index.claim());
+		assertTrue(index.step(table(names, count), count));
+		for (int i = 1; i < count; i++)
+		{
+			index.id("item " + i);
+			// Item 0 stays in use: the box shows it on every frame.
+			assertEquals(0, index.id("item 0"));
+			if (index.claim())
+			{
+				assertTrue(index.step(table(names, count), count));
+			}
+		}
+		assertEquals("a name in use is never dropped", 0, index.id("item 0"));
+		assertEquals(ItemNameIndex.PENDING, index.id("item 1"));
+	}
+
+	@Test
+	public void withIconsOffTheBoxNeverSearchesItemsByName()
+	{
+		int[] asked = {0};
+		ItemLookup counting = new ItemLookup()
+		{
+			@Override
+			public String name(int id)
+			{
+				return "item " + id;
+			}
+
+			@Override
+			public long price(int id)
+			{
+				return 0;
+			}
+
+			@Override
+			public int itemId(String name)
+			{
+				asked[0]++;
+				return GIANT_KEY;
+			}
+		};
+		GroupEvent clog = GroupEvent.of(GroupEvent.Type.CLOG, NOW, "Member 1").text("Giant key").build();
+		BoxText.Line off = BoxText.format(clog, counting, BoxSize.MEDIUM, false, BoxTimes.SHORT, NOW);
+		assertEquals(0, asked[0]);
+		assertNull(off.icon);
+		BoxText.format(clog, counting, BoxSize.MEDIUM, true, BoxTimes.SHORT, NOW);
+		assertEquals(1, asked[0]);
 	}
 
 	private static String repeat(String s, int n)

@@ -133,12 +133,60 @@ final class BoxText
 	/** The event as a box line at this size; icons and times as the settings say. */
 	static Line format(GroupEvent e, ItemLookup lookup, BoxSize size, boolean icons, BoxTimes times, long now)
 	{
+		if (!icons)
+		{
+			// No picture is drawn, so do not start a scan of the item list for one.
+			lookup = withoutNameSearch(lookup);
+		}
 		Fmt form = FORMS.get(e.type);
 		Part part = form == null ? new Part(null, EventText.describe(e, lookup), EventText.describe(e, lookup))
 			: form.apply(e, lookup, size.tier);
 		boolean pictured = icons && part.icon != null;
 		return new Line(pictured ? part.icon : null, e.member, pictured ? part.withIcon : part.textOnly,
 			times.of(now, e.at));
+	}
+
+	/** {@code lookup} with every answer but {@link ItemLookup#itemId}, which stays unknown. */
+	private static ItemLookup withoutNameSearch(ItemLookup lookup)
+	{
+		return new ItemLookup()
+		{
+			@Override
+			public String name(int id)
+			{
+				return lookup.name(id);
+			}
+
+			@Override
+			public long price(int id)
+			{
+				return lookup.price(id);
+			}
+
+			@Override
+			public int slot(int id)
+			{
+				return lookup.slot(id);
+			}
+
+			@Override
+			public int combatStyles(int id)
+			{
+				return lookup.combatStyles(id);
+			}
+
+			@Override
+			public long highAlch(int id)
+			{
+				return lookup.highAlch(id);
+			}
+
+			@Override
+			public String amount(long amount)
+			{
+				return lookup.amount(amount);
+			}
+		};
 	}
 
 	/** The level before a level-up's first: what it knew, or one below. */

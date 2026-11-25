@@ -231,12 +231,13 @@ final class OverlayStyle
 		}
 
 		/**
-		 * The detail as drawn: the words that fit in {@code first} pixels beside the member, then the rest on one
-		 * line of {@code rest} pixels. The first is "" when not even the first word fits there; one entry when all fits.
+		 * The detail as drawn: the words that fit in {@code first} pixels beside the member, then the rest wrapped
+		 * onto as many lines of {@code rest} pixels as it needs, never cut. The first is "" when not even the first
+		 * word fits there; one entry when all fits.
 		 */
 		static List<String> split(String detail, FontMetrics fm, int first, int rest)
 		{
-			List<String> out = new ArrayList<>(2);
+			List<String> out = new ArrayList<>(3);
 			if (detail.isEmpty())
 			{
 				return out;
@@ -253,7 +254,7 @@ final class OverlayStyle
 				cut = i;
 			}
 			out.add(cut < 0 ? "" : detail.substring(0, cut));
-			out.add(fit(detail.substring(cut + 1).trim(), fm, rest));
+			out.addAll(wrap(detail.substring(cut + 1), fm, Math.max(1, rest), Integer.MAX_VALUE));
 			return out;
 		}
 
@@ -306,10 +307,10 @@ final class OverlayStyle
 				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + slot + nameW + NAME_GAP, baseline),
 					detail.get(0), TEXT);
 			}
-			if (detail.size() > 1)
+			for (int i = 1; i < detail.size(); i++)
 			{
-				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + slot, baseline + fm.getHeight()),
-					detail.get(1), TEXT);
+				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + slot, baseline + i * fm.getHeight()),
+					detail.get(i), TEXT);
 			}
 			if (timeW > 0)
 			{
