@@ -55,10 +55,9 @@ final class Webhooks
 
 	/**
 	 * These (a member's own) with the leader's shared webhooks filling in: per webhook, the member's own setting
-	 * (URL and poster name) when its URL field holds a Discord webhook link, else the group's. A box left empty or
-	 * holding junk (the group key pasted in the wrong box, a half-copied link) never blocks the group's. Unchanged
-	 * when the group shares none. Main's fallback then runs over the result, so an empty category still lands on
-	 * Main (the member's own Main when valid, else the group's).
+	 * (URL and poster name) when its URL field is not empty, else the group's. Unchanged when the group shares
+	 * none. Main's fallback then runs over the result, so an empty category still lands on Main (the member's own
+	 * Main when set, else the group's).
 	 */
 	Webhooks withGroup(GroupWebhooks group)
 	{
@@ -70,7 +69,7 @@ final class Webhooks
 		Set<Webhook> borrowed = EnumSet.noneOf(Webhook.class);
 		for (Map.Entry<Webhook, Setting> e : group.settings.entrySet())
 		{
-			if (!DiscordWebhook.valid(setting(e.getKey()).url))
+			if (DiscordWebhook.clean(setting(e.getKey()).url).isEmpty())
 			{
 				merged.put(e.getKey(), e.getValue());
 				borrowed.add(e.getKey());

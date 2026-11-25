@@ -73,8 +73,6 @@ final class GroupSettingsTab
 		final Set<String> heard;
 		/** Who shares the group's webhooks (the leader), or null when nobody does. Never a URL. */
 		final String webhooksBy;
-		/** The leader shares webhooks in a form this build cannot read. */
-		boolean webhooksNeedUpdate;
 
 		View(GroupGovernance.Role role, GroupRoles roles, GroupSettings settings, boolean unclaimed, boolean syncing,
 			List<String> members, String self, Map<String, Long> current, MemberPrefs mine,
@@ -111,10 +109,8 @@ final class GroupSettingsTab
 				}
 			}
 			GroupWebhooks shared = g.sharedWebhooks();
-			View v = new View(g.myRole(self), g.roles(), g.settings(), g.unclaimed(), syncing, members, self, current,
+			return new View(g.myRole(self), g.roles(), g.settings(), g.unclaimed(), syncing, members, self, current,
 				mine, g.prefs(), heard, shared == null ? null : shared.by);
-			v.webhooksNeedUpdate = g.webhooksNeedUpdate();
-			return v;
 		}
 
 		boolean canEdit()
@@ -132,8 +128,7 @@ final class GroupSettingsTab
 				settings == null ? "" : settings.signature, String.valueOf(unclaimed), String.valueOf(syncing),
 				String.valueOf(members), self, String.valueOf(mine.all), String.valueOf(mine.noPost),
 				String.valueOf(mine.mute), String.valueOf(prefsText()), String.valueOf(heard),
-				settings == null ? String.valueOf(current) : "", String.valueOf(webhooksBy),
-				String.valueOf(webhooksNeedUpdate));
+				settings == null ? String.valueOf(current) : "", String.valueOf(webhooksBy));
 		}
 
 		private String prefsText()
@@ -268,7 +263,7 @@ final class GroupSettingsTab
 
 	private void drawWebhooks(JPanel tab, View v)
 	{
-		for (String line : SettingsModel.webhookLines(v.role, v.webhooksBy, v.webhooksNeedUpdate))
+		for (String line : SettingsModel.webhookLines(v.role, v.webhooksBy))
 		{
 			tab.add(text(line, MUTED));
 		}

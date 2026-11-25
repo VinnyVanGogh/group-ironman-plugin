@@ -43,8 +43,6 @@ final class GovernanceCodec
 	private static final int MAX_NAME = 64;
 	/** Well over the schema's size: a newer build's extra keys are read and then dropped. */
 	private static final int MAX_VALUES = 400;
-	/** Well over the seven webhooks: a newer build's extra ones are kept for the signature, then not used. */
-	private static final int MAX_ENTRIES = 32;
 
 	private GovernanceCodec()
 	{
@@ -87,13 +85,13 @@ final class GovernanceCodec
 		o.addProperty("bk", w.byKey);
 		o.addProperty("sh", w.shared);
 		JsonObject hooks = new JsonObject();
-		for (String[] e : w.entries())
+		for (Map.Entry<Webhook, Webhooks.Setting> e : w.settings.entrySet())
 		{
 			JsonArray s = new JsonArray();
-			s.add(e[1]);
-			s.add(e[2]);
-			s.add(e[3]);
-			hooks.add(e[0], s);
+			s.add(e.getValue().url);
+			s.add(e.getValue().mode.name());
+			s.add(e.getValue().name);
+			hooks.add(e.getKey().name(), s);
 		}
 		o.add("wh", hooks);
 		o.addProperty("sig", w.signature);
@@ -247,43 +245,27 @@ final class GovernanceCodec
 			history, string(in, "sig"));
 	}
 
-	/**
-	 * Every entry is kept as sent for the signature check, so a newer leader's webhook or poster-name choice this
-	 * build does not know costs only that entry: an unknown webhook is not used, an unknown choice falls back to the
-	 * webhook's own name. Null for a signed form newer than {@link GroupWebhooks#FORMAT}: this build cannot check it.
-	 */
+	/** As signed: a field that is no webhook or no poster-name choice this build knows fails the signature check. */
 	private static GroupWebhooks webhooks(JsonObject in)
 	{
-		if (number(in, "cv") > GroupWebhooks.FORMAT)
-		{
-			return null;
-		}
 		Map<Webhook, Webhooks.Setting> hooks = new EnumMap<>(Webhook.class);
-		List<String[]> signed = new ArrayList<>();
 		JsonElement wh = in.get("wh");
 		if (wh != null && wh.isJsonObject())
 		{
 			for (Map.Entry<String, JsonElement> e : wh.getAsJsonObject().entrySet())
 			{
-				if (signed.size() >= MAX_ENTRIES)
-				{
-					break;
-				}
-				JsonArray a = e.getValue().getAsJsonArray();
-				String url = a.get(0).getAsString();
-				String modeName = a.get(1).getAsString();
-				String name = a.get(2).getAsString();
-				signed.add(new String[]{e.getKey(), url, modeName, name});
 				Webhook w = known(Webhook.values(), e.getKey());
-				if (w != null && url.length() <= MAX_URL)
+				JsonArray a = e.getValue().getAsJsonArray();
+				DiscordPosterName mode = known(DiscordPosterName.values(), a.get(1).getAsString());
+				String url = a.get(0).getAsString();
+				if (w != null && mode != null && url.length() <= MAX_URL)
 				{
-					hooks.put(w, new Webhooks.Setting(url, known(DiscordPosterName.values(), modeName),
-						cap(name, PosterNames.MAX * 2)));
+					hooks.put(w, new Webhooks.Setting(url, mode, cap(a.get(2).getAsString(), PosterNames.MAX * 2)));
 				}
 			}
 		}
 		return new GroupWebhooks(string(in, "g"), number(in, "ver"), number(in, "ts"), cap(string(in, "by")),
-			string(in, "bk"), flag(in, "sh"), hooks, string(in, "sig"), signed);
+			string(in, "bk"), flag(in, "sh"), hooks, string(in, "sig"));
 	}
 
 	private static <E extends Enum<E>> E known(E[] values, String name)

@@ -154,12 +154,6 @@ final class GovernanceSync
 			case GovernanceCodec.ROLES:
 				return governance.receiveRoles(m.roles);
 			case GovernanceCodec.WEBHOOKS:
-				if (m.webhooks == null)
-				{
-					// Signed in a form newer than this build reads: the Settings tab says to update.
-					governance.newerWebhooks();
-					return null;
-				}
 				return governance.receiveWebhooks(m.webhooks);
 			default:
 				return governance.receiveSettings(m.settings);

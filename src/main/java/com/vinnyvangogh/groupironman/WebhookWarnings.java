@@ -33,8 +33,7 @@ final class WebhookWarnings
 			}
 			else if (!value.equals(warned.put(field.getKey(), value)))
 			{
-				out.add(GroupKey.isValid(GroupKey.fromPasted(value)) ? groupKeyMessage(field.getKey())
-					: message(field.getKey()));
+				out.add(message(field.getKey()));
 			}
 		}
 		return out;
@@ -43,12 +42,5 @@ final class WebhookWarnings
 	static String message(String label)
 	{
 		return GroupIronmanPlugin.NAME + ": the " + label + " Discord webhook isn't a valid Discord webhook link";
-	}
-
-	/** The group key pasted into a webhook box: the commonest mix-up, so it is named. */
-	static String groupKeyMessage(String label)
-	{
-		return GroupIronmanPlugin.NAME + ": the " + label + " Discord webhook box holds what looks like the group key,"
-			+ " not a webhook. Paste it in Group key instead; this box is ignored";
 	}
 }
