@@ -54,6 +54,10 @@ final class BannerAnchor
 	/**
 	 * {@code canvas}, a point in canvas pixels, in the space of a graphics whose transform is {@code t}: the move
 	 * the overlay renderer made is taken off. Scale is allowed for; a rotated or sheared graphics never occurs.
+	 *
+	 * <p>Not the plain inverse {@code (canvas - t) / s}: canvas points are what a dynamic overlay draws at, i.e. they
+	 * are already in the scaled space, so they land at {@code s * canvas}. Solving {@code s * u + t = s * canvas}
+	 * gives {@code u = canvas - t / s}.
 	 */
 	static Point toGraphics(Point canvas, AffineTransform t)
 	{

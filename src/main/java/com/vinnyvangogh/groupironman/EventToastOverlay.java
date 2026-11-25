@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Point;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -12,6 +13,7 @@ import net.runelite.api.MenuAction;
 import net.runelite.api.Player;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import net.runelite.client.ui.overlay.OverlayPanel;
+import net.runelite.client.ui.overlay.components.LayoutableRenderableEntity;
 
 /**
  * Event banners: one title and one line per event, newest on top, each for
@@ -86,8 +88,10 @@ final class EventToastOverlay extends OverlayPanel
 			lastPlaced = null;
 			panelComponent.setPreferredLocation(new Point());
 		}
+		// Measured from the blocks themselves: the panel's own size is last frame's (see OverlayStyle.drawnHeight).
+		List<LayoutableRenderableEntity> parts = new ArrayList<>(panelComponent.getChildren());
 		Dimension drawn = super.render(graphics);
-		lastHeight = drawn == null ? 0 : drawn.height;
+		lastHeight = drawn == null ? 0 : OverlayStyle.drawnHeight(parts);
 		return drawn;
 	}
 

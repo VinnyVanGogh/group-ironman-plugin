@@ -181,7 +181,10 @@ public class AbovePlayerBannerTest
 		AffineTransform t = new AffineTransform();
 		t.scale(2, 2);
 		t.translate(100, 50);
-		assertEquals(new Point(200, 250), BannerAnchor.toGraphics(new Point(300, 300), t));
+		// A dynamic overlay's (300, 300) lands at device (600, 600); from t that is user (200, 250), not (50, 100).
+		Point u = BannerAnchor.toGraphics(new Point(300, 300), t);
+		assertEquals(new Point(200, 250), u);
+		assertEquals(new java.awt.geom.Point2D.Double(600, 600), t.transform(u, null));
 		assertEquals(new Point(300, 300), BannerAnchor.toGraphics(new Point(300, 300), new AffineTransform()));
 	}
 }

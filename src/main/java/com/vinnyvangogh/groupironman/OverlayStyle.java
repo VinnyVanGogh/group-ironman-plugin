@@ -40,6 +40,8 @@ final class OverlayStyle
 	private static final int DOT = 7;
 	private static final int DOT_SLOT = 12;
 	private static final int GAP = 6;
+	private static final int PAD_X = 8;
+	private static final int PAD_Y = 6;
 
 	private OverlayStyle()
 	{
@@ -49,9 +51,26 @@ final class OverlayStyle
 	static void frame(PanelComponent panel, int width)
 	{
 		panel.setBackgroundColor(BACKGROUND);
-		panel.setBorder(new Rectangle(8, 6, 8, 6));
+		panel.setBorder(new Rectangle(PAD_X, PAD_Y, PAD_X, PAD_Y));
 		panel.setGap(new Point(0, 3));
 		panel.setPreferredSize(new Dimension(width, 0));
+	}
+
+	/**
+	 * How tall a framed panel drew these children, from their bounds once drawn. PanelComponent sizes itself from
+	 * the previous frame's children, so the height it returns lags a frame (only the padding on the first).
+	 */
+	static int drawnHeight(List<LayoutableRenderableEntity> children)
+	{
+		int top = Integer.MAX_VALUE;
+		int bottom = Integer.MIN_VALUE;
+		for (LayoutableRenderableEntity c : children)
+		{
+			Rectangle b = c.getBounds();
+			top = Math.min(top, b.y);
+			bottom = Math.max(bottom, b.y + b.height);
+		}
+		return children.isEmpty() ? 0 : bottom - top + 2 * PAD_Y;
 	}
 
 	/** Text cut to {@code max} pixels with ".." on the end. */
