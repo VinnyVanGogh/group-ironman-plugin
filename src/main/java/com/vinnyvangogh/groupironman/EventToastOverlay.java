@@ -58,6 +58,12 @@ final class EventToastOverlay extends OverlayPanel
 	{
 		List<ToastQueue.Toast> visible = toasts.visible(System.currentTimeMillis(),
 			TimeUnit.SECONDS.toMillis(config.overlayDurationSeconds()), config.overlayMaxStacked(), e -> true);
+		boolean abovePlayer = config.overlayPosition() == ToastPosition.ABOVE_PLAYER;
+		if (!abovePlayer)
+		{
+			// Also while idle: a spot kept from before a switch away must not come back as the off-screen fallback.
+			lastPlaced = null;
+		}
 		if (visible.isEmpty())
 		{
 			return null;
@@ -76,7 +82,7 @@ final class EventToastOverlay extends OverlayPanel
 			panelComponent.getChildren().add(new OverlayStyle.Row(
 				EasterEggs.tagged(EventText.describe(t.event, lookup), t.event, egg), OverlayStyle.TEXT).lines(3));
 		}
-		if (config.overlayPosition() == ToastPosition.ABOVE_PLAYER)
+		if (abovePlayer)
 		{
 			// Placed in canvas pixels, then moved into the space this graphics draws in (see BannerAnchor).
 			lastPlaced = BannerAnchor.place(headPoint(graphics), lastPlaced, client.getCanvasWidth(),
@@ -85,7 +91,6 @@ final class EventToastOverlay extends OverlayPanel
 		}
 		else
 		{
-			lastPlaced = null;
 			panelComponent.setPreferredLocation(new Point());
 		}
 		// Measured from the blocks themselves: the panel's own size is last frame's (see OverlayStyle.drawnHeight).
