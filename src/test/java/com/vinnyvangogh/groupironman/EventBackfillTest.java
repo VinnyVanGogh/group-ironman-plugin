@@ -3,6 +3,7 @@ package com.vinnyvangogh.groupironman;
 import com.google.gson.Gson;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -70,9 +71,26 @@ public class EventBackfillTest
 		/** What GroupService.receiveEvents does with one member's event, minus the client plumbing. */
 		void receive(GroupEvent wire, long now)
 		{
+			receive(wire, now, 1);
+		}
+
+		/** One party message as GroupService.receiveEvents takes it: each event, knowing how many came together. */
+		void message(String payload, long now)
+		{
+			GroupCodec.Decoded d = GroupCodec.decode(new Gson(), payload);
+			if (d.kind != GroupCodec.Kind.EVENTS)
+			{
+				// Banks, carried items, storage and extras fill the cards; GroupService never routes them as events.
+				return;
+			}
+			d.events.forEach(e -> receive(e, now, d.events.size()));
+		}
+
+		void receive(GroupEvent wire, long now, int batch)
+		{
 			// The wire carries no member: the receiver files it under the party member's name.
 			GroupEvent e = wire.member.isEmpty() ? wire.withMember("GroupArk") : wire;
-			EventBackfill.Arrival a = EventBackfill.classify(roster.feed(), e, now);
+			EventBackfill.Arrival a = EventBackfill.classify(roster.feed(), e, now, batch);
 			if (a == EventBackfill.Arrival.DUPLICATE)
 			{
 				return;
@@ -146,6 +164,89 @@ public class EventBackfillTest
 		ship.receive(e, NOW + 10 * 60_000);
 		assertEquals(1, ship.roster.feed().entries().size());
 		assertEquals(1, ship.toasts.size());
+	}
+
+	// ---- RUNELITE-510: only real events raise banners ----
+
+	/** Ark's client with events from the last minute: fresh enough that age alone would call them live. */
+	private GroupRoster arkJustNow()
+	{
+		GroupRoster ark = new GroupRoster();
+		ark.feed().add(run(GroupEvent.Type.LEVEL_UP, NOW - 50_000, "GroupArk", "Slayer", 71));
+		ark.feed().add(run(GroupEvent.Type.SLAYER, NOW - 40_000, "GroupArk", "Abyssal demons", 130));
+		ark.feed().add(run(GroupEvent.Type.LEVEL_UP, NOW - 30_000, "GroupArk", "Mining", 52));
+		ark.events().add(GroupEvent.drop(NOW - 20_000, "GroupArk", "Zulrah", items(FakeItems.WHIP, 1)));
+		ark.events().add(GroupEvent.drop(NOW - 10_000, "GroupArk", "Vorkath", items(FakeItems.WHIP, 1)));
+		return ark;
+	}
+
+	@Test
+	public void joiningSyncRaisesNoBannersEvenForFreshEvents()
+	{
+		Receiver ship = new Receiver(lookup);
+		List<GroupEvent> mine = EventBackfill.upload(arkJustNow(), "GroupArk", NOW);
+		GroupCodec.encodeEvents(gson, mine).forEach(p -> ship.message(p, NOW));
+		assertEquals(5, ship.roster.feed().entries().size());
+		assertEquals(0, ship.toasts.size());
+		assertEquals(0, ship.discord.size());
+	}
+
+	@Test
+	public void aSyncBurstOfFullInventoriesAndBanksRaisesNoBanners()
+	{
+		Receiver ship = new Receiver(lookup);
+		for (int i = 0; i < 50; i++)
+		{
+			ship.message(GroupCodec.encodeCarried(gson, items(FakeItems.SHARK, 20 + i, FakeItems.COAL, 5),
+				items(FakeItems.WHIP, 1)), NOW + i * 600);
+		}
+		GroupCodec.encodeBank(gson, new BankSnapshot(NOW, items(FakeItems.SHARK, 500, FakeItems.WHIP, 3)))
+			.forEach(p -> ship.message(p, NOW));
+		// A reconnect resends the recent events as one batch on top.
+		GroupCodec.encodeEvents(gson, EventBackfill.upload(arkJustNow(), "GroupArk", NOW))
+			.forEach(p -> ship.message(p, NOW));
+		assertEquals(0, ship.toasts.size());
+	}
+
+	@Test
+	public void aRealDropRaisesExactlyOneBanner()
+	{
+		Receiver ship = new Receiver(lookup);
+		GroupEvent drop = GroupEvent.drop(NOW - 1_000, "GroupArk", "Zulrah", items(FakeItems.WHIP, 1));
+		GroupCodec.encodeEvents(gson, Collections.singletonList(drop)).forEach(p -> ship.message(p, NOW));
+		assertEquals(1, ship.toasts.size());
+	}
+
+	@Test
+	public void aRepeatedMessageRaisesOneBanner()
+	{
+		Receiver ship = new Receiver(lookup);
+		GroupEvent drop = GroupEvent.drop(NOW - 1_000, "GroupArk", "Zulrah", items(FakeItems.WHIP, 1));
+		List<String> payloads = GroupCodec.encodeEvents(gson, Collections.singletonList(drop));
+		payloads.forEach(p -> ship.message(p, NOW));
+		payloads.forEach(p -> ship.message(p, NOW + 500));
+		payloads.forEach(p -> ship.message(p, NOW + 5_000));
+		assertEquals(1, ship.toasts.size());
+		assertEquals(1, ship.roster.feed().entries().size());
+	}
+
+	@Test
+	public void aBatchIsCatchUpAndALoneFreshEventIsLive()
+	{
+		DropLog feed = new GroupRoster().feed();
+		GroupEvent fresh = run(GroupEvent.Type.LEVEL_UP, NOW - 1_000, "GroupArk", "Fishing", 60);
+		assertEquals(EventBackfill.Arrival.LIVE, EventBackfill.classify(feed, fresh, NOW, 1));
+		assertEquals(EventBackfill.Arrival.BACKFILL, EventBackfill.classify(feed, fresh, NOW, 2));
+		assertEquals(EventBackfill.Arrival.BACKFILL,
+			EventBackfill.classify(feed, run(GroupEvent.Type.LEVEL_UP, NOW - 3 * 60_000, "GroupArk", "Fishing", 61),
+				NOW, 1));
+	}
+
+	@Test
+	public void aLateStorageVisitIsHistory()
+	{
+		assertFalse(EventBackfill.late(NOW - 30_000, NOW));
+		assertTrue(EventBackfill.late(NOW - EventBackfill.LIVE_MS - 1, NOW));
 	}
 
 	@Test

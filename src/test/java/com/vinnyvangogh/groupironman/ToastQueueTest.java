@@ -5,6 +5,7 @@ import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
 import static com.vinnyvangogh.groupironman.EventFixtures.sample;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class ToastQueueTest
@@ -42,6 +43,47 @@ public class ToastQueueTest
 		List<ToastQueue.Toast> shown = q.visible(NOW, DURATION, 3, e -> e.type != GroupEvent.Type.DEATH);
 		assertEquals(1, shown.size());
 		assertEquals(2, q.visible(NOW, DURATION, 3, e -> true).size());
+	}
+
+	@Test
+	public void atMostSixBannersAMinuteAndTheRestCountAsMore()
+	{
+		long duration = 60_000;
+		for (int i = 0; i < 10; i++)
+		{
+			assertEquals("banner " + i, i < ToastQueue.MAX_PER_WINDOW, q.add(sample(GroupEvent.Type.PET), NOW + i));
+		}
+		assertEquals(ToastQueue.MAX_PER_WINDOW, q.visible(NOW + 10, duration, 20, e -> true).size());
+		assertEquals(4, q.held(NOW + 10, DURATION));
+		assertEquals("the group box still lists every one", 10, q.recent(20).size());
+		assertEquals("+4 more in the Log", ToastQueue.heldLine(4));
+	}
+
+	@Test
+	public void theLimitIsASlidingMinute()
+	{
+		for (int i = 0; i < ToastQueue.MAX_PER_WINDOW; i++)
+		{
+			q.add(sample(GroupEvent.Type.PET), NOW);
+		}
+		assertFalse(q.add(sample(GroupEvent.Type.PET), NOW + ToastQueue.RATE_WINDOW_MS - 1));
+		assertTrue(q.add(sample(GroupEvent.Type.PET), NOW + ToastQueue.RATE_WINDOW_MS));
+	}
+
+	@Test
+	public void theMoreLineClearsAfterItsTimeOrADismiss()
+	{
+		for (int i = 0; i < ToastQueue.MAX_PER_WINDOW + 2; i++)
+		{
+			q.add(sample(GroupEvent.Type.PET), NOW);
+		}
+		assertEquals(2, q.held(NOW + DURATION - 1, DURATION));
+		assertEquals(0, q.held(NOW + DURATION, DURATION));
+
+		q.add(sample(GroupEvent.Type.PET), NOW + 1);
+		assertEquals(1, q.held(NOW + 2, DURATION));
+		q.dismissAll();
+		assertEquals(0, q.held(NOW + 3, DURATION));
 	}
 
 	@Test

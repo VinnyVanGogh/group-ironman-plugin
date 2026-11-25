@@ -48,6 +48,8 @@ final class LowStock
 	private final Map<String, Integer> minimums;
 	private final Map<String, String> displayNames;
 	private final Set<String> alerted = new HashSet<>();
+	/** Whether any storage state has been checked since these rules were made. */
+	private boolean primed;
 
 	private LowStock(Map<String, Integer> minimums, Map<String, String> displayNames)
 	{
@@ -97,9 +99,22 @@ final class LowStock
 		return minimums.isEmpty();
 	}
 
+	/**
+	 * A member's storage state from the party. The first one since these rules were set (a restart, a reconnect,
+	 * an edit) is a baseline, not a change: what is already short is recorded without alerting, so a sync does
+	 * not raise a banner for every item that was low before it (RUNELITE-510). Later states alert as {@link #check}.
+	 */
+	synchronized List<Alert> checkMember(Map<Integer, Integer> storage, ItemLookup items)
+	{
+		boolean baseline = !primed;
+		List<Alert> out = check(storage, items);
+		return baseline ? new ArrayList<>() : out;
+	}
+
 	/** Rules newly below their minimum after this storage state. Updates which rules have alerted. */
 	synchronized List<Alert> check(Map<Integer, Integer> storage, ItemLookup items)
 	{
+		primed = true;
 		Map<String, Integer> byName = new LinkedHashMap<>();
 		for (Map.Entry<Integer, Integer> e : storage.entrySet())
 		{

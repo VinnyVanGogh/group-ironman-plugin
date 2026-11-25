@@ -1949,7 +1949,8 @@ class GroupService
 			{
 				continue;
 			}
-			EventBackfill.Arrival arrival = EventBackfill.classify(roster.feed(), mine, now);
+			// A message carrying several events is catch-up, never something happening now (RUNELITE-510).
+			EventBackfill.Arrival arrival = EventBackfill.classify(roster.feed(), mine, now, received.size());
 			if (arrival == EventBackfill.Arrival.DUPLICATE)
 			{
 				continue;
@@ -1958,7 +1959,7 @@ class GroupService
 			added |= logged;
 			if (engine != null)
 			{
-				// Earlier events a member uploaded on joining the sync reach the Log only, never a toast.
+				// Earlier events a member uploaded on joining the sync, or any catch-up batch, reach the Log only.
 				if (arrival == EventBackfill.Arrival.BACKFILL)
 				{
 					engine.backfill(mine);
@@ -2297,7 +2298,9 @@ class GroupService
 		}
 		resolveNow(storage.keySet());
 		GroupEventEngine engine = events;
-		for (LowStock.Alert alert : lowStock.check(storage, lookup))
+		// A member's first state after a restart or reconnect is a baseline, not an alert for every short item.
+		LowStock rules = lowStock;
+		for (LowStock.Alert alert : own ? rules.check(storage, lookup) : rules.checkMember(storage, lookup))
 		{
 			notifier.notify(GroupIronmanPlugin.NAME + ": " + alert.message());
 			if (engine != null)
