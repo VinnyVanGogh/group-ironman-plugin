@@ -1,0 +1,9 @@
+{
+  "namespace": "group-shopping",
+  "name": "send",
+  "data": {
+    "v": 1,
+    "source": "group-shopping",
+    "payload": "{\"v\":1,\"k\":\"shop\",\"id\":\"l1\",\"name\":\"cox\",\"by\":\"Ember\",\"at\":1764000000000}"
+  }
+}

@@ -66,6 +66,9 @@ public class ConfigLayoutTest
 		"discordCombineLevels", "discordPosterName", "discordNameMain", "discordNameDrops", "discordNameDeaths",
 		"discordNameStorage", "discordNameProgress", "discordNameGroup", "discordNameActivities", "discordOnline"));
 
+	/** Published keys whose settings moved to Group Shopping (docs/contracts/group-shopping-v1.md, "Config migration"). */
+	static final Set<String> MOVED_TO_SHOPPING = new HashSet<>(Arrays.asList("overlayPathStop", "shoppingShopAlert"));
+
 	private static final List<String> SECTION_ORDER = Arrays.asList("Group", "Discord: what to post",
 		"Discord: how to post", "Discord: daily digest", "In-game", "Thresholds", "Advanced");
 
@@ -91,10 +94,15 @@ public class ConfigLayoutTest
 		Set<String> lost = new HashSet<>(PUBLISHED_KEYS);
 		lost.removeAll(keys);
 		lost.removeAll(MOVED_TO_RELAY);
+		lost.removeAll(MOVED_TO_SHOPPING);
 		assertTrue("published keys renamed or removed: " + lost, lost.isEmpty());
 		for (String moved : MOVED_TO_RELAY)
 		{
 			assertFalse(moved + " is Discord Relay's now, not shown twice", keys.contains(moved));
+		}
+		for (String moved : MOVED_TO_SHOPPING)
+		{
+			assertFalse(moved + " is Group Shopping's now, not shown twice", keys.contains(moved));
 		}
 	}
 

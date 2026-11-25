@@ -1,0 +1,9 @@
+{
+  "namespace": "group-shopping",
+  "name": "open",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "view": "lists"
+  }
+}

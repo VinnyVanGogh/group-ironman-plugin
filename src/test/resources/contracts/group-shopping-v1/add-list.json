@@ -1,0 +1,12 @@
+{
+  "namespace": "group-shopping",
+  "name": "add",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "kind": "list",
+    "itemId": 4151,
+    "itemName": "Abyssal whip",
+    "quantity": 1
+  }
+}
