@@ -47,6 +47,7 @@ import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetLoaded;
@@ -185,6 +186,7 @@ class GroupEventEngine
 	private final ToastQueue toasts = new ToastQueue();
 	private final WebhookWarnings webhookWarnings = new WebhookWarnings();
 	private final PosterNames posterNames = new PosterNames();
+	private final LampBook lampBook = new LampBook();
 	private final ProgressTracker progress = new ProgressTracker(Skill.values().length - 1);
 	/** Guards {@link #presence}: the client thread logs in and out, the executor polls. */
 	private final Object presenceLock = new Object();
@@ -1327,6 +1329,12 @@ class GroupEventEngine
 		}
 		// Before the value is judged: another account's levels are never the baseline for this one's.
 		checkAccount(System.currentTimeMillis());
+		GroupEvent used = lampBook.stat(event.getSkill().getName(), event.getXp(), System.currentTimeMillis(),
+			group.localPlayer());
+		if (used != null && wanted(used.type))
+		{
+			own(used);
+		}
 		List<GroupEvent> out = progress.skill(event.getSkill().getName(), event.getLevel(), event.getXp(),
 			System.currentTimeMillis(), group.localPlayer());
 		for (GroupEvent e : out)
@@ -1335,6 +1343,38 @@ class GroupEventEngine
 			{
 				own(e);
 			}
+		}
+	}
+
+	/** Rubbing or reading a lamp or book: its XP is looked for in the next few seconds. */
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event)
+	{
+		if (group.member() && wanted(GroupEvent.Type.LAMP_USED))
+		{
+			lampBook.clicked(event.getMenuOption(), event.getMenuTarget(), System.currentTimeMillis());
+		}
+	}
+
+	/** The inventory changed: a lamp or book more than before is one received. */
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event)
+	{
+		watchPickups(event);
+		if (event.getContainerId() != InventoryID.INV || !group.member() || !wanted(GroupEvent.Type.LAMP_BOOK))
+		{
+			return;
+		}
+		Map<Integer, Integer> inv = new TreeMap<>();
+		addAll(inv, event.getItemContainer());
+		// The bank, a trade or the group storage open: lamps moved, not received.
+		boolean moving = client.getWidget(InterfaceID.BANKMAIN, 0) != null
+			|| client.getWidget(InterfaceID.TRADEMAIN, 0) != null
+			|| client.getWidget(InterfaceID.SHARED_BANK, 0) != null;
+		for (GroupEvent e : lampBook.inventory(inv, id -> itemManager.getItemComposition(id).getName(),
+			System.currentTimeMillis(), group.localPlayer(), moving))
+		{
+			own(e);
 		}
 	}
 
@@ -1453,6 +1493,7 @@ class GroupEventEngine
 			group.shareActivity(waves.state(now));
 			// Another account may log in next: what this one was in the middle of (a grave, a raid) goes too.
 			watchers.reset();
+			lampBook.reset();
 			graveShot.free();
 			backWait = -1;
 		}
@@ -2255,8 +2296,8 @@ class GroupEventEngine
 		return counts;
 	}
 
-	@Subscribe
-	public void onItemContainerChanged(ItemContainerChanged event)
+	/** The inventory changed: a dropped item picked up again completes its watch. */
+	private void watchPickups(ItemContainerChanged event)
 	{
 		if (event.getContainerId() != InventoryID.INV || pickups.size() == 0)
 		{

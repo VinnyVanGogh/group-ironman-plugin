@@ -79,6 +79,8 @@ final class EventSettings
 			GroupIronmanConfig::overlayActivityDeath);
 		both(GroupEvent.Type.ANNOUNCEMENT, GroupIronmanConfig::discordAnnouncement,
 			GroupIronmanConfig::overlayAnnouncement);
+		both(GroupEvent.Type.LAMP_BOOK, GroupIronmanConfig::discordLampReceived, GroupIronmanConfig::overlayLampReceived);
+		both(GroupEvent.Type.LAMP_USED, GroupIronmanConfig::discordLampUsed, GroupIronmanConfig::overlayLampUsed);
 		both(GroupEvent.Type.EVERYONE_ONLINE, GroupIronmanConfig::discordEveryoneOnline,
 			GroupIronmanConfig::overlayEveryoneOnline);
 

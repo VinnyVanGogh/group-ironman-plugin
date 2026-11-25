@@ -101,6 +101,13 @@ final class GroupEvent
 		ACTIVITY_DEATH("ad", Category.DEATHS, Need.TEXT, false),
 		/** A short note a member typed ({@code ::announce}) for the group: {@link #text} is that text. */
 		ANNOUNCEMENT("an", Category.GROUP, Need.TEXT, false),
+		/**
+		 * A member got an XP lamp or skilling book ({@link LampBook}): {@link #text} its name, {@link #items} the item
+		 * (the picture), {@link #number} how many. Informational.
+		 */
+		LAMP_BOOK("lb", Category.DROPS, Need.TEXT, false),
+		/** A member used one: {@link #text} the skill, {@link #number} the XP gained, {@link #detail} the item. */
+		LAMP_USED("lu", Category.PROGRESS, Need.TEXT, false),
 		/** Every member of the group is online at once. Worked out by each client; never sent. */
 		EVERYONE_ONLINE("eo", Category.GROUP, Need.NOTHING, false);
 

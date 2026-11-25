@@ -113,6 +113,9 @@ final class BoxText
 			? glyph(Glyph.OFFLINE, "offline") : glyph(Glyph.ONLINE, t == 0 && e.world > 0 ? "W" + e.world : "online" + world(e), "online" + world(e)));
 		FORMS.put(GroupEvent.Type.BACK, (e, l, t) -> glyph(Glyph.ONLINE, "back " + e.number + "d"));
 		FORMS.put(GroupEvent.Type.SLAYER, (e, l, t) -> slayer(e));
+		FORMS.put(GroupEvent.Type.LAMP_BOOK, BoxText::lampBook);
+		FORMS.put(GroupEvent.Type.LAMP_USED, (e, l, t) -> skill(e.text, "+" + l.amount(e.number) + " xp",
+			e.text + " +" + l.amount(e.number) + " xp"));
 		FORMS.put(GroupEvent.Type.DROP, BoxText::drop);
 		FORMS.put(GroupEvent.Type.UNIQUE, BoxText::drop);
 	}
@@ -201,6 +204,14 @@ final class BoxText
 	{
 		String what = e.number > 0 ? e.number + " " + e.text : "done " + e.text;
 		return skill("Slayer", what, "Slayer " + what);
+	}
+
+	/** "Antique lamp" with the lamp's own picture; the name alone when the event carries no item. */
+	private static Part lampBook(GroupEvent e, ItemLookup lookup, int tier)
+	{
+		String words = e.number > 1 ? e.number + " x " + e.text : e.text;
+		return e.items.isEmpty() ? new Part(null, words, words)
+			: new Part(Icon.item(e.items.keySet().iterator().next()), words, words);
 	}
 
 	/** The item that is worth the most, so a drop's picture is the part that mattered; null when it has none. */

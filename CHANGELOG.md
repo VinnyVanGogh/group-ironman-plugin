@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- *Lamp or book received* and *Lamp or book used* events (`LampBook`) for XP lamps and skilling books, each with its own Discord and banner switch (all off by default); the Group box shows the item's icon for a receipt and the skill's for a use.
 - Member cards and the Group box show which pet a member has out, read from the client's follower and shared under the existing stats switch; older senders show nothing.
 - Log backfill (`EventBackfill`): events a member recorded while not synced (Fight Caves runs, slayer, levels, logins and the rest) are uploaded when they join the group's sync and appear in every member's Log and Activities with their original times, once each, in order. Backfilled events never toast or post to Discord. Members in the game but not syncing show "not syncing, last synced ... ago" on their card.
 - The roster check now removes entries filed under a name that is not on the group roster from every client's Log, storage log and member data, including the client that recorded them. The local player, roster members and the group's own entries are never removed.
