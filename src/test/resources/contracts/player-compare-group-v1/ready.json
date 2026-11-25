@@ -1,0 +1,9 @@
+{
+  "namespace": "player-compare",
+  "name": "ready",
+  "data": {
+    "v": 1,
+    "source": "player-compare",
+    "version": "1.0.0"
+  }
+}
