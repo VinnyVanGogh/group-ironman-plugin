@@ -28,6 +28,12 @@ interface ItemLookup
 		return 0;
 	}
 
+	/** The id of the item with this name (untradeables too), or a negative number while unknown. */
+	default int itemId(String name)
+	{
+		return -1;
+	}
+
 	/** What High Alchemy pays for one of the item in gp, 0 when unknown or not alchable. */
 	default long highAlch(int id)
 	{

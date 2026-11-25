@@ -141,6 +141,12 @@ final class OverlayStyle
 
 		/** Draws at ({@code x}, {@code y}) within {@code w} pixels; returns the height used. */
 		abstract int draw(Graphics2D g, int x, int y, int w);
+
+		/** The width this block needs to say everything on one line, in {@code g}'s font; 0 when it does not care. */
+		int natural(Graphics2D g)
+		{
+			return 0;
+		}
 	}
 
 	/** Accent bar, title in capitals, and an optional badge on the right ("3 online"). */
@@ -193,9 +199,10 @@ final class OverlayStyle
 	}
 
 	/**
-	 * One Group box event: [icon] member detail ... time. The time is kept and so is the member; only the detail
-	 * is cut, with "..", when the line is too long. The font is the box size's scale of the overlay font, and the
-	 * time is a little smaller and dimmer.
+	 * One Group box event: [icon] member detail ... time. The member and the time stay on the first line, the time
+	 * right-aligned; a detail too long for the room left wraps onto a second line under the member, cut with ".."
+	 * only if even that is too short. The font is the box size's scale of the overlay font, and the time is a little
+	 * smaller and dimmer.
 	 */
 	static final class EventRow extends Block
 	{
@@ -223,36 +230,94 @@ final class OverlayStyle
 			return width - iconSlot - nameWidth - NAME_GAP - (timeWidth == 0 ? 0 : timeWidth + GAP);
 		}
 
+		/**
+		 * The detail as drawn: the words that fit in {@code first} pixels beside the member, then the rest wrapped
+		 * onto as many lines of {@code rest} pixels as it needs, never cut. The first is "" when not even the first
+		 * word fits there; one entry when all fits.
+		 */
+		static List<String> split(String detail, FontMetrics fm, int first, int rest)
+		{
+			List<String> out = new ArrayList<>(3);
+			if (detail.isEmpty())
+			{
+				return out;
+			}
+			if (fm.stringWidth(detail) <= first)
+			{
+				out.add(detail);
+				return out;
+			}
+			int cut = -1;
+			for (int i = detail.indexOf(' '); i > 0 && fm.stringWidth(detail.substring(0, i)) <= first;
+				i = detail.indexOf(' ', i + 1))
+			{
+				cut = i;
+			}
+			out.add(cut < 0 ? "" : detail.substring(0, cut));
+			out.addAll(wrap(detail.substring(cut + 1), fm, Math.max(1, rest), Integer.MAX_VALUE));
+			return out;
+		}
+
+		private Font font(Graphics2D g)
+		{
+			Font base = g.getFont();
+			return base.deriveFont(base.getSize2D() * scale);
+		}
+
+		private int timeWidth(Graphics2D g, Font font)
+		{
+			return line.ago.isEmpty() ? 0 : g.getFontMetrics(font.deriveFont(font.getSize2D() * TIME_SCALE)).stringWidth(line.ago);
+		}
+
+		private int slot(FontMetrics fm)
+		{
+			return line.icon == null ? 0 : Math.max(8, fm.getHeight() - 2) + ICON_GAP;
+		}
+
+		@Override
+		int natural(Graphics2D g)
+		{
+			Font font = font(g);
+			FontMetrics fm = g.getFontMetrics(font);
+			int timeW = timeWidth(g, font);
+			return slot(fm) + fm.stringWidth(line.member) + (line.detail.isEmpty() ? 0 : NAME_GAP + fm.stringWidth(line.detail))
+				+ (timeW == 0 ? 0 : timeW + GAP);
+		}
+
 		@Override
 		int draw(Graphics2D g, int x, int y, int w)
 		{
 			Font base = g.getFont();
-			Font font = base.deriveFont(base.getSize2D() * scale);
+			Font font = font(g);
 			g.setFont(font);
 			FontMetrics fm = g.getFontMetrics();
-			Font small = font.deriveFont(font.getSize2D() * TIME_SCALE);
-			int timeW = line.ago.isEmpty() ? 0 : g.getFontMetrics(small).stringWidth(line.ago);
+			int timeW = timeWidth(g, font);
 			int size = Math.max(8, fm.getHeight() - 2);
-			int slot = line.icon == null ? 0 : size + ICON_GAP;
+			int slot = slot(fm);
 			int nameW = fm.stringWidth(line.member);
-			int room = detailRoom(w, slot, nameW, timeW);
 			int baseline = y + fm.getAscent();
 			if (line.icon != null)
 			{
 				BoxIcons.draw(g, line.icon, icons, x, y + (fm.getHeight() - size) / 2, size);
 			}
 			OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + slot, baseline), line.member, colour);
-			if (room > fm.stringWidth("..") && !line.detail.isEmpty())
+			List<String> detail = split(line.detail, fm, detailRoom(w, slot, nameW, timeW), w - slot);
+			if (!detail.isEmpty() && !detail.get(0).isEmpty())
 			{
 				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + slot + nameW + NAME_GAP, baseline),
-					fit(line.detail, fm, room), TEXT);
+					detail.get(0), TEXT);
+			}
+			for (int i = 1; i < detail.size(); i++)
+			{
+				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + slot, baseline + i * fm.getHeight()),
+					detail.get(i), TEXT);
 			}
 			if (timeW > 0)
 			{
-				g.setFont(small);
+				g.setFont(font.deriveFont(font.getSize2D() * TIME_SCALE));
 				OverlayUtil.renderTextLocation(g, new net.runelite.api.Point(x + w - timeW, baseline), line.ago, DIM);
 			}
-			int h = fm.getHeight();
+			int h = fm.getHeight() * Math.max(1, detail.size());
 			g.setFont(base);
 			return h;
 		}
@@ -306,6 +371,20 @@ final class OverlayStyle
 		{
 			this.scale = factor;
 			return this;
+		}
+
+		/** One-line rows (a name and its world, an activity) want their whole text; a wrapped note does not count. */
+		@Override
+		int natural(Graphics2D g)
+		{
+			if (maxLines > 2)
+			{
+				return 0;
+			}
+			Font base = g.getFont();
+			FontMetrics fm = g.getFontMetrics(scale == 1f ? base : base.deriveFont(base.getSize2D() * scale));
+			return indent + (dot == null ? 0 : DOT_SLOT) + fm.stringWidth(text)
+				+ (right.isEmpty() ? 0 : fm.stringWidth(right) + GAP);
 		}
 
 		@Override

@@ -26,6 +26,12 @@ public enum BoxSize
 		this.tier = tier;
 	}
 
+	/** The widest the box grows to show a long line whole; past it the line wraps. */
+	int maxWidth()
+	{
+		return width * 3 / 2;
+	}
+
 	@Override
 	public String toString()
 	{

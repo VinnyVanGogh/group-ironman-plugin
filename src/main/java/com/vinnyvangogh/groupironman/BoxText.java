@@ -17,7 +17,10 @@ final class BoxText
 		ONLINE, OFFLINE, DEATH, QUEST, DIARY, CLOG, PET, BEST, KILLS, COMBAT
 	}
 
-	/** One picture: a skill ({@link #skill}), an item ({@link #itemId}) or a {@link #glyph}; exactly one is set. */
+	/**
+	 * One picture: a skill ({@link #skill}), an item ({@link #itemId}) or a {@link #glyph}. An item may also carry a
+	 * glyph, drawn while the item's picture is not ready.
+	 */
 	static final class Icon
 	{
 		final String skill;
@@ -39,6 +42,12 @@ final class BoxText
 		static Icon item(int id)
 		{
 			return new Icon(null, id, null);
+		}
+
+		/** The item when its id is known, else the glyph alone. */
+		static Icon item(int id, Glyph fallback)
+		{
+			return new Icon(null, id < 0 ? -1 : id, fallback);
 		}
 
 		static Icon glyph(Glyph glyph)
@@ -100,10 +109,10 @@ final class BoxText
 		FORMS.put(GroupEvent.Type.QUEST, (e, l, t) -> glyph(Glyph.QUEST, e.text, "quest: " + e.text));
 		FORMS.put(GroupEvent.Type.QUEST_POINTS, (e, l, t) -> glyph(Glyph.QUEST, e.number + " QP"));
 		FORMS.put(GroupEvent.Type.DIARY, (e, l, t) -> glyph(Glyph.DIARY, e.text, "diary: " + e.text));
-		FORMS.put(GroupEvent.Type.CLOG, (e, l, t) -> glyph(Glyph.CLOG, e.text, "log: " + e.text));
+		FORMS.put(GroupEvent.Type.CLOG, (e, l, t) -> named(Glyph.CLOG, e, l, e.text, "log: " + e.text));
 		FORMS.put(GroupEvent.Type.PERSONAL_BEST, (e, l, t) -> glyph(Glyph.BEST, e.text, "PB: " + e.text));
 		FORMS.put(GroupEvent.Type.KC_MILESTONE, (e, l, t) -> glyph(Glyph.KILLS, e.number + " " + e.text));
-		FORMS.put(GroupEvent.Type.PET, (e, l, t) -> glyph(Glyph.PET, t == 0 || e.text.isEmpty() ? "pet" : "pet " + e.text));
+		FORMS.put(GroupEvent.Type.PET, (e, l, t) -> named(Glyph.PET, e, l, t == 0 || e.text.isEmpty() ? "pet" : "pet " + e.text));
 		FORMS.put(GroupEvent.Type.DEATH, (e, l, t) -> glyph(Glyph.DEATH,
 			t == 2 && !e.location.isEmpty() ? "died " + e.location : "died"));
 		FORMS.put(GroupEvent.Type.DEATH_VALUE, (e, l, t) -> glyph(Glyph.DEATH, "-" + l.amount(e.number),
@@ -124,12 +133,60 @@ final class BoxText
 	/** The event as a box line at this size; icons and times as the settings say. */
 	static Line format(GroupEvent e, ItemLookup lookup, BoxSize size, boolean icons, BoxTimes times, long now)
 	{
+		if (!icons)
+		{
+			// No picture is drawn, so do not start a scan of the item list for one.
+			lookup = withoutNameSearch(lookup);
+		}
 		Fmt form = FORMS.get(e.type);
 		Part part = form == null ? new Part(null, EventText.describe(e, lookup), EventText.describe(e, lookup))
 			: form.apply(e, lookup, size.tier);
 		boolean pictured = icons && part.icon != null;
 		return new Line(pictured ? part.icon : null, e.member, pictured ? part.withIcon : part.textOnly,
 			times.of(now, e.at));
+	}
+
+	/** {@code lookup} with every answer but {@link ItemLookup#itemId}, which stays unknown. */
+	private static ItemLookup withoutNameSearch(ItemLookup lookup)
+	{
+		return new ItemLookup()
+		{
+			@Override
+			public String name(int id)
+			{
+				return lookup.name(id);
+			}
+
+			@Override
+			public long price(int id)
+			{
+				return lookup.price(id);
+			}
+
+			@Override
+			public int slot(int id)
+			{
+				return lookup.slot(id);
+			}
+
+			@Override
+			public int combatStyles(int id)
+			{
+				return lookup.combatStyles(id);
+			}
+
+			@Override
+			public long highAlch(int id)
+			{
+				return lookup.highAlch(id);
+			}
+
+			@Override
+			public String amount(long amount)
+			{
+				return lookup.amount(amount);
+			}
+		};
 	}
 
 	/** The level before a level-up's first: what it knew, or one below. */
@@ -189,6 +246,21 @@ final class BoxText
 	private static Part glyph(Glyph glyph, String withIcon, String textOnly)
 	{
 		return new Part(Icon.glyph(glyph), withIcon, textOnly);
+	}
+
+	private static Part named(Glyph glyph, GroupEvent e, ItemLookup lookup, String text)
+	{
+		return named(glyph, e, lookup, text, text);
+	}
+
+	/**
+	 * A collection log slot or a pet: the item's own picture (its id carried on the event, or found by the name the
+	 * game's line gave), the glyph until then.
+	 */
+	private static Part named(Glyph glyph, GroupEvent e, ItemLookup lookup, String withIcon, String textOnly)
+	{
+		int id = e.items.isEmpty() ? lookup.itemId(e.text) : e.items.keySet().iterator().next();
+		return new Part(Icon.item(id, glyph), withIcon, textOnly);
 	}
 
 	private static String world(GroupEvent e)

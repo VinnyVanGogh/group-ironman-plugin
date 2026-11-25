@@ -76,7 +76,6 @@ final class GroupBoxOverlay extends OverlayPanel
 			events.add(new EventLine(new BoxText.Line(line.icon, line.member,
 				EasterEggs.tagged(line.detail, event, egg), line.ago), new Color(event.type.category.colour)));
 		}
-		OverlayStyle.frame(panelComponent, size.width);
 		Map<String, String> pets = new HashMap<>();
 		for (Map.Entry<String, MemberStats> e : group.roster().onlineStats(now).entrySet())
 		{
@@ -93,7 +92,28 @@ final class GroupBoxOverlay extends OverlayPanel
 				now / EmptyBox.ROTATE_MS);
 		}
 		build(panelComponent, online, group.roster().activities(now), pets, events, size, icons, empty);
+		OverlayStyle.frame(panelComponent, width(panelComponent.getChildren(), graphics, size));
 		return super.render(graphics);
+	}
+
+	/** Horizontal padding {@link OverlayStyle#frame} puts around the blocks. */
+	static final int PADDING = 16;
+
+	/**
+	 * The box's width: the size's own, grown so the longest line fits whole, but no wider than the size's
+	 * {@link BoxSize#maxWidth}; a line longer than that wraps.
+	 */
+	static int width(List<LayoutableRenderableEntity> kids, Graphics2D g, BoxSize size)
+	{
+		int want = size.width;
+		for (LayoutableRenderableEntity kid : kids)
+		{
+			if (kid instanceof OverlayStyle.Block)
+			{
+				want = Math.max(want, ((OverlayStyle.Block) kid).natural(g) + PADDING);
+			}
+		}
+		return Math.min(want, size.maxWidth());
 	}
 
 	static void build(PanelComponent panel, Map<String, Integer> online, Map<String, ActivityState> activities,
@@ -124,12 +144,12 @@ final class GroupBoxOverlay extends OverlayPanel
 			String pet = pets.get(e.getKey());
 			if (pet != null && !pet.isEmpty())
 			{
-				kids.add(new OverlayStyle.Row("Pet: " + pet, OverlayStyle.MUTED).indent(12).scale(size.fontScale));
+				kids.add(new OverlayStyle.Row("Pet: " + pet, OverlayStyle.MUTED).indent(12).lines(2).scale(size.fontScale));
 			}
 			ActivityState a = activities.get(e.getKey());
 			if (a != null)
 			{
-				kids.add(new OverlayStyle.Row(a.overlayLine(), ACTIVITY).indent(12).scale(size.fontScale));
+				kids.add(new OverlayStyle.Row(a.overlayLine(), ACTIVITY).indent(12).lines(2).scale(size.fontScale));
 			}
 		}
 		if (!events.isEmpty())
