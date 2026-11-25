@@ -96,13 +96,13 @@ public class GimPanelUiTest
 		{
 			GimPanelFixture.Scene s = GimPanelFixture.groupScene();
 			// Sync on, every Share switch off: the card opens by itself.
-			s.sharing = new SharingPrompt.Settings(GimPanelFixture.KEY, true, false, false, false, true);
+			s.sharing = new SharingPrompt.Settings(GimPanelFixture.KEY, true, false, false);
 			GimPanelFixture f = panel(s);
 			f.ui.assertShows("Share with your group?");
 			f.ui.click("Turn on sharing");
 			assertTrue(f.actions.calls.contains("turnOnSharing"));
-			f.ui.click("Post my events to Discord");
-			assertTrue(f.actions.calls.contains("postToDiscord"));
+			// Posting to Discord is Discord Relay's own switch: the card offers no Discord button.
+			f.ui.assertHides("Post my events to Discord");
 			f.ui.click("Not now");
 			f.ui.assertHides("Share with your group?");
 		});
@@ -152,7 +152,7 @@ public class GimPanelUiTest
 				GimPanelFixture.Scene s = GimPanelFixture.groupScene();
 				s.sync = GroupSync.State.NO_KEY;
 				// After the paste: sync on, some sharing on, not all of it.
-				s.sharing = new SharingPrompt.Settings(GimPanelFixture.KEY, true, true, false, false, false);
+				s.sharing = new SharingPrompt.Settings(GimPanelFixture.KEY, true, true, false);
 				GimPanelFixture f = panel(s);
 				f.ui.click("Paste group key");
 				assertEquals("pasteKey:" + GimPanelFixture.KEY, f.actions.calls.get(0));

@@ -14,27 +14,30 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-/** The "Turn on sharing" card: one click after pasting the key, nothing on without it (Board 2026-11-13). */
+/**
+ * The "Turn on sharing" card: one click after pasting the key, nothing on without it (Board 2026-11-13). Its old
+ * "Post my events to Discord" button went with the Discord settings to Discord Relay.
+ */
 public class SharingPromptTest
 {
 	private static final String KEY = GroupKey.generate();
 	private static final String OTHER_KEY = GroupKey.generate();
 
-	/** Sync and every Share switch off, no webhook. */
+	/** Sync and every Share switch off. */
 	private static SharingPrompt.Settings allOff(String key)
 	{
-		return new SharingPrompt.Settings(key, false, false, false, false, false);
+		return new SharingPrompt.Settings(key, false, false, false);
 	}
 
 	/** Sync on, every Share switch off. */
-	private static SharingPrompt.Settings syncOnly(String key, boolean webhook)
+	private static SharingPrompt.Settings syncOnly(String key)
 	{
-		return new SharingPrompt.Settings(key, true, false, false, false, webhook);
+		return new SharingPrompt.Settings(key, true, false, false);
 	}
 
-	private static SharingPrompt.Settings allSharing(String key, boolean webhook, boolean discordOn)
+	private static SharingPrompt.Settings allSharing(String key)
 	{
-		return new SharingPrompt.Settings(key, true, true, true, discordOn, webhook);
+		return new SharingPrompt.Settings(key, true, true, true);
 	}
 
 	@Test
@@ -46,14 +49,13 @@ public class SharingPromptTest
 		SharingPrompt.Card card = p.card(allOff(KEY));
 		assertNotNull(card);
 		assertTrue(card.sharing);
-		assertFalse("no webhook, no Discord button", card.discord);
 	}
 
 	@Test
 	public void shownWhileSyncIsOnAndEveryShareSwitchIsOff()
 	{
 		SharingPrompt p = new SharingPrompt();
-		assertNotNull(p.card(syncOnly(KEY, false)));
+		assertNotNull(p.card(syncOnly(KEY)));
 	}
 
 	@Test
@@ -61,7 +63,7 @@ public class SharingPromptTest
 	{
 		SharingPrompt p = new SharingPrompt();
 		p.pasted("");
-		assertNull(p.card(syncOnly("", false)));
+		assertNull(p.card(syncOnly("")));
 	}
 
 	@Test
@@ -70,9 +72,9 @@ public class SharingPromptTest
 		SharingPrompt p = new SharingPrompt();
 		p.pasted(KEY);
 		assertNotNull(p.card(allOff(KEY)));
-		assertNull(p.card(allSharing(KEY, false, false)));
+		assertNull(p.card(allSharing(KEY)));
 		// The player later unticks one switch: the card does not come back to nag.
-		assertNull(p.card(new SharingPrompt.Settings(KEY, true, true, false, false, false)));
+		assertNull(p.card(new SharingPrompt.Settings(KEY, true, true, false)));
 	}
 
 	@Test
@@ -82,30 +84,9 @@ public class SharingPromptTest
 		p.pasted(KEY);
 		p.notNow(KEY);
 		assertNull(p.card(allOff(KEY)));
-		assertNull("not even while sync is on with every switch off", p.card(syncOnly(KEY, false)));
+		assertNull("not even while sync is on with every switch off", p.card(syncOnly(KEY)));
 		p.pasted(OTHER_KEY);
 		assertNotNull("a new key brings it back", p.card(allOff(OTHER_KEY)));
-	}
-
-	@Test
-	public void theDiscordButtonShowsOnlyWithAWebhook()
-	{
-		SharingPrompt p = new SharingPrompt();
-		assertFalse(p.card(syncOnly(KEY, false)).discord);
-		assertTrue(p.card(syncOnly(KEY, true)).discord);
-		assertFalse("already posting", p.card(new SharingPrompt.Settings(KEY, true, false, false, true, true)).discord);
-	}
-
-	@Test
-	public void afterTurnOnSharingTheDiscordButtonStaysUntilUsed()
-	{
-		SharingPrompt p = new SharingPrompt();
-		p.pasted(KEY);
-		SharingPrompt.Card card = p.card(allSharing(KEY, true, false));
-		assertNotNull(card);
-		assertFalse(card.sharing);
-		assertTrue(card.discord);
-		assertNull(p.card(allSharing(KEY, true, true)));
 	}
 
 	@Test
@@ -123,14 +104,6 @@ public class SharingPromptTest
 	}
 
 	@Test
-	public void postToDiscordSetsOnlyPostToDiscord()
-	{
-		Map<String, Object> set = new LinkedHashMap<>();
-		SharingPrompt.postToDiscord(set::put);
-		assertEquals(java.util.Collections.singletonMap("discordEnabled", (Object) true), set);
-	}
-
-	@Test
 	public void everyKeyItSetsIsAnExistingBooleanSetting()
 	{
 		Set<String> booleans = new HashSet<>();
@@ -145,7 +118,6 @@ public class SharingPromptTest
 		{
 			assertTrue(key, booleans.contains(key));
 		}
-		assertTrue(booleans.contains(SharingPrompt.DISCORD_KEY));
 	}
 
 	@Test
@@ -164,7 +136,6 @@ public class SharingPromptTest
 		assertTrue("Sync with my group defaults on", s.sync);
 		assertFalse(s.anyShare);
 		assertFalse(s.allSharing);
-		assertFalse(s.webhook);
 		assertNotNull("a fresh install with a key sees the card", new SharingPrompt().card(s));
 
 		GroupIronmanConfig everything = new GroupIronmanConfig()
@@ -216,16 +187,9 @@ public class SharingPromptTest
 			{
 				return true;
 			}
-
-			@Override
-			public String discordWebhookUrl()
-			{
-				return "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz";
-			}
 		};
 		SharingPrompt.Settings all = SharingPrompt.Settings.of(everything);
 		assertTrue(all.anyShare);
 		assertTrue(all.allSharing);
-		assertTrue(all.webhook);
 	}
 }

@@ -1,0 +1,38 @@
+{
+  "namespace": "discord-relay",
+  "name": "event",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "channel": "DROPS",
+    "title": "Valuable drop",
+    "text": "Abyssal demon dropped 2 x Bones, 1 x Abyssal whip, kill count 120",
+    "fields": [{"name": "Items", "value": "2 x Bones, 1 x Abyssal whip (1.5M gp)", "inline": false}],
+    "iconItemId": 4151,
+    "screenshot": "frame",
+    "mergeKey": "Alice",
+    "mention": false,
+    "post": true,
+    "digest": false,
+    "attach": false,
+    "event": {
+      "type": "DROP",
+      "code": "d",
+      "category": "DROPS",
+      "at": 1767225600000,
+      "member": "Alice",
+      "text": "Abyssal demon",
+      "detail": "",
+      "number": 120,
+      "previous": 0,
+      "world": 0,
+      "location": "",
+      "broadcast": false,
+      "items": [
+        {"id": 526, "quantity": 2, "name": "Bones", "price": 100},
+        {"id": 4151, "quantity": 1, "name": "Abyssal whip", "price": 1500000}
+      ],
+      "taken": []
+    }
+  }
+}

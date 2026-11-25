@@ -106,12 +106,6 @@ final class GimPanelFixture
 			calls.add("turnOnSharing");
 		}
 
-		@Override
-		public void postToDiscord()
-		{
-			calls.add("postToDiscord");
-		}
-
 		/** What the quick switches show now; a test flips them as a config change would. */
 		final boolean[] quick = new boolean[QuickSettings.ITEMS.size()];
 
@@ -295,7 +289,7 @@ final class GimPanelFixture
 		GamePresence presence = GamePresence.UNKNOWN;
 		GroupSettingsTab.View settings;
 		boolean anyOn = true;
-		SharingPrompt.Settings sharing = new SharingPrompt.Settings(KEY, true, true, true, false, false);
+		SharingPrompt.Settings sharing = new SharingPrompt.Settings(KEY, true, true, true);
 		ShoppingTab.View shopping;
 
 		GroupIronmanPanel.View view()

@@ -1,0 +1,15 @@
+{
+  "namespace": "discord-relay",
+  "name": "ready",
+  "data": {
+    "v": 1,
+    "source": "discord-relay",
+    "version": "1.0.0",
+    "enabled": true,
+    "channels": {
+      "MAIN": {"url": "https://discord.com/api/webhooks/111/maintoken", "poster": "GIM_UTILITIES", "name": ""},
+      "ONLINE": {"url": "https://discord.com/api/webhooks/333/onlinetoken", "poster": "CUSTOM", "name": "Lumbridge Guide"},
+      "DROPS": {"url": "", "poster": "WEBHOOK", "name": ""}
+    }
+  }
+}

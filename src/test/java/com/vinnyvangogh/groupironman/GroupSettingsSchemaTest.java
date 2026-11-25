@@ -54,11 +54,15 @@ public class GroupSettingsSchemaTest
 		assertFalse(payload, payload.contains("SECRETTOKEN"));
 		assertFalse(payload, payload.contains("discord.com"));
 
-		GroupWebhooks off = GroupWebhooks.next(null, "groupship", false, Webhooks.of(everythingSet()), "Alex", leader,
-			NOW);
+		// The leader's own webhooks, as Discord Relay reports them: every one set.
+		java.util.Map<Webhook, Webhooks.Setting> all = new java.util.EnumMap<>(Webhook.class);
+		for (Webhook w : Webhook.values())
+		{
+			all.put(w, new Webhooks.Setting(SECRET, DiscordPosterName.WEBHOOK, ""));
+		}
+		GroupWebhooks off = GroupWebhooks.next(null, "groupship", false, new Webhooks(all), "Alex", leader, NOW);
 		assertFalse("sharing off carries none", GovernanceCodec.encode(new Gson(), off).contains("SECRETTOKEN"));
-		GroupWebhooks on = GroupWebhooks.next(off, "groupship", true, Webhooks.of(everythingSet()), "Alex", leader,
-			NOW + 1);
+		GroupWebhooks on = GroupWebhooks.next(off, "groupship", true, new Webhooks(all), "Alex", leader, NOW + 1);
 		assertTrue("the leader shares", GovernanceCodec.encode(new Gson(), on).contains("SECRETTOKEN"));
 	}
 

@@ -202,10 +202,11 @@ public class SharedWebhooksTest
 		assertFalse(merged.fromGroup(Webhook.DROPS));
 		assertEquals("the group's where the member left it empty", PROGRESS, merged.url(Webhook.PROGRESS));
 		assertTrue(merged.fromGroup(Webhook.PROGRESS));
-		assertEquals("with the leader's poster name", "Leader's Levels", merged.name(Webhook.PROGRESS));
+		assertEquals("with the leader's poster name", "Leader's Levels",
+			merged.settings().get(Webhook.PROGRESS).name);
 		assertEquals("an empty category lands on the group's Main", MAIN, merged.url(Webhook.DEATHS));
-		assertEquals("the group's choice for Main", Webhook.MAIN.defaultName, merged.name(Webhook.MAIN));
-		assertNull("the group's choice for Deaths: Webhook's own", merged.name(Webhook.DEATHS));
+		// Which name each choice posts under is Discord Relay's (its WebhooksTest); GIM passes the choice on.
+		assertEquals(DiscordPosterName.GIM_UTILITIES, merged.settings().get(Webhook.MAIN).mode);
 		assertNull("not shared: nothing to fill in", none().withGroup(null).url(Webhook.MAIN));
 	}
 
@@ -257,7 +258,7 @@ public class SharedWebhooksTest
 			Webhooks own = leader ? leaderHooks() : none();
 			Webhooks hooks = own.withGroup(client.shared());
 			assertEquals(ONLINE, hooks.url(Webhook.ONLINE));
-			if (StatusBoard.keeps(OnlineStatus.LIVE_BOARD, hooks, leader))
+			if (BoardLines.keeps(OnlineStatus.LIVE_BOARD, hooks, leader))
 			{
 				keepers++;
 			}
@@ -265,9 +266,9 @@ public class SharedWebhooksTest
 		assertEquals("one board for the group", 1, keepers);
 
 		// A member's own pasted Online status webhook is theirs, as before sharing existed.
-		assertTrue(StatusBoard.keeps(OnlineStatus.LIVE_BOARD, own(Webhook.ONLINE, OWN_ONLINE).withGroup(c[2].shared()),
+		assertTrue(BoardLines.keeps(OnlineStatus.LIVE_BOARD, own(Webhook.ONLINE, OWN_ONLINE).withGroup(c[2].shared()),
 			false));
-		assertFalse(StatusBoard.keeps(OnlineStatus.POSTS, leaderHooks(), true));
+		assertFalse(BoardLines.keeps(OnlineStatus.POSTS, leaderHooks(), true));
 	}
 
 	@Test
@@ -284,11 +285,11 @@ public class SharedWebhooksTest
 		}, gs);
 		Webhooks shared = none().withGroup(member.shared());
 		assertEquals("a member on the shared webhook follows the group", OnlineStatus.LIVE_BOARD,
-			StatusBoard.effective(OnlineStatus.POSTS, group, shared));
-		assertFalse("and, not the leader, posts nothing", StatusBoard.keeps(OnlineStatus.LIVE_BOARD, shared, false));
+			BoardLines.effective(OnlineStatus.POSTS, group, shared));
+		assertFalse("and, not the leader, posts nothing", BoardLines.keeps(OnlineStatus.LIVE_BOARD, shared, false));
 		Webhooks pasted = own(Webhook.ONLINE, OWN_ONLINE);
 		assertEquals("their own pasted webhook stays theirs", OnlineStatus.POSTS,
-			StatusBoard.effective(OnlineStatus.POSTS, group, pasted));
+			BoardLines.effective(OnlineStatus.POSTS, group, pasted));
 	}
 
 	@Test
@@ -303,7 +304,7 @@ public class SharedWebhooksTest
 	public void theFullestDocumentFitsOneMessage()
 	{
 		Map<Webhook, Webhooks.Setting> s = new EnumMap<>(Webhook.class);
-		String longName = new String(new char[PosterNames.MAX]).replace('\0', 'n');
+		String longName = new String(new char[Webhooks.MAX_NAME]).replace('\0', 'n');
 		for (Webhook w : Webhook.values())
 		{
 			String url = "https://canary.discordapp.com/api/webhooks/123456789012345678901/"

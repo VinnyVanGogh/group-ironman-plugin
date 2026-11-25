@@ -44,7 +44,7 @@ public class AlertsTest
 	@Test
 	public void noQuietHoursByDefault()
 	{
-		assertFalse(DiscordQueue.quiet(3, DEFAULTS.overlayQuietStart(), DEFAULTS.overlayQuietEnd()));
+		assertFalse(ToastQueue.quiet(3, DEFAULTS.overlayQuietStart(), DEFAULTS.overlayQuietEnd()));
 	}
 
 	@Test

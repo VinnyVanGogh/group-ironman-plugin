@@ -29,7 +29,7 @@ public class NoRawAmountsTest
 			+ "|BoostText\\.gp\\(");
 	/** The string builders the Board named: panel, chat, overlays and Discord. */
 	private static final String[] BUILDERS = {"StorageLog.java", "PanelModel.java", "FindStyle.java",
-		"GroupSearch.java", "EventText.java", "DiscordWebhook.java", "GroupIronmanPanel.java"};
+		"GroupSearch.java", "EventText.java", "GroupIronmanPanel.java"};
 
 	@Test
 	public void noQuantityIsPrintedRaw() throws IOException

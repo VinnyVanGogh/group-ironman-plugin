@@ -112,7 +112,7 @@ public class ActivityPrivacyTest
 			EnumSet.noneOf(GroupEvent.Type.class)));
 		prefs.put("Pat", new MemberPrefs(false, EnumSet.of(GroupEvent.Type.ACTIVITY_START),
 			EnumSet.noneOf(GroupEvent.Type.class)));
-		Map<String, String> out = StatusBoard.activitySuffixes(live, prefs, "Me", MemberPrefs.NONE, true);
+		Map<String, String> out = BoardLines.activitySuffixes(live, prefs, "Me", MemberPrefs.NONE, true);
 		assertEquals(" - in The Inferno, wave 40", out.get(GroupMembers.key("Alex")));
 		assertFalse("don't post my events", out.containsKey(GroupMembers.key("Sam")));
 		assertFalse("activity posts off", out.containsKey(GroupMembers.key("Pat")));
@@ -122,9 +122,9 @@ public class ActivityPrivacyTest
 	public void ownBoardClauseNeedsShareGroupEvents()
 	{
 		Map<String, ActivityState> live = Collections.singletonMap("Me", RUN);
-		assertTrue(StatusBoard.activitySuffixes(live, Collections.emptyMap(), "Me", MemberPrefs.NONE, false)
+		assertTrue(BoardLines.activitySuffixes(live, Collections.emptyMap(), "Me", MemberPrefs.NONE, false)
 			.isEmpty());
-		assertEquals(1, StatusBoard.activitySuffixes(live, Collections.emptyMap(), "Me", MemberPrefs.NONE, true)
+		assertEquals(1, BoardLines.activitySuffixes(live, Collections.emptyMap(), "Me", MemberPrefs.NONE, true)
 			.size());
 	}
 
@@ -139,7 +139,7 @@ public class ActivityPrivacyTest
 		Map<String, String> clauses = new HashMap<>();
 		clauses.put(GroupMembers.key("Alex"), " - in The Inferno, wave 40");
 		clauses.put(GroupMembers.key("Sam"), " - in Fight Caves, wave 10");
-		String lines = StatusBoard.lines(roster, heard, Collections.emptyMap(), Collections.emptyMap(), null,
+		String lines = BoardLines.lines(roster, heard, Collections.emptyMap(), Collections.emptyMap(), null,
 			GamePresence.UNKNOWN, clauses, now);
 		assertTrue(lines, lines.contains("**Alex** online - in The Inferno, wave 40"));
 		assertFalse(lines, lines.contains("Fight Caves"));

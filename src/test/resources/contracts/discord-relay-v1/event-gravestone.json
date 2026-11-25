@@ -1,0 +1,35 @@
+{
+  "namespace": "discord-relay",
+  "name": "event",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "channel": "DEATHS",
+    "title": "Gravestone expiring",
+    "text": "gravestone at Lumbridge on world 302 has about 3 min left",
+    "fields": [],
+    "iconItemId": null,
+    "screenshot": "grave",
+    "mergeKey": "Alice",
+    "mention": false,
+    "post": true,
+    "digest": false,
+    "attach": false,
+    "event": {
+      "type": "GRAVESTONE_EXPIRING",
+      "code": "ge",
+      "category": "DEATHS",
+      "at": 1767225600000,
+      "member": "Alice",
+      "text": "",
+      "detail": "",
+      "number": 3,
+      "previous": 0,
+      "world": 302,
+      "location": "Lumbridge",
+      "broadcast": false,
+      "items": [],
+      "taken": []
+    }
+  }
+}
