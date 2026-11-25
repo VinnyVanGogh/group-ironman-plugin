@@ -20,6 +20,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.MenuAction;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatColorType;
 import net.runelite.client.chat.ChatMessageBuilder;
@@ -88,6 +89,9 @@ public class GroupIronmanPlugin extends Plugin
 	/** What the on-screen path card says; null while no path is in force. Built each redraw. */
 	private volatile PathStopPlan pathPlan;
 	private PathStopOverlay pathOverlay;
+	private SyncReminder syncReminder;
+	/** The sync-off chat line goes out once per login, the banner stays until synced. */
+	private boolean syncRemindedThisLogin;
 
 	@Inject
 	private WSClient wsClient;
@@ -172,7 +176,10 @@ public class GroupIronmanPlugin extends Plugin
 			ShortestPathBridge.clientThreadEventPoster(clientThread::invoke, eventBus::post)));
 		pathOverlay = new PathStopOverlay(config, () -> pathPlan);
 		overlayManager.add(pathOverlay);
-		panel = new GroupIronmanPanel(itemManager, skillIconManager, spriteManager, new GroupIronmanPanel.Actions()
+		syncReminder = new SyncReminder();
+		syncRemindedThisLogin = false;
+		overlayManager.add(syncReminder);
+		panel =new GroupIronmanPanel(itemManager, skillIconManager, spriteManager, new GroupIronmanPanel.Actions()
 		{
 			@Override
 			public void join()
@@ -435,6 +442,43 @@ public class GroupIronmanPlugin extends Plugin
 		{
 			postUpdateNotes();
 		}
+		else if (event.getGameState() == GameState.LOGIN_SCREEN)
+		{
+			syncRemindedThisLogin = false;
+		}
+	}
+
+	/** Shows the sync-off banner while this member could join but has not, and says so in chat once per login. */
+	@Subscribe
+	public void onGameTick(GameTick tick)
+	{
+		SyncReminder reminder = syncReminder;
+		if (reminder == null)
+		{
+			return;
+		}
+		boolean due = group.member() && SyncReminder.due(group.syncState());
+		reminder.show(due);
+		if (due && !syncRemindedThisLogin)
+		{
+			syncRemindedThisLogin = true;
+			chatMessageManager.queue(QueuedMessage.builder()
+				.type(ChatMessageType.CONSOLE)
+				.runeLiteFormattedMessage(new ChatMessageBuilder().append(ChatColorType.HIGHLIGHT)
+					.append(NAME + ": ").append(ChatColorType.NORMAL).append(SyncReminder.CHAT).build())
+				.build());
+		}
+	}
+
+	/** The banner's "Join group sync": the player's own click, the same as the panel button. */
+	@Subscribe
+	public void onOverlayMenuClicked(OverlayMenuClicked click)
+	{
+		if (syncReminder != null && click.getOverlay() == syncReminder
+			&& SyncReminder.JOIN.equals(click.getEntry().getOption()))
+		{
+			clientThread.invokeLater(group::joinGroup);
+		}
 	}
 
 	/**
@@ -480,6 +524,11 @@ public class GroupIronmanPlugin extends Plugin
 		{
 			overlayManager.remove(pathOverlay);
 			pathOverlay = null;
+		}
+		if (syncReminder != null)
+		{
+			overlayManager.remove(syncReminder);
+			syncReminder = null;
 		}
 		wsClient.unregisterMessage(VvgGroupIronmanMessage.class);
 		eventBus.unregister(events);
