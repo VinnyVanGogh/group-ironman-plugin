@@ -2198,7 +2198,7 @@ class GroupEventEngine
 		long window = TimeUnit.MINUTES.toMillis(config.discordGroupPosts());
 		boolean pings = post.big && mention != null && !mention.trim().isEmpty();
 		EventThreads.Moment moment = window <= 0 ? null
-			: EventPosts.moment(gson, url, post, words, egg, username, pings);
+			: EventPosts.moment(gson, url, post, words, egg, username, pings, DeathBoard.row(events, words));
 		if (moment != null)
 		{
 			return png -> grouped.add(moment, json, picked ? png : null, window);

@@ -59,6 +59,12 @@ final class EventThreads extends EditedThreads<EventThreads.Feed, EventThreads.E
 		}
 	}
 
+	/** Most cards a message keeps: the deaths' latest full card and its board rows, else Discord's embed limit. */
+	static int limit(String family)
+	{
+		return DeathBoard.FAMILY.equals(family) ? 1 + DeathBoard.MAX_ROWS : MAX_CARDS;
+	}
+
 	/** The facts of a moment's lead event a storage card is drawn from: whose, when, the world and place. */
 	static final class Lead
 	{
@@ -90,11 +96,19 @@ final class EventThreads extends EditedThreads<EventThreads.Feed, EventThreads.E
 	{
 		final String embed;
 		final String line;
+		/** A death's line on the {@link DeathBoard}; null for every other card and for one saved before the board. */
+		final String row;
 
 		Card(String embed, String line)
 		{
+			this(embed, line, null);
+		}
+
+		Card(String embed, String line, String row)
+		{
 			this.embed = embed;
 			this.line = line;
+			this.row = row;
 		}
 	}
 
@@ -173,10 +187,16 @@ final class EventThreads extends EditedThreads<EventThreads.Feed, EventThreads.E
 			return STORAGE.equals(family);
 		}
 
-		/** Room for one more moment: storage always has it, others while under {@link #MAX_CARDS}. */
+		/** Room for one more moment: storage always has it, others while under {@link #limit}. */
 		private boolean fits()
 		{
-			return storage() || cards.size() < MAX_CARDS;
+			return storage() || rolls() || cards.size() < limit(family);
+		}
+
+		/** The deaths' board rolls: the oldest row drops off, the message goes on. */
+		private boolean rolls()
+		{
+			return DeathBoard.FAMILY.equals(family);
 		}
 
 		private void add(Moment m)
@@ -187,6 +207,10 @@ final class EventThreads extends EditedThreads<EventThreads.Feed, EventThreads.E
 			if (!storage())
 			{
 				cards.add(0, m.card);
+				if (rolls() && cards.size() > limit(family))
+				{
+					cards.subList(limit(family), cards.size()).clear();
+				}
 				return;
 			}
 			m.taken.forEach((id, n) -> net.merge(id, -(long) n, Long::sum));
@@ -229,7 +253,7 @@ final class EventThreads extends EditedThreads<EventThreads.Feed, EventThreads.E
 			this.username = f.username;
 			this.storage = f.storage();
 			this.chronological = "SLAYER".equals(f.family);
-			List<Card> shown = new ArrayList<>(f.cards.subList(0, Math.min(MAX_CARDS, f.cards.size())));
+			List<Card> shown = new ArrayList<>(f.cards.subList(0, Math.min(limit(f.family), f.cards.size())));
 			if (chronological)
 			{
 				Collections.reverse(shown);
