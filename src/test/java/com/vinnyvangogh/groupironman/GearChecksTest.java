@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -122,16 +123,32 @@ public class GearChecksTest
 		assertFalse(GearChecks.matches("Prayer potion(2)", "Prayer potion(4)"));
 		assertFalse(GearChecks.matches("Prayer potion flask", "Prayer potion"));
 		assertTrue(GearChecks.matches("SALVE AMULET(EI)", "Salve amulet(ei)"));
-		List<GearChecks.Line> lines = revs(items(PRAYER_2, SHARK), items(), Collections.emptyList());
+		Map<Integer, Integer> inv = new HashMap<>();
+		inv.put(PRAYER_2, 1);
+		inv.put(PRAYER_4, 1);
+		inv.put(SHARK, 6);
+		List<GearChecks.Line> lines = revs(inv, items(), Collections.emptyList());
 		assertEquals(GearChecks.State.OK, line(lines, "Prayer restore").state);
 		assertEquals(GearChecks.State.OK, line(lines, "Food").state);
+	}
+
+	@Test
+	public void fewerThanTheCountIsShortAndListsTheDifference()
+	{
+		List<GearChecks.Line> lines = revs(items(PRAYER_2), items(), Collections.emptyList());
+		GearChecks.Line prayer = line(lines, "Prayer restore");
+		assertEquals(GearChecks.State.SHORT, prayer.state);
+		assertEquals(1, prayer.have);
+		assertEquals(1, prayer.short_());
+		assertTrue(prayer.nobody());
 	}
 
 	@Test
 	public void carriedItemCanBeInventoryOrWorn()
 	{
 		List<GearChecks.Line> lines = revs(items(), items(SHARK), Collections.emptyList());
-		assertEquals(GearChecks.State.OK, line(lines, "Food").state);
+		assertEquals(1, line(lines, "Food").have);
+		assertEquals(GearChecks.State.SHORT, line(lines, "Food").state);
 	}
 
 	@Test
@@ -143,16 +160,190 @@ public class GearChecksTest
 	}
 
 	@Test
-	public void problemsCountsEveryLineNotOk()
+	public void problemsCountsEveryRequiredLineNotOk()
 	{
 		List<GearChecks.Line> lines = revs(items(SALVE_EI), items(), Collections.emptyList());
 		int missing = 0;
+		int optional = 0;
 		for (GearChecks.Line l : lines)
 		{
-			missing += l.state == GearChecks.State.OK ? 0 : 1;
+			optional += l.req.optional ? 1 : 0;
+			missing += l.state == GearChecks.State.OK || l.req.optional ? 0 : 1;
 		}
+		assertTrue(optional > 0);
 		assertEquals(missing, GearChecks.problems(lines));
-		assertEquals(lines.size(), GearChecks.problems(lines));
+		assertEquals(lines.size() - optional, GearChecks.problems(lines));
+	}
+
+	// ---- Any-of kinds, sub-fight skips, the shopping plan ----
+
+	private static final int WHIP = 10;
+	private static final int STAFF = 11;
+	private static final int CROSSBOW = 12;
+	private static final int SPADE = 13;
+	private static final int AMULET = 14;
+
+	private static final ItemLookup GEAR = new ItemLookup()
+	{
+		private final Map<Integer, String> names = new HashMap<>();
+
+		{
+			names.put(WHIP, "Abyssal whip");
+			names.put(STAFF, "Staff of fire");
+			names.put(CROSSBOW, "Rune crossbow");
+			names.put(SPADE, "Spade");
+			names.put(AMULET, "Amulet of strength");
+			names.put(SHARK, "Shark");
+		}
+
+		@Override
+		public String name(int id)
+		{
+			return names.getOrDefault(id, "item " + id);
+		}
+
+		@Override
+		public long price(int id)
+		{
+			return 0;
+		}
+
+		@Override
+		public int slot(int id)
+		{
+			return id == WHIP || id == STAFF || id == CROSSBOW ? GearChecks.WEAPON_SLOT : id == AMULET ? 2 : -1;
+		}
+
+		@Override
+		public int combatStyles(int id)
+		{
+			switch (id)
+			{
+				case WHIP:
+					return ItemStyles.MELEE | ItemStyles.COMBAT;
+				case STAFF:
+					return ItemStyles.MELEE | ItemStyles.MAGIC | ItemStyles.COMBAT;
+				case CROSSBOW:
+					return ItemStyles.RANGED | ItemStyles.COMBAT;
+				case AMULET:
+					return ItemStyles.MELEE | ItemStyles.COMBAT;
+				default:
+					return 0;
+			}
+		}
+	};
+
+	private static List<GearChecks.Line> barrows(Set<String> skipped, Map<Integer, Integer> inv,
+		Map<Integer, Integer> worn, List<GroupSearch.Source> sources)
+	{
+		return GearChecks.check(GearChecks.byId("barrows"), skipped, inv, worn, sources, "Me", GEAR);
+	}
+
+	@Test
+	public void anyOfKindMatchesByStatsNotName()
+	{
+		assertTrue(GearChecks.Kind.RANGED_WEAPON.accepts(GearChecks.WEAPON_SLOT, ItemStyles.RANGED));
+		assertFalse(GearChecks.Kind.RANGED_WEAPON.accepts(2, ItemStyles.RANGED));
+		assertTrue(GearChecks.Kind.NON_MAGIC_WEAPON.accepts(GearChecks.WEAPON_SLOT, ItemStyles.MELEE));
+		assertFalse(GearChecks.Kind.NON_MAGIC_WEAPON.accepts(GearChecks.WEAPON_SLOT,
+			ItemStyles.MELEE | ItemStyles.MAGIC));
+		assertFalse(GearChecks.Kind.ANY_WEAPON.accepts(GearChecks.WEAPON_SLOT, 0));
+		assertFalse(GearChecks.Kind.NONE.accepts(GearChecks.WEAPON_SLOT, ItemStyles.MELEE));
+
+		// A staff, named nowhere in the table, is a weapon of any style but not "not magic" for Ahrim.
+		List<GearChecks.Line> staff = barrows(Collections.emptySet(), items(), items(STAFF), Collections.emptyList());
+		assertEquals(GearChecks.State.OK, line(staff, "Weapon (any style)").state);
+		assertEquals(GearChecks.State.MISSING, line(staff, "Not magic, for Ahrim").state);
+		// A crossbow in the bag satisfies Ahrim's line; an amulet with melee stats is no weapon.
+		List<GearChecks.Line> both = barrows(Collections.emptySet(), items(CROSSBOW, AMULET), items(STAFF),
+			Collections.emptyList());
+		assertEquals(GearChecks.State.OK, line(both, "Not magic, for Ahrim").state);
+		List<GearChecks.Line> amulet = barrows(Collections.emptySet(), items(), items(AMULET), Collections.emptyList());
+		assertEquals(GearChecks.State.MISSING, line(amulet, "Weapon (any style)").state);
+	}
+
+	@Test
+	public void skippingAFightRemovesItsLine()
+	{
+		List<GearChecks.Line> all = barrows(Collections.emptySet(), items(), items(), Collections.emptyList());
+		line(all, "Not magic, for Ahrim");
+		List<GearChecks.Line> skipped = barrows(Collections.singleton("ahrim"), items(), items(),
+			Collections.emptyList());
+		assertEquals(all.size() - 1, skipped.size());
+		for (GearChecks.Line l : skipped)
+		{
+			assertFalse(l.req.label, l.req.label.contains("Ahrim"));
+		}
+		assertEquals(Collections.singletonList("Ahrim"), GearChecks.byId("barrows").fights());
+	}
+
+	@Test
+	public void aKindOnlyLineRequestsWhatTheTeammateActuallyHolds()
+	{
+		GearChecks.Rule rule = new GearChecks.Rule("custom-1", "Mine", new int[0], Collections.singletonList(
+			new GearChecks.Req("Any melee weapon", Collections.emptyList(), GearChecks.Need.CARRIED, 1,
+				GearChecks.Kind.MELEE_WEAPON, false, "")), true);
+		GearChecks.Line nobody = GearChecks.check(rule, items(), items(), Collections.emptyList(), "Me", GEAR).get(0);
+		assertEquals("", nobody.itemName);
+		assertEquals(Collections.singletonList("Any melee weapon"),
+			GearChecks.plan(Collections.singletonList(nobody)).unnamed);
+		GearChecks.Line held = GearChecks.check(rule, items(), items(), Collections.singletonList(
+			new GroupSearch.Source("Alex", "bank", items(WHIP), 5)), "Me", GEAR).get(0);
+		assertTrue(held.requestable());
+		assertEquals("Abyssal whip", held.itemName);
+		assertEquals(WHIP, held.itemId);
+	}
+
+	@Test
+	public void shoppingPlanRequestsFirstSkipsOptionalAndNeverListsTwice()
+	{
+		GearChecks.Rule rule = new GearChecks.Rule("custom-1", "Mine", new int[0], Arrays.asList(
+			new GearChecks.Req("Food", Arrays.asList("Shark"), GearChecks.Need.CARRIED, 6, GearChecks.Kind.NONE,
+				false, ""),
+			new GearChecks.Req("More food", Arrays.asList("shark"), GearChecks.Need.CARRIED, 10,
+				GearChecks.Kind.NONE, false, ""),
+			new GearChecks.Req("Spade", GearChecks.Need.CARRIED, "Spade"),
+			new GearChecks.Req("Teleport", GearChecks.Need.CARRIED, "Barrows teleport").optional(true),
+			new GearChecks.Req("Spade again", GearChecks.Need.CARRIED, "Spade")), true);
+		Map<Integer, Integer> inv = new HashMap<>();
+		inv.put(SHARK, 2);
+		List<GearChecks.Line> lines = GearChecks.check(rule, inv, items(), Collections.singletonList(
+			new GroupSearch.Source("Alex", "bank", items(SPADE), 5)), "Me", GEAR);
+		GearChecks.Plan plan = GearChecks.plan(lines);
+		assertEquals(1, plan.request.size());
+		assertEquals("Spade", plan.request.get(0).name);
+		assertEquals(1, plan.request.get(0).quantity);
+		assertEquals(1, plan.shop.size());
+		assertEquals("Shark", plan.shop.get(0).name);
+		assertEquals(8, plan.shop.get(0).quantity);
+		assertTrue(plan.unnamed.isEmpty());
+	}
+
+	@Test
+	public void anItemBothRequestableAndNotIsOnlyRequested()
+	{
+		GearChecks.Line shop = new GearChecks.Line(new GearChecks.Req("A", GearChecks.Need.CARRIED, "Shark").count(5),
+			GearChecks.State.MISSING, 0, Collections.emptyList(), "Shark", -1);
+		GearChecks.Line ask = new GearChecks.Line(new GearChecks.Req("B", GearChecks.Need.CARRIED, "Shark").count(3),
+			GearChecks.State.MISSING, 0, Collections.singletonList("Alex (bank)"), "Shark", -1);
+		for (List<GearChecks.Line> order : Arrays.asList(Arrays.asList(shop, ask), Arrays.asList(ask, shop)))
+		{
+			GearChecks.Plan plan = GearChecks.plan(order);
+			assertTrue(plan.shop.isEmpty());
+			assertEquals(1, plan.request.size());
+			assertEquals(5, plan.request.get(0).quantity);
+		}
+	}
+
+	@Test
+	public void optionalLinesAreNeverProblems()
+	{
+		GearChecks.Rule rule = new GearChecks.Rule("custom-1", "Mine", new int[0], Collections.singletonList(
+			new GearChecks.Req("Teleport", GearChecks.Need.CARRIED, "Barrows teleport").optional(true)), true);
+		List<GearChecks.Line> lines = GearChecks.check(rule, items(), items(), Collections.emptyList(), "Me", GEAR);
+		assertEquals(GearChecks.State.MISSING, lines.get(0).state);
+		assertEquals(0, GearChecks.problems(lines));
+		assertTrue(GearChecks.plan(lines).empty());
 	}
 
 	@Test

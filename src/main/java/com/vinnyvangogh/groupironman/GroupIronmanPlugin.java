@@ -334,6 +334,18 @@ public class GroupIronmanPlugin extends Plugin
 			}
 
 			@Override
+			public void gearShoppingList(String place, GearChecks.Plan plan, Consumer<String> done)
+			{
+				group.gearShoppingList(place, plan, done);
+			}
+
+			@Override
+			public void saveGearBook()
+			{
+				group.saveGearBook();
+			}
+
+			@Override
 			public boolean addRequest(String name, Map<Integer, Integer> items)
 			{
 				return group.addRequest(name, items);

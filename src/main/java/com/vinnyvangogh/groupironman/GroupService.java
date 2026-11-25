@@ -303,6 +303,8 @@ class GroupService
 	/** When this player last played before this session; 0 when not known. */
 	private volatile long since;
 	private volatile String self = "";
+	/** The Gear tab's own lists and edits, read from config on start; never sent to the group. */
+	private volatile GearBook gearBook = GearBook.empty();
 
 	final ItemLookup lookup = new ItemLookup()
 	{
@@ -395,6 +397,7 @@ class GroupService
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
+		gearBook = GearBook.parse(gson, config.gearBook());
 		executor.execute(() ->
 		{
 			regions = RegionNames.load();
@@ -1207,7 +1210,7 @@ class GroupService
 		here = position();
 		redrawIfMoved();
 		if (here != null && (before == null || before.getRegionID() != here.getRegionID())
-			&& GearChecks.forRegion(here.getRegionID()) != null)
+			&& gearBook.forRegion(here.getRegionID()) != null)
 		{
 			// Entering a place with a gear rule: the Gear tab picks it up on this redraw.
 			onChange.run();
@@ -2514,7 +2517,83 @@ class GroupService
 		WorldPoint at = here;
 		return new GearTab.View(self, at == null ? 0 : at.getRegionID(),
 			mine == null ? Collections.emptyMap() : mine.inventory, mine == null ? Collections.emptyMap() : mine.worn,
-			roster.searchSources(), lookup);
+			roster.searchSources(), lookup, gearBook);
+	}
+
+	/** Gear tab: writes the player's lists after an edit; an untouched book clears the key. Any thread. */
+	void saveGearBook()
+	{
+		GearBook book = gearBook;
+		if (book.isEmpty())
+		{
+			configManager.unsetConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GEAR_BOOK);
+		}
+		else
+		{
+			setConfig(GroupIronmanConfig.KEY_GEAR_BOOK, book.toJson(gson));
+		}
+	}
+
+	/**
+	 * Gear tab, "Make shopping list": one request to the group for what teammates hold and one shopping list of this
+	 * player's own for the rest, both named after the place. Ids come from the item search on the client thread;
+	 * {@code done} gets the line to show, on that thread.
+	 */
+	void gearShoppingList(String place, GearChecks.Plan plan, Consumer<String> done)
+	{
+		clientThread.invokeLater(() ->
+		{
+			List<String> notFound = new ArrayList<>();
+			Map<Integer, Integer> ask = resolveWants(plan.request, notFound);
+			Map<Integer, Integer> buy = resolveWants(plan.shop, notFound);
+			ask.keySet().forEach(buy::remove);
+			String name = "Bring this: " + place;
+			StringBuilder out = new StringBuilder();
+			if (!ask.isEmpty())
+			{
+				out.append(addRequest(name, ask) ? "Asked the group for " + ask.size() + " item"
+					+ (ask.size() == 1 ? "" : "s") + ". " : "Request not added: log in first, or the list is full. ");
+			}
+			if (!buy.isEmpty())
+			{
+				out.append(addShoppingList(name, "", Collections.emptyList(), Collections.singletonList(self), buy)
+					? "Added " + buy.size() + " item" + (buy.size() == 1 ? "" : "s") + " to your shopping lists. "
+					: "Shopping list not added: log in first, or the book is full. ");
+			}
+			if (!notFound.isEmpty())
+			{
+				out.append("Could not find: ").append(String.join(", ", notFound)).append('.');
+			}
+			done.accept(out.length() == 0 ? "Nothing to add." : out.toString().trim());
+		});
+	}
+
+	/** Client thread. Item ids for {@code wants}, quantities merged by id; names the search misses go in {@code notFound}. */
+	private Map<Integer, Integer> resolveWants(List<GearChecks.Want> wants, List<String> notFound)
+	{
+		Map<Integer, Integer> out = new LinkedHashMap<>();
+		for (GearChecks.Want w : wants)
+		{
+			Integer id = null;
+			for (ItemPrice p : itemManager.search(w.name))
+			{
+				if (GearChecks.matches(p.getName(), w.name))
+				{
+					id = p.getId();
+					names.putIfAbsent(p.getId(), p.getName());
+					break;
+				}
+			}
+			if (id == null)
+			{
+				notFound.add(w.name);
+			}
+			else
+			{
+				out.merge(id, w.quantity, Math::max);
+			}
+		}
+		return out;
 	}
 
 	/**
