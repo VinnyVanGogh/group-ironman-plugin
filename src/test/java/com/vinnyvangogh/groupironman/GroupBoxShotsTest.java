@@ -50,12 +50,47 @@ public class GroupBoxShotsTest
 		@Override
 		public BufferedImage item(int id)
 		{
-			BufferedImage img = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-			Graphics2D g = img.createGraphics();
-			g.setColor(new Color(0xB0, 0x60, 0x30));
-			g.fillRect(2, 2, 12, 12);
-			g.dispose();
-			return img;
+			return square(new Color(0xB0, 0x60, 0x30));
+		}
+
+		/** Game sprites need SpriteManager and a client: a teal square marks where one is drawn. */
+		@Override
+		public BufferedImage glyph(BoxText.Glyph glyph)
+		{
+			return PluginIcons.spriteOf(glyph) >= 0 || PluginIcons.itemOf(glyph) >= 0
+				? square(new Color(0x30, 0xA0, 0xA0)) : null;
+		}
+	};
+
+	private static BufferedImage square(Color colour)
+	{
+		BufferedImage img = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g = img.createGraphics();
+		g.setColor(colour);
+		g.fillRect(2, 2, 12, 12);
+		g.dispose();
+		return img;
+	}
+
+	/** Knows the Giant key by name, as the plugin's item name index would once its scan finds it. */
+	private final ItemLookup lookup = new ItemLookup()
+	{
+		@Override
+		public String name(int id)
+		{
+			return items.name(id);
+		}
+
+		@Override
+		public long price(int id)
+		{
+			return items.price(id);
+		}
+
+		@Override
+		public int itemId(String name)
+		{
+			return "Giant key".equalsIgnoreCase(name) ? 20754 : -1;
 		}
 	};
 
@@ -74,7 +109,13 @@ public class GroupBoxShotsTest
 		out.add(GroupEvent.of(GroupEvent.Type.PERSONAL_BEST, NOW - TimeUnit.HOURS.toMillis(30), "Member 3")
 			.text("Vorkath 1:12").build());
 		out.add(GroupEvent.of(GroupEvent.Type.CLOG, NOW - TimeUnit.DAYS.toMillis(3), "Member 1")
-			.text("Twisted bow").build());
+			.text("Giant key").build());
+		out.add(GroupEvent.of(GroupEvent.Type.DIARY, NOW - TimeUnit.DAYS.toMillis(4), "Member 2")
+			.text("Western Provinces Elite").build());
+		out.add(GroupEvent.of(GroupEvent.Type.KC_MILESTONE, NOW - TimeUnit.MINUTES.toMillis(12), "Member 3")
+			.text("Zulrah").number(500).build());
+		out.add(GroupEvent.of(GroupEvent.Type.COMBAT_LEVEL, NOW - TimeUnit.MINUTES.toMillis(3), "Member 1")
+			.number(120).build());
 		out.add(GroupEvent.of(GroupEvent.Type.DEATH, NOW - 70_000, "Member 3").build());
 		return out;
 	}
@@ -84,26 +125,29 @@ public class GroupBoxShotsTest
 		List<GroupBoxOverlay.EventLine> lines = new ArrayList<>();
 		for (GroupEvent e : events())
 		{
-			lines.add(new GroupBoxOverlay.EventLine(BoxText.format(e, items, size, icons, BoxTimes.SHORT, NOW),
+			lines.add(new GroupBoxOverlay.EventLine(BoxText.format(e, lookup, size, icons, BoxTimes.SHORT, NOW),
 				new Color(e.type.category.colour)));
 		}
 		Map<String, Integer> online = new LinkedHashMap<>();
 		online.put("Member 1", 480);
-		online.put("Member 2", 301);
+		online.put("Member 2", 315);
 		PanelComponent panel = new PanelComponent();
-		OverlayStyle.frame(panel, size.width);
 		GroupBoxOverlay.build(panel, online, new LinkedHashMap<>(), lines, size, PICTURES);
-		BufferedImage img = new BufferedImage(size.width + 4, 330, BufferedImage.TYPE_INT_ARGB);
+		BufferedImage img = new BufferedImage(size.maxWidth() + 4, 400, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g = img.createGraphics();
 		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 		g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+		// Framed the way the overlay frames it: grown to the longest line, never past the size's widest.
+		int width = GroupBoxOverlay.width(panel.getChildren(), g, size);
+		assertTrue(size + " box " + width, width >= size.width && width <= size.maxWidth());
+		OverlayStyle.frame(panel, width);
 		g.setColor(new Color(60, 70, 50));
 		g.fillRect(0, 0, img.getWidth(), img.getHeight());
 		panel.setPreferredLocation(new java.awt.Point(2, 2));
 		Dimension used = panel.render(g);
 		g.dispose();
-		assertTrue("box wider than its size: " + used, used.width <= size.width + 1);
-		return img.getSubimage(0, 0, size.width + 4, 250);
+		assertTrue("box wider than it was framed: " + used, used.width <= width + 1);
+		return img.getSubimage(0, 0, width + 4, img.getHeight());
 	}
 
 	@Test
