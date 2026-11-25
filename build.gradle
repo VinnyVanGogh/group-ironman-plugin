@@ -102,6 +102,37 @@ tasks.register('printRuneLiteVersion') {
 	}
 }
 
+// Stamps the git commit into a resource so a dev build shows its update notes
+// again whenever the build changes (UpdateNotes.current). The Plugin Hub swaps
+// this file for its own, so a Hub build has no stamp and keys on the version only.
+def buildInfoDir = layout.buildDirectory.dir('generated/build-info')
+def gitCommit = { ->
+	try
+	{
+		def p = ['git', 'rev-parse', '--short', 'HEAD'].execute(null, projectDir)
+		def out = p.text.trim()
+		return p.waitFor() == 0 ? out : ''
+	}
+	catch (Exception e)
+	{
+		return ''
+	}
+}
+tasks.register('generateBuildInfo') {
+	def dir = buildInfoDir
+	outputs.dir(dir)
+	outputs.upToDateWhen { false }
+	doLast {
+		def f = dir.get().file('com/vinnyvangogh/groupironman/build-info.properties').asFile
+		f.parentFile.mkdirs()
+		f.text = "commit=${gitCommit()}\n"
+	}
+}
+sourceSets.main.resources.srcDir(buildInfoDir)
+tasks.named('processResources') {
+	dependsOn 'generateBuildInfo'
+}
+
 tasks.named('test') {
 	dependsOn 'printRuneLiteVersion'
 }
