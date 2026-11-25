@@ -701,6 +701,22 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(keyName = "discordShopNear", name = "Shop has what the group needs",
+		description = "A member came up on a shop that sells something a Shopping list still needs.",
+		section = discordEventsSection, position = 41)
+	default boolean discordShopNear()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "discordStockShort", name = "Group storage running short",
+		description = "A member's storage visit left an item below its minimum.",
+		section = discordEventsSection, position = 42)
+	default boolean discordStockShort()
+	{
+		return false;
+	}
+
 	// ---- 4. Discord: how to post ----
 
 	@ConfigItem(keyName = "discordOnlineStatus", name = "Online status", description = "Posts: one per login and"
@@ -1315,6 +1331,48 @@ public interface GroupIronmanConfig extends Config
 	default boolean overlayEveryoneOnline()
 	{
 		return false;
+	}
+
+	@ConfigItem(keyName = "overlayShopNear", name = "Banner: Shop has what the group needs",
+		description = "A member came up on a shop that sells something a Shopping list still needs.",
+		section = inGameSection, position = 58)
+	default boolean overlayShopNear()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "overlayStockShort", name = "Banner: Group storage running short",
+		description = "A member's storage visit left an item below its minimum.",
+		section = inGameSection, position = 59)
+	default boolean overlayStockShort()
+	{
+		return false;
+	}
+
+	@ConfigItem(keyName = "sharedAlerts", name = "Share need and shop alerts",
+		description = "Tell the group when you come up on a shop that sells what they need, when group storage runs"
+		+ " short, and a chat line when a member's new request, finished request or alert arrives. The group's"
+		+ " leader sets this for the group; it needs Share group events.",
+		section = inGameSection, position = 60)
+	default boolean sharedAlerts()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "sharedAlertsSend", name = "Send my need and shop alerts",
+		description = "Off stops your client sending shop and low-storage alerts, whatever the group's setting.",
+		section = inGameSection, position = 61)
+	default boolean sharedAlertsSend()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "sharedAlertsChat", name = "Chat line for shared alerts",
+		description = "Off mutes the chat line for members' requests and shop and low-storage alerts here.",
+		section = inGameSection, position = 62)
+	default boolean sharedAlertsChat()
+	{
+		return true;
 	}
 
 	@ConfigItem(keyName = "overlayDismissKey", name = "Dismiss banners key",

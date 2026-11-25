@@ -69,6 +69,8 @@ final class EventSettings
 		both(GroupEvent.Type.FARMING, GroupIronmanConfig::discordFarming, GroupIronmanConfig::overlayFarming);
 		both(GroupEvent.Type.BIRDHOUSE, GroupIronmanConfig::discordBirdhouse, GroupIronmanConfig::overlayBirdhouse);
 		both(GroupEvent.Type.REQUEST, GroupIronmanConfig::discordRequest, GroupIronmanConfig::overlayRequest);
+		both(GroupEvent.Type.SHOP_NEAR, GroupIronmanConfig::discordShopNear, GroupIronmanConfig::overlayShopNear);
+		both(GroupEvent.Type.STOCK_SHORT, GroupIronmanConfig::discordStockShort, GroupIronmanConfig::overlayStockShort);
 		both(GroupEvent.Type.ACTIVITY_START, GroupIronmanConfig::discordActivityStart,
 			GroupIronmanConfig::overlayActivityStart);
 		both(GroupEvent.Type.ACTIVITY_WAVE, GroupIronmanConfig::discordActivityWave,

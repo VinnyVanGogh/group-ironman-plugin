@@ -72,6 +72,8 @@ final class GroupSettingsSchema
 	static final GroupEvent.Type OWN_DISCORD = GroupEvent.Type.ONLINE;
 	/** "Post events for members without the plugin" ({@link GroupBroadcasts}), on by default. */
 	static final String NO_PLUGIN_EVENTS = "discordNoPluginEvents";
+	/** "Share need and shop alerts" ({@link SharedAlerts}): the group's switch, on by default; each member may still opt out. */
+	static final String SHARED_ALERTS = "sharedAlerts";
 	/** "Post every N waves" for wave activities ({@link WaveTracker}); 0 posts the final boss waves only. */
 	static final String WAVE_EVERY = "eventWaveEvery";
 
@@ -124,6 +126,7 @@ final class GroupSettingsSchema
 		timing("discordFreeloaderAt", "Freeloader at (gp)", 0, GP_MAX, GroupIronmanConfig::discordFreeloaderAt);
 		flag(NO_PLUGIN_EVENTS, "Post events for members without the plugin", TIMING,
 			GroupIronmanConfig::discordNoPluginEvents);
+		flag(SHARED_ALERTS, "Share need and shop alerts", TIMING, GroupIronmanConfig::sharedAlerts);
 
 		ALL = Collections.unmodifiableList(new ArrayList<>(BY_KEY.values()));
 	}

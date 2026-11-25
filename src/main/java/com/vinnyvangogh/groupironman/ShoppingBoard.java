@@ -180,11 +180,17 @@ final class ShoppingBoard
 	/** "your group needs 4 more Bucket, 3 more Rope and 2 other items"; empty for no lines. */
 	static String describe(List<ShopAllocation.Line> lines)
 	{
+		return lines == null || lines.isEmpty() ? "" : "your group needs " + items(lines);
+	}
+
+	/** "10 more Shark, 5 more Lobster and 2 other items": what a shop's lines still need. Empty for none. */
+	static String items(List<ShopAllocation.Line> lines)
+	{
 		if (lines == null || lines.isEmpty())
 		{
 			return "";
 		}
-		StringBuilder text = new StringBuilder("your group needs ");
+		StringBuilder text = new StringBuilder();
 		int named = Math.min(3, lines.size());
 		for (int i = 0; i < named; i++)
 		{

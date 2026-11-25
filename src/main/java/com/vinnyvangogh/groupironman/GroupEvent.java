@@ -101,6 +101,10 @@ final class GroupEvent
 		ACTIVITY_DEATH("ad", Category.DEATHS, Need.TEXT, false),
 		/** A short note a member typed ({@code ::announce}) for the group: {@link #text} is that text. */
 		ANNOUNCEMENT("an", Category.GROUP, Need.TEXT, false),
+		/** A member came up on a shop that sells what the group still needs ({@link SharedAlerts}): text the shop, detail what. */
+		SHOP_NEAR("sn", Category.GROUP, Need.TEXT, false),
+		/** Group storage ran short of an item ({@link SharedAlerts}): text the item, number what is left, detail the minimum. */
+		STOCK_SHORT("ks", Category.GROUP, Need.TEXT, false),
 		/** Every member of the group is online at once. Worked out by each client; never sent. */
 		EVERYONE_ONLINE("eo", Category.GROUP, Need.NOTHING, false);
 
