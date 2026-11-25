@@ -372,4 +372,78 @@ public class GearChecksTest
 			assertNotNull(GearChecks.byId(r.id));
 		}
 	}
+
+	/** A stand-in for the tradeable item search: substring hits, in the order given. */
+	private static java.util.function.Function<String, List<ShoppingTab.Hit>> search(ShoppingTab.Hit... all)
+	{
+		return q ->
+		{
+			List<ShoppingTab.Hit> out = new ArrayList<>();
+			for (ShoppingTab.Hit h : all)
+			{
+				if (h.name.toLowerCase().contains(q.toLowerCase()))
+				{
+					out.add(h);
+				}
+			}
+			return out;
+		};
+	}
+
+	@Test
+	public void resolveWantsTakesTheFirstExactOrDoseMatchAndMergesQuantities()
+	{
+		java.util.function.Function<String, List<ShoppingTab.Hit>> search = search(
+			new ShoppingTab.Hit(10, "Super restore mix(2)"), new ShoppingTab.Hit(11, "Prayer potion(4)"),
+			new ShoppingTab.Hit(12, "Prayer potion(3)"), new ShoppingTab.Hit(20, "Shark"),
+			new ShoppingTab.Hit(21, "Sharks fin"));
+		List<String> notFound = new ArrayList<>();
+		Map<Integer, Integer> ids = GearChecks.resolveWants(Arrays.asList(new GearChecks.Want("Prayer potion", 2),
+			new GearChecks.Want("Shark", 6), new GearChecks.Want("prayer potion", 4),
+			new GearChecks.Want("Dragonfire shield", 1)), search, Collections.emptyMap(), notFound);
+		// Prayer potion(4) is the first hit that is the name with a dose; "Super restore mix" never matches.
+		assertEquals(Integer.valueOf(4), ids.get(11));
+		assertEquals(Integer.valueOf(6), ids.get(20));
+		assertEquals(2, ids.size());
+		assertEquals(Collections.singletonList("Dragonfire shield"), notFound);
+	}
+
+	@Test
+	public void resolveWantsFindsAnUntradeableAMemberHolds()
+	{
+		Map<Integer, String> known = new HashMap<>();
+		known.put(SALVE_EI + 100, "Salve amulet(ei)");
+		known.put(SALVE_EI, "Salve amulet(ei)");
+		known.put(SHARK, "Shark");
+		List<String> notFound = new ArrayList<>();
+		Map<Integer, Integer> ids = GearChecks.resolveWants(Arrays.asList(new GearChecks.Want("Salve amulet(ei)", 1),
+			new GearChecks.Want("Fire cape", 1)), search(), known, notFound);
+		assertEquals(Collections.singletonMap(SALVE_EI, 1), ids);
+		assertEquals(Collections.singletonList("Fire cape"), notFound);
+		// The tradeable search wins when it knows the item.
+		assertEquals(Integer.valueOf(99), GearChecks.resolveId("Shark", search(new ShoppingTab.Hit(99, "Shark")), known));
+		// Names match whole, or with a variant suffix: "Salve amulet" is the (ei), "Salve" is nothing.
+		assertEquals(Integer.valueOf(SALVE_EI), GearChecks.resolveId("Salve amulet", search(), known));
+		assertNull(GearChecks.resolveId("Salve", search(), known));
+	}
+
+	@Test
+	public void makeShoppingListTwiceAddsNothingTwice()
+	{
+		Map<Integer, Integer> want = new HashMap<>();
+		want.put(SHARK, 6);
+		want.put(PRAYER_4, 4);
+		want.put(SALVE_EI, 1);
+		Map<Integer, Integer> listed = new HashMap<>();
+		listed.put(SHARK, 8);
+		listed.put(PRAYER_4, 2);
+		assertEquals(1, GearChecks.dropListed(want, listed));
+		// Shark is listed in full; prayer potions only 2 of 4, so they stay; salve was never listed.
+		assertFalse(want.containsKey(SHARK));
+		assertEquals(Integer.valueOf(4), want.get(PRAYER_4));
+		assertEquals(Integer.valueOf(1), want.get(SALVE_EI));
+		listed.putAll(want);
+		assertEquals(2, GearChecks.dropListed(want, listed));
+		assertTrue(want.isEmpty());
+	}
 }

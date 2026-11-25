@@ -45,6 +45,8 @@ final class GearBook
 		String title;
 		int[] regions;
 		List<LineSpec> lines;
+		/** An edited starting rule: {@link #fingerprint} of the shipped list it was edited from. */
+		String base;
 	}
 
 	/** The whole key. */
@@ -57,6 +59,11 @@ final class GearBook
 	}
 
 	private final Map<String, GearChecks.Rule> edits = new LinkedHashMap<>();
+	/**
+	 * Per edited starting rule, the shipped list it was edited from. An edit is a full copy, so a later fix to
+	 * {@link GearChecks#RULES} never reaches it; a differing fingerprint lets the panel say so and offer a reset.
+	 */
+	private final Map<String, String> bases = new LinkedHashMap<>();
 	private final List<GearChecks.Rule> custom = new ArrayList<>();
 	private final Map<String, Set<String>> skips = new LinkedHashMap<>();
 
@@ -96,6 +103,9 @@ final class GearBook
 				if (r != null)
 				{
 					book.edits.put(base.id, r.withTitle(base.title).withRegions(base.regions));
+					String from = e.getValue().base;
+					// No fingerprint: saved before they were kept, so take the shipped list as the one edited.
+					book.bases.put(base.id, from == null || from.isEmpty() ? fingerprint(base) : from);
 				}
 			}
 		}
@@ -138,6 +148,10 @@ final class GearBook
 					book.skips.put(e.getKey(), fights);
 				}
 			}
+			for (String id : new ArrayList<>(book.skips.keySet()))
+			{
+				book.pruneSkips(id);
+			}
 		}
 		return book;
 	}
@@ -147,7 +161,9 @@ final class GearBook
 		Data data = new Data();
 		for (GearChecks.Rule r : edits.values())
 		{
-			data.edits.put(r.id, toSpec(r));
+			RuleSpec spec = toSpec(r);
+			spec.base = bases.get(r.id);
+			data.edits.put(r.id, spec);
 		}
 		for (GearChecks.Rule r : custom)
 		{
@@ -214,6 +230,26 @@ final class GearBook
 		return edits.containsKey(id);
 	}
 
+	/**
+	 * An edited starting rule whose shipped list has changed since the player edited it: the panel offers
+	 * "Reset to default" or "Keep mine".
+	 */
+	synchronized boolean shippedChanged(String id)
+	{
+		GearChecks.Rule base = GearChecks.byId(id);
+		return base != null && edits.containsKey(id) && !fingerprint(base).equals(bases.get(id));
+	}
+
+	/** "Keep mine": the player has seen the shipped change and keeps their edit; stops {@link #shippedChanged}. */
+	synchronized void keepMine(String id)
+	{
+		GearChecks.Rule base = GearChecks.byId(id);
+		if (base != null && edits.containsKey(id))
+		{
+			bases.put(id, fingerprint(base));
+		}
+	}
+
 	/** Saves {@code r} over the rule with its id; false for an unknown id. */
 	synchronized boolean put(GearChecks.Rule r)
 	{
@@ -223,6 +259,7 @@ final class GearBook
 			if (custom.get(i).id.equals(r.id))
 			{
 				custom.set(i, new GearChecks.Rule(r.id, cleanTitle(r.title), r.regions, lines, true));
+				pruneSkips(r.id);
 				return true;
 			}
 		}
@@ -232,6 +269,9 @@ final class GearBook
 			return false;
 		}
 		edits.put(base.id, new GearChecks.Rule(base.id, base.title, base.regions, lines, false));
+		// Kept from the first edit: a later edit must not hide a shipped change the player has not answered.
+		bases.putIfAbsent(base.id, fingerprint(base));
+		pruneSkips(base.id);
 		return true;
 	}
 
@@ -239,6 +279,8 @@ final class GearBook
 	synchronized void reset(String id)
 	{
 		edits.remove(id);
+		bases.remove(id);
+		pruneSkips(id);
 	}
 
 	/** A new place of the player's own, triggered by {@code region} when it is above 0; null when the book is full. */
@@ -291,6 +333,46 @@ final class GearBook
 		{
 			skips.remove(id);
 		}
+		pruneSkips(id);
+	}
+
+	/**
+	 * Drops skips no line of the rule names any more (a fight edited away, a rule gone), so a stale skip never
+	 * comes back to hide a line the player adds later.
+	 */
+	private void pruneSkips(String id)
+	{
+		Set<String> s = skips.get(id);
+		if (s == null)
+		{
+			return;
+		}
+		GearChecks.Rule r = find(id);
+		if (r != null)
+		{
+			List<String> fights = r.fights();
+			s.removeIf(f -> fights.stream().noneMatch(f::equalsIgnoreCase));
+		}
+		if (r == null || s.isEmpty())
+		{
+			skips.remove(id);
+		}
+	}
+
+	/**
+	 * A stable summary of a rule's lines (String#hashCode is fixed by the language spec), so the saved value
+	 * still compares equal after a client restart or update when the shipped list did not change.
+	 */
+	static String fingerprint(GearChecks.Rule r)
+	{
+		StringBuilder sb = new StringBuilder();
+		for (GearChecks.Req q : r.reqs)
+		{
+			sb.append(q.label).append('\u0001').append(String.join("\u0002", q.names)).append('\u0001')
+				.append(q.need.name()).append('\u0001').append(q.count).append('\u0001').append(q.kind.name())
+				.append('\u0001').append(q.optional).append('\u0001').append(q.fight).append('\u0003');
+		}
+		return Integer.toHexString(sb.toString().hashCode()) + "-" + r.reqs.size();
 	}
 
 	private static String clean(String s)

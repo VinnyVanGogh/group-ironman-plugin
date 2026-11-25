@@ -66,6 +66,7 @@ import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
+import net.runelite.client.events.ProfileChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemEquipmentStats;
 import net.runelite.client.game.ItemStats;
@@ -305,6 +306,9 @@ class GroupService
 	private volatile String self = "";
 	/** The Gear tab's own lists and edits, read from config on start; never sent to the group. */
 	private volatile GearBook gearBook = GearBook.empty();
+	/** The key's value {@link #gearBook} was read from or last saved as; a different value means reload. */
+	private volatile String gearBookJson = "";
+	private final Object gearBookLock = new Object();
 
 	final ItemLookup lookup = new ItemLookup()
 	{
@@ -397,7 +401,9 @@ class GroupService
 		cacheLoaded = false;
 		since = 0;
 		reloadConfig();
-		gearBook = GearBook.parse(gson, config.gearBook());
+		gearBookJson = "";
+		gearBook = GearBook.empty();
+		reloadGearBook();
 		executor.execute(() ->
 		{
 			regions = RegionNames.load();
@@ -2523,15 +2529,50 @@ class GroupService
 	/** Gear tab: writes the player's lists after an edit; an untouched book clears the key. Any thread. */
 	void saveGearBook()
 	{
-		GearBook book = gearBook;
-		if (book.isEmpty())
+		// A private lock: the write posts ConfigChanged on this thread, which re-enters reloadGearBook.
+		synchronized (gearBookLock)
 		{
-			configManager.unsetConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GEAR_BOOK);
+			GearBook book = gearBook;
+			if (book.isEmpty())
+			{
+				gearBookJson = "";
+				configManager.unsetConfiguration(GroupIronmanConfig.GROUP, GroupIronmanConfig.KEY_GEAR_BOOK);
+			}
+			else
+			{
+				String json = book.toJson(gson);
+				// Set first: the ConfigChanged this write posts must see its own value, not reload over the book.
+				gearBookJson = json;
+				setConfig(GroupIronmanConfig.KEY_GEAR_BOOK, json);
+			}
 		}
-		else
+	}
+
+	/**
+	 * Re-reads the player's lists when the key no longer holds what this client last read or saved: a RuneLite
+	 * profile switch or a settings reset. Without it the old book stays in memory and the next edit writes it over
+	 * the new profile's lists. The key is per RuneLite profile, not per RuneScape account (one player's own lists).
+	 */
+	void reloadGearBook()
+	{
+		synchronized (gearBookLock)
 		{
-			setConfig(GroupIronmanConfig.KEY_GEAR_BOOK, book.toJson(gson));
+			String json = config.gearBook();
+			String now = json == null ? "" : json;
+			if (!now.equals(gearBookJson))
+			{
+				gearBookJson = now;
+				gearBook = GearBook.parse(gson, now);
+			}
 		}
+	}
+
+	/** Posted after a profile switch's own ConfigChanged events; read again in case none named the gear key. */
+	@Subscribe
+	public void onProfileChanged(ProfileChanged event)
+	{
+		reloadGearBook();
+		onChange.run();
 	}
 
 	/**
@@ -2544,11 +2585,18 @@ class GroupService
 		clientThread.invokeLater(() ->
 		{
 			List<String> notFound = new ArrayList<>();
-			Map<Integer, Integer> ask = resolveWants(plan.request, notFound);
-			Map<Integer, Integer> buy = resolveWants(plan.shop, notFound);
+			Map<Integer, Integer> ask = GearChecks.resolveWants(plan.request, this::tradeableHits, names, notFound);
+			Map<Integer, Integer> buy = GearChecks.resolveWants(plan.shop, this::tradeableHits, names, notFound);
 			ask.keySet().forEach(buy::remove);
+			Map<Integer, Integer> listed = listedBySelf();
+			int already = GearChecks.dropListed(ask, listed) + GearChecks.dropListed(buy, listed);
 			String name = "Bring this: " + place;
 			StringBuilder out = new StringBuilder();
+			if (already > 0)
+			{
+				out.append(already).append(already == 1 ? " item is" : " items are")
+					.append(" already on your requests or shopping lists. ");
+			}
 			if (!ask.isEmpty())
 			{
 				out.append(addRequest(name, ask) ? "Asked the group for " + ask.size() + " item"
@@ -2562,35 +2610,60 @@ class GroupService
 			}
 			if (!notFound.isEmpty())
 			{
-				out.append("Could not find: ").append(String.join(", ", notFound)).append('.');
+				out.append("Could not find: ").append(String.join(", ", notFound)).append(". ")
+					.append(UNTRADEABLE_HINT);
 			}
 			done.accept(out.length() == 0 ? "Nothing to add." : out.toString().trim());
 		});
 	}
 
-	/** Client thread. Item ids for {@code wants}, quantities merged by id; names the search misses go in {@code notFound}. */
-	private Map<Integer, Integer> resolveWants(List<GearChecks.Want> wants, List<String> notFound)
+	/** Why an item name may not resolve: the item search only knows tradeables. */
+	private static final String UNTRADEABLE_HINT =
+		"Untradeable items are found once you or a teammate has one.";
+
+	/** Client thread. The item search's tradeable matches, best first; their names are kept for {@link #lookup}. */
+	private List<ShoppingTab.Hit> tradeableHits(String query)
 	{
-		Map<Integer, Integer> out = new LinkedHashMap<>();
-		for (GearChecks.Want w : wants)
+		List<ShoppingTab.Hit> hits = new ArrayList<>();
+		for (ItemPrice p : itemManager.search(query))
 		{
-			Integer id = null;
-			for (ItemPrice p : itemManager.search(w.name))
+			names.putIfAbsent(p.getId(), p.getName());
+			hits.add(new ShoppingTab.Hit(p.getId(), p.getName()));
+		}
+		return hits;
+	}
+
+	/**
+	 * What this player has already asked for or listed: open requests of their own (items not yet closed) and the
+	 * custom shopping lists they are on, larger quantity per item.
+	 */
+	private Map<Integer, Integer> listedBySelf()
+	{
+		Map<Integer, Integer> out = new HashMap<>();
+		ShoppingSync shop = shopping;
+		if (shop == null || self.isEmpty())
+		{
+			return out;
+		}
+		for (RequestList r : shop.requests())
+		{
+			if (r.open() && r.ownedBy(self))
 			{
-				if (GearChecks.matches(p.getName(), w.name))
+				r.items.forEach((id, n) ->
 				{
-					id = p.getId();
-					names.putIfAbsent(p.getId(), p.getName());
-					break;
-				}
+					if (!r.closedItems.contains(id))
+					{
+						out.merge(id, n, Math::max);
+					}
+				});
 			}
-			if (id == null)
+		}
+		String me = GroupMembers.key(self);
+		for (ShoppingList l : shop.active())
+		{
+			if (l.custom() && l.members.stream().anyMatch(m -> GroupMembers.key(m).equals(me)))
 			{
-				notFound.add(w.name);
-			}
-			else
-			{
-				out.merge(id, w.quantity, Math::max);
+				l.items.forEach((id, n) -> out.merge(id, n, Math::max));
 			}
 		}
 		return out;
@@ -2604,19 +2677,10 @@ class GroupService
 	{
 		clientThread.invokeLater(() ->
 		{
-			Integer id = null;
-			for (ItemPrice p : itemManager.search(itemName))
-			{
-				if (GearChecks.matches(p.getName(), itemName))
-				{
-					id = p.getId();
-					names.putIfAbsent(p.getId(), p.getName());
-					break;
-				}
-			}
+			Integer id = GearChecks.resolveId(itemName, this::tradeableHits, names);
 			if (id == null)
 			{
-				done.accept("Could not find " + itemName + " to add.");
+				done.accept("Could not find " + itemName + " to add. " + UNTRADEABLE_HINT);
 				return;
 			}
 			Map<Integer, Integer> one = Collections.singletonMap(id, 1);

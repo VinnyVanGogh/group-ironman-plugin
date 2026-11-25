@@ -516,6 +516,13 @@ public class GroupIronmanPlugin extends Plugin
 		{
 			return;
 		}
+		if (GroupIronmanConfig.KEY_GEAR_BOOK.equals(event.getKey()))
+		{
+			// The Gear tab's own saves land here too; a profile switch or settings reset brings a different value.
+			group.reloadGearBook();
+			redraw();
+			return;
+		}
 		group.reloadConfig();
 		events.reloadConfig();
 		// The sidebar button stays whatever the switches say; the panel shows the change.

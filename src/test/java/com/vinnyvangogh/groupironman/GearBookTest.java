@@ -131,6 +131,91 @@ public class GearBookTest
 	}
 
 	@Test
+	public void aChangedShippedListIsFlaggedUntilResetOrKept()
+	{
+		GearBook book = GearBook.empty();
+		GearChecks.Rule vork = book.byId("vorkath");
+		assertTrue(book.put(vork.withReqs(vork.reqs.subList(1, vork.reqs.size()))));
+		assertFalse("edited from today's list", book.shippedChanged("vorkath"));
+		assertFalse(restart(book).shippedChanged("vorkath"));
+		assertFalse("never edited", book.shippedChanged("zulrah"));
+
+		// What an update that changed the shipped Vorkath list looks like: the saved fingerprint no longer matches.
+		String stale = book.toJson(GSON).replace(GearBook.fingerprint(GearChecks.byId("vorkath")), "0-0");
+		GearBook updated = GearBook.parse(GSON, stale);
+		assertTrue(updated.shippedChanged("vorkath"));
+		assertTrue(restart(updated).shippedChanged("vorkath"));
+		// Editing again keeps the question open: the player has not answered it.
+		assertTrue(updated.put(updated.byId("vorkath")));
+		assertTrue(updated.shippedChanged("vorkath"));
+
+		updated.keepMine("vorkath");
+		assertFalse(updated.shippedChanged("vorkath"));
+		assertTrue(updated.edited("vorkath"));
+		assertFalse(restart(updated).shippedChanged("vorkath"));
+
+		GearBook reset = GearBook.parse(GSON, stale);
+		reset.reset("vorkath");
+		assertFalse(reset.shippedChanged("vorkath"));
+		assertTrue(reset.isEmpty());
+	}
+
+	@Test
+	public void aSaveWithoutAFingerprintIsNotFlagged()
+	{
+		String json = "{\"edits\":{\"vorkath\":{\"lines\":[{\"label\":\"Food\",\"names\":[\"Shark\"]}]}}}";
+		GearBook book = GearBook.parse(GSON, json);
+		assertTrue(book.edited("vorkath"));
+		assertFalse(book.shippedChanged("vorkath"));
+	}
+
+	@Test
+	public void skipsForFightsNoLongerOnTheListAreDropped()
+	{
+		GearBook book = GearBook.empty();
+		book.skip("barrows", "Ahrim", true);
+		assertEquals(Collections.singleton("Ahrim"), book.skipped("barrows"));
+		GearChecks.Rule barrows = book.byId("barrows");
+		List<GearChecks.Req> noAhrim = new ArrayList<>();
+		for (GearChecks.Req r : barrows.reqs)
+		{
+			if (!"Ahrim".equals(r.fight))
+			{
+				noAhrim.add(r);
+			}
+		}
+		assertTrue(book.put(barrows.withReqs(noAhrim)));
+		assertTrue(book.skipped("barrows").isEmpty());
+		// Putting the Ahrim line back must not bring the old skip back with it.
+		book.reset("barrows");
+		assertTrue(book.skipped("barrows").isEmpty());
+		assertTrue(book.isEmpty());
+
+		book.skip("barrows", "Dharok", true);
+		assertTrue("not a fight on the list", book.skipped("barrows").isEmpty());
+
+		String json = "{\"skips\":{\"barrows\":[\"Ahrim\",\"Gone\"],\"nope\":[\"Ahrim\"],\"custom-3\":[\"X\"]}}";
+		GearBook read = GearBook.parse(GSON, json);
+		assertEquals(Collections.singleton("Ahrim"), read.skipped("barrows"));
+		assertTrue(read.skipped("nope").isEmpty());
+		assertTrue(read.skipped("custom-3").isEmpty());
+		assertFalse(restart(read).toJson(GSON).contains("Gone"));
+	}
+
+	@Test
+	public void removingAnOwnPlaceDropsItsSkips()
+	{
+		GearBook book = GearBook.empty();
+		GearChecks.Rule mine = book.addCustom("Mine", 0);
+		assertTrue(book.put(mine.withReqs(Collections.singletonList(
+			new GearChecks.Req("Staff", GearChecks.Need.WORN, "Staff").fight("Boss")))));
+		book.skip(mine.id, "Boss", true);
+		assertEquals(Collections.singleton("Boss"), restart(book).skipped(mine.id));
+		assertTrue(book.remove(mine.id));
+		assertTrue(book.isEmpty());
+	}
+
+	@Test
 	public void handEditedJsonIsCleanedNotTrusted()
 	{
 		String json = "{\"edits\":{\"nope\":{\"lines\":[{\"label\":\"x\",\"names\":[\"y\"]}]},"

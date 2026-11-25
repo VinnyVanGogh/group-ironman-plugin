@@ -202,6 +202,11 @@ final class GearTab
 			tab.add(creator(book, v.region));
 		}
 
+		if (book.shippedChanged(selected.id))
+		{
+			tab.add(shippedChanged(book, selected));
+		}
+
 		Set<String> skipped = book.skipped(selected.id);
 		for (String fight : selected.fights())
 		{
@@ -241,6 +246,30 @@ final class GearTab
 		{
 			tab.add(GroupIronmanPanel.text(status, MUTED));
 		}
+	}
+
+	/** An edited starting list whose shipped version changed since: reset to it, or keep the edit and stop asking. */
+	private JPanel shippedChanged(GearBook book, GearChecks.Rule rule)
+	{
+		JPanel box = Ui.card();
+		box.add(GroupIronmanPanel.text("The default list for " + rule.title + " changed since you edited it.", EQUIP));
+		JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2));
+		JButton reset = Ui.button("Reset to default", "Replace your edit with the new default list", () ->
+		{
+			book.reset(rule.id);
+			actions.saveGearBook();
+			redraw.run();
+		});
+		reset.setIcon(GearIcons.glyph(GearIcons.Glyph.RESET));
+		buttons.add(reset);
+		buttons.add(Ui.button("Keep mine", "Keep your edited list and stop showing this", () ->
+		{
+			book.keepMine(rule.id);
+			actions.saveGearBook();
+			redraw.run();
+		}));
+		box.add(buttons);
+		return box;
 	}
 
 	private JToggleButton skipToggle(GearBook book, GearChecks.Rule rule, String fight, boolean on)

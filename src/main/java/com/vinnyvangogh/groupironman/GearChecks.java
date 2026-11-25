@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Function;
 import net.runelite.api.EquipmentInventorySlot;
 
 /**
@@ -505,6 +507,72 @@ final class GearChecks
 		String n = itemName.toLowerCase(Locale.ROOT).trim();
 		String w = wanted.toLowerCase(Locale.ROOT).trim();
 		return n.equals(w) || n.startsWith(w + "(") && !w.endsWith(")");
+	}
+
+	/**
+	 * The item id for {@code name}: the first matching hit of {@code search} (the tradeable item search, best first),
+	 * else the lowest matching id this client has a name for ({@code known}: items the player or a teammate holds),
+	 * so an untradeable a member owns still resolves. Null when neither knows it.
+	 */
+	static Integer resolveId(String name, Function<String, List<ShoppingTab.Hit>> search, Map<Integer, String> known)
+	{
+		for (ShoppingTab.Hit h : search.apply(name))
+		{
+			if (matches(h.name, name))
+			{
+				return h.id;
+			}
+		}
+		Integer best = null;
+		for (Map.Entry<Integer, String> e : known.entrySet())
+		{
+			// The lowest id is the unnoted item: a noted copy shares the name and sits one above.
+			if (matches(e.getValue(), name) && (best == null || e.getKey() < best))
+			{
+				best = e.getKey();
+			}
+		}
+		return best;
+	}
+
+	/** Item ids for {@code wants}, quantities merged by id (larger wins); names nothing resolves go in {@code notFound}. */
+	static Map<Integer, Integer> resolveWants(List<Want> wants, Function<String, List<ShoppingTab.Hit>> search,
+		Map<Integer, String> known, List<String> notFound)
+	{
+		Map<Integer, Integer> out = new LinkedHashMap<>();
+		for (Want w : wants)
+		{
+			Integer id = resolveId(w.name, search, known);
+			if (id == null)
+			{
+				notFound.add(w.name);
+			}
+			else
+			{
+				out.merge(id, w.quantity, Math::max);
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * Drops from {@code want} every item already listed in at least the wanted quantity ({@code listed}: this
+	 * player's open requests and shopping lists), so pressing "Make shopping list" twice adds nothing twice.
+	 * Returns how many were dropped.
+	 */
+	static int dropListed(Map<Integer, Integer> want, Map<Integer, Integer> listed)
+	{
+		int dropped = 0;
+		for (Iterator<Map.Entry<Integer, Integer>> it = want.entrySet().iterator(); it.hasNext(); )
+		{
+			Map.Entry<Integer, Integer> e = it.next();
+			if (listed.getOrDefault(e.getKey(), 0) >= e.getValue())
+			{
+				it.remove();
+				dropped++;
+			}
+		}
+		return dropped;
 	}
 
 	/** Whether item {@code id} satisfies {@code req}: one of its names, or its kind. */
