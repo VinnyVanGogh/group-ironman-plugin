@@ -56,15 +56,17 @@ final class EventToastOverlay extends OverlayPanel
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		List<ToastQueue.Toast> visible = toasts.visible(System.currentTimeMillis(),
-			TimeUnit.SECONDS.toMillis(config.overlayDurationSeconds()), config.overlayMaxStacked(), e -> true);
+		long now = System.currentTimeMillis();
+		long duration = TimeUnit.SECONDS.toMillis(config.overlayDurationSeconds());
+		List<ToastQueue.Toast> visible = toasts.visible(now, duration, config.overlayMaxStacked(), e -> true);
+		int held = toasts.held(now, duration);
 		boolean abovePlayer = config.overlayPosition() == ToastPosition.ABOVE_PLAYER;
 		if (!abovePlayer)
 		{
 			// Also while idle: a spot kept from before a switch away must not come back as the off-screen fallback.
 			lastPlaced = null;
 		}
-		if (visible.isEmpty())
+		if (visible.isEmpty() && held == 0)
 		{
 			return null;
 		}
@@ -81,6 +83,14 @@ final class EventToastOverlay extends OverlayPanel
 			panelComponent.getChildren().add(new OverlayStyle.Header(EventText.title(t.event), t.event.member, colour));
 			panelComponent.getChildren().add(new OverlayStyle.Row(
 				EasterEggs.tagged(EventText.describe(t.event, lookup), t.event, egg), OverlayStyle.TEXT).lines(3));
+		}
+		if (held > 0)
+		{
+			if (!first)
+			{
+				panelComponent.getChildren().add(new OverlayStyle.Rule());
+			}
+			panelComponent.getChildren().add(new OverlayStyle.Row(ToastQueue.heldLine(held), OverlayStyle.TEXT));
 		}
 		if (abovePlayer)
 		{

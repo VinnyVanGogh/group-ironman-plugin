@@ -55,6 +55,29 @@ public class LowStockTest
 	}
 
 	@Test
+	public void aMembersFirstStateIsABaselineNotAnAlert()
+	{
+		// RUNELITE-510: after a restart the first synced storage must not alert for what was already short.
+		LowStock low = LowStock.parse("Shark: 100, Coal: 50");
+		assertTrue(low.checkMember(items(SHARK, 40, COAL, 10), ITEMS).isEmpty());
+		assertTrue("still short, already known", low.checkMember(items(SHARK, 30, COAL, 10), ITEMS).isEmpty());
+		assertTrue(low.checkMember(items(SHARK, 150, COAL, 10), ITEMS).isEmpty());
+		List<LowStock.Alert> alerts = low.checkMember(items(SHARK, 99, COAL, 10), ITEMS);
+		assertEquals("a real drop below the minimum still alerts", 1, alerts.size());
+		assertEquals("Shark", alerts.get(0).item);
+	}
+
+	@Test
+	public void ownVisitsStillAlertFirstTime()
+	{
+		LowStock low = LowStock.parse("Shark: 100");
+		assertEquals(1, low.check(items(SHARK, 40), ITEMS).size());
+		assertTrue("own save already primed: no repeat", low.checkMember(items(SHARK, 40), ITEMS).isEmpty());
+		assertTrue(low.checkMember(items(SHARK, 150), ITEMS).isEmpty());
+		assertEquals(1, low.checkMember(items(SHARK, 10), ITEMS).size());
+	}
+
+	@Test
 	public void matchesByNameCaseInsensitively()
 	{
 		LowStock low = LowStock.parse("PRAYER POTION(4): 20");

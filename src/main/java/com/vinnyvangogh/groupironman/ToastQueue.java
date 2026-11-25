@@ -33,21 +33,61 @@ final class ToastQueue
 		}
 	}
 
+	/** Banners shown at most in any {@link #RATE_WINDOW_MS}; the rest are counted into one "+N more" line. */
+	static final int MAX_PER_WINDOW = 6;
+	static final long RATE_WINDOW_MS = 60_000;
+
 	private final LinkedList<Toast> toasts = new LinkedList<>();
 	private final LinkedList<GroupEvent> recent = new LinkedList<>();
+	/** When each banner in the current window was shown, oldest first. */
+	private final LinkedList<Long> shownTimes = new LinkedList<>();
+	private int held;
+	private long heldAt;
 
-	synchronized void add(GroupEvent event, long now)
+	/**
+	 * A banner for {@code event}, unless {@link #MAX_PER_WINDOW} have shown in the last minute (RUNELITE-510): then
+	 * it is counted for the "+N more" line instead. The group box lists it either way. False when held back.
+	 */
+	synchronized boolean add(GroupEvent event, long now)
 	{
-		toasts.addFirst(new Toast(event, now));
 		recent.addFirst(event);
-		while (toasts.size() > MAX_KEPT)
-		{
-			toasts.removeLast();
-		}
 		while (recent.size() > MAX_KEPT)
 		{
 			recent.removeLast();
 		}
+		while (!shownTimes.isEmpty() && now - shownTimes.peekFirst() >= RATE_WINDOW_MS)
+		{
+			shownTimes.removeFirst();
+		}
+		if (shownTimes.size() >= MAX_PER_WINDOW)
+		{
+			held++;
+			heldAt = now;
+			return false;
+		}
+		shownTimes.addLast(now);
+		toasts.addFirst(new Toast(event, now));
+		while (toasts.size() > MAX_KEPT)
+		{
+			toasts.removeLast();
+		}
+		return true;
+	}
+
+	/** The banner line for {@code n} held-back events. */
+	static String heldLine(int n)
+	{
+		return "+" + n + " more in the Log";
+	}
+
+	/** Banners held back by the rate limit, shown as "+N more" for {@code durationMs} after the last one. */
+	synchronized int held(long now, long durationMs)
+	{
+		if (held > 0 && now - heldAt >= durationMs)
+		{
+			held = 0;
+		}
+		return held;
 	}
 
 	/** The newest {@code max} banners still within {@code durationMs}, newest first. Expired ones are dropped. */
@@ -74,6 +114,7 @@ final class ToastQueue
 	{
 		int n = toasts.size();
 		toasts.clear();
+		held = 0;
 		return n;
 	}
 
@@ -93,5 +134,7 @@ final class ToastQueue
 	{
 		toasts.clear();
 		recent.clear();
+		shownTimes.clear();
+		held = 0;
 	}
 }
