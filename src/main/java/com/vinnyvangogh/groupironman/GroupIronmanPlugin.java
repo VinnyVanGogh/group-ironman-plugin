@@ -400,10 +400,7 @@ public class GroupIronmanPlugin extends Plugin
 			@Override
 			public String clearPath()
 			{
-				PathSession s = paths;
-				String said = s == null ? "" : s.stop();
-				redraw();
-				return said;
+				return stopPath();
 			}
 		}, (task, delayMs) -> executor.schedule(task, delayMs, TimeUnit.MILLISECONDS), SwingUtilities::invokeLater);
 		navButton = NavigationButton.builder()
@@ -508,6 +505,25 @@ public class GroupIronmanPlugin extends Plugin
 		events.reloadConfig();
 		// The sidebar button stays whatever the switches say; the panel shows the change.
 		redraw();
+	}
+
+	/** The Shopping tab's "Stop path" and the Path to card's right-click: one stop, what it said. */
+	private String stopPath()
+	{
+		PathSession s = paths;
+		String said = s == null ? "" : s.stop();
+		redraw();
+		return said;
+	}
+
+	@Subscribe
+	public void onOverlayMenuClicked(OverlayMenuClicked click)
+	{
+		PathStopOverlay o = pathOverlay;
+		if (o != null && o.stops(click))
+		{
+			stopPath();
+		}
 	}
 
 	@Subscribe

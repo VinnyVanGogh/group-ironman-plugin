@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Point;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -12,6 +13,7 @@ import net.runelite.api.MenuAction;
 import net.runelite.api.Player;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import net.runelite.client.ui.overlay.OverlayPanel;
+import net.runelite.client.ui.overlay.components.LayoutableRenderableEntity;
 
 /**
  * Event banners: one title and one line per event, newest on top, each for
@@ -30,6 +32,8 @@ final class EventToastOverlay extends OverlayPanel
 	private final Client client;
 	/** Height drawn last frame: "Above player" grows upward from the head, so it needs it before drawing. */
 	private int lastHeight;
+	/** Where "Above player" drew last, in canvas pixels: kept while the head is off screen. */
+	private Point lastPlaced;
 
 	EventToastOverlay(ToastQueue toasts, GroupIronmanConfig config, ItemLookup lookup,
 		Supplier<EasterEggs.Settings> eggs, Client client)
@@ -56,6 +60,12 @@ final class EventToastOverlay extends OverlayPanel
 		long duration = TimeUnit.SECONDS.toMillis(config.overlayDurationSeconds());
 		List<ToastQueue.Toast> visible = toasts.visible(now, duration, config.overlayMaxStacked(), e -> true);
 		int held = toasts.held(now, duration);
+		boolean abovePlayer = config.overlayPosition() == ToastPosition.ABOVE_PLAYER;
+		if (!abovePlayer)
+		{
+			// Also while idle: a spot kept from before a switch away must not come back as the off-screen fallback.
+			lastPlaced = null;
+		}
 		if (visible.isEmpty() && held == 0)
 		{
 			return null;
@@ -82,17 +92,21 @@ final class EventToastOverlay extends OverlayPanel
 			}
 			panelComponent.getChildren().add(new OverlayStyle.Row(ToastQueue.heldLine(held), OverlayStyle.TEXT));
 		}
-		if (config.overlayPosition() == ToastPosition.ABOVE_PLAYER)
+		if (abovePlayer)
 		{
-			panelComponent.setPreferredLocation(BannerAnchor.place(headPoint(graphics),
-				client.getCanvasWidth(), client.getCanvasHeight(), OverlayStyle.BANNER_WIDTH, lastHeight));
+			// Placed in canvas pixels, then moved into the space this graphics draws in (see BannerAnchor).
+			lastPlaced = BannerAnchor.place(headPoint(graphics), lastPlaced, client.getCanvasWidth(),
+				client.getCanvasHeight(), OverlayStyle.BANNER_WIDTH, lastHeight);
+			panelComponent.setPreferredLocation(BannerAnchor.toGraphics(lastPlaced, graphics.getTransform()));
 		}
 		else
 		{
 			panelComponent.setPreferredLocation(new Point());
 		}
+		// Measured from the blocks themselves: the panel's own size is last frame's (see OverlayStyle.drawnHeight).
+		List<LayoutableRenderableEntity> parts = new ArrayList<>(panelComponent.getChildren());
 		Dimension drawn = super.render(graphics);
-		lastHeight = drawn == null ? 0 : drawn.height;
+		lastHeight = drawn == null ? 0 : OverlayStyle.drawnHeight(parts);
 		return drawn;
 	}
 
