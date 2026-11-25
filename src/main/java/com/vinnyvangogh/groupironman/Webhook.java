@@ -9,7 +9,7 @@ import java.util.Map;
  * has its own poster name choice, kept even on Main's URL (Board pre-run answer).
  *
  * <p>The default names are RuneScape-flavoured, under Discord's 80 characters and free of the words Discord refuses
- * in a webhook username ({@link PosterNames#refused}); WebhooksTest holds them to that.
+ * in a webhook username (Discord Relay's poster-name check); WebhooksTest holds them to that.
  *
  * <p>Separate from {@link GroupEvent.Category}, which picks embed colours, Log filters and digest ticks: the
  * webhooks are where a post goes, which the Board split differently.

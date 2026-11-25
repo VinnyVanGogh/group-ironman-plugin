@@ -23,10 +23,10 @@ import net.runelite.client.config.Units;
  * already uses. Every switch defaults to off: a fresh install sends nothing
  * and listens to nothing.
  *
- * <p>The panel has exactly eight sections, in this order: Group, Discord:
- * connection, Discord: what to post, Discord: how to post, Discord: daily
- * digest, In-game, Thresholds, Advanced. {@code ConfigLayoutTest} holds the
- * layout to that.
+ * <p>The panel has exactly seven sections, in this order: Group, Discord:
+ * what to post, Discord: how to post, Discord: daily digest, In-game,
+ * Thresholds, Advanced. {@code ConfigLayoutTest} holds the layout to that.
+ * Webhooks and every other posting setting are the Discord Relay plugin's.
  */
 @ConfigGroup(GroupIronmanConfig.GROUP)
 public interface GroupIronmanConfig extends Config
@@ -47,8 +47,6 @@ public interface GroupIronmanConfig extends Config
 	 * group key belongs to, so an account in another group is told apart from a member ({@link GroupBinding}).
 	 */
 	String KEY_BOUND_GROUP = "boundGroup";
-	/** 'Combine level-ups': frozen key; its default moved 30 → 60 for new installs only (GroupEventEngine). */
-	String KEY_COMBINE_LEVELS = "discordCombineLevels";
 
 	/**
 	 * The {@code @Units} on every gp number box: no suffix at all. RuneLite's number box is a fixed 6 columns
@@ -58,22 +56,18 @@ public interface GroupIronmanConfig extends Config
 	 */
 	String GP_PLAIN = "";
 
-	// ---- The eight sections ----
-	// Every section but Group starts closed, so a first install shows all eight names at a glance (Board 2026-11-11).
+	// ---- The seven sections ----
+	// Every section but Group starts closed, so a first install shows every name at a glance (Board 2026-11-11).
 
 	@ConfigSection(name = "Group", description = "What you share. You see members' data only for what you share.",
 		position = 0)
 	String groupSection = "sectionGroup";
 
-	@ConfigSection(name = "Discord: connection", description = "Webhooks and poster names. Each client posts only"
-		+ " its own events.", position = 1, closedByDefault = true)
-	String discordConnectionSection = "sectionDiscordConnection";
-
-	@ConfigSection(name = "Discord: what to post", description = "One switch per event.", position = 2,
-		closedByDefault = true)
+	@ConfigSection(name = "Discord: what to post", description = "One switch per event. The Discord Relay plugin"
+		+ " posts them, to its own webhooks.", position = 2, closedByDefault = true)
 	String discordEventsSection = "sectionDiscordWhat";
 
-	@ConfigSection(name = "Discord: how to post", description = "Online status, grouping, screenshots, quiet hours.",
+	@ConfigSection(name = "Discord: how to post", description = "Online status, quiet hours, Easter eggs.",
 		position = 3, closedByDefault = true)
 	String discordHowSection = "sectionDiscordHow";
 
@@ -216,193 +210,14 @@ public interface GroupIronmanConfig extends Config
 		return false;
 	}
 
-	// ---- 2. Discord: connection ----
-
-	@ConfigItem(keyName = "discordEnabled", name = "Post to Discord",
-		description = "Post ticked events to the webhooks.", warning = DiscordWebhook.WARNING,
-		section = discordConnectionSection, position = 0)
-	default boolean discordEnabled()
-	{
-		return false;
-	}
-
-	// Seven webhooks, three rows each: the URL, the poster-name choice, the Custom box (Board 2026-11-11). Main
-	// keeps the keys of the one webhook there used to be. A category left empty posts to Main's URL under its own
-	// poster name. Webhooks.of is the only reader of these keys; Webhook says which events each one carries.
-
-	@ConfigItem(keyName = "discordWebhookUrl", name = "Main webhook",
-		description = "From Discord channel settings, Integrations. Gets every post with no webhook of its own.",
-		secret = true, section = discordConnectionSection, position = 1)
-	default String discordWebhookUrl()
-	{
-		return "";
-	}
-
-	@ConfigItem(keyName = "discordPosterName", name = "Main name",
-		description = "The webhook's name, Town Crier, or Custom below.", section = discordConnectionSection, position = 2)
-	default DiscordPosterName discordPosterName()
-	{
-		return DiscordPosterName.WEBHOOK;
-	}
-
-	@ConfigItem(keyName = "discordNameMain", name = "Main custom name",
-		description = "Up to 80 characters; not 'discord', 'clyde', 'everyone', 'here', @, #, : or ```.",
-		section = discordConnectionSection, position = 3)
-	default String discordNameMain()
-	{
-		return "Town Crier";
-	}
-
-	@ConfigItem(keyName = "discordGroupUrl", name = "Online status webhook",
-		description = "Empty uses Main. Changing it starts a new board.", secret = true,
-		section = discordConnectionSection, position = 4)
-	default String discordGroupUrl()
-	{
-		return "";
-	}
-
-	@ConfigItem(keyName = "discordPosterOnline", name = "Online name",
-		description = "The webhook's name, World Hopper, or Custom below.", section = discordConnectionSection,
-		position = 5)
-	default DiscordPosterName discordPosterOnline()
-	{
-		return DiscordPosterName.WEBHOOK;
-	}
-
-	@ConfigItem(keyName = "discordNameGroup", name = "Online custom name", description = "Used with Custom.",
-		section = discordConnectionSection, position = 6)
-	default String discordNameGroup()
-	{
-		return "World Hopper";
-	}
-
-	@ConfigItem(keyName = "discordDropsUrl", name = "Drops & loot webhook",
-		description = "Drops, pets, log slots, uniques, chests. Empty uses Main.", secret = true,
-		section = discordConnectionSection, position = 7)
-	default String discordDropsUrl()
-	{
-		return "";
-	}
-
-	@ConfigItem(keyName = "discordPosterDrops", name = "Drops name",
-		description = "The webhook's name, Party Pete, or Custom below.", section = discordConnectionSection,
-		position = 8)
-	default DiscordPosterName discordPosterDrops()
-	{
-		return DiscordPosterName.WEBHOOK;
-	}
-
-	@ConfigItem(keyName = "discordNameDrops", name = "Drops custom name", description = "Used with Custom.",
-		section = discordConnectionSection, position = 9)
-	default String discordNameDrops()
-	{
-		return "Party Pete";
-	}
-
-	@ConfigItem(keyName = "discordProgressUrl", name = "Progress webhook", description = "Levels, XP, quests."
-		+ " Empty uses Main.", secret = true, section = discordConnectionSection, position = 10)
-	default String discordProgressUrl()
-	{
-		return "";
-	}
-
-	@ConfigItem(keyName = "discordPosterProgress", name = "Progress name", description = "The webhook's name,"
-		+ " Skillcape Seller, or Custom below.", section = discordConnectionSection, position = 11)
-	default DiscordPosterName discordPosterProgress()
-	{
-		return DiscordPosterName.WEBHOOK;
-	}
-
-	@ConfigItem(keyName = "discordNameProgress", name = "Progress custom name", description = "Used with Custom.",
-		section = discordConnectionSection, position = 12)
-	default String discordNameProgress()
-	{
-		return "Skillcape Seller";
-	}
-
-	@ConfigItem(keyName = "discordDeathsUrl", name = "Deaths & danger webhook", description = "Deaths, Hardcore"
-		+ " lives, gravestones. Empty uses Main.", secret = true, section = discordConnectionSection, position = 13)
-	default String discordDeathsUrl()
-	{
-		return "";
-	}
-
-	@ConfigItem(keyName = "discordPosterDeaths", name = "Deaths name", description = "The webhook's name, Death's"
-		+ " Office, or Custom below.", section = discordConnectionSection, position = 14)
-	default DiscordPosterName discordPosterDeaths()
-	{
-		return DiscordPosterName.WEBHOOK;
-	}
-
-	@ConfigItem(keyName = "discordNameDeaths", name = "Deaths custom name", description = "Used with Custom.",
-		section = discordConnectionSection, position = 15)
-	default String discordNameDeaths()
-	{
-		return "Death's Office";
-	}
-
-	@ConfigItem(keyName = "discordStorageUrl", name = "Group storage webhook", description = "Storage events."
-		+ " Empty uses Main.", secret = true, section = discordConnectionSection, position = 16)
-	default String discordStorageUrl()
-	{
-		return "";
-	}
-
-	@ConfigItem(keyName = "discordPosterStorage", name = "Storage name", description = "The webhook's name,"
-		+ " Gielinor Banker, or Custom below.", section = discordConnectionSection, position = 17)
-	default DiscordPosterName discordPosterStorage()
-	{
-		return DiscordPosterName.WEBHOOK;
-	}
-
-	@ConfigItem(keyName = "discordNameStorage", name = "Storage custom name", description = "Used with Custom.",
-		section = discordConnectionSection, position = 18)
-	default String discordNameStorage()
-	{
-		return "Gielinor Banker";
-	}
-
-	@ConfigItem(keyName = "discordDigestUrl", name = "Daily digest webhook", description = "Empty uses Main.",
-		secret = true, section = discordConnectionSection, position = 19)
-	default String discordDigestUrl()
-	{
-		return "";
-	}
-
-	@ConfigItem(keyName = "discordPosterDigest", name = "Digest name", description = "The webhook's name, Varrock"
-		+ " Herald, or Custom below.", section = discordConnectionSection, position = 20)
-	default DiscordPosterName discordPosterDigest()
-	{
-		return DiscordPosterName.WEBHOOK;
-	}
-
-	@ConfigItem(keyName = "discordNameDigest", name = "Digest custom name", description = "Used with Custom.",
-		section = discordConnectionSection, position = 21)
-	default String discordNameDigest()
-	{
-		return "Varrock Herald";
-	}
-
-	// Retired with the seven-webhook split: Activities is no longer a webhook (its events go to Main, Barrows to
-	// Drops & loot). Kept hidden, never read, so the frozen keys are never reused for something else.
-
-	@ConfigItem(keyName = "discordActivitiesUrl", name = "Activities webhook (retired)", description = "Retired.",
-		secret = true, hidden = true, section = discordConnectionSection, position = 22)
-	default String discordActivitiesUrl()
-	{
-		return "";
-	}
-
-	@ConfigItem(keyName = "discordNameActivities", name = "Activities name (retired)", description = "Retired.",
-		hidden = true, section = discordConnectionSection, position = 23)
-	default String discordNameActivities()
-	{
-		return "";
-	}
+	// ---- 2. Discord ----
+	// Webhooks, poster names, screenshots, the mention and grouping moved to the Discord Relay plugin, which posts
+	// (docs/contracts/discord-relay-v1.md lists every moved key; it reads their stored values once, and they are
+	// never removed here). What stays is the group's: which events post, the digest, quiet hours, Easter eggs.
 
 	@ConfigItem(keyName = KEY_OPT_OUT_ALL, name = "Don't post my events", description = "None of your events go to"
 		+ " Discord, whatever the group says. Per event: panel Settings tab. Leader and editors see this.",
-		section = discordConnectionSection, position = 24)
+		section = discordEventsSection, position = -1)
 	default boolean eventOptOutAll()
 	{
 		return false;
@@ -712,14 +527,6 @@ public interface GroupIronmanConfig extends Config
 		return OnlineStatus.POSTS;
 	}
 
-	@ConfigItem(keyName = "discordRepostBoard", name = "Repost board daily",
-		description = "Live board: after midnight, repost it at the bottom and delete the old one.",
-		section = discordHowSection, position = 13)
-	default boolean discordRepostBoard()
-	{
-		return true;
-	}
-
 	@Range(max = 10)
 	@Units(Units.MINUTES)
 	@ConfigItem(keyName = "discordOfflineGrace", name = "Offline grace",
@@ -728,75 +535,6 @@ public interface GroupIronmanConfig extends Config
 	default int discordOfflineGrace()
 	{
 		return 2;
-	}
-
-	@ConfigItem(keyName = KEY_COMBINE_LEVELS, name = "Combine level-ups",
-		description = "Levels within this many minutes edit one message, a card per skill. 0 is off.",
-		section = discordHowSection, position = 2)
-	@Range(max = 240)
-	@Units(Units.MINUTES)
-	default int discordCombineLevels()
-	{
-		return 60;
-	}
-
-	@ConfigItem(keyName = "discordGroupPosts", name = "Group posts (minutes)",
-		description = "Same-kind events within this many minutes edit one message, up to 10 cards. Storage shows net"
-			+ " totals. 0 is off.", section = discordHowSection, position = 15)
-	@Range(max = 240)
-	@Units(Units.MINUTES)
-	default int discordGroupPosts()
-	{
-		return 30;
-	}
-
-	@ConfigItem(keyName = "discordStyle", name = "Message style", description = "Embeds with icons, or plain text.",
-		section = discordHowSection, position = 3)
-	default DiscordStyle discordStyle()
-	{
-		return DiscordStyle.EMBED;
-	}
-
-	@ConfigItem(keyName = "discordScreenshot", name = "Attach a screenshot",
-		description = "A game screenshot on each post.", section = discordHowSection, position = 4)
-	default boolean discordScreenshot()
-	{
-		return false;
-	}
-
-	@ConfigItem(keyName = "discordPickupShot", name = "Add picked-up screenshot",
-		description = "Your drop posts get a second screenshot once you pick the drop up, so the inventory shows it."
-			+ " The post goes on its own, not in a grouped message. Needs 'Attach a screenshot'.",
-		section = discordHowSection, position = 16)
-	default boolean discordPickupShot()
-	{
-		return false;
-	}
-
-	@ConfigItem(keyName = "discordPickupMinutes", name = "Pickup wait (minutes)",
-		description = "How long after a drop posts a pickup still adds the second screenshot.",
-		section = discordHowSection, position = 17)
-	@Range(min = 1, max = 30)
-	@Units(Units.MINUTES)
-	default int discordPickupMinutes()
-	{
-		return 5;
-	}
-
-	@ConfigItem(keyName = "discordGravestoneScreenshot",name = "Grave picture",
-		description = "For gravestone posts: where you died, where you stand, or none. Needs 'Attach a screenshot'.",
-		section = discordHowSection, position = 5)
-	default GraveScreenshot discordGravestoneScreenshot()
-	{
-		return GraveScreenshot.DEATH;
-	}
-
-	@ConfigItem(keyName = "discordMention", name = "Mention for big events",
-		description = "Pinged on pets, 99s, max and Hardcore lives, e.g. <@&role id>.", section = discordHowSection,
-		position = 6)
-	default String discordMention()
-	{
-		return "";
 	}
 
 	@ConfigItem(keyName = "discordQuietStart", name = "Quiet hours from",
@@ -848,14 +586,6 @@ public interface GroupIronmanConfig extends Config
 	default boolean discordNoPluginEvents()
 	{
 		return true;
-	}
-
-	/** Replaced by {@link #discordOnlineStatus}; still read once, so an older install keeps its choice. */
-	@ConfigItem(keyName = "discordOnline", name = "Online and offline", description = "Replaced.", hidden = true,
-		section = discordHowSection, position = 12)
-	default boolean discordOnline()
-	{
-		return false;
 	}
 
 	// ---- 5. Discord: daily digest ----

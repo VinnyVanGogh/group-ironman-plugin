@@ -5,104 +5,19 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
 
 /**
- * The daily digest: each category's lines since the last digest, collected
- * alongside the instant posts (never instead of them), and when the digest
- * and the weekly recap are due. Pure and clock-free, so the schedule is
- * tested with fixed times.
- *
- * <p>Only this player's own lines are ever held, the same rule as every post
- * (BRIEF.md #18), so a group's digests are one per member.
+ * The weekly recap: when it is due, and one player's week tallied for it. The daily digest itself (each
+ * category's lines, held and posted once a day) is Discord Relay's: GIM marks which events go in it
+ * ({@code digest} on the {@code event} message, docs/contracts/discord-relay-v1.md).
  */
 final class Digest
 {
-	/** Most lines kept per category per day; the oldest make way. */
-	static final int MAX_LINES = 50;
-
-	private final Map<GroupEvent.Category, LinkedList<String>> lines = new EnumMap<>(GroupEvent.Category.class);
-
-	synchronized void add(GroupEvent.Category category, String line)
+	private Digest()
 	{
-		LinkedList<String> held = lines.computeIfAbsent(category, c -> new LinkedList<>());
-		held.addLast(line);
-		while (held.size() > MAX_LINES)
-		{
-			held.removeFirst();
-		}
 	}
 
-	/** The held lines, oldest first, and forgets them. */
-	synchronized List<String> drain(GroupEvent.Category category)
-	{
-		LinkedList<String> held = lines.remove(category);
-		return held == null ? new ArrayList<>() : new ArrayList<>(held);
-	}
-
-	/** One {@code CATEGORY<tab>line} per line. Event text holds no tabs or newlines once flattened. */
-	synchronized String save()
-	{
-		StringBuilder out = new StringBuilder();
-		for (Map.Entry<GroupEvent.Category, LinkedList<String>> e : lines.entrySet())
-		{
-			for (String line : e.getValue())
-			{
-				out.append(e.getKey().name()).append('\t').append(flat(line)).append('\n');
-			}
-		}
-		return out.toString();
-	}
-
-	private static String flat(String line)
-	{
-		return line.replace('\t', ' ').replace('\n', ' ');
-	}
-
-	static Digest parse(String saved)
-	{
-		Digest out = new Digest();
-		for (String row : (saved == null ? "" : saved).split("\n"))
-		{
-			String[] parts = row.split("\t", 2);
-			GroupEvent.Category category = parts.length == 2 ? category(parts[0]) : null;
-			if (category != null)
-			{
-				out.add(category, parts[1]);
-			}
-		}
-		return out;
-	}
-
-	private static GroupEvent.Category category(String name)
-	{
-		for (GroupEvent.Category c : GroupEvent.Category.values())
-		{
-			if (c.name().equals(name))
-			{
-				return c;
-			}
-		}
-		return null;
-	}
-
-	/** Today's digest time has passed and the last one was before it. A first run ({@code last} 0) only baselines. */
-	static boolean dailyDue(long last, long now, int hour, ZoneId zone)
-	{
-		if (last <= 0)
-		{
-			return false;
-		}
-		ZonedDateTime today = Instant.ofEpochMilli(now).atZone(zone).withHour(hour).withMinute(0).withSecond(0)
-			.withNano(0);
-		return now >= today.toInstant().toEpochMilli() && last < today.toInstant().toEpochMilli();
-	}
-
-	/** This Monday's recap time has passed and the last recap was before it. */
+	/** This Monday's recap time has passed and the last recap was before it. A first run ({@code last} 0) only baselines. */
 	static boolean weeklyDue(long last, long now, int hour, ZoneId zone)
 	{
 		if (last <= 0)

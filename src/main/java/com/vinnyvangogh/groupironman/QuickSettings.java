@@ -43,8 +43,6 @@ final class QuickSettings
 	static final List<Item> ITEMS = Collections.unmodifiableList(Arrays.asList(
 		new Item("groupSync", "Sync with my group", "Join and share with your group's party.",
 			GroupIronmanConfig::groupSync),
-		new Item("discordEnabled", "Post to Discord", "Send your events to your webhooks.",
-			GroupIronmanConfig::discordEnabled),
 		new Item(GroupIronmanConfig.KEY_OPT_OUT_ALL, "Keep my events off Discord",
 			"None of your events go to Discord, whatever the group says. Same as \"Don't post my events\".", GroupIronmanConfig::eventOptOutAll),
 		new Item("groupShareBank", "Share bank", "Let your group see your bank.",

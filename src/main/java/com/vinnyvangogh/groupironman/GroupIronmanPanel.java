@@ -94,9 +94,6 @@ class GroupIronmanPanel extends PluginPanel
 		/** Ticks Sync with my group and every Share switch ({@link SharingPrompt#SHARING_KEYS}). */
 		void turnOnSharing();
 
-		/** Ticks Post to Discord. */
-		void postToDiscord();
-
 		/** The quick-settings switches' values now, in {@link QuickSettings#ITEMS} order. */
 		boolean[] quickValues();
 
@@ -662,7 +659,7 @@ class GroupIronmanPanel extends PluginPanel
 		// the lag with the Settings tab open (that tab is skipped when unchanged, the header was not).
 		String signature = String.join("|", String.valueOf(SidebarButton.offNotice(v.anyOn)), h.title,
 			String.valueOf(h.detail), String.valueOf(h.ok), String.valueOf(h.buttons), String.valueOf(note),
-			card == null ? "-" : card.sharing + "," + card.discord + "," + v.sharing.key,
+			card == null ? "-" : card.sharing + "," + v.sharing.key,
 			String.valueOf(v.group.strangers()), quickOpen + Arrays.toString(quick));
 		if (signature.equals(headerDrawn) && header.getComponentCount() > 0)
 		{
@@ -750,11 +747,6 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			buttons.add(cardButton("Turn on sharing", "Ticks Sync with my group and every Share switch",
 				actions::turnOnSharing));
-		}
-		if (card.discord)
-		{
-			buttons.add(cardButton("Post my events to Discord", "Ticks Post to Discord, for your webhook",
-				actions::postToDiscord));
 		}
 		buttons.add(cardButton("Not now", "Hides this until the group key changes", () -> sharing.notNow(s.key)));
 		box.add(buttons);

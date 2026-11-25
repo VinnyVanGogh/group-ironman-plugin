@@ -58,8 +58,9 @@ import net.runelite.client.ui.overlay.OverlayMenuEntry;
  * registers on the event bus; this class owns the side panel and its button.
  *
  * <p>Party traffic goes only through RuneLite's own {@code PartyService}. The
- * plugin's only network call of its own is the optional Discord webhook the
- * player sets ({@link GroupEventEngine}); it runs no server. It joins the
+ * plugin makes no network call of its own and runs no server: Discord posts are
+ * the separate Discord Relay plugin's, handed over through RuneLite's
+ * {@code PluginMessage} ({@link DiscordRelay}). It joins the
  * group's party by itself once there is a group key, so the Party plugin can
  * stay off. The key travels outside the game: "Copy group key" puts it on the
  * computer's clipboard for the player to send (e.g. in Discord) and "Paste
@@ -235,12 +236,6 @@ public class GroupIronmanPlugin extends Plugin
 				group.turnOnSharing();
 				// The player's own click, as Paste is: joins once, right away, now that sync is on.
 				clientThread.invokeLater(group::joinGroup);
-			}
-
-			@Override
-			public void postToDiscord()
-			{
-				group.postToDiscord();
 			}
 
 			@Override
@@ -425,6 +420,7 @@ public class GroupIronmanPlugin extends Plugin
 		group.startUp(this::redraw, this::getPluginDirectory);
 		events.startUp(group);
 		eventBus.register(events);
+		events.greetRelay();
 		sidebar.startUp();
 		redraw();
 
@@ -676,7 +672,7 @@ public class GroupIronmanPlugin extends Plugin
 			current.put(s.key, values.value(s.key));
 		}
 		return GroupSettingsTab.View.of(g, self, group.members().names(), current, MemberPrefs.of(config),
-			group.syncing());
+			group.syncing()).relayMissing(!events.relayInstalled());
 	}
 
 	/** Markers only add points to the world map; they never open it (that stays the player's click). */

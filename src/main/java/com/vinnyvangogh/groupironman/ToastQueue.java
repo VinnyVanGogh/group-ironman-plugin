@@ -21,6 +21,16 @@ final class ToastQueue
 	/** Banners kept at most, whatever the setting; the group box keeps as many recent events. */
 	static final int MAX_KEPT = 20;
 
+	/** Quiet from {@code start} up to {@code end} (hours, 0-23), across midnight when start is later; equal means never. */
+	static boolean quiet(int hour, int start, int end)
+	{
+		if (start == end)
+		{
+			return false;
+		}
+		return start < end ? hour >= start && hour < end : hour >= start || hour < end;
+	}
+
 	static final class Toast
 	{
 		final GroupEvent event;

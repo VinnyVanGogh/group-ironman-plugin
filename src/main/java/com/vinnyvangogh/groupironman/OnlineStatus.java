@@ -8,7 +8,7 @@ public enum OnlineStatus
 {
 	/** A post for each login and logout, with the offline grace. */
 	POSTS("Posts"),
-	/** One message in the Group channel, edited as members log in, log out or hop ({@link StatusBoard}). */
+	/** One message in the Group channel, edited as members log in, log out or hop ({@link BoardLines}). */
 	LIVE_BOARD("Live board"),
 	OFF("Off");
 

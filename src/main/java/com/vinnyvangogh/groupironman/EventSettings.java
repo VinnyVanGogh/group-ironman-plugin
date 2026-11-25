@@ -196,7 +196,7 @@ final class EventSettings
 		return from(config, values, prefs, config.discordOnlineStatus());
 	}
 
-	/** As above, with {@code online} the Online status in force ({@link StatusBoard#effective}). */
+	/** As above, with {@code online} the Online status in force ({@link BoardLines#effective}). */
 	static EventSettings from(GroupIronmanConfig config, GroupSettingsSchema.Resolved values, MemberPrefs prefs,
 		OnlineStatus online)
 	{

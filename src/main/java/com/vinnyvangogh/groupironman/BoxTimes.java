@@ -1,6 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-/** How the Group box words when an event happened. Public for the config proxy (see {@link DiscordStyle}). */
+/** How the Group box words when an event happened. Public for the config proxy (see {@link OnlineStatus}). */
 public enum BoxTimes
 {
 	SHORT("Short"),

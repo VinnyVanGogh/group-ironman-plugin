@@ -206,6 +206,8 @@ class GroupService
 	private volatile GovernanceSync governance;
 	/** The leader's signed webhooks document as the cache file keeps it, or null. Never put in the config. */
 	private volatile String cachedWebhooks;
+	/** This member's own webhooks, from Discord Relay ({@link #relayWebhooks(Webhooks)}). */
+	private volatile Webhooks relayWebhooks = Webhooks.NONE;
 	/** The group event engine, told about storage visits, minimums and members' events; null when not running. */
 	private volatile GroupEventEngine events;
 	/** The Shopping tab's shared lists and members' quest progress; null when not running. */
@@ -696,10 +698,27 @@ class GroupService
 		return r == GovernanceSync.SaveResult.SAVED && !syncing() ? GovernanceSync.SaveResult.SAVED_OFFLINE : r;
 	}
 
+	/**
+	 * This member's own webhooks, as Discord Relay reported them ({@code ready} message); none while it is not
+	 * installed. GIM never posts with them: they are read only to share them and to place the live board.
+	 */
+	void relayWebhooks(Webhooks own)
+	{
+		Webhooks next = own == null ? Webhooks.NONE : own;
+		boolean changed = next != relayWebhooks;
+		relayWebhooks = next;
+		if (changed)
+		{
+			republishWebhooks();
+		}
+		// The settings tab's install hint follows Discord Relay coming and going.
+		onChange.run();
+	}
+
 	/** The leader's "Share webhooks with the group". False when refused: this client is not the leader. */
 	boolean shareWebhooks(boolean share)
 	{
-		return asSelf(governance, g -> g.shareWebhooks(self, share, Webhooks.of(config), System.currentTimeMillis()));
+		return asSelf(governance, g -> g.shareWebhooks(self, share, relayWebhooks, System.currentTimeMillis()));
 	}
 
 	/** The leader's shared webhooks this client holds, or null when the leader shares none. */
@@ -711,11 +730,12 @@ class GroupService
 
 	/**
 	 * Where this client's posts go: its own webhooks, with the leader's shared ones filling every field it left
-	 * empty ({@link Webhooks#withGroup}). Every sender asks this.
+	 * empty ({@link Webhooks#withGroup}). Discord Relay applies the same rule to the {@code shared} webhooks GIM
+	 * sends it; GIM reads this only to decide who keeps the live board.
 	 */
 	Webhooks webhooks()
 	{
-		return Webhooks.of(config).withGroup(sharedWebhooks());
+		return relayWebhooks.withGroup(sharedWebhooks());
 	}
 
 	/** True when this client is the group's leader, holding the leader's key. */
@@ -731,7 +751,7 @@ class GroupService
 		GovernanceSync g = governance;
 		if (g != null && sharedWebhooks() != null && isLeader())
 		{
-			g.shareWebhooks(self, true, Webhooks.of(config), System.currentTimeMillis());
+			g.shareWebhooks(self, true, relayWebhooks, System.currentTimeMillis());
 		}
 	}
 
@@ -815,12 +835,6 @@ class GroupService
 	void turnOnSharing()
 	{
 		SharingPrompt.turnOnSharing(this::setConfigObject);
-	}
-
-	/** "Post my events to Discord": the player's own click. */
-	void postToDiscord()
-	{
-		SharingPrompt.postToDiscord(this::setConfigObject);
 	}
 
 	void reloadConfig()

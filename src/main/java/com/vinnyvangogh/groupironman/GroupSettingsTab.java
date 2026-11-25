@@ -73,6 +73,8 @@ final class GroupSettingsTab
 		final Set<String> heard;
 		/** Who shares the group's webhooks (the leader), or null when nobody does. Never a URL. */
 		final String webhooksBy;
+		/** Discord Relay has not answered: the tab shows {@link DiscordRelay#INSTALL_HINT}. */
+		boolean relayMissing;
 
 		View(GroupGovernance.Role role, GroupRoles roles, GroupSettings settings, boolean unclaimed, boolean syncing,
 			List<String> members, String self, Map<String, Long> current, MemberPrefs mine,
@@ -113,6 +115,13 @@ final class GroupSettingsTab
 				mine, g.prefs(), heard, shared == null ? null : shared.by);
 		}
 
+		/** This view, noting whether Discord Relay is missing. */
+		View relayMissing(boolean missing)
+		{
+			relayMissing = missing;
+			return this;
+		}
+
 		boolean canEdit()
 		{
 			return role != GroupGovernance.Role.MEMBER;
@@ -128,7 +137,7 @@ final class GroupSettingsTab
 				settings == null ? "" : settings.signature, String.valueOf(unclaimed), String.valueOf(syncing),
 				String.valueOf(members), self, String.valueOf(mine.all), String.valueOf(mine.noPost),
 				String.valueOf(mine.mute), String.valueOf(prefsText()), String.valueOf(heard),
-				settings == null ? String.valueOf(current) : "", String.valueOf(webhooksBy));
+				settings == null ? String.valueOf(current) : "", String.valueOf(webhooksBy), String.valueOf(relayMissing));
 		}
 
 		private String prefsText()
@@ -263,6 +272,10 @@ final class GroupSettingsTab
 
 	private void drawWebhooks(JPanel tab, View v)
 	{
+		if (v.relayMissing)
+		{
+			tab.add(text(DiscordRelay.INSTALL_HINT, ColorScheme.BRAND_ORANGE));
+		}
 		for (String line : SettingsModel.webhookLines(v.role, v.webhooksBy))
 		{
 			tab.add(text(line, MUTED));
@@ -273,8 +286,9 @@ final class GroupSettingsTab
 		}
 		JCheckBox box = new JCheckBox("Share webhooks with the group", v.webhooksBy != null);
 		small(box);
-		box.setToolTipText("Send your seven webhooks and poster names to every member, so they only tick 'Post to"
-			+ " Discord'. Anyone with the group key can read them. Off, or a new group key, stops sending them.");
+		box.setToolTipText("Send your Discord Relay webhooks and poster names to every member, so they only tick"
+			+ " 'Post to Discord' there. Anyone with the group key can read them. Off, or a new group key, stops"
+			+ " sending them.");
 		box.addActionListener(e ->
 		{
 			boolean on = box.isSelected();
