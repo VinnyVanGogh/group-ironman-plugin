@@ -1,6 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
-/** What the Group box shows when nobody else is online. Public for the config proxy (see {@link DiscordStyle}). */
+/** What the Group box shows when nobody else is online. Public for the config proxy (see {@link OnlineStatus}). */
 public enum EmptyBoxMode
 {
 	USEFUL("Useful"),

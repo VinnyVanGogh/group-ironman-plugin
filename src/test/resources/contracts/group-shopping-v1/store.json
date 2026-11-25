@@ -1,0 +1,9 @@
+{
+  "namespace": "group-shopping",
+  "name": "store",
+  "data": {
+    "v": 1,
+    "source": "group-shopping",
+    "cache": "{\"lists\":[],\"reqs\":[],\"claims\":[],\"hist\":[],\"qp\":{}}"
+  }
+}

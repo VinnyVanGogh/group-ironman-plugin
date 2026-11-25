@@ -103,7 +103,7 @@ public class GovernanceSyncTest
 		alex.outbox.clear();
 
 		// Turning sharing off without ever having shared sends nothing either.
-		assertTrue(alex.sync.shareWebhooks("Alex", false, Webhooks.of(DEFAULTS), NOW + 2));
+		assertTrue(alex.sync.shareWebhooks("Alex", false, Webhooks.NONE, NOW + 2));
 		alex.sync.flush(MemberPrefs.NONE);
 		assertTrue(alex.outbox.isEmpty());
 

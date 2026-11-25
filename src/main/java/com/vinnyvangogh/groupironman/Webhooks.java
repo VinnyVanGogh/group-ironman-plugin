@@ -3,23 +3,31 @@ package com.vinnyvangogh.groupironman;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
- * The one place a post's webhook URL and poster name are decided. Every sender asks this, never a webhook setting
- * directly. Pure over a snapshot of the settings, so the rules are tested.
+ * A snapshot of the seven webhooks' settings (URL, poster-name choice, custom name). Discord Relay owns the
+ * webhooks and does every post; GIM keeps this only for the group: the leader's "Share webhooks with the group"
+ * signs Discord Relay's own webhooks into a {@link GroupWebhooks} document, and the live board's "who keeps it"
+ * rule reads where the Online status posts would go ({@link BoardLines#keeps}).
  *
  * <ul>
- * <li>URL: the webhook's own when set and valid, else Main's, else none (nothing is posted).</li>
- * <li>Name: the webhook's own choice, also when its URL fell back to Main's. Webhook's own sends no
- * {@code username}; Default name sends {@link Webhook#defaultName}; Custom sends the box, or the default name
- * when the box is blank or a name Discord refuses ({@link PosterNames#refused}).</li>
+ * <li>URL: the webhook's own when set and valid, else Main's, else none.</li>
+ * <li>A member's own webhook wins over the leader's shared one for that webhook ({@link #withGroup}).</li>
  * </ul>
  */
 final class Webhooks
 {
+	/** Discord's limit on a webhook username. */
+	static final int MAX_NAME = 80;
+	/** discord.com (and the old discordapp.com, and the ptb/canary clients' hosts), /api/webhooks/id/token. */
+	private static final Pattern URL = Pattern.compile(
+		"^https://(?:(?:ptb|canary)\\.)?discord(?:app)?\\.com/api/webhooks/\\d+/[A-Za-z0-9_-]+/?$");
+	/** Quotes a pasted link may come wrapped in: straight, backtick and curly. */
+	private static final String QUOTES = "\"'`“”‘’";
+
 	/** One webhook's three settings, as typed. */
 	static final class Setting
 	{
@@ -34,6 +42,9 @@ final class Webhooks
 			this.name = name == null ? "" : name;
 		}
 	}
+
+	/** No webhooks at all: Discord Relay not installed, or nothing set. */
+	static final Webhooks NONE = new Webhooks(Collections.<Webhook, Setting>emptyMap());
 
 	private static final Setting UNSET = new Setting("", DiscordPosterName.WEBHOOK, "");
 
@@ -53,11 +64,37 @@ final class Webhooks
 		this.fromGroup = fromGroup.isEmpty() ? EnumSet.noneOf(Webhook.class) : EnumSet.copyOf(fromGroup);
 	}
 
+	static boolean valid(String url)
+	{
+		return URL.matcher(clean(url)).matches();
+	}
+
+	/** The field as typed, without surrounding whitespace or quotes. Empty for null. */
+	static String clean(String url)
+	{
+		String s = url == null ? "" : url.trim();
+		while (s.length() >= 2 && QUOTES.indexOf(s.charAt(0)) >= 0 && QUOTES.indexOf(s.charAt(s.length() - 1)) >= 0)
+		{
+			s = s.substring(1, s.length() - 1).trim();
+		}
+		return s;
+	}
+
+	/** A poster name trimmed and cut to {@link #MAX_NAME} characters, never through a surrogate pair. */
+	static String cleanName(String name)
+	{
+		String s = name == null ? "" : name.trim();
+		if (s.length() > MAX_NAME)
+		{
+			int end = Character.isHighSurrogate(s.charAt(MAX_NAME - 1)) ? MAX_NAME - 1 : MAX_NAME;
+			s = s.substring(0, end).trim();
+		}
+		return s;
+	}
+
 	/**
 	 * These (a member's own) with the leader's shared webhooks filling in: per webhook, the member's own setting
-	 * (URL and poster name) when its URL field is not empty, else the group's. Unchanged when the group shares
-	 * none. Main's fallback then runs over the result, so an empty category still lands on Main (the member's own
-	 * Main when set, else the group's).
+	 * when its URL field is not empty, else the group's. Unchanged when the group shares none.
 	 */
 	Webhooks withGroup(GroupWebhooks group)
 	{
@@ -69,7 +106,7 @@ final class Webhooks
 		Set<Webhook> borrowed = EnumSet.noneOf(Webhook.class);
 		for (Map.Entry<Webhook, Setting> e : group.settings.entrySet())
 		{
-			if (DiscordWebhook.clean(setting(e.getKey()).url).isEmpty())
+			if (clean(setting(e.getKey()).url).isEmpty())
 			{
 				merged.put(e.getKey(), e.getValue());
 				borrowed.add(e.getKey());
@@ -81,7 +118,7 @@ final class Webhooks
 	/** True when {@link #url}{@code (webhook)} is the leader's shared URL, not one this member typed. */
 	boolean fromGroup(Webhook webhook)
 	{
-		Webhook used = DiscordWebhook.valid(setting(webhook).url) ? webhook : Webhook.MAIN;
+		Webhook used = valid(setting(webhook).url) ? webhook : Webhook.MAIN;
 		return fromGroup.contains(used) && url(webhook) != null;
 	}
 
@@ -99,71 +136,24 @@ final class Webhooks
 	String url(Webhook webhook)
 	{
 		String own = setting(webhook).url;
-		if (DiscordWebhook.valid(own))
+		if (valid(own))
 		{
-			return DiscordWebhook.clean(own);
+			return clean(own);
 		}
 		String main = setting(Webhook.MAIN).url;
-		return DiscordWebhook.valid(main) ? DiscordWebhook.clean(main) : null;
+		return valid(main) ? clean(main) : null;
 	}
 
-	/** The {@code username} {@code webhook}'s posts go out under; null sends none, so the webhook's own shows. */
-	String name(Webhook webhook)
+	/** At least one webhook to post to. */
+	boolean any()
 	{
-		Setting s = setting(webhook);
-		switch (s.mode)
-		{
-			case CUSTOM:
-				String custom = PosterNames.clean(s.name);
-				return custom.isEmpty() || PosterNames.refused(custom) ? webhook.defaultName : custom;
-			case GIM_UTILITIES:
-				return webhook.defaultName;
-			default:
-				return null;
-		}
-	}
-
-	/** Every URL field, by the label its warning uses, in settings order. */
-	Map<String, String> urlFields()
-	{
-		Map<String, String> out = new LinkedHashMap<>();
 		for (Webhook w : Webhook.values())
 		{
-			out.put(w.label, setting(w).url);
+			if (url(w) != null)
+			{
+				return true;
+			}
 		}
-		return out;
-	}
-
-	/** Every Custom box by label; blank for a webhook not on Custom, whose box is unused and so never warns. */
-	Map<String, String> customNames()
-	{
-		Map<String, String> out = new LinkedHashMap<>();
-		for (Webhook w : Webhook.values())
-		{
-			Setting s = setting(w);
-			out.put(w.label, s.mode == DiscordPosterName.CUSTOM ? s.name : "");
-		}
-		return out;
-	}
-
-	/** The seven webhooks' settings. The only reader of the webhook and poster-name keys. */
-	static Webhooks of(GroupIronmanConfig config)
-	{
-		Map<Webhook, Setting> s = new EnumMap<>(Webhook.class);
-		s.put(Webhook.MAIN, new Setting(config.discordWebhookUrl(), config.discordPosterName(),
-			config.discordNameMain()));
-		s.put(Webhook.ONLINE, new Setting(config.discordGroupUrl(), config.discordPosterOnline(),
-			config.discordNameGroup()));
-		s.put(Webhook.DROPS, new Setting(config.discordDropsUrl(), config.discordPosterDrops(),
-			config.discordNameDrops()));
-		s.put(Webhook.PROGRESS, new Setting(config.discordProgressUrl(), config.discordPosterProgress(),
-			config.discordNameProgress()));
-		s.put(Webhook.DEATHS, new Setting(config.discordDeathsUrl(), config.discordPosterDeaths(),
-			config.discordNameDeaths()));
-		s.put(Webhook.STORAGE, new Setting(config.discordStorageUrl(), config.discordPosterStorage(),
-			config.discordNameStorage()));
-		s.put(Webhook.DIGEST, new Setting(config.discordDigestUrl(), config.discordPosterDigest(),
-			config.discordNameDigest()));
-		return new Webhooks(s);
+		return false;
 	}
 }

@@ -71,9 +71,18 @@ import net.runelite.client.ui.components.IconTextField;
 class GroupIronmanPanel extends PluginPanel
 {
 	/** What the buttons in the header, and in the Settings tab, do. */
-	interface Actions extends GroupSettingsTab.Actions, ShoppingTab.Actions, CompareTab.Actions,
-		GearTab.Actions
+	interface Actions extends GroupSettingsTab.Actions, GearTab.Actions
 	{
+		/** Compare tab: hand the group to Player Compare and show its group view. */
+		default void openCompare()
+		{
+		}
+
+		/** Shopping tab: hand the group to Group Shopping and show its lists. */
+		default void openShopping()
+		{
+		}
+
 		void join();
 
 		void switchParty();
@@ -93,9 +102,6 @@ class GroupIronmanPanel extends PluginPanel
 
 		/** Ticks Sync with my group and every Share switch ({@link SharingPrompt#SHARING_KEYS}). */
 		void turnOnSharing();
-
-		/** Ticks Post to Discord. */
-		void postToDiscord();
 
 		/** The quick-settings switches' values now, in {@link QuickSettings#ITEMS} order. */
 		boolean[] quickValues();
@@ -124,21 +130,11 @@ class GroupIronmanPanel extends PluginPanel
 		final boolean anyOn;
 		/** What the "Turn on sharing" card reads. */
 		final SharingPrompt.Settings sharing;
-		/** The Shopping tab's view, or null before the plugin has started its lists. */
-		final ShoppingTab.View shopping;
 
 		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
 			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GamePresence presence,
 			GroupSettingsTab.View settings, boolean anyOn, SharingPrompt.Settings sharing)
 		{
-			this(sync, group, members, items, switches, regions, since, self, presence, settings, anyOn, sharing, null);
-		}
-
-		View(GroupSync.State sync, GroupRoster group, GroupMembers members, ItemLookup items,
-			GroupOutbox.Switches switches, RegionNames regions, long since, String self, GamePresence presence,
-			GroupSettingsTab.View settings, boolean anyOn, SharingPrompt.Settings sharing, ShoppingTab.View shopping)
-		{
-			this.shopping = shopping;
 			this.anyOn = anyOn;
 			this.sharing = sharing;
 			this.presence = presence;
@@ -155,8 +151,10 @@ class GroupIronmanPanel extends PluginPanel
 
 		/** Members' shared boss bests, quests and diaries; set by the plugin, empty until it does. */
 		ProgressView progress = ProgressView.EMPTY;
-		/** The Compare tab's view, or null before the plugin has started. */
-		CompareTab.View compare;
+		/** Player Compare has answered: the Compare tab opens its group view, else it shows the install card. */
+		boolean compareInstalled;
+		/** Group Shopping has answered: the Shopping tab opens its lists, else it shows the install card. */
+		boolean shoppingInstalled;
 		/** The Gear tab's view, or null before the plugin has started. */
 		GearTab.View gear;
 	}
@@ -190,8 +188,6 @@ class GroupIronmanPanel extends PluginPanel
 	private final Map<Integer, BufferedImage> slotIcons = new ConcurrentHashMap<>();
 	private final Actions actions;
 	private final GroupSettingsTab settingsTab;
-	private final ShoppingTab shoppingTab;
-	private final CompareTab compareTab;
 	private final GearTab gearTab;
 
 	private final JPanel header = new Column();
@@ -300,8 +296,6 @@ class GroupIronmanPanel extends PluginPanel
 		this.skillIcons = skillIcons;
 		this.actions = actions;
 		this.settingsTab = new GroupSettingsTab(actions, this::redraw);
-		this.shoppingTab = new ShoppingTab(actions, itemManager, this::redraw);
-		this.compareTab = new CompareTab(actions, skillIcons, this::redraw);
 		this.gearTab = new GearTab(actions, this::redraw);
 		setLayout(new BorderLayout());
 		setBorder(new EmptyBorder(8, 8, 8, 8));
@@ -546,11 +540,6 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			return false;
 		}
-		if ("Shopping".equals(current))
-		{
-			// The same for the Shopping tab: its form keeps a half-typed name or search.
-			return v.shopping != null && !shoppingTab.changed(v.shopping);
-		}
 		if (!"Settings".equals(current))
 		{
 			return false;
@@ -560,12 +549,15 @@ class GroupIronmanPanel extends PluginPanel
 
 	private void drawCompare(JPanel tab, View v)
 	{
-		if (v.compare == null)
+		// Leaderboard, Players, Banked, Group vs group and Item are drawn by Player Compare's "Group" source.
+		if (!v.compareInstalled)
 		{
-			empty(tab, "Compare is starting.", "Open this tab again in a moment.");
+			empty(tab, "Compare", PlayerCompare.INSTALL_HINT + " (from the Plugin Hub).");
 			return;
 		}
-		compareTab.draw(tab, v.compare);
+		tab.add(heading("Compare"));
+		tab.add(text("Your group's levels, bosses, banked XP and gear open in Player Compare.", MUTED));
+		tab.add(Ui.button("Open group compare", "Show the group in Player Compare's panel", actions::openCompare));
 	}
 
 	private void drawGear(JPanel tab, View v)
@@ -580,12 +572,16 @@ class GroupIronmanPanel extends PluginPanel
 
 	private void drawShopping(JPanel tab, View v)
 	{
-		if (v.shopping == null)
+		// Lists, presets, requests and "Path to" are drawn by the Group Shopping plugin.
+		if (!v.shoppingInstalled)
 		{
-			empty(tab, "Shopping lists are starting.", "Open this tab again in a moment.");
+			empty(tab, "Shopping", GroupShopping.INSTALL_HINT + " (from the Plugin Hub).");
 			return;
 		}
-		shoppingTab.draw(tab, v.shopping);
+		tab.add(heading("Shopping"));
+		tab.add(text("Your group's shopping lists and requests open in Group Shopping.", MUTED));
+		tab.add(Ui.button("Open shopping lists", "Show the group's lists in Group Shopping's panel",
+			actions::openShopping));
 	}
 
 	private void drawSettings(JPanel tab, View v, long now)
@@ -662,7 +658,7 @@ class GroupIronmanPanel extends PluginPanel
 		// the lag with the Settings tab open (that tab is skipped when unchanged, the header was not).
 		String signature = String.join("|", String.valueOf(SidebarButton.offNotice(v.anyOn)), h.title,
 			String.valueOf(h.detail), String.valueOf(h.ok), String.valueOf(h.buttons), String.valueOf(note),
-			card == null ? "-" : card.sharing + "," + card.discord + "," + v.sharing.key,
+			card == null ? "-" : card.sharing + "," + v.sharing.key,
 			String.valueOf(v.group.strangers()), quickOpen + Arrays.toString(quick));
 		if (signature.equals(headerDrawn) && header.getComponentCount() > 0)
 		{
@@ -750,11 +746,6 @@ class GroupIronmanPanel extends PluginPanel
 		{
 			buttons.add(cardButton("Turn on sharing", "Ticks Sync with my group and every Share switch",
 				actions::turnOnSharing));
-		}
-		if (card.discord)
-		{
-			buttons.add(cardButton("Post my events to Discord", "Ticks Post to Discord, for your webhook",
-				actions::postToDiscord));
 		}
 		buttons.add(cardButton("Not now", "Hides this until the group key changes", () -> sharing.notNow(s.key)));
 		box.add(buttons);

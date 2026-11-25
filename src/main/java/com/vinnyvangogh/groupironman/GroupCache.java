@@ -70,8 +70,8 @@ final class GroupCache
 	}
 
 	/**
-	 * With {@code shop}, the Shopping tab's lists, their history and members' quest progress ({@link
-	 * ShoppingSync#toCache}); null for none. A build from before the Shopping tab ignores the key.
+	 * With {@code shop}, Group Shopping's saved state, kept unread ({@link GroupShopping}); null for none. A build
+	 * from before the Shopping tab ignores the key.
 	 */
 	static String write(Gson gson, GroupRoster roster, String webhooks, JsonObject shop)
 	{

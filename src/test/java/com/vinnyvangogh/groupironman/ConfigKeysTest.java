@@ -29,9 +29,8 @@ import static org.junit.Assert.assertTrue;
 public class ConfigKeysTest
 {
 	private static final Path SOURCES = Paths.get("src/main/java/com/vinnyvangogh/groupironman");
-	/** Keys kept only so they are never reused: hidden and unread (the Activities webhook, 2026-11-12). */
-	private static final Set<String> RETIRED = new HashSet<>(Arrays.asList("discordActivitiesUrl",
-		"discordNameActivities"));
+	/** Keys kept only so they are never reused: hidden and unread. None now: the retired webhook keys moved to Discord Relay. */
+	private static final Set<String> RETIRED = new HashSet<>();
 
 	@Test
 	public void everySettingCanBeReadThroughAConfigProxy() throws Exception

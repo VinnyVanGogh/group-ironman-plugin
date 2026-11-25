@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import static com.vinnyvangogh.groupironman.EventFixtures.NOW;
@@ -175,22 +176,18 @@ public class PresenceDebounceTest
 		tickThrough(NOW + 30 * MIN, NOW + 33 * MIN, GRACE);
 		login(NOW + 40 * MIN, 303, "GroupShip", GRACE);
 		assertEquals(3, posted.size());
-		Gson gson = new Gson();
-		String[] titles = {"GroupShip: Online", "GroupShip: Offline", "GroupShip: Online"};
+		// What Discord Relay is handed for each: the member's name and the right heading (its payload tests
+		// check the embed and plain text built from these).
+		String[] titles = {"Online", "Offline", "Online"};
 		for (int i = 0; i < 3; i++)
 		{
 			GroupEvent e = posted.get(i);
-			JsonObject o = new JsonParser().parse(
-				DiscordWebhook.payload(gson, e, new FakeItems(), DiscordStyle.EMBED, "", false)).getAsJsonObject();
-			JsonObject embed = o.getAsJsonArray("embeds").get(0).getAsJsonObject();
-			assertEquals(titles[i], embed.get("title").getAsString());
-			String description = embed.get("description").getAsString();
-			assertFalse(description, description.contains("You"));
-			assertEquals(i == 1, description.startsWith("offline"));
-			String plain = new JsonParser().parse(
-				DiscordWebhook.payload(gson, e, new FakeItems(), DiscordStyle.PLAIN, "", false))
-				.getAsJsonObject().get("content").getAsString();
-			assertTrue(plain, plain.startsWith("GroupShip: " + (i == 1 ? "offline" : "is online")));
+			assertEquals("GroupShip", e.member);
+			assertEquals(titles[i], EventText.title(e));
+			Map<String, Object> sent = DiscordRelay.event(e, new FakeItems(), true, false, false);
+			assertEquals(titles[i], sent.get("title"));
+			String text = String.valueOf(sent.get("text"));
+			assertFalse(text, text.contains("You"));
 		}
 	}
 

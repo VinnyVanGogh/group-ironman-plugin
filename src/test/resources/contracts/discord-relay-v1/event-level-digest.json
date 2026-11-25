@@ -1,0 +1,35 @@
+{
+  "namespace": "discord-relay",
+  "name": "event",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "channel": "PROGRESS",
+    "title": "Level up",
+    "text": "Attack level 67",
+    "fields": [],
+    "iconItemId": null,
+    "screenshot": "frame",
+    "mergeKey": "Alice",
+    "mention": false,
+    "post": false,
+    "digest": true,
+    "attach": false,
+    "event": {
+      "type": "LEVEL_UP",
+      "code": "lv",
+      "category": "PROGRESS",
+      "at": 1767225600000,
+      "member": "Alice",
+      "text": "Attack",
+      "detail": "",
+      "number": 67,
+      "previous": 66,
+      "world": 302,
+      "location": "",
+      "broadcast": false,
+      "items": [],
+      "taken": []
+    }
+  }
+}

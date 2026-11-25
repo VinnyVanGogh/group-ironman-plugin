@@ -108,17 +108,11 @@ public class LevelEveryTest
 			levels.route(GroupEvent.of(GroupEvent.Type.LEVEL_UP, NOW, "Alex").text("Attack").number(level)
 				.previous(level - 1).build(), true, s, items);
 		}
+		// Only 60 and 65 reach Discord Relay, which combines them into one streak card (its LevelThreads test).
 		assertEquals(2, posted.size());
-		LevelThreads threads = new LevelThreads();
-		long window = 30 * 60_000L;
-		LevelThreads.Edit first = threads.level(posted.get(0), "u", NOW, window, null);
-		assertNotNull("60 starts the post", first);
-		assertNull("65 joins it", threads.level(posted.get(1), "u", NOW + 60_000, window, null));
-		LevelThreads.Streak streak = first.streak;
-		assertEquals(1, streak.cards.size());
-		assertEquals(59, streak.cards.get(0).from);
-		assertEquals(65, streak.cards.get(0).to);
-		assertEquals("Attack 59 → 65 (+6) in 1 min", streak.cards.get(0).text());
+		assertEquals(60, posted.get(0).number);
+		assertEquals(65, posted.get(1).number);
+		assertEquals(64, posted.get(1).previous);
 	}
 
 	@Test

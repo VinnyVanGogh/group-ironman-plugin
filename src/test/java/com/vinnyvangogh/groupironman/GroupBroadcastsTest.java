@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import org.junit.Test;
@@ -269,23 +270,17 @@ public class GroupBroadcastsTest
 	}
 
 	@Test
-	public void theFooterSaysWhereThePostCameFrom()
+	public void discordRelayIsToldWhereThePostCameFrom()
 	{
-		Gson gson = new Gson();
 		FakeItems items = new FakeItems();
 		GroupEvent e = parse("Ott has completed a quest: Cook's Assistant");
-		// Gson writes the apostrophe as ', so the check is on the words after it.
-		String marker = "group broadcast";
-		String embed = DiscordWebhook.payload(gson, DiscordMerge.single(e, items), items, DiscordStyle.EMBED, "",
-			false, null);
-		assertTrue(embed, embed.contains(marker));
-		String plain = DiscordWebhook.payload(gson, DiscordMerge.single(e, items), items, DiscordStyle.PLAIN, "",
-			false, null);
-		assertTrue(plain, plain.contains(marker));
-
+		// Discord Relay writes the "group broadcast" footer from this flag, and never screenshots this screen for it.
+		@SuppressWarnings("unchecked")
+		Map<String, Object> sent = (Map<String, Object>) DiscordRelay.event(e, items, true, false, false).get("event");
+		assertEquals(true, sent.get("broadcast"));
+		assertEquals(DiscordRelay.SHOT_NONE, DiscordRelay.screenshot(e));
 		GroupEvent own = GroupEvent.of(GroupEvent.Type.QUEST, NOW, "Alex").text("Cook's Assistant").build();
-		assertFalse(DiscordWebhook.payload(gson, DiscordMerge.single(own, items), items, DiscordStyle.EMBED, "",
-			false, null).contains(marker));
+		assertEquals(false, DiscordRelay.eventData(own, items).get("broadcast"));
 		String drop = EventText.describe(parse("Ott received a drop: Abyssal whip (1,500,000 coins)."), items);
 		assertTrue(drop, drop.startsWith("received a drop: 1 x Abyssal whip"));
 	}

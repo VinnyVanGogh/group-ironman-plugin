@@ -1,0 +1,39 @@
+{
+  "namespace": "discord-relay",
+  "name": "event",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "channel": "STORAGE",
+    "title": "Group storage visit",
+    "text": "group storage: took 1 x Abyssal whip; deposited 2 x Bones",
+    "fields": [{"name": "Items", "value": "2 x Bones (200 gp)", "inline": false}],
+    "iconItemId": 526,
+    "screenshot": "frame",
+    "mergeKey": "Alice",
+    "mention": false,
+    "post": false,
+    "digest": false,
+    "attach": true,
+    "event": {
+      "type": "STORAGE_SUMMARY",
+      "code": "ss",
+      "category": "STORAGE",
+      "at": 1767225600000,
+      "member": "Alice",
+      "text": "",
+      "detail": "",
+      "number": 0,
+      "previous": 0,
+      "world": 0,
+      "location": "",
+      "broadcast": false,
+      "items": [
+        {"id": 526, "quantity": 2, "name": "Bones", "price": 100}
+      ],
+      "taken": [
+        {"id": 4151, "quantity": 1, "name": "Abyssal whip", "price": 1500000}
+      ]
+    }
+  }
+}

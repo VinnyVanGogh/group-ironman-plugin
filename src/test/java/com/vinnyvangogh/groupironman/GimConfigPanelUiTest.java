@@ -21,7 +21,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class GimConfigPanelUiTest
 {
-	static final List<String> SECTIONS = Arrays.asList("Group", "Discord: connection", "Discord: what to post",
+	static final List<String> SECTIONS = Arrays.asList("Group", "Discord: what to post",
 		"Discord: how to post", "Discord: daily digest", "In-game", "Thresholds", "Advanced");
 
 	@Before
@@ -56,35 +56,22 @@ public class GimConfigPanelUiTest
 		});
 	}
 
+	/** Webhooks are Discord Relay's settings: GIM's page holds no secret field and no "Post to Discord". */
 	@Test
-	public void discordConnectionHoldsTheWebhooksAsSecrets()
+	public void noWebhookFieldsAreLeftInGimsSettings()
 	{
 		SwingDriver.onEdt(() ->
 		{
 			ConfigPanelHarness h = settings();
-			h.setOpen("Discord: connection", true);
-			SwingDriver section = new SwingDriver(h.section("Discord: connection"));
-			section.assertShows("Post to Discord");
-			section.assertShows("Main webhook");
-			section.assertShows("Daily digest webhook");
-			section.assertShows("Main custom name");
-			assertEquals("the main webhook and six optional ones", 7, section.all(JPasswordField.class).size());
-			h.setOpen("Discord: connection", false);
-			assertFalse(h.isOpen("Discord: connection"));
-		});
-	}
-
-	@Test
-	public void postToDiscordShowsItsSavedValue()
-	{
-		SwingDriver.onEdt(() ->
-		{
-			ConfigPanelHarness h = ConfigPanelHarness.of("GIM Utilities", GimPanelFixture.DEFAULTS,
-				Collections.singletonMap("discordEnabled", true));
-			h.setOpen("Discord: connection", true);
-			SwingDriver section = new SwingDriver(h.section("Discord: connection"));
-			JCheckBox post = section.find(JCheckBox.class, b -> true, "Post to Discord switch");
-			assertTrue(post.isSelected());
+			h.setOpen("Discord: what to post", true);
+			h.setOpen("Discord: how to post", true);
+			SwingDriver ui = new SwingDriver(h.panel());
+			assertEquals(0, ui.all(JPasswordField.class).size());
+			ui.assertHides("Main webhook");
+			ui.assertShows("Don't post my events");
+			JCheckBox drop = new SwingDriver(h.section("Discord: what to post")).find(JCheckBox.class, b -> true,
+				"a per-event switch");
+			assertFalse("every switch off on a fresh install", drop.isSelected());
 		});
 	}
 

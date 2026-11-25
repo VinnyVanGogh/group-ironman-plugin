@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Two more kinds inside a {@link VvgGroupIronmanMessage}, next to {@link ShoppingCodec}'s:
+ * Two more kinds inside a {@link VvgGroupIronmanMessage}, next to Group Shopping's ({@link GroupShopping}):
  *
  * <ul>
  * <li>{@code pbs}: the sender's boss personal bests ({@link PersonalBests}), seconds by boss name.</li>

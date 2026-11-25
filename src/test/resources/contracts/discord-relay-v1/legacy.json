@@ -1,0 +1,11 @@
+{
+  "namespace": "discord-relay",
+  "name": "legacy",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "statusBoard": "w111\t1234567890\t20454\t",
+    "levelStreaks": null,
+    "groupedPosts": null
+  }
+}

@@ -43,8 +43,6 @@ final class QuickSettings
 	static final List<Item> ITEMS = Collections.unmodifiableList(Arrays.asList(
 		new Item("groupSync", "Sync with my group", "Join and share with your group's party.",
 			GroupIronmanConfig::groupSync),
-		new Item("discordEnabled", "Post to Discord", "Send your events to your webhooks.",
-			GroupIronmanConfig::discordEnabled),
 		new Item(GroupIronmanConfig.KEY_OPT_OUT_ALL, "Keep my events off Discord",
 			"None of your events go to Discord, whatever the group says. Same as \"Don't post my events\".", GroupIronmanConfig::eventOptOutAll),
 		new Item("groupShareBank", "Share bank", "Let your group see your bank.",
@@ -58,9 +56,7 @@ final class QuickSettings
 		new Item("groupWorldMap", "Members on world map", "Needs 'Share stats' on both sides.",
 			GroupIronmanConfig::groupWorldMap),
 		new Item("groupFindCommand", "::find chat command", "'::find whip' shows who has it.",
-			GroupIronmanConfig::groupFindCommand),
-		new Item("overlayPathStop", "Path stop card", "On screen while you path from the Shopping tab.",
-			GroupIronmanConfig::overlayPathStop)));
+			GroupIronmanConfig::groupFindCommand)));
 
 	private QuickSettings()
 	{

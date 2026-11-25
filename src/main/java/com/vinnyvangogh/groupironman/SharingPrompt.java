@@ -24,8 +24,6 @@ final class SharingPrompt
 	static final List<String> SHARING_KEYS = Collections.unmodifiableList(Arrays.asList("groupSync",
 		"groupShareBank", "groupShareStorage", "groupShareStats", "groupShareCarried", "groupShareExtras",
 		"groupShareDrops", "groupShareEvents"));
-	/** What "Post my events to Discord" sets to true. */
-	static final String DISCORD_KEY = "discordEnabled";
 
 	static final String TEXT = "Your group sees only what you share. 'Turn on sharing' ticks Sync with my group and"
 		+ " every Share switch: bank, group storage changes, stats, inventory and equipment, pouch, quiver and vault,"
@@ -41,18 +39,13 @@ final class SharingPrompt
 		final boolean anyShare;
 		/** Sync and every Share switch are on: nothing left for "Turn on sharing" to do. */
 		final boolean allSharing;
-		final boolean discordOn;
-		/** A Discord webhook to post to: one of this player's own. */
-		final boolean webhook;
 
-		Settings(String key, boolean sync, boolean anyShare, boolean allSharing, boolean discordOn, boolean webhook)
+		Settings(String key, boolean sync, boolean anyShare, boolean allSharing)
 		{
 			this.key = key == null ? "" : key;
 			this.sync = sync;
 			this.anyShare = anyShare;
 			this.allSharing = allSharing;
-			this.discordOn = discordOn;
-			this.webhook = webhook;
 		}
 
 		static Settings of(GroupIronmanConfig c)
@@ -66,33 +59,18 @@ final class SharingPrompt
 				any |= s;
 				all &= s;
 			}
-			return new Settings(GroupKey.normalize(c.groupKey()), c.groupSync(), any, all && c.groupSync(),
-				c.discordEnabled(), anyWebhook(Webhooks.of(c)));
-		}
-
-		private static boolean anyWebhook(Webhooks hooks)
-		{
-			for (Webhook w : Webhook.values())
-			{
-				if (hooks.url(w) != null)
-				{
-					return true;
-				}
-			}
-			return false;
+			return new Settings(GroupKey.normalize(c.groupKey()), c.groupSync(), any, all && c.groupSync());
 		}
 	}
 
-	/** What the card shows: which of its two buttons. */
+	/** What the card shows. Posting to Discord is Discord Relay's own switch, so the card has one button. */
 	static final class Card
 	{
 		final boolean sharing;
-		final boolean discord;
 
-		Card(boolean sharing, boolean discord)
+		Card(boolean sharing)
 		{
 			this.sharing = sharing;
-			this.discord = discord;
 		}
 	}
 
@@ -103,12 +81,6 @@ final class SharingPrompt
 		{
 			set.accept(key, true);
 		}
-	}
-
-	/** "Post my events to Discord": the Post to Discord switch only. */
-	static void postToDiscord(BiConsumer<String, Object> set)
-	{
-		set.accept(DISCORD_KEY, true);
 	}
 
 	/** The key the card is open for; null when closed. */
@@ -147,8 +119,8 @@ final class SharingPrompt
 		{
 			return null;
 		}
-		Card card = new Card(!s.allSharing, s.webhook && !s.discordOn);
-		if (!card.sharing && !card.discord)
+		Card card = new Card(!s.allSharing);
+		if (!card.sharing)
 		{
 			// Done: a later change to one switch does not bring it back.
 			openFor = null;

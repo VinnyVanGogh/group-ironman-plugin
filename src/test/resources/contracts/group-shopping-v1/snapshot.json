@@ -1,0 +1,16 @@
+{
+  "namespace": "group-shopping",
+  "name": "snapshot",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "self": "Ember",
+    "members": ["Ember", "Moss"],
+    "syncing": true,
+    "sources": [
+      {"member": "Ember", "where": "bank", "items": {"385": 12, "453": 5}},
+      {"member": "Moss", "where": "inventory", "items": {"2434": 10}},
+      {"member": "Group", "where": "storage", "items": {"995": 250000}}
+    ]
+  }
+}

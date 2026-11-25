@@ -1,0 +1,14 @@
+{
+  "namespace": "group-shopping",
+  "name": "event",
+  "data": {
+    "v": 1,
+    "source": "group-shopping",
+    "type": "REQUEST",
+    "member": "Ember",
+    "kind": 2,
+    "list": "Fire cape",
+    "detail": "Shark for Moss",
+    "itemId": 385
+  }
+}

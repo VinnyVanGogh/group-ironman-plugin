@@ -1,0 +1,12 @@
+{
+  "namespace": "discord-relay",
+  "name": "board",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "channel": "ONLINE",
+    "keep": true,
+    "settled": true,
+    "lines": "🟢 **Alice** online (world 302)\n🔴 **Bob** last seen <t:1767225000:R> on world 330"
+  }
+}

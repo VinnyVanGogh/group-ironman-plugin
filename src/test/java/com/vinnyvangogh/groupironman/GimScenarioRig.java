@@ -1,7 +1,6 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.vinnyvangogh.scenarios.Probes;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -11,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.TimeUnit;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.Skill;
@@ -23,24 +21,24 @@ import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.PluginMessage;
 
 /**
  * The headless stand-in for GIM Utilities' event handlers. {@code GroupService} and {@code GroupEventEngine} need
  * a live {@code Client} (local player, clan channel, party), so a JUnit run cannot start them. This rig subscribes
  * to the same events on a real {@code EventBus} and hands them to the same classes those handlers call
- * ({@link StorageSession}, {@link ProgressTracker}, {@link LevelPosts}, {@link EventRouter}, {@link ChannelPosts},
- * {@link GovernanceSync}), with a fake Discord transport and a scenario clock. Only the few lines of glue are its
- * own; everything a probe reports is the plugin's code.
+ * ({@link StorageSession}, {@link ProgressTracker}, {@link EventRouter}, {@link ChannelPosts},
+ * {@link GovernanceSync}), with a scenario clock. Discord is what GIM hands Discord Relay ({@link DiscordRelay}
+ * {@code event} messages); Relay's merging, streak edits and screenshots are its own tests. Only the few lines of
+ * glue are this rig's; everything a probe reports is the plugin's code.
  *
- * <p>Not covered here: DiscordBatch's merging of a moment's events, screenshots, and anything read from the
- * client (worlds, regions, kill counts). Those stay in their own unit tests and the in-game checklist.
+ * <p>Not covered here: anything read from the client (worlds, regions, kill counts). Those stay in their own unit
+ * tests and the in-game checklist.
  */
 final class GimScenarioRig
 {
-	static final String WEBHOOK = "https://discord.com/api/webhooks/1/scenario";
 	static final String GROUP = "Iron Pals";
 	static final int GRACE_MINUTES = 2;
-	private static final long LEVEL_WINDOW = TimeUnit.MINUTES.toMillis(30);
 	private static final GroupIronmanConfig DEFAULTS = new GroupIronmanConfig()
 	{
 	};
@@ -56,22 +54,15 @@ final class GimScenarioRig
 	private final StorageSession storage = new StorageSession();
 	private final GroupRoster roster = new GroupRoster();
 	private final ProgressTracker progress = new ProgressTracker(Skill.values().length - 1);
-	private final List<DiscordQueue.Post> sent = new ArrayList<>();
-	private final List<DiscordSender.Done> unanswered = new ArrayList<>();
-	private final DiscordSender sender = new DiscordSender((post, done) ->
-	{
-		sent.add(post);
-		unanswered.add(done);
-	}, () -> now, () -> 12);
-	private final LevelPosts levels = new LevelPosts(sender, gson, () -> now, () -> DiscordStyle.EMBED,
-		() -> DiscordWebhook.USERNAME);
+	/** What GIM handed Discord Relay, in order. */
+	private final List<PluginMessage> sent = new ArrayList<>();
+	private final DiscordRelay relay = new DiscordRelay(m -> sent.add((PluginMessage) m));
 	private final List<String> overlay = new ArrayList<>();
 	private final EventRouter router = new EventRouter(this::toDiscord, e -> overlay.add(EventText.sentence(e, items)));
 	private final ChannelPosts channel = new ChannelPosts(ZoneOffset.UTC);
 	private final Map<String, GovernanceClient> members = new HashMap<>();
 	private final GovernanceClient me;
 	private final List<String> saves = new ArrayList<>();
-	private int messageIds;
 
 	GimScenarioRig(String self)
 	{
@@ -164,17 +155,7 @@ final class GimScenarioRig
 		}
 		for (GroupEvent event : progress.skill(e.getSkill().getName(), e.getLevel(), e.getXp(), now, self))
 		{
-			if (event.type == GroupEvent.Type.LEVEL_UP)
-			{
-				String json = DiscordWebhook.payload(gson, DiscordMerge.single(event, items), items,
-					DiscordStyle.EMBED, "", false, null, DiscordWebhook.USERNAME);
-				levels.level(WEBHOOK, event, LEVEL_WINDOW, null, json);
-				overlay.add(EventText.sentence(event, items));
-			}
-			else
-			{
-				router.route(event, true, settings, items);
-			}
+			router.route(event, true, settings, items);
 		}
 	}
 
@@ -189,9 +170,10 @@ final class GimScenarioRig
 		}
 	}
 
+	/** As GroupEventEngine.toDiscord: the event, to Discord Relay. */
 	private void toDiscord(GroupEvent e)
 	{
-		sender.post(WEBHOOK, DiscordWebhook.payload(gson, e, items, DiscordStyle.EMBED, "", false), null);
+		relay.send(DiscordRelay.EVENT, DiscordRelay.event(e, items, true, false, false));
 	}
 
 	// Members' presence from the game's Group channel, as GroupEventEngine feeds ChannelPosts.
@@ -282,47 +264,22 @@ final class GimScenarioRig
 		settle();
 	}
 
-	/** Sends what is owed and answers each request as Discord would, until nothing is left. */
+	/** Nothing is owed: GIM hands each event over at once, and Discord Relay does the sending. */
 	void settle()
 	{
-		for (int i = 0; i < 20; i++)
-		{
-			levels.tick();
-			sender.pump();
-			if (unanswered.isEmpty())
-			{
-				return;
-			}
-			List<DiscordSender.Done> answering = new ArrayList<>(unanswered);
-			unanswered.clear();
-			for (DiscordSender.Done done : answering)
-			{
-				done.done(200, null, "m" + (++messageIds));
-			}
-		}
 	}
 
-	/** "post: Alex: Level up | Prayer level 24", one line per request in order; an edit says "edit". */
+	/** "event: Alex: Level up | ...", one line per event handed to Discord Relay, in order. */
 	private List<String> discordLines()
 	{
 		List<String> out = new ArrayList<>();
-		for (DiscordQueue.Post post : sent)
+		for (PluginMessage m : sent)
 		{
-			out.add((post.edit == null ? "post: " : "edit: ") + words(post.json));
+			Map<String, Object> d = m.getData();
+			@SuppressWarnings("unchecked")
+			Map<String, Object> event = (Map<String, Object>) d.get("event");
+			out.add(m.getName() + ": " + event.get("member") + ": " + d.get("title") + " | " + d.get("text"));
 		}
 		return out;
-	}
-
-	private String words(String json)
-	{
-		JsonObject o = gson.fromJson(json, JsonObject.class);
-		if (o.has("embeds") && o.getAsJsonArray("embeds").size() > 0)
-		{
-			JsonObject embed = o.getAsJsonArray("embeds").get(0).getAsJsonObject();
-			String title = embed.has("title") ? embed.get("title").getAsString() : "";
-			String description = embed.has("description") ? embed.get("description").getAsString() : "";
-			return title + " | " + description;
-		}
-		return o.has("content") ? o.get("content").getAsString() : json;
 	}
 }

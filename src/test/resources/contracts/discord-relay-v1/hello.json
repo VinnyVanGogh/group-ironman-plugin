@@ -1,0 +1,9 @@
+{
+  "namespace": "discord-relay",
+  "name": "hello",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "version": "1.0.0"
+  }
+}

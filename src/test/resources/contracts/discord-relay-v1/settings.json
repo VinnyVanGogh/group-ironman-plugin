@@ -1,0 +1,31 @@
+{
+  "namespace": "discord-relay",
+  "name": "settings",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "discordTypes": ["DROP", "LEVEL_UP", "GRAVESTONE_EXPIRING"],
+    "digestCategories": ["DROPS", "PROGRESS"],
+    "digestHour": 20,
+    "quietStart": 23,
+    "quietEnd": 7,
+    "offlineGraceMinutes": 2,
+    "onlineStatus": "LIVE_BOARD",
+    "dropMin": 100000,
+    "storageMin": 50000,
+    "clueMin": 0,
+    "easterEggs": {"on": true, "legendAt": 1000000, "freeloaderAt": 1000000},
+    "shared": {
+      "by": "Alice",
+      "channels": {
+        "MAIN": {"url": "https://discord.com/api/webhooks/111/maintoken", "poster": "GIM_UTILITIES", "name": ""},
+        "ONLINE": {"url": "", "poster": "WEBHOOK", "name": ""},
+        "DROPS": {"url": "", "poster": "WEBHOOK", "name": ""},
+        "PROGRESS": {"url": "", "poster": "WEBHOOK", "name": ""},
+        "DEATHS": {"url": "", "poster": "CUSTOM", "name": "Grim"},
+        "STORAGE": {"url": "", "poster": "WEBHOOK", "name": ""},
+        "DIGEST": {"url": "", "poster": "WEBHOOK", "name": ""}
+      }
+    }
+  }
+}

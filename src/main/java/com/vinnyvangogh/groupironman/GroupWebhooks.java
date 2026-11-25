@@ -78,8 +78,8 @@ final class GroupWebhooks
 		{
 			return new Webhooks.Setting("", DiscordPosterName.WEBHOOK, "");
 		}
-		String url = s.url.length() <= MAX_URL && DiscordWebhook.valid(s.url) ? DiscordWebhook.clean(s.url) : "";
-		return new Webhooks.Setting(url, s.mode, PosterNames.clean(s.name));
+		String url = s.url.length() <= MAX_URL && Webhooks.valid(s.url) ? Webhooks.clean(s.url) : "";
+		return new Webhooks.Setting(url, s.mode, Webhooks.cleanName(s.name));
 	}
 
 	/** True when sharing {@code shared} with {@code own}'s webhooks would publish exactly what this holds. */

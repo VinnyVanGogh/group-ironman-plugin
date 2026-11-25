@@ -106,12 +106,6 @@ final class GimPanelFixture
 			calls.add("turnOnSharing");
 		}
 
-		@Override
-		public void postToDiscord()
-		{
-			calls.add("postToDiscord");
-		}
-
 		/** What the quick switches show now; a test flips them as a config change would. */
 		final boolean[] quick = new boolean[QuickSettings.ITEMS.size()];
 
@@ -182,103 +176,9 @@ final class GimPanelFixture
 		}
 
 		@Override
-		public boolean addList(String name, String preset, List<String> picks, List<String> members,
-			Map<Integer, Integer> items)
+		public void openShopping()
 		{
-			calls.add("addList:" + (preset.isEmpty() ? name : preset) + ":" + picks.size() + ":" + members);
-			return true;
-		}
-
-		@Override
-		public boolean renameList(String id, String name)
-		{
-			calls.add("renameList:" + id + "=" + name);
-			return true;
-		}
-
-		@Override
-		public boolean removeList(String id)
-		{
-			calls.add("removeList:" + id);
-			return true;
-		}
-
-		@Override
-		public void searchItems(String query, java.util.function.Consumer<List<ShoppingTab.Hit>> done)
-		{
-			calls.add("searchItems:" + query);
-			done.accept(Collections.singletonList(new ShoppingTab.Hit(954, "Rope")));
-		}
-
-		@Override
-		public boolean addRequest(String name, Map<Integer, Integer> items)
-		{
-			calls.add("addRequest:" + name + ":" + items);
-			return true;
-		}
-
-		@Override
-		public boolean renameRequest(String id, String name)
-		{
-			calls.add("renameRequest:" + id + "=" + name);
-			return true;
-		}
-
-		@Override
-		public boolean removeRequest(String id)
-		{
-			calls.add("removeRequest:" + id);
-			return true;
-		}
-
-		@Override
-		public boolean closeRequest(String id)
-		{
-			calls.add("closeRequest:" + id);
-			return true;
-		}
-
-		@Override
-		public boolean closeRequestItem(String id, int itemId)
-		{
-			calls.add("closeRequestItem:" + id + ":" + itemId);
-			return true;
-		}
-
-		@Override
-		public boolean claimRequest(String id, int itemId, boolean claimed)
-		{
-			calls.add("claimRequest:" + id + ":" + itemId + "=" + claimed);
-			return true;
-		}
-
-		/** The character's saved open lists, as the RuneLite profile would hold it. */
-		String openLists;
-
-		@Override
-		public String openLists()
-		{
-			return openLists;
-		}
-
-		@Override
-		public void saveOpenLists(String keys)
-		{
-			openLists = keys;
-		}
-
-		@Override
-		public String pathTo(ItemPaths.Target why, ItemPaths.Stop to)
-		{
-			calls.add("pathTo:" + why.kind + ":" + why.id + ":" + why.itemId + "=" + to.name);
-			return to.label() + ".";
-		}
-
-		@Override
-		public String clearPath()
-		{
-			calls.add("clearPath");
-			return "Path cleared.";
+			calls.add("openShopping");
 		}
 	}
 
@@ -295,13 +195,16 @@ final class GimPanelFixture
 		GamePresence presence = GamePresence.UNKNOWN;
 		GroupSettingsTab.View settings;
 		boolean anyOn = true;
-		SharingPrompt.Settings sharing = new SharingPrompt.Settings(KEY, true, true, true, false, false);
-		ShoppingTab.View shopping;
+		SharingPrompt.Settings sharing = new SharingPrompt.Settings(KEY, true, true, true);
+		/** Group Shopping has answered: the Shopping tab shows its open button. */
+		boolean shoppingInstalled;
 
 		GroupIronmanPanel.View view()
 		{
-			return new GroupIronmanPanel.View(sync, roster, GroupMembers.of(GROUP, members), new FakeItems(), switches,
-				REGIONS, since, self, presence, settings, anyOn, sharing, shopping);
+			GroupIronmanPanel.View v = new GroupIronmanPanel.View(sync, roster, GroupMembers.of(GROUP, members),
+				new FakeItems(), switches, REGIONS, since, self, presence, settings, anyOn, sharing);
+			v.shoppingInstalled = shoppingInstalled;
+			return v;
 		}
 	}
 
@@ -445,52 +348,6 @@ final class GimPanelFixture
 		feed.add(GroupEvent.of(GroupEvent.Type.STORAGE_DEPOSIT, s.now - 20 * MIN, MOSS)
 			.items(items(FakeItems.COINS, 250_000)).build());
 		feed.add(GroupEvent.of(GroupEvent.Type.ONLINE, s.now - 10 * MIN, MOSS).text("online").world(330).build());
-		return s;
-	}
-
-	// ---- Shopping, as GroupIronmanPlugin#shoppingView builds it ----
-
-	/**
-	 * The Board's screenshot (2026-11-14), made up: a custom "cox" list for two members (coal done, four items
-	 * still needed), the 1 Defence "Ancient Magicks" preset with no quest done, and one request. Ember holds some
-	 * of the sharks.
-	 */
-	static Scene shoppingScene()
-	{
-		Scene s = groupScene();
-		com.google.gson.Gson gson = new com.google.gson.Gson();
-		FakeItems names = new FakeItems();
-		Map<Integer, Integer> cox = new LinkedHashMap<>();
-		cox.put(FakeItems.DRAGON_WARHAMMER, 1);
-		cox.put(FakeItems.SHARK, 20);
-		cox.put(FakeItems.PRAYER_POT_4, 10);
-		cox.put(FakeItems.SUPER_RESTORE_4, 8);
-		cox.put(FakeItems.COAL, 5);
-		List<ShoppingList> lists = Arrays.asList(
-			ShoppingList.create("cox", "", Collections.emptyList(), Arrays.asList(SELF, MOSS), cox, MOSS,
-				s.now - 2 * MIN),
-			ShoppingList.create("Ancient Magicks", "ancient-magicks", Collections.emptyList(),
-				Collections.singletonList(SELF), Collections.emptyMap(), MOSS, s.now - 5 * MIN));
-		Map<String, Map<Integer, Long>> held = new LinkedHashMap<>();
-		Map<Integer, Long> mine = new LinkedHashMap<>();
-		mine.put(FakeItems.SHARK, 12L);
-		mine.put(FakeItems.COAL, 5L);
-		Map<Integer, Long> moss = new LinkedHashMap<>();
-		moss.put(FakeItems.PRAYER_POT_4, 10L);
-		moss.put(FakeItems.COAL, 5L);
-		held.put(SELF, mine);
-		held.put(MOSS, moss);
-		ShopAllocation.Holdings holdings = new ShopAllocation.Holdings(held, Collections.emptyMap());
-		QuestProgress none = QuestProgress.of(Collections.emptyList(), Collections.emptyList());
-		ShoppingBoard.Inputs in = new ShoppingBoard.Inputs(QuestData.load(gson), ShopPresets.load(gson),
-			member -> none, holdings, id -> true,names::name,
-			new ShopSources.Viewer(Collections.emptyMap(), none));
-		RequestList ask = RequestList.create("", items(FakeItems.SHARK, 50, FakeItems.LOBSTER, 30), MOSS,
-			s.now - 10 * MIN);
-		List<RequestBoard.Card> requests = Collections.singletonList(
-			RequestBoard.card(ask, Collections.emptyList(), holdings, names::name));
-		s.shopping = new ShoppingTab.View(ShoppingBoard.of(lists, in), ShopPresets.load(gson).presets(),
-			NAMES, Collections.emptyList(), true, true, requests, SELF, null, "");
 		return s;
 	}
 

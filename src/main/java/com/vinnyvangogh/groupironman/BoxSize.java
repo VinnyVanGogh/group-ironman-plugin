@@ -2,7 +2,7 @@ package com.vinnyvangogh.groupironman;
 
 /**
  * How big the on-screen Group box is: its width, its font and how much each event line says. Public for the
- * config proxy (see {@link DiscordStyle}). {@link #MEDIUM} is the width the box has always had.
+ * config proxy (see {@link OnlineStatus}). {@link #MEDIUM} is the width the box has always had.
  */
 public enum BoxSize
 {

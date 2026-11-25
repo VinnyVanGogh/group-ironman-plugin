@@ -4,7 +4,7 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
  * Where event banners appear. Public for the config proxy (see
- * {@link DiscordStyle}); a short list of RuneLite's own overlay positions.
+ * {@link OnlineStatus}); a short list of RuneLite's own overlay positions.
  */
 public enum ToastPosition
 {

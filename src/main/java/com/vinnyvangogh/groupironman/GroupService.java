@@ -1,6 +1,8 @@
 package com.vinnyvangogh.groupironman;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -64,7 +66,9 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.PluginMessage;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemEquipmentStats;
@@ -114,11 +118,10 @@ class GroupService
 	static final int ROSTER_INTERVAL_TICKS = 10;
 	/** Roster reads with no group before a login is told it is not in the group: 5 reads, about 30 s. */
 	static final int NOT_MEMBER_WAITS = 5;
-	/** How often this player's quest progress is re-read for the Shopping tab (about half a minute). */
+	/** How often this player's quests and diaries are re-read (about half a minute). */
 	static final int QUEST_INTERVAL_TICKS = 50;
-	static final int SHOP_ALERT_INTERVAL_TICKS = 3;
-	/** How often the owner's client closes request items the group now holds (about three seconds). */
-	static final int SEAL_INTERVAL_TICKS = 5;
+	/** How often Group Shopping is told what the group holds, when it changed (about three seconds). */
+	static final int SHOP_SNAPSHOT_TICKS = 5;
 	/** The chatFilterCheck script callback the base chat filter plugin uses to drop a line. */
 	private static final String CHAT_FILTER_CHECK = "chatFilterCheck";
 
@@ -186,6 +189,29 @@ class GroupService
 	@Inject
 	private CarriedContainers containers;
 
+	@Inject
+	private EventBus eventBus;
+
+	/** The Compare tab's hand-off to Player Compare ({@link PlayerCompare}); the bus is read when a message goes. */
+	private final PlayerCompare compare = new PlayerCompare(m ->
+	{
+		EventBus bus = eventBus;
+		if (bus != null)
+		{
+			bus.post(m);
+		}
+	});
+
+	/** The Shopping tab's hand-off to Group Shopping ({@link GroupShopping}), on the same bus. */
+	private final GroupShopping shop = new GroupShopping(m ->
+	{
+		EventBus bus = eventBus;
+		if (bus != null)
+		{
+			bus.post(m);
+		}
+	});
+
 	private final GroupRoster roster = new GroupRoster();
 	private final BankAssembler assembler = new BankAssembler();
 	private final Map<Integer, String> names = new ConcurrentHashMap<>();
@@ -206,32 +232,26 @@ class GroupService
 	private volatile GovernanceSync governance;
 	/** The leader's signed webhooks document as the cache file keeps it, or null. Never put in the config. */
 	private volatile String cachedWebhooks;
+	/** This member's own webhooks, from Discord Relay ({@link #relayWebhooks(Webhooks)}). */
+	private volatile Webhooks relayWebhooks = Webhooks.NONE;
 	/** The group event engine, told about storage visits, minimums and members' events; null when not running. */
 	private volatile GroupEventEngine events;
-	/** The Shopping tab's shared lists and members' quest progress; null when not running. */
-	private volatile ShoppingSync shopping;
+	/**
+	 * Group Shopping's saved lists, requests, history and quest progress: the cache file's {@code shop} entry as
+	 * JSON text, kept for it unread ({@link GroupShopping#STORE}); null when there is none.
+	 */
+	private volatile String shopCache;
 	/** Members' boss bests and quests/diaries; null when not running. */
 	private volatile MemberProgressBook progress;
-	private volatile QuestData questData = QuestData.empty();
-	private volatile ShopPresets presets = new ShopPresets();
-	/** Whether each item can change hands, read with its name on the client thread. */
-	private final Map<Integer, Boolean> tradeable = new ConcurrentHashMap<>();
-	/** This player's real levels, read with their quest progress, for which shops will serve them. */
-	private volatile Map<String, Integer> ownLevels = Collections.emptyMap();
-	/** Where this player stood on the last tick, for "Path to"; null when logged out. */
+	/** Where this player stood on the last tick, for the Gear tab; null when logged out. */
 	private volatile WorldPoint here;
-	/** Where the panel last drew from: "Path to next" is nearest-first from here, so it is redrawn when the player has moved well away. */
-	private WorldPoint drawnFrom;
-	// Client thread only.
-	private final ShopVisits shopVisits = new ShopVisits();
 	/** This player's own boss bests, read from their own chat; shared only under "Share group events". */
 	private final PbCapture pbCapture = new PbCapture();
 	private volatile boolean pbDirty;
 	/** This player's quests, quest points and diaries, read with their quest progress; null until read. */
 	private volatile AchievementState ownAchievements;
 	private int ticksSinceQuests = QUEST_INTERVAL_TICKS;
-	private int ticksSinceShopAlert;
-	private int ticksSinceSeal;
+	private int ticksSinceShopSnapshot;
 
 	private volatile LowStock lowStock = LowStock.parse("");
 	/** The rules text {@link #lowStock} was parsed from; null before the first config load. */
@@ -388,11 +408,6 @@ class GroupService
 			cachedWebhooks = webhooks;
 			saveCache();
 		});
-		shopping = new ShoppingSync(gson, this::send, () ->
-		{
-			saveCache();
-			this.onChange.run();
-		});
 		progress = new MemberProgressBook(gson, this::send);
 		cacheLoaded = false;
 		since = 0;
@@ -400,14 +415,143 @@ class GroupService
 		executor.execute(() ->
 		{
 			regions = RegionNames.load();
-			questData = QuestData.load(gson);
-			presets = ShopPresets.load(gson);
 			loadCache();
 		});
+		// Player Compare answers with ready (heard by onPluginMessage); until then Compare shows the install card.
+		compare.send(PlayerCompare.HELLO, PlayerCompare.hello(UpdateNotes.VERSION));
+		// The same for Group Shopping and the Shopping tab.
+		shop.send(GroupShopping.HELLO, GroupShopping.hello(UpdateNotes.VERSION));
+	}
+
+	/** True once Group Shopping has answered: the Shopping tab can open its lists. */
+	boolean shoppingInstalled()
+	{
+		return shop.installed();
+	}
+
+	/** Shopping tab's button: hand Group Shopping the group as it is now and ask it to show its lists. */
+	void openShopping()
+	{
+		sendShopSnapshot(true);
+		shop.send(GroupShopping.OPEN, GroupShopping.open());
+	}
+
+	private void sendShopSnapshot(boolean force)
+	{
+		shop.sendSnapshot(GroupShopping.snapshot(self, PlayerCompare.names(members.names(), self), syncing(),
+			roster.searchSources()), force);
+	}
+
+	/** Group Shopping's messages: its party payloads, its saved state, and this player's request events. */
+	private void receiveShopping(PluginMessage message)
+	{
+		Map<String, Object> data = message.getData();
+		switch (shop.receive(message))
+		{
+			case SNAPSHOT:
+				sendShopSnapshot(true);
+				if (cacheLoaded)
+				{
+					shop.send(GroupShopping.RESTORE, GroupShopping.restore(shopCache));
+				}
+				onChange.run();
+				break;
+			case SEND:
+				shop.queue(GroupShopping.payload(data));
+				break;
+			case STORE:
+				Object cache = data.get("cache");
+				shopCache = cache instanceof String ? (String) cache : null;
+				saveCache();
+				break;
+			case EVENT:
+				GroupEvent event = GroupShopping.event(data, self, System.currentTimeMillis());
+				if (event != null)
+				{
+					ifSet(events, e -> clientThread.invokeLater(() -> e.request(event)));
+				}
+				break;
+			case BYE:
+				onChange.run();
+				break;
+			default:
+				break;
+		}
+	}
+
+	/** True once Player Compare has answered: the Compare tab can open its group view. */
+	boolean compareInstalled()
+	{
+		return compare.installed();
+	}
+
+	/** Compare tab's button: hand Player Compare the group as it is now and ask it to show the group view. */
+	void openCompare()
+	{
+		sendCompareSnapshot();
+		compare.send(PlayerCompare.OPEN, PlayerCompare.open());
+	}
+
+	/** Player Compare's ready or request: it gets the group as it is now. */
+	@Subscribe
+	public void onPluginMessage(PluginMessage message)
+	{
+		if (GroupShopping.NAMESPACE.equals(message.getNamespace()))
+		{
+			receiveShopping(message);
+		}
+		else if (compare.receive(message))
+		{
+			sendCompareSnapshot();
+			onChange.run();
+		}
+		else if (PlayerCompare.NAMESPACE.equals(message.getNamespace()) && PlayerCompare.BYE.equals(message.getName()))
+		{
+			onChange.run();
+		}
+	}
+
+	private void sendCompareSnapshot()
+	{
+		compare.send(PlayerCompare.SNAPSHOT, compareSnapshot());
+	}
+
+	/** Every member's shared figures for Player Compare: levels (hiscore levels for one who shares none), bests. */
+	Map<String, Object> compareSnapshot()
+	{
+		List<String> names = PlayerCompare.names(members.names(), self);
+		ProgressView view = progressView();
+		Map<String, MemberStats> stats = roster.allStats();
+		Map<String, GroupCodec.Carried> carried = roster.allCarried();
+		Map<String, BankSnapshot> banks = roster.banks();
+		List<PlayerCompare.Member> out = new ArrayList<>();
+		for (String name : names)
+		{
+			Map<String, Integer> levels = new TreeMap<>();
+			MemberStats s = stats.get(name);
+			HiscoreBook.Entry h = roster.hiscores().entry(name);
+			if (s != null)
+			{
+				s.skills().forEach((skill, l) -> levels.put(skill, l.real));
+			}
+			else if (h != null)
+			{
+				levels.putAll(h.levels);
+			}
+			AchievementState a = view.achievements(name);
+			GroupCodec.Carried c = carried.get(name);
+			BankSnapshot bank = banks.get(name);
+			out.add(new PlayerCompare.Member(name, levels, a == null ? -1 : a.questPoints(), view.bests(name).all(),
+				h == null ? null : h.scores, c == null ? null : c.worn, c == null ? null : c.inventory,
+				bank == null ? null : bank.items()));
+		}
+		return PlayerCompare.snapshot(self, out, roster.storageItems());
 	}
 
 	void shutDown()
 	{
+		compare.send(PlayerCompare.BYE, PlayerCompare.bye());
+		shop.send(GroupShopping.BYE, GroupShopping.bye());
 		if (session)
 		{
 			roster.markPlayed(System.currentTimeMillis());
@@ -420,10 +564,8 @@ class GroupService
 		}
 		members = GroupMembers.UNKNOWN;
 		governance = null;
-		shopping = null;
+		shopCache = null;
 		progress = null;
-		tradeable.clear();
-		ownLevels = Collections.emptyMap();
 		cachedWebhooks = null;
 		cacheLoaded = false;
 		session = false;
@@ -696,10 +838,27 @@ class GroupService
 		return r == GovernanceSync.SaveResult.SAVED && !syncing() ? GovernanceSync.SaveResult.SAVED_OFFLINE : r;
 	}
 
+	/**
+	 * This member's own webhooks, as Discord Relay reported them ({@code ready} message); none while it is not
+	 * installed. GIM never posts with them: they are read only to share them and to place the live board.
+	 */
+	void relayWebhooks(Webhooks own)
+	{
+		Webhooks next = own == null ? Webhooks.NONE : own;
+		boolean changed = next != relayWebhooks;
+		relayWebhooks = next;
+		if (changed)
+		{
+			republishWebhooks();
+		}
+		// The settings tab's install hint follows Discord Relay coming and going.
+		onChange.run();
+	}
+
 	/** The leader's "Share webhooks with the group". False when refused: this client is not the leader. */
 	boolean shareWebhooks(boolean share)
 	{
-		return asSelf(governance, g -> g.shareWebhooks(self, share, Webhooks.of(config), System.currentTimeMillis()));
+		return asSelf(governance, g -> g.shareWebhooks(self, share, relayWebhooks, System.currentTimeMillis()));
 	}
 
 	/** The leader's shared webhooks this client holds, or null when the leader shares none. */
@@ -711,11 +870,12 @@ class GroupService
 
 	/**
 	 * Where this client's posts go: its own webhooks, with the leader's shared ones filling every field it left
-	 * empty ({@link Webhooks#withGroup}). Every sender asks this.
+	 * empty ({@link Webhooks#withGroup}). Discord Relay applies the same rule to the {@code shared} webhooks GIM
+	 * sends it; GIM reads this only to decide who keeps the live board.
 	 */
 	Webhooks webhooks()
 	{
-		return Webhooks.of(config).withGroup(sharedWebhooks());
+		return relayWebhooks.withGroup(sharedWebhooks());
 	}
 
 	/** True when this client is the group's leader, holding the leader's key. */
@@ -731,7 +891,7 @@ class GroupService
 		GovernanceSync g = governance;
 		if (g != null && sharedWebhooks() != null && isLeader())
 		{
-			g.shareWebhooks(self, true, Webhooks.of(config), System.currentTimeMillis());
+			g.shareWebhooks(self, true, relayWebhooks, System.currentTimeMillis());
 		}
 	}
 
@@ -815,12 +975,6 @@ class GroupService
 	void turnOnSharing()
 	{
 		SharingPrompt.turnOnSharing(this::setConfigObject);
-	}
-
-	/** "Post my events to Discord": the player's own click. */
-	void postToDiscord()
-	{
-		SharingPrompt.postToDiscord(this::setConfigObject);
 	}
 
 	void reloadConfig()
@@ -1208,12 +1362,10 @@ class GroupService
 		if (client.getGameState() != GameState.LOGGED_IN)
 		{
 			here = null;
-			drawnFrom = null;
 			return;
 		}
 		WorldPoint before = here;
 		here = position();
-		redrawIfMoved();
 		if (here != null && (before == null || before.getRegionID() != here.getRegionID())
 			&& GearChecks.forRegion(here.getRegionID()) != null)
 		{
@@ -1251,9 +1403,13 @@ class GroupService
 			roster.markPlayed(now);
 		}
 		recordSeen(now);
-		pollQuests();
-		shopAlert();
-		sealRequests();
+		pollAchievements();
+		if (shop.installed() && ++ticksSinceShopSnapshot >= SHOP_SNAPSHOT_TICKS)
+		{
+			// Unchanged holdings send nothing (GroupShopping#sendSnapshot).
+			ticksSinceShopSnapshot = 0;
+			sendShopSnapshot(false);
+		}
 		carriedDirty |= containers.tick();
 		GroupOutbox.Switches s = switches();
 		updateCarried(s);
@@ -1899,11 +2055,11 @@ class GroupService
 			onChange.run();
 			return;
 		}
-		ShoppingSync shop = shopping;
-		if (shop != null && ShoppingSync.isShopping(payload) && shop.receive(name, payload))
+		if (GroupShopping.isShopping(payload))
 		{
+			// Group Shopping's own payload: passed on unread, dropped when it is not installed.
+			shop.send(GroupShopping.PARTY, GroupShopping.party(name, payload));
 			roster.heard(name, System.currentTimeMillis());
-			resolve(shoppingItemIds());
 			return;
 		}
 		List<String> posted = GroupCodec.posted(gson, payload);
@@ -1916,11 +2072,11 @@ class GroupService
 		log.debug("ignored unreadable group payload from {}", message.getMemberId());
 	}
 
-	/** Game tick, connected: roles, settings and this member's announce, then shopping lists, whichever changed. */
+	/** Game tick, connected: roles, settings and this member's announce, then Group Shopping's queue, whichever changed. */
 	private void flushGovernance()
 	{
 		ifSet(governance, g -> g.flush(MemberPrefs.of(config)));
-		ifSet(shopping, shop -> shop.flush(self));
+		shop.drain().forEach(this::send);
 		if (pbDirty && config.groupShareEvents())
 		{
 			pbDirty = false;
@@ -2367,7 +2523,6 @@ class GroupService
 			if (name != null)
 			{
 				names.put(id, name);
-				tradeable.put(id, item.isTradeable());
 				prices.put(id, (long) itemManager.getItemPrice(id));
 				readGear(id, item);
 			}
@@ -2429,7 +2584,16 @@ class GroupService
 				return false;
 			}
 			restoreWebhooks(GroupCache.webhooks(gson, json));
-			ifSet(shopping, shop -> shop.fromCache(GroupCache.shop(gson, json), System.currentTimeMillis()));
+			JsonElement saved = GroupCache.shop(gson, json);
+			if (shopCache == null && saved != null && saved.isJsonObject())
+			{
+				// A store that came before the file was read is newer, and kept.
+				shopCache = gson.toJson(saved);
+			}
+			if (shop.installed())
+			{
+				shop.send(GroupShopping.RESTORE, GroupShopping.restore(shopCache));
+			}
 			return true;
 		}
 		catch (Exception e)
@@ -2462,8 +2626,7 @@ class GroupService
 			// Whatever arrived meanwhile is in the roster and goes out with the first save after loading.
 			return;
 		}
-		ShoppingSync shop = shopping;
-		String json = GroupCache.write(gson, roster, cachedWebhooks, shop == null ? null : shop.toCache());
+		String json = GroupCache.write(gson, roster, cachedWebhooks, shopCacheObject());
 		executor.execute(() ->
 		{
 			try
@@ -2475,6 +2638,26 @@ class GroupService
 				log.debug("could not write group cache", e);
 			}
 		});
+	}
+
+	/** Group Shopping's saved state as the cache file's {@code shop} object; null when none or unreadable. */
+	private JsonObject shopCacheObject()
+	{
+		String text = shopCache;
+		if (text == null)
+		{
+			return null;
+		}
+		try
+		{
+			JsonElement e = gson.fromJson(text, JsonElement.class);
+			return e != null && e.isJsonObject() ? e.getAsJsonObject() : null;
+		}
+		catch (RuntimeException e)
+		{
+			log.debug("Group Shopping stored unreadable state", e);
+			return null;
+		}
 	}
 
 	/** Executor thread. The cache inside the plugin's data directory (.runelite/plugin-data/gim-utilities). */
@@ -2510,18 +2693,6 @@ class GroupService
 			config.groupShareEvents() ? ownAchievements : null);
 	}
 
-	/** What the Compare tab shows. */
-	CompareTab.View compareView(ProgressView view)
-	{
-		List<String> names = new ArrayList<>(members.names());
-		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
-		{
-			names.add(self);
-		}
-		return new CompareTab.View(self, CompareSupport.figures(roster, names, view), names,
-			CompareSupport.banked(roster, names), CompareSupport.storageBanked(roster));
-	}
-
 	/** What the Gear tab shows: this player's last shared inventory and worn items, the region, and the group's items. */
 	GearTab.View gearView()
 	{
@@ -2555,301 +2726,36 @@ class GroupService
 				done.accept("Could not find " + itemName + " to add.");
 				return;
 			}
-			Map<Integer, Integer> one = Collections.singletonMap(id, 1);
-			boolean ok = shopping
-				? addShoppingList(itemName, "", Collections.emptyList(), Collections.singletonList(self), one)
-				: addRequest(itemName, one);
-			done.accept(ok ? (shopping ? "Added " + itemName + " to your shopping lists."
-				: "Asked the group for " + itemName + ".") : "Not added: log in first, or the list is full.");
+			if (!shop.installed() || self.isEmpty())
+			{
+				done.accept(GroupShopping.INSTALL_HINT + ", then log in.");
+				return;
+			}
+			// Group Shopping makes the list or the request; it says so in its own panel.
+			shop.send(GroupShopping.ADD, GroupShopping.add(shopping, id, itemName));
+			done.accept(shopping ? "Sent " + itemName + " to your shopping lists."
+				: "Asked the group for " + itemName + ".");
 		});
-	}
-
-	/** "Who benefits most" for an item picked from the dropdown; {@code done} runs on the client thread. */
-	void benefit(int itemId, Consumer<BenefitFinder.Outcome> done)
-	{
-		List<String> names = new ArrayList<>(members.names());
-		if (!self.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(self)))
-		{
-			names.add(self);
-		}
-		ItemBenefit.Settings settings = ItemBenefit.Settings.parse(config.compareStats(), config.compareCategories());
-		clientThread.invokeLater(() -> done.accept(BenefitFinder.runId(itemId, CompareSupport.source(itemManager),
-			CompareSupport.members(roster, names), settings)));
-	}
-
-	/** Summed hiscore experience per skill for up to a group's worth of players; null when none were read. */
-	void groupExperience(List<String> names, Consumer<Map<String, Long>> done)
-	{
-		CompareSupport.groupExperience(hiscoreClient,
-			names.size() > CompareTab.MAX_OTHER_NAMES ? names.subList(0, CompareTab.MAX_OTHER_NAMES) : names, done);
-	}
-
-	/** The shared lists, or null when not running. */
-	ShoppingSync shopping()
-	{
-		return shopping;
-	}
-
-	ShopPresets presets()
-	{
-		return presets;
-	}
-
-	/** Client thread. Redraws the panel once the player is far enough from where it last drew "Path to next". */
-	private void redrawIfMoved()
-	{
-		if (ItemPaths.movedFar(drawnFrom, here))
-		{
-			drawnFrom = here;
-			onChange.run();
-		}
-	}
-
-	/** Where this player stood on the last game tick; null when logged out. Any thread. */
-	WorldPoint here()
-	{
-		return here;
-	}
-
-	/** What a {@link ShoppingBoard} works from, as this client knows it now. Any thread. */
-	ShoppingBoard.Inputs shoppingInputs()
-	{
-		ShoppingSync shop = shopping;
-		QuestProgress mine = shop == null ? QuestProgress.UNKNOWN : shop.progress(self);
-		return new ShoppingBoard.Inputs(questData, presets,
-			member -> shop == null ? QuestProgress.UNKNOWN : shop.progress(member),
-			ShopAllocation.Holdings.from(roster.searchSources()), id -> tradeable.getOrDefault(id, false),
-			lookup::name, new ShopSources.Viewer(ownLevels, mine));
-	}
-
-	/** "Add list": false when not logged in, not started or the book is full. */
-	boolean addShoppingList(String name, String preset, List<String> picks, List<String> members,
-		Map<Integer, Integer> items)
-	{
-		boolean ok = !members.isEmpty() && asSelf(shopping, shop -> shop.add(ShoppingList.create(name, preset, picks,
-			members, items, self, System.currentTimeMillis())));
-		if (ok)
-		{
-			resolve(shoppingItemIds());
-		}
-		return ok;
-	}
-
-	boolean renameShoppingList(String id, String name)
-	{
-		return asSelf(shopping, shop -> shop.rename(id, name, self, System.currentTimeMillis()));
-	}
-
-	boolean removeShoppingList(String id)
-	{
-		return asSelf(shopping, shop -> shop.remove(id, self, System.currentTimeMillis()));
-	}
-
-	/** A custom list's item search, on the client thread; {@code done} gets tradeable matches, best first. */
-	void searchItems(String query, Consumer<List<ShoppingTab.Hit>> done)
-	{
-		clientThread.invokeLater(() ->
-		{
-			List<ShoppingTab.Hit> hits = new ArrayList<>();
-			for (ItemPrice p : itemManager.search(query))
-			{
-				if (hits.size() >= ShoppingTab.MAX_HITS)
-				{
-					break;
-				}
-				names.putIfAbsent(p.getId(), p.getName());
-				hits.add(new ShoppingTab.Hit(p.getId(), p.getName()));
-			}
-			done.accept(hits);
-		});
-	}
-
-	// ---- Requests: each member's own lists the group fills ----
-
-	/** A request of this player's own; a blank name becomes "Name's requests". False when refused. */
-	boolean addRequest(String name, Map<Integer, Integer> items)
-	{
-		ShoppingSync shop = shopping;
-		if (shop == null || self.isEmpty())
-		{
-			return false;
-		}
-		long now = System.currentTimeMillis();
-		RequestList r = RequestList.create(name, items, self, now);
-		boolean ok = shop.addRequest(r);
-		if (ok)
-		{
-			resolve(r.items.keySet());
-			postRequest(RequestBoard.made(r, lookup::name, now));
-		}
-		return ok;
-	}
-
-	/** Owner only, as every request edit below. */
-	boolean renameRequest(String id, String name)
-	{
-		return asSelf(shopping, shop -> shop.renameRequest(id, name, self, System.currentTimeMillis()));
-	}
-
-	boolean removeRequest(String id)
-	{
-		return asSelf(shopping, shop -> shop.removeRequest(id, self, System.currentTimeMillis()));
-	}
-
-	/** The owner closes the whole list by hand: no "done" post, since the group may not have it all. */
-	boolean closeRequest(String id)
-	{
-		return asSelf(shopping, shop -> shop.closeRequest(id, self, System.currentTimeMillis()));
-	}
-
-	boolean closeRequestItem(String id, int itemId)
-	{
-		ShoppingSync shop = shopping;
-		if (shop == null || self.isEmpty())
-		{
-			return false;
-		}
-		RequestList next = shop.closeItems(id, Collections.singleton(itemId), self, System.currentTimeMillis());
-		postIfDone(next);
-		return next != null;
-	}
-
-	/** "I'll get it" (or taking it back): anyone, on an open item. */
-	boolean claimRequest(String id, int itemId, boolean claimed)
-	{
-		ShoppingSync shop = shopping;
-		long now = System.currentTimeMillis();
-		if (shop == null || self.isEmpty() || !shop.claim(id, itemId, self, claimed, now))
-		{
-			return false;
-		}
-		RequestList r = shop.request(id);
-		if (claimed && r != null)
-		{
-			postRequest(RequestBoard.claimed(r, itemId, lookup.name(itemId), self, now));
-		}
-		return true;
-	}
-
-	/** Every request, worked out against what the group holds now. Any thread. */
-	List<RequestBoard.Card> requestCards()
-	{
-		ShoppingSync shop = shopping;
-		List<RequestBoard.Card> out = new ArrayList<>();
-		if (shop == null)
-		{
-			return out;
-		}
-		ShopAllocation.Holdings holdings = ShopAllocation.Holdings.from(roster.searchSources());
-		for (RequestList r : shop.requests())
-		{
-			out.add(RequestBoard.card(r, shop.claims(r.id), holdings, lookup::name));
-		}
-		return out;
-	}
-
-	/**
-	 * Client thread, every {@link #SEAL_INTERVAL_TICKS}. Only the owner's client writes a request, so it is the
-	 * one that closes items the group now holds enough of, and posts "done" (once) when that closes the list.
-	 */
-	private void sealRequests()
-	{
-		ShoppingSync shop = shopping;
-		if (shop == null || self.isEmpty() || ++ticksSinceSeal < SEAL_INTERVAL_TICKS)
-		{
-			return;
-		}
-		ticksSinceSeal = 0;
-		ShopAllocation.Holdings holdings = null;
-		for (RequestList r : shop.requests())
-		{
-			if (!r.open() || !r.ownedBy(self))
-			{
-				continue;
-			}
-			if (holdings == null)
-			{
-				holdings = ShopAllocation.Holdings.from(roster.searchSources());
-			}
-			Set<Integer> reached = RequestBoard.reached(RequestBoard.card(r, Collections.emptyList(), holdings,
-				lookup::name));
-			postIfDone(shop.closeItems(r.id, reached, self, System.currentTimeMillis()));
-		}
-	}
-
-	private void postIfDone(RequestList next)
-	{
-		if (next != null && next.closed)
-		{
-			postRequest(RequestBoard.done(next, next.at));
-		}
-	}
-
-	/** One of this player's request events, to Discord and the banners under their own switches. */
-	private void postRequest(GroupEvent event)
-	{
-		ifSet(events, e -> clientThread.invokeLater(() -> e.request(event)));
 	}
 
 	/** Someone joined or the party changed: roles, settings and every list, removals included, go out next tick. */
 	private void resendShared()
 	{
 		ifSet(governance, GovernanceSync::resendAll);
-		ifSet(shopping, ShoppingSync::resendAll);
+		shop.send(GroupShopping.JOINED, GroupShopping.joined());
 		ifSet(progress, MemberProgressBook::resendAll);
 		pbDirty = true;
 	}
 
-	/** Every item any live list may show, for names and whether it can change hands. */
-	private Set<Integer> shoppingItemIds()
+	/** Client thread. This player's quests, quest points and diaries, every {@link #QUEST_INTERVAL_TICKS}. */
+	private void pollAchievements()
 	{
-		Set<Integer> ids = new HashSet<>();
-		ShoppingSync shop = shopping;
-		if (shop == null)
-		{
-			return ids;
-		}
-		for (RequestList r : shop.requests())
-		{
-			ids.addAll(r.items.keySet());
-		}
-		for (ShoppingList l : shop.active())
-		{
-			ids.addAll(l.items.keySet());
-			ShopPresets.Preset p = l.custom() ? null : presets.preset(l.preset);
-			if (p == null)
-			{
-				continue;
-			}
-			for (QuestData.Quest q : ShopNeeds.closure(questData, p.roots(l.picks)))
-			{
-				q.items().stream().filter(ShopNeeds::shoppable).forEach(i -> ids.add(i.itemId()));
-			}
-		}
-		return ids;
-	}
-
-	/** Client thread. This player's quest progress and levels, every {@link #QUEST_INTERVAL_TICKS}. */
-	private void pollQuests()
-	{
-		ShoppingSync shop = shopping;
-		if (++ticksSinceQuests < QUEST_INTERVAL_TICKS || shop == null || self.isEmpty())
+		if (++ticksSinceQuests < QUEST_INTERVAL_TICKS || self.isEmpty())
 		{
 			return;
 		}
 		ticksSinceQuests = 0;
-		Map<String, Integer> levels = new HashMap<>();
-		for (Skill skill : Skill.values())
-		{
-			if (skill != Skill.OVERALL)
-			{
-				levels.put(skill.getName(), client.getRealSkillLevel(skill));
-			}
-		}
-		ownLevels = levels;
-		shop.ownProgress(self, QuestStates.read(QuestStates.wanted(questData), q -> q.getState(client)));
 		ownAchievements = readAchievements();
-		resolveNow(shoppingItemIds());
 	}
 
 	/** Client thread. Every quest the game reports, quest points and diary tiers. */
@@ -2871,28 +2777,6 @@ class GroupService
 		}
 		return AchievementCapture.state(client.getVarpValue(net.runelite.api.gameval.VarPlayerID.QP), finished,
 			started, EventWatchers.diaryVarbits(), client::getVarbitValue);
-	}
-
-	/** Client thread. "Shopping: shop alert": once per approach to a shop selling something still needed. */
-	private void shopAlert()
-	{
-		if (!config.shoppingShopAlert() || ++ticksSinceShopAlert < SHOP_ALERT_INTERVAL_TICKS)
-		{
-			return;
-		}
-		ticksSinceShopAlert = 0;
-		ShoppingSync shop = shopping;
-		WorldPoint at = position();
-		List<ShoppingList> lists = shop == null ? Collections.emptyList() : shop.active();
-		if (at == null || lists.isEmpty())
-		{
-			return;
-		}
-		Map<String, List<ShopAllocation.Line>> shops = ShoppingBoard.byShop(ShoppingBoard.of(lists, shoppingInputs()));
-		for (String name : shopVisits.arrived(at.getX(), at.getY(), at.getPlane(), shops.keySet(), questData))
-		{
-			tell(name + ": " + ShoppingBoard.describe(shops.get(name)) + ".");
-		}
 	}
 
 	/** Kept for the panel: is any group feature on; false shows its "everything is off" notice. */

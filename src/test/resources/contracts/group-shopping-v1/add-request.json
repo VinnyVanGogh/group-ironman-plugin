@@ -1,0 +1,12 @@
+{
+  "namespace": "group-shopping",
+  "name": "add",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "kind": "request",
+    "itemId": 385,
+    "itemName": "Shark",
+    "quantity": 1
+  }
+}

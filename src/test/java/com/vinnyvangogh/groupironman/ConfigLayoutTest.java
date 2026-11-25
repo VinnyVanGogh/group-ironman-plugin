@@ -19,7 +19,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The settings panel is eight sections in a fixed order, and moving a setting
+ * The settings panel is seven sections in a fixed order, and moving a setting
  * between them never touches what it is saved under: the config group and
  * every keyName stay exactly as they were published.
  */
@@ -56,12 +56,25 @@ public class ConfigLayoutTest
 		"overlayFarming", "overlayBirdhouse", "discordRequest", "overlayRequest", "discordDigestHour", "digestDrops", "digestDeaths", "digestStorage",
 		"digestProgress", "digestGroup", "digestActivities", "showUpdateNotes", "lastSeenVersion"));
 
-	private static final List<String> SECTION_ORDER = Arrays.asList("Group", "Discord: connection",
-		"Discord: what to post", "Discord: how to post", "Discord: daily digest", "In-game", "Thresholds", "Advanced");
+	/**
+	 * Published keys whose settings moved to the Discord Relay plugin (docs/contracts/discord-relay-v1.md,
+	 * "Config migration"): Relay reads their stored values once, and GIM never unsets them.
+	 */
+	static final Set<String> MOVED_TO_RELAY = new HashSet<>(Arrays.asList("discordEnabled", "discordWebhookUrl",
+		"discordDropsUrl", "discordDeathsUrl", "discordStorageUrl", "discordProgressUrl", "discordGroupUrl",
+		"discordActivitiesUrl", "discordStyle", "discordScreenshot", "discordGravestoneScreenshot", "discordMention",
+		"discordCombineLevels", "discordPosterName", "discordNameMain", "discordNameDrops", "discordNameDeaths",
+		"discordNameStorage", "discordNameProgress", "discordNameGroup", "discordNameActivities", "discordOnline"));
 
-	/** Every section but Group starts closed, so a first install shows all eight names at once. */
-	private static final Set<String> CLOSED = new HashSet<>(Arrays.asList("Discord: connection",
-		"Discord: what to post", "Discord: how to post", "Discord: daily digest", "In-game", "Thresholds", "Advanced"));
+	/** Published keys whose settings moved to Group Shopping (docs/contracts/group-shopping-v1.md, "Config migration"). */
+	static final Set<String> MOVED_TO_SHOPPING = new HashSet<>(Arrays.asList("overlayPathStop", "shoppingShopAlert"));
+
+	private static final List<String> SECTION_ORDER = Arrays.asList("Group", "Discord: what to post",
+		"Discord: how to post", "Discord: daily digest", "In-game", "Thresholds", "Advanced");
+
+	/** Every section but Group starts closed, so a first install shows every name at once. */
+	private static final Set<String> CLOSED = new HashSet<>(Arrays.asList("Discord: what to post",
+		"Discord: how to post", "Discord: daily digest", "In-game", "Thresholds", "Advanced"));
 
 	@Test
 	public void theConfigGroupIsUnchanged()
@@ -80,11 +93,21 @@ public class ConfigLayoutTest
 		}
 		Set<String> lost = new HashSet<>(PUBLISHED_KEYS);
 		lost.removeAll(keys);
+		lost.removeAll(MOVED_TO_RELAY);
+		lost.removeAll(MOVED_TO_SHOPPING);
 		assertTrue("published keys renamed or removed: " + lost, lost.isEmpty());
+		for (String moved : MOVED_TO_RELAY)
+		{
+			assertFalse(moved + " is Discord Relay's now, not shown twice", keys.contains(moved));
+		}
+		for (String moved : MOVED_TO_SHOPPING)
+		{
+			assertFalse(moved + " is Group Shopping's now, not shown twice", keys.contains(moved));
+		}
 	}
 
 	@Test
-	public void exactlyEightSectionsInOrderWithOnlyGroupOpen() throws Exception
+	public void exactlySevenSectionsInOrderWithOnlyGroupOpen() throws Exception
 	{
 		List<ConfigSection> sections = new ArrayList<>(sections().values());
 		sections.sort(Comparator.comparingInt(ConfigSection::position));
@@ -128,9 +151,8 @@ public class ConfigLayoutTest
 	public void onlineStatusIsAboutHowToPostNotWhichEvents()
 	{
 		assertEquals(GroupIronmanConfig.discordHowSection, sectionOf("discordOnlineStatus"));
-		assertEquals(GroupIronmanConfig.discordHowSection, sectionOf("discordCombineLevels"));
-		assertEquals(GroupIronmanConfig.discordHowSection, sectionOf("discordGravestoneScreenshot"));
-		assertEquals(GroupIronmanConfig.discordConnectionSection, sectionOf("discordPosterName"));
+		assertEquals(GroupIronmanConfig.discordHowSection, sectionOf("discordOfflineGrace"));
+		assertEquals(GroupIronmanConfig.discordEventsSection, sectionOf("eventOptOutAll"));
 	}
 
 	@Test

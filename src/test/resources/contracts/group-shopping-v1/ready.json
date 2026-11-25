@@ -1,0 +1,9 @@
+{
+  "namespace": "group-shopping",
+  "name": "ready",
+  "data": {
+    "v": 1,
+    "source": "group-shopping",
+    "version": "1.0.0"
+  }
+}

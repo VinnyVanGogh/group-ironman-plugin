@@ -1,0 +1,13 @@
+{
+  "namespace": "group-shopping",
+  "name": "event",
+  "data": {
+    "v": 1,
+    "source": "group-shopping",
+    "type": "REQUEST",
+    "member": "Ember",
+    "kind": 1,
+    "list": "Fire cape",
+    "detail": "500 Shark, 20 Prayer potion(4)"
+  }
+}

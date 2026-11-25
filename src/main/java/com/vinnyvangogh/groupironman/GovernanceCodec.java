@@ -260,7 +260,7 @@ final class GovernanceCodec
 				String url = a.get(0).getAsString();
 				if (w != null && mode != null && url.length() <= MAX_URL)
 				{
-					hooks.put(w, new Webhooks.Setting(url, mode, cap(a.get(2).getAsString(), PosterNames.MAX * 2)));
+					hooks.put(w, new Webhooks.Setting(url, mode, cap(a.get(2).getAsString(), Webhooks.MAX_NAME * 2)));
 				}
 			}
 		}

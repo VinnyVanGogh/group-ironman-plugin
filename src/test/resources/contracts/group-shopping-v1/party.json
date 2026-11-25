@@ -1,0 +1,10 @@
+{
+  "namespace": "group-shopping",
+  "name": "party",
+  "data": {
+    "v": 1,
+    "source": "gim-utilities",
+    "member": "Moss",
+    "payload": "{\"v\":1,\"k\":\"rqc\",\"id\":\"r1\",\"item\":385,\"by\":\"Moss\",\"on\":true,\"at\":1764000000000}"
+  }
+}

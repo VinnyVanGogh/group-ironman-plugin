@@ -48,7 +48,6 @@ public class ReadmeShots
 		SHOTS.put("settings-who-posts", 760);
 		SHOTS.put("panel-group-hiscores", 760);
 		SHOTS.put("storage-log", 520);
-		SHOTS.put("settings-discord-connection", 640);
 		SHOTS.put("settings-thresholds-advanced", 760);
 	}
 
@@ -73,7 +72,6 @@ public class ReadmeShots
 		renders.put("settings-who-posts", ReadmeShots::whoPosts);
 		renders.put("panel-group-hiscores", ReadmeShots::groupHiscores);
 		renders.put("storage-log", ReadmeShots::storageLog);
-		renders.put("settings-discord-connection", ReadmeShots::discordConnection);
 		renders.put("settings-thresholds-advanced", ReadmeShots::thresholdsAdvanced);
 		assertEquals("every shot in the list has a render", SHOTS.keySet(), renders.keySet());
 
@@ -161,13 +159,6 @@ public class ReadmeShots
 		return panelShot(f);
 	}
 
-	static BufferedImage discordConnection()
-	{
-		ConfigPanelHarness h = ConfigPanelHarness.of("GIM Utilities", GimPanelFixture.DEFAULTS, discordOn());
-		h.setOpen("Discord: connection", true);
-		return SwingDriver.stack(WIDTH, CONFIG_PAD, SCALE, BACKGROUND, h.section("Discord: connection"));
-	}
-
 	static BufferedImage thresholdsAdvanced()
 	{
 		ConfigPanelHarness h = ConfigPanelHarness.of("GIM Utilities", GimPanelFixture.DEFAULTS,
@@ -180,18 +171,4 @@ public class ReadmeShots
 
 	/** The margin RuneLite's settings page puts around its sections. */
 	static final int CONFIG_PAD = 6;
-
-	/** Post to Discord ticked and made-up webhooks, so the fields show as filled secrets. */
-	private static Map<String, Object> discordOn()
-	{
-		Map<String, Object> v = new LinkedHashMap<>();
-		v.put("discordEnabled", true);
-		String hook = "https://discord.com/api/webhooks/0/made-up";
-		for (String key : new String[]{"discordWebhookUrl", "discordGroupUrl", "discordDropsUrl", "discordProgressUrl",
-			"discordDeathsUrl", "discordStorageUrl", "discordDigestUrl"})
-		{
-			v.put(key, hook);
-		}
-		return v;
-	}
 }

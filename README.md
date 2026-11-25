@@ -1,10 +1,21 @@
 # GIM Utilities
 
-Share banks, group storage changes, stats, drops, shopping lists, gear checks
-and live bossing runs with your Group Ironman team over RuneLite Party.
+Share banks, group storage changes, stats, drops, gear checks and live bossing
+runs with your Group Ironman team over RuneLite Party.
 
 Split out of Build Guard (which keeps its build and XP warnings) so the two
 plugins can run side by side.
+
+Three companion plugins from the Plugin Hub add more, and GIM Utilities hands
+them your group's data so they feel built in:
+
+- **Discord Relay** posts your group's events to Discord.
+- **Player Compare** draws the **Compare** tab (leaderboard, banked XP, gear).
+- **Group Shopping** draws the **Shopping** tab (shared lists, requests,
+  *Path to*).
+
+Without a companion, its tab or setting shows one line telling you which plugin
+to install. Everything else works on its own.
 
 ## Quick start
 
@@ -16,11 +27,14 @@ plugins can run side by side.
 3. Everyone else copies the key and clicks **Paste group key** in the panel (or
    pastes it into *Group key* in the settings). On the **Share with your
    group?** card, click **Turn on sharing** to enable *Sync with my group* and
-   every *Share* switch in one click (**Post my events to Discord** also shows
-   when a webhook is set). Nothing turns on without your click.
+   every *Share* switch in one click. Nothing turns on without your click.
 4. Once per session, click **Join group sync** in the panel header (RuneLite
-   Plugin Hub rules do not allow automatic party joins on login). The built-in
-   Party plugin is not needed.
+   Plugin Hub rules do not allow automatic party joins on login). Until you do,
+   a *Group sync is off - click to join* banner and one chat reminder per login
+   show; right-click the banner and pick **Join group sync** to join from
+   there. The built-in Party plugin is not needed.
+5. Optional: install **Discord Relay**, **Player Compare** and **Group
+   Shopping** from the Plugin Hub for Discord posts, Compare and Shopping.
 
 Anyone with your group key can join that party, so share it only inside your
 group. Only players on your in-game Group Ironman roster are shown; anyone else
@@ -36,10 +50,10 @@ want to share, and only sees other members' data for categories they share
 themselves.
 
 The panel header shows your sync status, key controls, and a foldable **Quick
-settings** card mirroring the ten most-used toggles (*Sync with my group*,
-*Post to Discord*, *Keep my events off Discord*, *Share bank*, *Share storage
-changes*, *Share stats*, *Group box*, *Members on world map*, *::find chat
-command*, *Path stop card*) plus **All settings**. Below it sit ten tabs:
+settings** card mirroring the most-used toggles (*Sync with my group*, *Keep
+my events off Discord*, *Share bank*, *Share storage changes*, *Share stats*,
+*Group box*, *Members on world map*, *::find chat command*) plus **All
+settings**. Below it sit ten tabs:
 
 - **Group:** a collapsible card per member (yours fills from your own client
   even when sync is off) with world and location, HP / Prayer / Run / Spec orbs
@@ -91,37 +105,30 @@ command*, *Path stop card*) plus **All settings**. Below it sit ten tabs:
   with per-wave personal bests), **Personal bests** across bosses with the
   group best marked, and **Recent runs**.
 
-- **Compare:** five views in consistent per-member colours: **Leaderboard**
-  (Hiscores-style skill tile grid plus *Bossing*, *Activities* and *Minigames*
-  counts), **Compare** (two members side by side), **Group** (your group's XP
-  against up to five typed players on the public hiscores), **Item** (*Who
-  benefits most?* ranked by stat gain over worn gear, ownership, and bundled
-  OSRS Wiki equip level requirements), and **Banked XP** (skill XP and minimum
-  levels from banked and carried supplies, with an option to count shared
-  storage once).
+- **Compare** (needs **Player Compare**): **Open group compare** shows your
+  group in Player Compare's panel, using the stats your group shares here:
+  leaderboard, two members side by side, your group against typed players,
+  *Who benefits most?* for an item, and banked XP.
 
-- **Shopping:** folded shared shopping lists and personal item requests
-  (*Request: ask the group*, claimable with **I'll get it**). Includes nine **1
-  Defence pure** quest-milestone presets (subtracting quests and prerequisites
-  each member has already completed, using bundled Quest Route and OSRS Wiki
-  drop data) and custom lists. Items in banks, group storage, inventories or
-  equipment count as *have*; **Path to** and **Path to next** route to the
-  nearest reachable shop via the **Shortest Path** plugin (naming the town and
-  next stop, with an optional on-screen *Path stop card* and chat *Shopping:
-  shop alert*).
+- **Shopping** (needs **Group Shopping**): **Open shopping lists** shows your
+  group's shared lists, item requests, quest presets and *Path to* in Group
+  Shopping's panel, using the banks, storage and inventories your group shares
+  here.
 
 - **Gear:** **Bring this** checks for Revenant Caves, Vorkath, Zulrah, Barrows,
   Chambers of Xeric, Theatre of Blood, Tombs of Amascut, and Slayer tasks,
   selected automatically when you enter the region or picked from the list.
   Marks each requirement *OK*, *Equip* (in your inventory when it must be worn)
   or *Missing*, showing which teammates hold a missing item with one-click
-  **Request from group** or **Add to shopping**.
+  **Request from group** or **Add to shopping** (Group Shopping).
 
 - **Settings** (panel tab): ECDSA-signed group leader and editor roles, one
   group-wide set of thresholds and event switches (saved by the leader or an
   editor, read-only for other members, with version history), optional
-  leader-shared Discord webhooks, per-member Discord and banner opt-outs, and a
-  read-only **Who posts what** table.
+  leader-shared Discord webhooks (taken from the leader's Discord Relay),
+  per-member Discord and banner opt-outs, and a read-only **Who posts what**
+  table. Without Discord Relay it shows *Install Discord Relay to post to
+  Discord*.
 
   <details><summary>As the leader</summary>
 
@@ -152,13 +159,15 @@ command*, *Path stop card*) plus **All settings**. Below it sit ten tabs:
   offline, everyone online, "back after a break", weekly recaps and Barrows
   chests—plus desktop notifications for *Storage minimums* and *Show members on
   world map*. Each event can go to:
-  - **Discord**, via up to seven webhooks (rich embeds or plain text,
-    per-member *Combine level-ups* and *Group posts (minutes)* in-place
-    editing, a daily-reposted *Live board*, optional screenshots including *Add
-    picked-up screenshot* on drops and *Grave picture* on gravestones,
-    big-event role mentions, quiet hours, Easter eggs, daily digests, and
-    single-poster relay of in-game Group broadcasts for *Members without the
-    plugin* in chronological order).
+  - **Discord**, through the **Discord Relay** plugin. GIM Utilities decides
+    which events go out and which member's client posts them (the group's
+    switches, thresholds, opt-outs, the *Live board* lines, daily digest
+    categories, quiet hours, Easter egg settings, and single-poster relay of
+    in-game Group broadcasts for *Members without the plugin*). Discord Relay
+    holds the webhooks and does the posting: embeds or plain text, combined
+    level-ups and grouped posts, screenshots, role mentions and the daily
+    digest. Your existing webhook settings carry over to Discord Relay on its
+    first run.
   - **In-game**, via deduplicated *Banner:* toasts (*Top centre*, *Top left*,
     *Top right*, *Above chatbox* or *Above player*, dismissable by hotkey or
     right-click, with *Banner quiet from / until*) and an optional **Group
@@ -166,49 +175,38 @@ command*, *Path stop card*) plus **All settings**. Below it sit ten tabs:
     events, five size presets, optional icons/timestamps, and configurable
     *Empty group box shows* lines when nobody else is online.
 
-- **RuneLite configuration:** eight sections—*Group* (open by default) and
-  *Discord: connection*, *Discord: what to post*, *Discord: how to post*,
-  *Discord: daily digest*, *In-game*, *Thresholds* and *Advanced* (closed by
-  default). Full setting reference: [SETUP.md](SETUP.md#settings).
+- **RuneLite configuration:** seven sections—*Group* (open by default) and
+  *Discord: what to post*, *Discord: how to post*, *Discord: daily digest*,
+  *In-game*, *Thresholds* and *Advanced* (closed by default). Webhook URLs and
+  poster names live in Discord Relay's settings. Full setting reference:
+  [SETUP.md](SETUP.md#settings).
 
 ## Privacy and network
 
-GIM Utilities runs no server of its own. Group sync travels only through
-RuneLite's built-in `PartyService`, restricted to names on your in-game Group
-Ironman roster, and hiscore lookups read only from Jagex's official hiscores
-through RuneLite's `HiscoreClient`. **Only the optional Discord webhook** is a
-network call of the plugin's own: it stays off until you enable *Post to
-Discord* and enter a webhook URL (or use webhooks shared by your group leader),
-and it sends your IP address and your own events (plus single-poster in-game
-Group channel broadcasts when enabled) to Discord.
+GIM Utilities runs no server of its own and makes no network calls of its own
+beyond RuneLite's. Group sync travels only through RuneLite's built-in
+`PartyService`, restricted to names on your in-game Group Ironman roster, and
+hiscore lookups read only from Jagex's official hiscores through RuneLite's
+`HiscoreClient`. Discord posts are made by the separate **Discord Relay**
+plugin, which stays off until you turn it on there; GIM Utilities passes it
+events inside your own RuneLite client (RuneLite's `PluginMessage`), never over
+the network.
 
-## Discord webhooks
+## Discord
 
-*Discord: connection* has seven webhooks. Only **Main webhook** is needed:
-leave any category webhook empty and its posts route to Main while keeping that
-category's own poster name (*Webhook's own*, *Default name*, or *Custom*).
-
-| Webhook | What it posts | Default name |
-| --- | --- | --- |
-| Main | Clue rewards, dry streaks, Wilderness and skull, achievement diary tiers, combat achievements, kill count milestones, personal bests, Slayer tasks, farming runs, bird houses and Hespori, "back after a break", weekly recaps, shopping requests, `::announce` notes, everyone online, and any category whose webhook URL is left empty. | Town Crier |
-| Online status | The *Live board*, or login and logout posts (*Online status*). Changing this URL starts a new board. | World Hopper |
-| Drops & loot | Valuable drops, pets, new collection log slots, untradeable uniques, raid uniques, Barrows chests, "took the last one". | Party Pete |
-| Progress | Level-ups, 99s and max total, XP milestones, combat level, total level milestones, quests, quest point milestones, and activity start, wave milestone and completion posts. | Skillcape Seller |
-| Deaths & danger | Deaths, value lost on death, gravestone expiring warnings, Hardcore life lost, and activity deaths. | Death's Office |
-| Group storage | Big storage deposits and withdrawals, storage visit summaries, storage minimums hit. | Gielinor Banker |
-| Daily digest | Once-a-day summaries ticked under *Discord: daily digest*. | Varrock Herald |
-
-Each webhook URL has its own queue and rate limit, so a busy Drops channel
-never delays a death post.
+Install **Discord Relay** from the Plugin Hub, turn on its *Post to Discord*
+and set its webhooks there. GIM Utilities' *Discord: what to post*, *how to
+post* and *daily digest* sections (shared by the group leader or an editor)
+still choose which events go to Discord, and each event names the channel it
+belongs to: Main, Online status, Drops & loot, Progress, Deaths & danger, Group
+storage or Daily digest. Leave a channel's webhook empty in Discord Relay and
+its posts go to Main.
 
 ## License
 
 BSD-2-Clause. Bundled region names and farming/bird house cycles are adapted
-from [RuneLite](https://github.com/runelite/runelite) (BSD-2-Clause), bank
-tiles from [Shortest Path](https://github.com/Skretzo/shortest-path)
-(BSD-2-Clause), quest item data from
-[Quest Route](https://github.com/VinnyVanGogh/questpath-plugin) (BSD-2-Clause),
-and item drop, equip-requirement and banked-XP tables from the
+from [RuneLite](https://github.com/runelite/runelite) (BSD-2-Clause), and the
+Group Ironman shared item requirements table from the
 [Old School RuneScape Wiki](https://oldschool.runescape.wiki) (CC BY-NC-SA
 3.0); group features are an independent implementation over RuneLite Party with
 no code from Group Ironmen Tracker or Dink. See [LICENSE](LICENSE) and

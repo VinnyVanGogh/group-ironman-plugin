@@ -63,54 +63,19 @@ Copyright (c) 2018, NotFoxtrot <https://github.com/NotFoxtrot>
 All rights reserved.
 ```
 
-## Old School RuneScape Wiki: item drops
-
-`src/main/resources/com/vinnyvangogh/groupironman/item-drops.txt` lists which
-monsters drop some items and at what rate, read from the Old School RuneScape
-Wiki (<https://oldschool.runescape.wiki>, its `dropsline` and `infobox_item`
-data, 2026-11-14). Wiki content is under the Creative Commons
-Attribution-NonCommercial-ShareAlike 3.0 license
-(<https://creativecommons.org/licenses/by-nc-sa/3.0/>); the table is a small
-adaptation of it, shared under the same license.
-
-## Old School RuneScape Wiki: item equip requirements
-
-`src/main/resources/com/vinnyvangogh/groupironman/item-requirements.txt` lists
-the skill levels needed to wield or wear some common combat items, read from
-the Old School RuneScape Wiki (<https://oldschool.runescape.wiki>, each item's
-equipment requirements, 2026-11-18). Same Creative Commons
-Attribution-NonCommercial-ShareAlike 3.0 license as above; the table is a
-small adaptation of it, shared under the same license.
-
-## Old School RuneScape Wiki: item experience
-
-`src/main/resources/com/vinnyvangogh/groupironman/banked-xp.txt` lists the
-experience some bones, ashes, logs, raw fish, uncut gems and bars give when
-used once, read from the Old School RuneScape Wiki
-(<https://oldschool.runescape.wiki>, 2026-11-18). Same Creative Commons
-Attribution-NonCommercial-ShareAlike 3.0 license as above; the table is a
-small adaptation of it, shared under the same license.
-
 ## Old School RuneScape Wiki: Group Ironman shared item requirements
 
 `src/main/resources/com/vinnyvangogh/groupironman/gim-shared-requirements.json`
 lists obtain requirements, equip/use requirements and tradeability for common
 Group Ironman items, read from the Old School RuneScape Wiki
-(<https://oldschool.runescape.wiki>, 2026-11-19). Same Creative Commons
-Attribution-NonCommercial-ShareAlike 3.0 license as above; the table is a
-small adaptation of it, shared under the same license.
+(<https://oldschool.runescape.wiki>, 2026-11-19). Wiki content is under the
+Creative Commons Attribution-NonCommercial-ShareAlike 3.0 license
+(<https://creativecommons.org/licenses/by-nc-sa/3.0/>); the table is a small
+adaptation of it, shared under the same license.
 
-## Shortest Path: bank tiles
-
-`src/main/resources/com/vinnyvangogh/groupironman/banks.tsv` lists one tile
-per bank with no skill, quest or varbit requirement, taken from Shortest
-Path's `src/main/resources/destinations/game_features/bank.tsv`
-(<https://github.com/Skretzo/shortest-path>, master, read 2026-11-14), and
-renames Varrock's and Falador's two banks East and West. No code was copied;
-"Path to" talks to Shortest Path only through RuneLite's `PluginMessage`.
-Shortest Path is under the BSD 2-Clause license, with the terms above; its
-`LICENSE` file carries the template line "Copyright (c) <YEAR>, <COPYRIGHT
-HOLDER>" rather than a name.
+The item drop, equip requirement and item experience tables, and the Shortest
+Path bank tiles, moved to the Player Compare and Group Shopping plugins with
+the Compare and Shopping features, and carry their notices there.
 
 ## Group Ironmen Tracker
 
